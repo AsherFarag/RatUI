@@ -41,7 +41,7 @@ namespace RatUI
 
 } // namespace RatUI
 
-#include "Containers.inl"
-#include "Math.inl"
+#include "Core/Containers.inl"
+#include "Core/Math.inl"
 
 #undef RATUI_TRY_EXPR

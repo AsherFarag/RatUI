@@ -1,9 +1,15 @@
 #pragma once
 #include "Core.h"
 #include "Layout.h"
+#include "Renderer/RenderContext.h"
 
 namespace RatUI
 {
+    /**
+     * @brief The IWidget interface defines the core functionality that all UI widgets must implement.
+     * 
+     * Equivalent to QWidget in Qt or UWidget in Unreal Engine, this interface provides methods for measuring, arranging, and rendering UI elements.
+     */
     class IWidget
     {
     public:
@@ -21,6 +27,12 @@ namespace RatUI
          * @param a_FinalRect The final rectangle within which the widget should be arranged, defined by its center and half-extents.
          */
         virtual void Arrange( const Rectf& a_FinalRect ) {}
+
+        /**
+         * @brief Renders the widget using the provided render context.
+         * @param a_Context The render context containing necessary information for rendering, such as the renderer instance.
+         */
+        virtual void Render( const RenderContext& a_Context ) {}
     };
 
 } // namespace RatUI

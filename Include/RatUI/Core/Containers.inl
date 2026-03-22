@@ -8,6 +8,8 @@
  */
 
 #include "Core.h"
+#include <iterator>
+#include <utility>
 
 #ifndef RATUI_SPAN_IMPL
     #include <span>

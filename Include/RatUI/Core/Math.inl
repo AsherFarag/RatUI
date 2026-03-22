@@ -2,6 +2,10 @@
 
 #include "Core.h"
 #include "Containers.inl"
+#include <cmath>
+#include <limits>
+#include <type_traits>
+#include <utility>
 
 #ifndef RATUI_VEC_IMPL
     #define RATUI_VEC_IMPL ::RatUI::Detail::Vec
@@ -28,7 +32,21 @@ namespace RatUI
 
             FixedArray<T, Dim> Data;
         
-            constexpr Vec() = default;
+            constexpr Vec()
+            {
+                for ( size i = 0; i < Dim; ++i )
+                {
+                    Data[ i ] = T{};
+                }
+            }
+
+            constexpr explicit Vec( const T& a_Value )
+            {
+                for ( size i = 0; i < Dim; ++i )
+                {
+                    Data[ i ] = a_Value;
+                }
+            }
         
             template<typename... Args>
             constexpr Vec( Args&&... a_Args ) : Data{ std::forward<Args>( a_Args )... } {}
@@ -42,12 +60,24 @@ namespace RatUI
                 for ( size i = 0; i < Dim; ++i ) Result[ i ] = Data[ i ] + a_Rhs[ i ];
                 return Result;
             }
+
+            constexpr Vec& operator+=( const Vec& a_Rhs )
+            {
+                for ( size i = 0; i < Dim; ++i ) Data[ i ] += a_Rhs[ i ];
+                return *this;
+            }
         
             constexpr Vec operator-( const Vec& a_Rhs ) const
             {
                 Vec Result;
                 for ( size i = 0; i < Dim; ++i ) Result[ i ] = Data[ i ] - a_Rhs[ i ];
                 return Result;
+            }
+
+            constexpr Vec& operator-=( const Vec& a_Rhs )
+            {
+                for ( size i = 0; i < Dim; ++i ) Data[ i ] -= a_Rhs[ i ];
+                return *this;
             }
         
             constexpr Vec operator*( T a_Scalar ) const
@@ -56,6 +86,12 @@ namespace RatUI
                 for ( size i = 0; i < Dim; ++i ) Result[ i ] = Data[ i ] * a_Scalar;
                 return Result;
             }
+
+            constexpr Vec& operator*=( T a_Scalar )
+            {
+                for ( size i = 0; i < Dim; ++i ) Data[ i ] *= a_Scalar;
+                return *this;
+            }
         
             constexpr Vec operator/( T a_Scalar ) const
             {
@@ -63,12 +99,23 @@ namespace RatUI
                 for ( size i = 0; i < Dim; ++i ) Result[ i ] = Data[ i ] / a_Scalar;
                 return Result;
             }
+
+            constexpr Vec& operator/=( T a_Scalar )
+            {
+                for ( size i = 0; i < Dim; ++i ) Data[ i ] /= a_Scalar;
+                return *this;
+            }
         
             constexpr bool operator==( const Vec& a_Rhs ) const
             {
                 for ( size i = 0; i < Dim; ++i )
                     if ( Data[ i ] != a_Rhs[ i ] ) return false;
                 return true;
+            }
+
+            constexpr bool operator!=( const Vec& a_Rhs ) const
+            {
+                return !( *this == a_Rhs );
             }
         
             constexpr T Dot( const Vec& a_Rhs ) const
@@ -80,9 +127,34 @@ namespace RatUI
         
             constexpr T LengthSq() const { return Dot( *this ); }
             constexpr T Length()   const { return static_cast<T>( std::sqrt( LengthSq() ) ); }
-        
-            constexpr Vec Normalized() const { return *this / Length(); }
+
+            constexpr Vec Normalized() const
+            {
+                const T CurrentLength = Length();
+                if constexpr ( std::is_floating_point_v<T> )
+                {
+                    if ( CurrentLength <= std::numeric_limits<T>::epsilon() )
+                    {
+                        return Vec{};
+                    }
+                }
+                else
+                {
+                    if ( CurrentLength == T{} )
+                    {
+                        return Vec{};
+                    }
+                }
+
+                return *this / CurrentLength;
+            }
         };
+
+        template<typename T, size Dim>
+        constexpr Vec<T, Dim> operator*( T a_Scalar, const Vec<T, Dim>& a_Vector )
+        {
+            return a_Vector * a_Scalar;
+        }
     }
 
     using Vec2f = RATUI_VEC_IMPL<RatUI::f32, 2>;
@@ -105,6 +177,12 @@ namespace RatUI
         Vec2f Center{ 0, 0 };
         Vec2f HalfExtents{ 0, 0 };
 
+        static constexpr Rectf FromMinMax( Vec2f a_Min, Vec2f a_Max )
+        {
+            const Vec2f Size = a_Max - a_Min;
+            return { a_Min + ( Size * 0.5f ), Size * 0.5f };
+        }
+
         constexpr f32   Top() const { return Center[ 1 ] - HalfExtents[ 1 ]; }
         constexpr f32   Bottom() const { return Center[ 1 ] + HalfExtents[ 1 ]; }
         constexpr f32   Left() const { return Center[ 0 ] - HalfExtents[ 0 ]; }
@@ -115,7 +193,16 @@ namespace RatUI
         constexpr Vec2f BottomLeft() const { return Vec2f{ Center[ 0 ] - HalfExtents[ 0 ], Center[ 1 ] + HalfExtents[ 1 ] }; }
         constexpr Vec2f BottomRight() const { return Center + HalfExtents; }
 
+        constexpr Vec2f Min() const { return TopLeft(); }
+        constexpr Vec2f Max() const { return BottomRight(); }
+
         constexpr Vec2f Size() const { return HalfExtents * 2; }
+
+        constexpr bool Intersects( const Rectf& a_Other ) const
+        {
+            return Left() <= a_Other.Right() && Right() >= a_Other.Left() &&
+                   Top() <= a_Other.Bottom() && Bottom() >= a_Other.Top();
+        }
 
         constexpr bool Contains( Vec2f a_Point ) const
         {
@@ -123,6 +210,21 @@ namespace RatUI
             Vec2f BottomRight = this->BottomRight();
             return ( a_Point[ 0 ] >= TopLeft[ 0 ] && a_Point[ 0 ] <= BottomRight[ 0 ] ) &&
                    ( a_Point[ 1 ] >= TopLeft[ 1 ] && a_Point[ 1 ] <= BottomRight[ 1 ] );
+        }
+
+        constexpr Rectf Intersection( const Rectf& a_Other ) const
+        {
+            const Vec2f NewMin{ ( Left() > a_Other.Left() ) ? Left() : a_Other.Left(),
+                                ( Top() > a_Other.Top() ) ? Top() : a_Other.Top() };
+            const Vec2f NewMax{ ( Right() < a_Other.Right() ) ? Right() : a_Other.Right(),
+                                ( Bottom() < a_Other.Bottom() ) ? Bottom() : a_Other.Bottom() };
+
+            if ( NewMax[ 0 ] < NewMin[ 0 ] || NewMax[ 1 ] < NewMin[ 1 ] )
+            {
+                return {};
+            }
+
+            return Rectf::FromMinMax( NewMin, NewMax );
         }
     };
 
