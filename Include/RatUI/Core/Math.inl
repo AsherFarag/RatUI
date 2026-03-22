@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core.h"
+#include "../Core.h"
 #include "Containers.inl"
 #include <cmath>
 #include <limits>
@@ -19,6 +19,10 @@ namespace RatUI
 {
     namespace Detail
     {
+        // TODO: This implementation requires many member functions,
+        // ideally it should just be a simple struct with operator[] and the rest of the functionality should be implemented as free functions. 
+        // So libraries like 'glm' can be easily integrated without users writing custom wrappers
+
         /**
          * @brief A simple fixed-size vector class template for mathematical operations.
          * @brief This is a basic implementation and can be extended with more functionality as needed.
