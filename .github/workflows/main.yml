@@ -45,9 +45,4 @@ jobs:
 
       # Step 5: Run tests
       - name: Run tests
-        run: |
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            ctest --test-dir build --output-on-failure
-          else
-            ctest --test-dir build --output-on-failure
-          fi
+        run: ctest --test-dir build --output-on-failure
