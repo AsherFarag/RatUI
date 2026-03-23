@@ -49,7 +49,9 @@ private:
     std::unique_ptr<SDL2Renderer> m_Renderer;
 };
 
-int main( int /*argc*/, char* /*argv*/[] )
+#undef main // SDL2 redefines main() on some platforms, so we undefine it here to avoid conflicts with our own main() function.
+
+int main( int argc, char** argv )
 {
     SandboxApp app;
     return app.Run() ? 0 : 1;
