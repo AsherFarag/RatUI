@@ -8,18 +8,25 @@ project(RatUI VERSION 0.1 LANGUAGES CXX)
 option(RATUI_BUILD_TESTS "Build RatUI tests" OFF)
 option(RATUI_BUILD_EXAMPLES "Build RatUI examples" OFF)
 
+# Generate compile_commands.json
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # =========================
 # Header-only library
 # =========================
-add_library(RatUI INTERFACE)
+add_library(${PROJECT_NAME} INTERFACE)
 
-target_include_directories(RatUI
+target_include_directories(${PROJECT_NAME}
     INTERFACE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Include>
         $<INSTALL_INTERFACE:Include>
 )
 
-target_compile_features(RatUI INTERFACE cxx_std_20)
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+)
 
 # =========================
 # Subdirectories
