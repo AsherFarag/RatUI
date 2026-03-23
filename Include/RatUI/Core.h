@@ -48,7 +48,8 @@ namespace RatUI
 
 #include "Core/Containers.inl"
 #include "Core/Math.inl"
-#include "Core/String.h"
+#include "Core/String.inl"
 #include "Core/Memory.inl"
+#include "Core/Units.inl"
 
 #undef RATUI_TRY_EXPR

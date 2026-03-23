@@ -31,6 +31,17 @@
     #define RATUI_SMALL_ARRAY_IMPL RATUI_ARRAY_IMPL
 #endif // TODO: Implement a SBO optimized small array and define RATUI_SMALL_ARRAY_IMPL to use it.
 
+#ifndef RATUI_VARIANT_IMPL
+    #include <variant>
+    #define RATUI_VARIANT_IMPL std::variant
+#endif // Default to std::variant if no custom variant implementation is provided.
+
+#ifndef RATUI_OPTIONAL_IMPL
+    #include <optional>
+    #define RATUI_OPTIONAL_IMPL std::optional
+    #define RATUI_NULLOPT_IMPL std::nullopt
+#endif // Default to std::optional if no custom optional implementation is provided.
+
 namespace RatUI
 {
     // === Containers ===
@@ -68,6 +79,21 @@ namespace RatUI
      */
     template<typename T, size InlineSize>
     using SmallArray = RATUI_SMALL_ARRAY_IMPL<T /*, InlineSize */>;
+
+    /**
+     * @brief Variant is a type that can hold one of several alternative types, similar to std::variant.
+     * @tparam Types The list of types that the variant can hold.
+     */
+    template<typename... Types>
+    using Variant = RATUI_VARIANT_IMPL<Types...>;
+
+    /**
+     * @brief Optional is a type that may or may not contain a value, similar to std::optional.
+     * @tparam T The type of the value that may be contained in the optional.
+     */
+    template<typename T>
+    using Optional = RATUI_OPTIONAL_IMPL<T>;
+    inline constexpr auto NullOpt = RATUI_NULLOPT_IMPL;
 
     // === Container Access ===
 
