@@ -8,7 +8,6 @@ project(RatUI VERSION 0.1 LANGUAGES CXX)
 option(RATUI_BUILD_TESTS "Build RatUI tests" OFF)
 option(RATUI_BUILD_EXAMPLES "Build RatUI examples" OFF)
 
-# Generate compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # =========================
