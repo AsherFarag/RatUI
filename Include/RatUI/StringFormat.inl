@@ -14,7 +14,7 @@
 // std::formatter specializations must live outside namespace RatUI.
 
 // === Math.inl ===
-template<typename T, RatUI::size Dim>
+template<typename T, unsigned Dim>
 struct std::formatter<RatUI::Vec<T, Dim>>
 {
     constexpr auto parse(std::format_parse_context& ctx)
@@ -27,7 +27,7 @@ struct std::formatter<RatUI::Vec<T, Dim>>
     {
         auto out = ctx.out();
         *out++ = '(';
-        for (RatUI::size i = 0; i < Dim; ++i)
+        for (unsigned i = 0; i < Dim; ++i)
         {
             if (i > 0) { *out++ = ','; *out++ = ' '; }
             out = std::format_to(out, "{}", value[i]);
