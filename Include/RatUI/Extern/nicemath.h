@@ -149,7 +149,7 @@ struct vbase {
 
   S data[N];
 
-  constexpr vbase() = default;
+  constexpr vbase() : data{} {}
 
   template <class... Args>
   constexpr vbase(Args... args) : data{ args... } {
