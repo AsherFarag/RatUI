@@ -26,6 +26,11 @@
     #define RATUI_FIXED_ARRAY_IMPL std::array
 #endif // Default to std::array if no custom fixed array implementation is provided.
 
+#ifndef RATUI_SMALL_ARRAY_IMPL
+    #include <array>
+    #define RATUI_SMALL_ARRAY_IMPL RATUI_ARRAY_IMPL
+#endif // TODO: Implement a SBO optimized small array and define RATUI_SMALL_ARRAY_IMPL to use it.
+
 namespace RatUI
 {
     // === Containers ===
@@ -54,6 +59,15 @@ namespace RatUI
      */
     template<typename T, size N>
     using FixedArray = RATUI_FIXED_ARRAY_IMPL<T, N>;
+
+    /**
+     * @brief SmallArray is a container that optimizes for small sizes by using inline storage up to a certain capacity, and dynamically allocating memory for larger sizes.
+     * TODO: Implement me!
+     * @tparam T The type of elements stored in the array.
+     * @tparam InlineSize The number of elements that can be stored inline before dynamic allocation is used.
+     */
+    template<typename T, size InlineSize>
+    using SmallArray = RATUI_SMALL_ARRAY_IMPL<T /*, InlineSize */>;
 
     // === Container Access ===
 

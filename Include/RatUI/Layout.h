@@ -58,6 +58,24 @@ namespace RatUI
     };
 
     /**
+     * @brief Represents the visibility state of a UI element, which can affect both rendering and layout.
+     * @note Similar to Unreal Engine's EVisibility.
+     */
+    struct Visibility
+    {
+        enum EType : u8
+        {
+            Visible,  
+            Hidden,   
+            Collapsed,
+        };
+
+        EType Value{ Visible };
+
+        constexpr bool IsVisible() const { return Value == Visible; }
+    };
+
+    /**
      * @brief Represents the size constraints for a UI element, including minimum and maximum sizes.
      */
     struct Constraints
@@ -85,21 +103,13 @@ namespace RatUI
         EAlignment       Alignment{ AlignTopLeft }; ///< The alignment of the element's content within its bounds, using the EAlignment flags.
         ELayoutDirection LayoutDirection{ ELayoutDirection::Horizontal }; ///< The layout direction for child elements, if this element is a container.
     };
-    
-    /**
-     * @brief Represents the output of the measure pass of the layout process, containing the desired size of the element.
-     */
-    struct MeasureOutput
-    {
-        Vec2f DesiredSize{ 0.0f, 0.0f }; ///< The size that the element desires based on its content and constraints.
-    };
 
-    /**
-     * @brief Represents the output of the arrange pass of the layout process, containing the final position and size of the element.
-     */
-    struct ArrangeOutput
+    struct Geometry
     {
-        Rectf FinalRect{ { 0.0f, 0.0f }, { 0.0f, 0.0f } }; ///< The final position and size of the element after arrangement.
+        Vec2f LocalPosition{ 0.0f, 0.0f }; ///< Position of the element relative to its parent.
+        Vec2f LocalSize{ 0.0f, 0.0f }; ///< Size of the element in its local coordinate space.
+        Vec2f AbsoluteScale{ 1.0f, 1.0f }; ///< Cumulative scale from the root to this element.
+        Vec2f AbsolutePosition{ 0.0f, 0.0f }; ///< Cumulative position from the root to this element.
     };
 
 } // namespace RatUI

@@ -6,6 +6,7 @@
  */
 
 #include "Config.h"
+#include <cstddef>
 #include <cstdint>
 
 /** @brief Helper macro to conditionally compile an expression if it is valid. */
@@ -39,9 +40,15 @@ namespace RatUI
     template<typename>
     inline constexpr bool AlwaysFalse = false;
 
+    // === Config Definitions ===
+
+    inline constexpr size c_ChildrenSBOSize = RATUI_CONFIG_CHILDREN_SBO_SIZE;
+
 } // namespace RatUI
 
 #include "Core/Containers.inl"
 #include "Core/Math.inl"
+#include "Core/String.h"
+#include "Core/Memory.inl"
 
 #undef RATUI_TRY_EXPR
