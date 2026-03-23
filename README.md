@@ -1,4 +1,4 @@
-# RatUI
+# <img src="https://github.com/AsherFarag/RatUI/blob/main/Logo.png" alt="RatUI Logo" style="width: 75px"> RatUI 
 
 RatUI is a Retained-Mode Graphical User Interface library built for C++20.
 It's designed to work around your codebase rather than the other way around.
