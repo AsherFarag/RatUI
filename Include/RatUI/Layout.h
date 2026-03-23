@@ -95,7 +95,7 @@ namespace RatUI
      */
     struct LayoutInput
     {
-        Constraints      Constraints{ Constraints::Unbounded() }; ///< The minimum and maximum size constraints for the element.
+        ::RatUI::Constraints Constraints{ ::RatUI::Constraints::Unbounded() }; ///< The minimum and maximum size constraints for the element.
         Vec4f            Padding{ 0.0f };           ///< The padding to apply inside the element's bounds, reducing the space available for content.
         Vec4f            Margin{ 0.0f };            ///< The margin to apply outside the element's bounds, increasing the space between this element and others.
         Vec2f            SizeHint{ 0.0f, 0.0f };    ///< Explicit desired size. Zero means derived from content.
