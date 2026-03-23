@@ -11,8 +11,34 @@
 
 #include <format>
 
-// std::formatter specializations must live in the std namespace (or global
-// namespace via ADL).  They are NOT placed inside namespace RatUI.
+// std::formatter specializations must live outside namespace RatUI.
+
+// === Math.inl ===
+
+template<typename T, RatUI::size Dim>
+struct std::formatter<RatUI::Detail::Vec<T, Dim>>
+{
+    constexpr auto parse(std::format_parse_context& ctx)
+    {
+        return ctx.begin(); // no custom format options
+    }
+
+    template<typename FormatContext>
+    auto format(const RatUI::Detail::Vec<T, Dim>& value, FormatContext& ctx) const
+    {
+        auto out = ctx.out();
+        *out++ = '(';
+        for (RatUI::size i = 0; i < Dim; ++i)
+        {
+            if (i > 0) { *out++ = ','; *out++ = ' '; }
+            out = std::format_to(out, "{}", value[i]);
+        }
+        *out++ = ')';
+        return out;
+    }
+};
+
+// === Layout.h ===
 
 template<>
 struct std::formatter<RatUI::EAlignment>
@@ -94,7 +120,8 @@ struct std::formatter<RatUI::ELayoutDirection>
     template<typename FormatContext>
     auto format(RatUI::ELayoutDirection value, FormatContext& ctx) const
     {
-        using enum RatUI::ELayoutDirection;
+        using namespace RatUI;
+        using enum ELayoutDirection;
     
         switch (value)
         {

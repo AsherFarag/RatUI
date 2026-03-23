@@ -9,14 +9,11 @@
 #include <cstddef>
 #include <cstdint>
 
-/** @brief Helper macro to conditionally compile a statement if the check expression is valid.
- *  @param _Check  Expression to test inside a requires-clause (no 'return').
- *  @param _Stmt   Statement to execute when the check succeeds (may include 'return').
- */
-#define RATUI_TRY_EXPR( _Check, _Stmt ) \
-    if constexpr ( requires { _Check; } ) \
+/** @brief Helper macro to conditionally compile and return an expression if it is valid. */
+#define RATUI_TRY_EXPR( _Expr ) \
+    if constexpr ( requires { _Expr; } ) \
     { \
-        _Stmt; \
+        return _Expr; \
     }
 
 namespace RatUI

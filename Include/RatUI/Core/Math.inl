@@ -51,16 +51,15 @@ namespace RatUI
                     Data[ i ] = a_Value;
                 }
             }
+        
+            template<typename T0, typename T1, typename... Rest>
+            constexpr Vec( T0&& a_T0, T1&& a_T1, Rest&&... a_Rest )
+                : Data{ std::forward<T0>( a_T0 ), std::forward<T1>( a_T1 ), std::forward<Rest>( a_Rest )... } {}
 
             constexpr Vec( const Vec& ) = default;
             constexpr Vec( Vec&& )      = default;
             constexpr Vec& operator=( const Vec& ) = default;
             constexpr Vec& operator=( Vec&& )      = default;
-
-            template<typename... Args>
-                requires ( sizeof...(Args) != 1 ||
-                           !( std::is_same_v<std::remove_cvref_t<Args>, Vec<T, Dim>> || ... ) )
-            constexpr Vec( Args&&... a_Args ) : Data{ std::forward<Args>( a_Args )... } {}
         
             constexpr T&       operator[]( size a_Index )       { return Data[ a_Index ]; }
             constexpr const T& operator[]( size a_Index ) const { return Data[ a_Index ]; }
