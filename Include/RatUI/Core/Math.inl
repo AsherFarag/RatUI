@@ -51,8 +51,15 @@ namespace RatUI
                     Data[ i ] = a_Value;
                 }
             }
-        
+
+            constexpr Vec( const Vec& ) = default;
+            constexpr Vec( Vec&& )      = default;
+            constexpr Vec& operator=( const Vec& ) = default;
+            constexpr Vec& operator=( Vec&& )      = default;
+
             template<typename... Args>
+                requires ( !( sizeof...(Args) == 1 &&
+                              ( std::is_same_v<std::remove_cvref_t<Args>, Vec<T, Dim>> || ... ) ) )
             constexpr Vec( Args&&... a_Args ) : Data{ std::forward<Args>( a_Args )... } {}
         
             constexpr T&       operator[]( size a_Index )       { return Data[ a_Index ]; }
@@ -178,8 +185,8 @@ namespace RatUI
      */
     struct Rectf
     {
-        Vec2f Center{ 0, 0 };
-        Vec2f HalfExtents{ 0, 0 };
+        Vec2f Center{ 0.0f, 0.0f };
+        Vec2f HalfExtents{ 0.0f, 0.0f };
 
         static constexpr Rectf FromMinMax( Vec2f a_Min, Vec2f a_Max )
         {

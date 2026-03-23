@@ -5,15 +5,18 @@
  * @brief This file contains core type definitions and utilities for RatUI.
  */
 
-#include "Config.h"
+#include "Core/Config.h"
 #include <cstddef>
 #include <cstdint>
 
-/** @brief Helper macro to conditionally compile an expression if it is valid. */
-#define RATUI_TRY_EXPR( _Expr ) \
-    if constexpr ( requires { _Expr; } ) \
+/** @brief Helper macro to conditionally compile a statement if the check expression is valid.
+ *  @param _Check  Expression to test inside a requires-clause (no 'return').
+ *  @param _Stmt   Statement to execute when the check succeeds (may include 'return').
+ */
+#define RATUI_TRY_EXPR( _Check, _Stmt ) \
+    if constexpr ( requires { _Check; } ) \
     { \
-        _Expr; \
+        _Stmt; \
     }
 
 namespace RatUI

@@ -9,7 +9,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Catch2)
 
 add_executable(RatUI_Tests
-    test_main.cpp
+    Common/Test.cpp
 )
 
 target_link_libraries(RatUI_Tests

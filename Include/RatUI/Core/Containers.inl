@@ -100,75 +100,75 @@ namespace RatUI
     template<typename Container, typename... Args>
     constexpr decltype(auto) PushBack( Container& a_Container, Args&&... a_Args )
     {
-             RATUI_TRY_EXPR( return a_Container.push_back( std::forward<Args>( a_Args )... ) )
-        else RATUI_TRY_EXPR( return a_Container.PushBack( std::forward<Args>( a_Args )... ) )
-        else RATUI_TRY_EXPR( return a_Container.pushBack( std::forward<Args>( a_Args )... ) )
+             RATUI_TRY_EXPR( a_Container.push_back( std::forward<Args>( a_Args )... ),   return a_Container.push_back( std::forward<Args>( a_Args )... ) )
+        else RATUI_TRY_EXPR( a_Container.PushBack( std::forward<Args>( a_Args )... ),    return a_Container.PushBack( std::forward<Args>( a_Args )... ) )
+        else RATUI_TRY_EXPR( a_Container.pushBack( std::forward<Args>( a_Args )... ),    return a_Container.pushBack( std::forward<Args>( a_Args )... ) )
         else { static_assert( AlwaysFalse<Container>, "Container does not support PushBack, push_back, or pushBack." ); }
     }
 
     template<typename Container, typename... Args>
     constexpr decltype(auto) EmplaceBack( Container& a_Container, Args&&... a_Args )
     {
-             RATUI_TRY_EXPR( return a_Container.emplace_back( std::forward<Args>( a_Args )... ) )
-        else RATUI_TRY_EXPR( return a_Container.EmplaceBack( std::forward<Args>( a_Args )... ) )
-        else RATUI_TRY_EXPR( return a_Container.emplaceBack( std::forward<Args>( a_Args )... ) )
+             RATUI_TRY_EXPR( a_Container.emplace_back( std::forward<Args>( a_Args )... ), return a_Container.emplace_back( std::forward<Args>( a_Args )... ) )
+        else RATUI_TRY_EXPR( a_Container.EmplaceBack( std::forward<Args>( a_Args )... ), return a_Container.EmplaceBack( std::forward<Args>( a_Args )... ) )
+        else RATUI_TRY_EXPR( a_Container.emplaceBack( std::forward<Args>( a_Args )... ), return a_Container.emplaceBack( std::forward<Args>( a_Args )... ) )
         else { static_assert( AlwaysFalse<Container>, "Container does not support EmplaceBack, emplace_back, or emplaceBack." ); }
     }
 
     template<typename Container, typename... Args>
     constexpr decltype(auto) Insert( Container& a_Container, Args&&... a_Args )
     {
-             RATUI_TRY_EXPR( return a_Container.insert( std::forward<Args>( a_Args )... ) )
-        else RATUI_TRY_EXPR( return a_Container.Insert( std::forward<Args>( a_Args )... ) )
+             RATUI_TRY_EXPR( a_Container.insert( std::forward<Args>( a_Args )... ), return a_Container.insert( std::forward<Args>( a_Args )... ) )
+        else RATUI_TRY_EXPR( a_Container.Insert( std::forward<Args>( a_Args )... ), return a_Container.Insert( std::forward<Args>( a_Args )... ) )
         else { static_assert( AlwaysFalse<Container>, "Container does not support Insert or insert." ); }
     }
 
     template<typename Container, typename... Args>
     constexpr decltype(auto) Emplace( Container& a_Container, Args&&... a_Args )
     {
-             RATUI_TRY_EXPR( return a_Container.emplace( std::forward<Args>( a_Args )... ) )
-        else RATUI_TRY_EXPR( return a_Container.Emplace( std::forward<Args>( a_Args )... ) )
+             RATUI_TRY_EXPR( a_Container.emplace( std::forward<Args>( a_Args )... ), return a_Container.emplace( std::forward<Args>( a_Args )... ) )
+        else RATUI_TRY_EXPR( a_Container.Emplace( std::forward<Args>( a_Args )... ), return a_Container.Emplace( std::forward<Args>( a_Args )... ) )
         else { static_assert( AlwaysFalse<Container>, "Container does not support Emplace or emplace." ); }
     }
 
     template<typename Container, typename... Args>
     constexpr decltype(auto) Erase( Container& a_Container, Args&&... a_Args )
     {
-             RATUI_TRY_EXPR( return a_Container.erase( std::forward<Args>( a_Args )... ) )
-        else RATUI_TRY_EXPR( return a_Container.Erase( std::forward<Args>( a_Args )... ) )
+             RATUI_TRY_EXPR( a_Container.erase( std::forward<Args>( a_Args )... ), return a_Container.erase( std::forward<Args>( a_Args )... ) )
+        else RATUI_TRY_EXPR( a_Container.Erase( std::forward<Args>( a_Args )... ), return a_Container.Erase( std::forward<Args>( a_Args )... ) )
         else { static_assert( AlwaysFalse<Container>, "Container does not support Erase or erase." ); }
     }
 
     template<typename Container>
     constexpr void PopBack( Container& a_Container )
     {
-             RATUI_TRY_EXPR( a_Container.pop_back() )
-        else RATUI_TRY_EXPR( a_Container.PopBack() )
-        else RATUI_TRY_EXPR( a_Container.popBack() )
+             RATUI_TRY_EXPR( a_Container.pop_back(), a_Container.pop_back() )
+        else RATUI_TRY_EXPR( a_Container.PopBack(),  a_Container.PopBack() )
+        else RATUI_TRY_EXPR( a_Container.popBack(),  a_Container.popBack() )
         else { static_assert( AlwaysFalse<Container>, "Container does not support PopBack, pop_back, or popBack." ); }
     }
 
     template<typename Container>
     constexpr void Clear( Container& a_Container )
     {
-             RATUI_TRY_EXPR( a_Container.clear() )
-        else RATUI_TRY_EXPR( a_Container.Clear() )
+             RATUI_TRY_EXPR( a_Container.clear(), a_Container.clear() )
+        else RATUI_TRY_EXPR( a_Container.Clear(), a_Container.Clear() )
         else { static_assert( AlwaysFalse<Container>, "Container does not support Clear or clear." ); }
     }
 
     template<typename Container>
     constexpr void Reserve( Container& a_Container, const size a_Capacity )
     {
-             RATUI_TRY_EXPR( a_Container.reserve( a_Capacity ) )
-        else RATUI_TRY_EXPR( a_Container.Reserve( a_Capacity ) )
+             RATUI_TRY_EXPR( a_Container.reserve( a_Capacity ), a_Container.reserve( a_Capacity ) )
+        else RATUI_TRY_EXPR( a_Container.Reserve( a_Capacity ), a_Container.Reserve( a_Capacity ) )
         else { static_assert( AlwaysFalse<Container>, "Container does not support Reserve or reserve." ); }
     }
 
     template<typename Container>
     constexpr void Resize( Container& a_Container, const size a_Size )
     {
-             RATUI_TRY_EXPR( a_Container.resize( a_Size ) )
-        else RATUI_TRY_EXPR( a_Container.Resize( a_Size ) )
+             RATUI_TRY_EXPR( a_Container.resize( a_Size ), a_Container.resize( a_Size ) )
+        else RATUI_TRY_EXPR( a_Container.Resize( a_Size ), a_Container.Resize( a_Size ) )
         else { static_assert( AlwaysFalse<Container>, "Container does not support Resize or resize." ); }
     }
 
@@ -177,66 +177,66 @@ namespace RatUI
     template<typename Container>
     constexpr decltype(auto) Front( Container& a_Container )
     {
-             RATUI_TRY_EXPR( return a_Container.front() )
-        else RATUI_TRY_EXPR( return a_Container.Front() )
+             RATUI_TRY_EXPR( a_Container.front(), return a_Container.front() )
+        else RATUI_TRY_EXPR( a_Container.Front(), return a_Container.Front() )
         else { static_assert( AlwaysFalse<Container>, "Container does not support Front or front." ); }
     }
 
     template<typename Container>
     constexpr decltype(auto) Front( const Container& a_Container )
     {
-             RATUI_TRY_EXPR( return a_Container.front() )
-        else RATUI_TRY_EXPR( return a_Container.Front() )
+             RATUI_TRY_EXPR( a_Container.front(), return a_Container.front() )
+        else RATUI_TRY_EXPR( a_Container.Front(), return a_Container.Front() )
         else { static_assert( AlwaysFalse<Container>, "Container does not support Front or front." ); }
     }
 
     template<typename Container>
     constexpr decltype(auto) Back( Container& a_Container )
     {
-             RATUI_TRY_EXPR( return a_Container.back() )
-        else RATUI_TRY_EXPR( return a_Container.Back() )
+             RATUI_TRY_EXPR( a_Container.back(), return a_Container.back() )
+        else RATUI_TRY_EXPR( a_Container.Back(), return a_Container.Back() )
         else { static_assert( AlwaysFalse<Container>, "Container does not support Back or back." ); }
     }
 
     template<typename Container>
     constexpr decltype(auto) Back( const Container& a_Container )
     {
-             RATUI_TRY_EXPR( return a_Container.back() )
-        else RATUI_TRY_EXPR( return a_Container.Back() )
+             RATUI_TRY_EXPR( a_Container.back(), return a_Container.back() )
+        else RATUI_TRY_EXPR( a_Container.Back(), return a_Container.Back() )
         else { static_assert( AlwaysFalse<Container>, "Container does not support Back or back." ); }
     }
 
     template<typename Container>
     constexpr decltype(auto) At( Container& a_Container, const size a_Index )
     {
-             RATUI_TRY_EXPR( return a_Container.at( a_Index ) )
-        else RATUI_TRY_EXPR( return a_Container.At( a_Index ) )
-        else RATUI_TRY_EXPR( return a_Container[ a_Index ] )
+             RATUI_TRY_EXPR( a_Container.at( a_Index ),    return a_Container.at( a_Index ) )
+        else RATUI_TRY_EXPR( a_Container.At( a_Index ),    return a_Container.At( a_Index ) )
+        else RATUI_TRY_EXPR( a_Container[ a_Index ],       return a_Container[ a_Index ] )
         else { static_assert( AlwaysFalse<Container>, "Container does not support At, at, or operator[]." ); }
     }
 
     template<typename Container>
     constexpr decltype(auto) At( const Container& a_Container, const size a_Index )
     {
-             RATUI_TRY_EXPR( return a_Container.at( a_Index ) )
-        else RATUI_TRY_EXPR( return a_Container.At( a_Index ) )
-        else RATUI_TRY_EXPR( return a_Container[ a_Index ] )
+             RATUI_TRY_EXPR( a_Container.at( a_Index ),    return a_Container.at( a_Index ) )
+        else RATUI_TRY_EXPR( a_Container.At( a_Index ),    return a_Container.At( a_Index ) )
+        else RATUI_TRY_EXPR( a_Container[ a_Index ],       return a_Container[ a_Index ] )
         else { static_assert( AlwaysFalse<Container>, "Container does not support At, at, or operator[]." ); }
     }
 
     template<typename Container>
     constexpr decltype(auto) Data( Container& a_Container )
     {
-             RATUI_TRY_EXPR( return a_Container.data() )
-        else RATUI_TRY_EXPR( return a_Container.Data() )
+             RATUI_TRY_EXPR( a_Container.data(), return a_Container.data() )
+        else RATUI_TRY_EXPR( a_Container.Data(), return a_Container.Data() )
         else { static_assert( AlwaysFalse<Container>, "Container does not support Data or data." ); }
     }
 
     template<typename Container>
     constexpr decltype(auto) Data( const Container& a_Container )
     {
-             RATUI_TRY_EXPR( return a_Container.data() )
-        else RATUI_TRY_EXPR( return a_Container.Data() )
+             RATUI_TRY_EXPR( a_Container.data(), return a_Container.data() )
+        else RATUI_TRY_EXPR( a_Container.Data(), return a_Container.Data() )
         else { static_assert( AlwaysFalse<Container>, "Container does not support Data or data." ); }
     }
 
