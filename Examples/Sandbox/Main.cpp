@@ -17,7 +17,7 @@ public:
 protected:
     bool OnInitialize() override
     {
-        m_Renderer = std::make_unique<SDL2Renderer>( GetSDLRenderer() );
+        m_Renderer = std::make_unique<SDL2Renderer>( GetRenderer() );
         return true;
     }
 

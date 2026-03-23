@@ -47,10 +47,10 @@ public:
                 ProcessEvents();
                 OnUpdate();
 
-                SDL_SetRenderDrawColor( m_SDLRenderer, 0, 0, 0, 255 );
-                SDL_RenderClear( m_SDLRenderer );
+                SDL_SetRenderDrawColor( m_Renderer, 0, 0, 0, 255 );
+                SDL_RenderClear( m_Renderer );
                 OnRender();
-                SDL_RenderPresent( m_SDLRenderer );
+                SDL_RenderPresent( m_Renderer );
             }
         }
         catch ( const std::exception& )
@@ -74,10 +74,10 @@ protected:
     virtual bool OnShutdown()   = 0;
 
     /** @brief Returns the underlying SDL_Window handle. */
-    SDL_Window*   GetWindow()      const { return m_Window; }
+    SDL_Window*   GetWindow()   const { return m_Window; }
 
     /** @brief Returns the underlying SDL_Renderer handle. */
-    SDL_Renderer* GetSDLRenderer() const { return m_SDLRenderer; }
+    SDL_Renderer* GetRenderer() const { return m_Renderer; }
 
 private:
     bool Initialize()
@@ -100,12 +100,12 @@ private:
             return false;
         }
 
-        m_SDLRenderer = SDL_CreateRenderer(
+        m_Renderer = SDL_CreateRenderer(
             m_Window, -1,
             SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
         );
 
-        if ( !m_SDLRenderer )
+        if ( !m_Renderer )
         {
             SDL_DestroyWindow( m_Window );
             m_Window = nullptr;
@@ -130,10 +130,10 @@ private:
     {
         bool result = OnShutdown();
 
-        if ( m_SDLRenderer )
+        if ( m_Renderer )
         {
-            SDL_DestroyRenderer( m_SDLRenderer );
-            m_SDLRenderer = nullptr;
+            SDL_DestroyRenderer( m_Renderer );
+            m_Renderer = nullptr;
         }
 
         if ( m_Window )
@@ -150,5 +150,5 @@ private:
     Config        m_Config;
     bool          m_Running{ true };
     SDL_Window*   m_Window{ nullptr };
-    SDL_Renderer* m_SDLRenderer{ nullptr };
+    SDL_Renderer* m_Renderer{ nullptr };
 };

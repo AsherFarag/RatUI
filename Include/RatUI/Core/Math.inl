@@ -58,8 +58,8 @@ namespace RatUI
             constexpr Vec& operator=( Vec&& )      = default;
 
             template<typename... Args>
-                requires ( !( sizeof...(Args) == 1 &&
-                              ( std::is_same_v<std::remove_cvref_t<Args>, Vec<T, Dim>> || ... ) ) )
+                requires ( sizeof...(Args) != 1 ||
+                           !( std::is_same_v<std::remove_cvref_t<Args>, Vec<T, Dim>> || ... ) )
             constexpr Vec( Args&&... a_Args ) : Data{ std::forward<Args>( a_Args )... } {}
         
             constexpr T&       operator[]( size a_Index )       { return Data[ a_Index ]; }
