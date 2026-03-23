@@ -37,10 +37,7 @@ For building and running the examples, you'll need the following:
 2. **Configure and build with CMake:**
 
    ```bash
-   mkdir build
-   cd build
-   cmake ..
-   cmake --build .
+   cmake -B build -DRATUI_BUILD_TESTS=ON -DRATUI_BUILD_EXAMPLES=ON
    ```
 3. **Run examples:**
    
