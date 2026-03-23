@@ -1,7 +1,7 @@
 #pragma once
-#include "Core.h"
-#include "Layout.h"
-#include "Renderer/RenderContext.h"
+#include "../Core.h"
+#include "../Layout.h"
+#include "../Renderer/RenderContext.h"
 
 namespace RatUI
 {

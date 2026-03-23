@@ -5,15 +5,15 @@
  * @brief This file contains core type definitions and utilities for RatUI.
  */
 
-#include "Config.h"
+#include "Core/Config.h"
 #include <cstddef>
 #include <cstdint>
 
-/** @brief Helper macro to conditionally compile an expression if it is valid. */
+/** @brief Helper macro to conditionally compile and return an expression if it is valid. */
 #define RATUI_TRY_EXPR( _Expr ) \
     if constexpr ( requires { _Expr; } ) \
     { \
-        _Expr; \
+        return _Expr; \
     }
 
 namespace RatUI
