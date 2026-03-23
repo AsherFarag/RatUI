@@ -11,6 +11,8 @@
 
 #include <format>
 
+// std::formatter specializations must live outside namespace RatUI.
+
 // === Math.inl ===
 
 template<typename T, RatUI::size Dim>

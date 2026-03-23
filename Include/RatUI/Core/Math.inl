@@ -58,6 +58,8 @@ namespace RatUI
 
             constexpr Vec( const Vec& ) = default;
             constexpr Vec( Vec&& )      = default;
+            constexpr Vec& operator=( const Vec& ) = default;
+            constexpr Vec& operator=( Vec&& )      = default;
         
             constexpr T&       operator[]( size a_Index )       { return Data[ a_Index ]; }
             constexpr const T& operator[]( size a_Index ) const { return Data[ a_Index ]; }
