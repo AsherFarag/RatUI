@@ -15,8 +15,8 @@ add_library(RatUI INTERFACE)
 
 target_include_directories(RatUI
     INTERFACE
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Include>
+        $<INSTALL_INTERFACE:Include>
 )
 
 target_compile_features(RatUI INTERFACE cxx_std_20)
@@ -26,9 +26,9 @@ target_compile_features(RatUI INTERFACE cxx_std_20)
 # =========================
 if(RATUI_BUILD_TESTS)
     enable_testing()
-    add_subdirectory(tests)
+    add_subdirectory(Tests)
 endif()
 
 if(RATUI_BUILD_EXAMPLES)
-    add_subdirectory(examples)
+    add_subdirectory(Examples)
 endif()

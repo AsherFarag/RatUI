@@ -52,8 +52,12 @@ namespace RatUI
                 }
             }
         
-            template<typename... Args>
-            constexpr Vec( Args&&... a_Args ) : Data{ std::forward<Args>( a_Args )... } {}
+            template<typename T0, typename T1, typename... Rest>
+            constexpr Vec( T0&& a_T0, T1&& a_T1, Rest&&... a_Rest )
+                : Data{ std::forward<T0>( a_T0 ), std::forward<T1>( a_T1 ), std::forward<Rest>( a_Rest )... } {}
+
+            constexpr Vec( const Vec& ) = default;
+            constexpr Vec( Vec&& )      = default;
         
             constexpr T&       operator[]( size a_Index )       { return Data[ a_Index ]; }
             constexpr const T& operator[]( size a_Index ) const { return Data[ a_Index ]; }
@@ -178,8 +182,8 @@ namespace RatUI
      */
     struct Rectf
     {
-        Vec2f Center{ 0, 0 };
-        Vec2f HalfExtents{ 0, 0 };
+        Vec2f Center{ 0.0f, 0.0f };
+        Vec2f HalfExtents{ 0.0f, 0.0f };
 
         static constexpr Rectf FromMinMax( Vec2f a_Min, Vec2f a_Max )
         {
