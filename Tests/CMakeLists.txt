@@ -11,6 +11,7 @@ FetchContent_MakeAvailable(Catch2)
 add_executable(RatUI_Tests
     Core/TestVec.cpp
     Core/TestContainers.cpp
+    Core/TestUnits.cpp
     Layout/TestLayout.cpp
     StringFormat/TestStringFormat.cpp
 )
