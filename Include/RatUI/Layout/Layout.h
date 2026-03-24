@@ -67,10 +67,15 @@ namespace RatUI
         Content, ///< Size is determined by the content of the element.
         Fill,    ///< Size fills the available space in the parent container.
         Fixed    ///< Size is explicitly specified and does not change based on content or available space.
+
+        // TODO: There should be Flex and Percent modes instead of Fill.
     };
 
     /**
      * @brief Wrap modes define how child elements are arranged when they exceed the available space in a container.
+	 * @note Wrapping behavior is only applicable to certain layout types (e.g., Horizontal and Vertical) and is ignored for others (e.g., Overlay).
+	 * ELayoutType::Horizontal with EWrapMode::Wrap will wrap child elements to the next line when they exceed the container's width,
+     * while ELayoutType::Vertical with EWrapMode::Wrap will wrap child elements to the next column when they exceed the container's height.
      */
     enum class EWrapMode : u8
     {
@@ -202,35 +207,41 @@ namespace RatUI
      */
     struct LayoutStyle
     {
-        // Layout properties
+        // - Layout properties
         f32         Spacing{ 0.0f };                    ///< The spacing to apply between child elements in a container, in pixels.
         ELayoutType LayoutType{ ELayoutType::Overlay }; ///< The layout type to use for arranging child elements (if this element is a container).
         EAlignment  ChildAlign{ EAlignment::TopLeft };  ///< Default alignment for child elements within this container.
         EWrapMode   WrapMode{ EWrapMode::NoWrap };      ///< The wrap mode to use when child elements exceed the available space in a container.
 
-        // Positioning properties
+        // - Positioning properties
         Edges Padding{};        ///< The padding to apply around the content of the element, in pixels.
         Edges Margin{};         ///< The margin to apply around the element itself, in pixels.
         struct Anchor Anchor{}; ///< The anchor points for the element, used when PositionMode is set to Anchored.
         EPositioningMode PositionMode{ EPositioningMode::Flow }; ///< The positioning mode for the element, determining how it is positioned relative to its parent container.
 
-        // Alignment properties
+        // - Alignment properties
         EAlignment SelfAlign{ EAlignment::Inherit }; ///< Overrides parent's ChildAlign for this element. Only applicable when PositionMode is Flow.
 
-        // Sizing properties
+        // - Sizing properties
         ESizingMode WidthMode{ ESizingMode::Content };  ///< The sizing mode for the width of the element.
         ESizingMode HeightMode{ ESizingMode::Content }; ///< The sizing mode for the height of the element.
-        f32 FixedWidth{ 0.0f };        ///< The fixed width to use when WidthMode is set to Fixed.
-        f32 FixedHeight{ 0.0f };       ///< The fixed height to use when HeightMode is set to Fixed.
+        f32 FixedWidth{ 0.0f };  ///< The fixed width to use when WidthMode is set to Fixed.
+        f32 FixedHeight{ 0.0f }; ///< The fixed height to use when HeightMode is set to Fixed.
+        
+        /**
+         * @note PercentWidth/PercentHeight are only meaningful when the parent axis is Fixed or Fill. 
+         * Inside a Content-sized parent, Fill children fall back to Content (zero intrinsic size) and PercentWidth/Height is ignored.
+         */
         f32 PercentWidth{ 0.0f };      ///< The percentage of the available width to use when WidthMode is set to Fill.
         f32 PercentHeight{ 0.0f };     ///< The percentage of the available height to use when HeightMode is set to Fill.
+
         f32 FlexGrow{ 0.0f };          ///< Determines how much of the remaining space the element should occupy relative to its siblings.
         Constraints SizeConstraints{}; ///< The size constraints to consider when laying out the element.
     };
 
     /**
      * @brief Represents the output of the layout process for a UI element, including its final position and size, desired size, and visibility state.
-     * Calculated and cached during the Measure and Arrange steps of the layout process. 
+     * Calculated and cached during the Measure and Arrange steps of the layout process.
      */
     struct LayoutResult
     {

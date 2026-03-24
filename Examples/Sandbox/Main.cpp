@@ -66,6 +66,10 @@ protected:
         blueWidget.Style.PercentWidth = 1.f;
         rootWidget.AddChild( blueWidget );
 
+		// Make bottom blue widget fill based on sine wave to demonstrate dynamic layout updates
+		f32 time = static_cast<f32>( SDL_GetTicks() ) / 1000.f;
+        greenWidget.Style.FixedHeight = 150 * ( 0.5f + 0.5f * std::sin( time ) );
+
         // Measure and arrange the widget tree to compute final positions and sizes
 		i32 windowWidth, windowHeight;
 		SDL_GetWindowSize( GetWindow(), &windowWidth, &windowHeight );
