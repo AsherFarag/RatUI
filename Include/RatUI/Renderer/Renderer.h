@@ -13,8 +13,6 @@ namespace RatUI
     public:
         virtual ~IRenderer() = default;
 
-        #pragma region Drawing API
-
         /** 
          * @brief Draws a solid rectangle with the specified brush, position, and size.
          * @param a_Brush The brush to use for drawing.
@@ -62,8 +60,6 @@ namespace RatUI
                                             Vec2f a_Size, 
                                             f32 a_CornerRadius, 
                                             f32 a_Thickness ) = 0;
-
-        #pragma endregion
 
         /** 
          * @brief Sets the color override for the renderer.

@@ -118,9 +118,9 @@ namespace RatUI
         constexpr Rect<T> Intersection( const Rect<T>& a_Other ) const
         {
             const Vec2<T> NewMin{ ( Left() > a_Other.Left() ) ? Left() : a_Other.Left(),
-                                   ( Top() > a_Other.Top() ) ? Top() : a_Other.Top() };
+                                  ( Top() > a_Other.Top() ) ? Top() : a_Other.Top() };
             const Vec2<T> NewMax{ ( Right() < a_Other.Right() ) ? Right() : a_Other.Right(),
-                                   ( Bottom() < a_Other.Bottom() ) ? Bottom() : a_Other.Bottom() };
+                                  ( Bottom() < a_Other.Bottom() ) ? Bottom() : a_Other.Bottom() };
 
             if ( NewMax[ 0 ] < NewMin[ 0 ] || NewMax[ 1 ] < NewMin[ 1 ] )
             {

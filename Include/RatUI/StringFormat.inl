@@ -58,15 +58,15 @@ struct std::formatter<RatUI::EAlignment>
         // ---- Fast path: exact presets (most common in UI) ----
         switch (value)
         {
-            case AlignTopLeft:               return std::format_to(out, "AlignTopLeft");
-            case AlignTopCenter:             return std::format_to(out, "AlignTopCenter");
-            case AlignTopRight:              return std::format_to(out, "AlignTopRight");
-            case AlignCenterLeft:            return std::format_to(out, "AlignCenterLeft");
-            case AlignCenter:                return std::format_to(out, "AlignCenter");
-            case AlignCenterRight:           return std::format_to(out, "AlignCenterRight");
-            case AlignBottomLeft:            return std::format_to(out, "AlignBottomLeft");
-            case AlignBottomCenter:          return std::format_to(out, "AlignBottomCenter");
-            case AlignBottomRight:           return std::format_to(out, "AlignBottomRight");
+            case TopLeft:               return std::format_to(out, "TopLeft");
+            case TopCenter:             return std::format_to(out, "TopCenter");
+            case TopRight:              return std::format_to(out, "TopRight");
+            case CenterLeft:            return std::format_to(out, "CenterLeft");
+            case Center:                return std::format_to(out, "Center");
+            case CenterRight:           return std::format_to(out, "CenterRight");
+            case BottomLeft:            return std::format_to(out, "BottomLeft");
+            case BottomCenter:          return std::format_to(out, "BottomCenter");
+            case BottomRight:           return std::format_to(out, "BottomRight");
             case static_cast<EAlignment>(0): return std::format_to(out, "None");
             default:                         break;
         }
@@ -90,14 +90,14 @@ struct std::formatter<RatUI::EAlignment>
         const RatUI::u16 v = static_cast<RatUI::u16>(value);
     
         // Horizontal (mutually exclusive in valid cases)
-        if (v & AlignLeft)      append("AlignLeft", first);
-        if (v & AlignHCenter)   append("AlignHCenter", first);
-        if (v & AlignRight)     append("AlignRight", first);
+        if (v & Left)      append("Left", first);
+        if (v & HCenter)   append("HCenter", first);
+        if (v & Right)     append("Right", first);
     
         // Vertical
-        if (v & AlignTop)       append("AlignTop", first);
-        if (v & AlignVCenter)   append("AlignVCenter", first);
-        if (v & AlignBottom)    append("AlignBottom", first);
+        if (v & Top)       append("Top", first);
+        if (v & VCenter)   append("VCenter", first);
+        if (v & Bottom)    append("Bottom", first);
     
         if (first) // nothing written
         {
@@ -109,7 +109,7 @@ struct std::formatter<RatUI::EAlignment>
 };
 
 template<>
-struct std::formatter<RatUI::ELayoutDirection>
+struct std::formatter<RatUI::ELayoutType>
 {
     constexpr auto parse(std::format_parse_context& ctx)
     {
@@ -117,16 +117,16 @@ struct std::formatter<RatUI::ELayoutDirection>
     }
 
     template<typename FormatContext>
-    auto format(RatUI::ELayoutDirection value, FormatContext& ctx) const
+    auto format(RatUI::ELayoutType value, FormatContext& ctx) const
     {
         using namespace RatUI;
-        using enum ELayoutDirection;
+        using enum ELayoutType;
     
         switch (value)
         {
             case Horizontal: return std::format_to(ctx.out(), "Horizontal");
             case Vertical:   return std::format_to(ctx.out(), "Vertical");
-            case Stack:      return std::format_to(ctx.out(), "Stack");
+            case Overlay:    return std::format_to(ctx.out(), "Overlay");
             case Grid:       return std::format_to(ctx.out(), "Grid");
             default:         return std::format_to(ctx.out(), "Unknown");
         }

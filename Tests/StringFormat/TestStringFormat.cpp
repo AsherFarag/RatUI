@@ -35,59 +35,59 @@ TEST_CASE( "Vec2f zero formats correctly", "[format][vec]" )
 // EAlignment formatter
 // =============================================================================
 
-TEST_CASE( "EAlignment formats preset AlignTopLeft", "[format][alignment]" )
+TEST_CASE( "Ement formats preset TopLeft", "[format][alignment]" )
 {
-    REQUIRE( std::format( "{}", AlignTopLeft ) == "AlignTopLeft" );
+    REQUIRE( std::format( "{}", TopLeft ) == "TopLeft" );
 }
 
-TEST_CASE( "EAlignment formats preset AlignCenter", "[format][alignment]" )
+TEST_CASE( "Ement formats preset Center", "[format][alignment]" )
 {
-    REQUIRE( std::format( "{}", AlignCenter ) == "AlignCenter" );
+    REQUIRE( std::format( "{}", Center ) == "Center" );
 }
 
-TEST_CASE( "EAlignment formats preset AlignBottomRight", "[format][alignment]" )
+TEST_CASE( "Ement formats preset BottomRight", "[format][alignment]" )
 {
-    REQUIRE( std::format( "{}", AlignBottomRight ) == "AlignBottomRight" );
+    REQUIRE( std::format( "{}", BottomRight ) == "BottomRight" );
 }
 
-TEST_CASE( "EAlignment formats all nine presets correctly", "[format][alignment]" )
+TEST_CASE( "Ement formats all nine presets correctly", "[format][alignment]" )
 {
-    REQUIRE( std::format( "{}", AlignTopLeft     ) == "AlignTopLeft"     );
-    REQUIRE( std::format( "{}", AlignTopCenter   ) == "AlignTopCenter"   );
-    REQUIRE( std::format( "{}", AlignTopRight    ) == "AlignTopRight"    );
-    REQUIRE( std::format( "{}", AlignCenterLeft  ) == "AlignCenterLeft"  );
-    REQUIRE( std::format( "{}", AlignCenter      ) == "AlignCenter"      );
-    REQUIRE( std::format( "{}", AlignCenterRight ) == "AlignCenterRight" );
-    REQUIRE( std::format( "{}", AlignBottomLeft  ) == "AlignBottomLeft"  );
-    REQUIRE( std::format( "{}", AlignBottomCenter) == "AlignBottomCenter");
-    REQUIRE( std::format( "{}", AlignBottomRight ) == "AlignBottomRight" );
+    REQUIRE( std::format( "{}", TopLeft     ) == "TopLeft"     );
+    REQUIRE( std::format( "{}", TopCenter   ) == "TopCenter"   );
+    REQUIRE( std::format( "{}", TopRight    ) == "TopRight"    );
+    REQUIRE( std::format( "{}", CenterLeft  ) == "CenterLeft"  );
+    REQUIRE( std::format( "{}", Center      ) == "Center"      );
+    REQUIRE( std::format( "{}", CenterRight ) == "CenterRight" );
+    REQUIRE( std::format( "{}", BottomLeft  ) == "BottomLeft"  );
+    REQUIRE( std::format( "{}", BottomCenter) == "BottomCenter");
+    REQUIRE( std::format( "{}", BottomRight ) == "BottomRight" );
 }
 
-TEST_CASE( "EAlignment zero value formats as None", "[format][alignment]" )
+TEST_CASE( "Ement zero value formats as None", "[format][alignment]" )
 {
     REQUIRE( std::format( "{}", static_cast<EAlignment>( 0 ) ) == "None" );
 }
 
-TEST_CASE( "EAlignment formats individual flag AlignLeft", "[format][alignment]" )
+TEST_CASE( "Ement formats individual flag Left", "[format][alignment]" )
 {
-    REQUIRE( std::format( "{}", AlignLeft ) == "AlignLeft" );
+    REQUIRE( std::format( "{}", Left ) == "Left" );
 }
 
-TEST_CASE( "EAlignment formats individual flag AlignTop", "[format][alignment]" )
+TEST_CASE( "Ement formats individual flag Top", "[format][alignment]" )
 {
-    REQUIRE( std::format( "{}", AlignTop ) == "AlignTop" );
+    REQUIRE( std::format( "{}", Top ) == "Top" );
 }
 
 // =============================================================================
-// ELayoutDirection formatter
+// ELayoutType formatter
 // =============================================================================
 
-TEST_CASE( "ELayoutDirection formats all values", "[format][direction]" )
+TEST_CASE( "ELayoutType formats all values", "[format][direction]" )
 {
-    REQUIRE( std::format( "{}", ELayoutDirection::Horizontal ) == "Horizontal" );
-    REQUIRE( std::format( "{}", ELayoutDirection::Vertical   ) == "Vertical"   );
-    REQUIRE( std::format( "{}", ELayoutDirection::Stack      ) == "Stack"      );
-    REQUIRE( std::format( "{}", ELayoutDirection::Grid       ) == "Grid"       );
+    REQUIRE( std::format( "{}", ELayoutType::Horizontal ) == "Horizontal" );
+    REQUIRE( std::format( "{}", ELayoutType::Vertical   ) == "Vertical"   );
+    REQUIRE( std::format( "{}", ELayoutType::Overlay    ) == "Overlay"    );
+    REQUIRE( std::format( "{}", ELayoutType::Grid       ) == "Grid"       );
 }
 
 // =============================================================================

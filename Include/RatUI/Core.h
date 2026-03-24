@@ -8,6 +8,7 @@
 #include "Core/Config.h"
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 
 /** @brief Helper macro to conditionally compile and return an expression if it is valid. */
 #define RATUI_TRY_EXPR( _Expr ) \
@@ -39,6 +40,10 @@ namespace RatUI
 
     template<typename>
     inline constexpr bool AlwaysFalse = false;
+
+    /** Shorthand because I'm lazy and sick of typing std::numeric_limits<T>::max() all the time. */
+    template<typename T>
+    using Limits = std::numeric_limits<T>;
 
     // === Config Definitions ===
 
