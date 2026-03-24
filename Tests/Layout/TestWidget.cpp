@@ -376,3 +376,49 @@ TEST_CASE( "MeasureWidget child DesiredSize is populated during parent measureme
 
     RequireApproxEqual( child.Layout.DesiredSize, Vec2f( 55.0f, 35.0f ) );
 }
+
+TEST_CASE( "MeasureWidget child with Fill mode in parent with Content mode falls back to Content for measurement", "[widget][measure]" )
+{
+    Widget parent{};
+    parent.Style.LayoutType = ELayoutType::Horizontal;
+    parent.Style.WidthMode  = ESizingMode::Content;
+    parent.Style.HeightMode = ESizingMode::Content;
+
+    Widget child{};
+    child.Style.WidthMode   = ESizingMode::Fill; // Circular dependency if treated as Fill
+    child.Style.HeightMode  = ESizingMode::Fill; // Circular dependency if treated as Fill
+    child.Style.PercentWidth = 1.0f; // Would want to take all available width, but should fall back to Content
+    child.Style.PercentHeight = 1.0f; // Would want to take all available height, but should fall back to Content
+    AddChild( parent, child );
+
+    Vec2f result = MeasureWidget( parent, Vec2f( 1000.0f, 1000.0f ) );
+
+    // If the child's Fill is treated as Content during measure, it resolves to 0x0, so the parent's size is also 0x0.
+    RequireApproxEqual( result, Vec2f( 0.0f, 0.0f ) );
+
+	// The child's DesiredSize should also be 0x0 since it falls back to Content mode during measurement.
+    RequireApproxEqual( child.Layout.DesiredSize, Vec2f( 0.0f, 0.0f ) );
+}
+
+TEST_CASE( "ArrangeLinear expands Fill child after Content parent is resolved", "[widget][arrange]" )
+{
+    Widget parent{};
+    parent.Style.LayoutType = ELayoutType::Horizontal;
+    parent.Style.WidthMode = ESizingMode::Fixed;
+    parent.Style.FixedWidth = 400.f;
+    parent.Style.HeightMode = ESizingMode::Fixed;
+    parent.Style.FixedHeight = 200.f;
+
+    Widget child{};
+    child.Style.WidthMode = ESizingMode::Fill;
+    child.Style.HeightMode = ESizingMode::Fill;
+    child.Style.PercentWidth = 1.0f;
+    child.Style.PercentHeight = 1.0f;
+    AddChild( parent, child );
+
+    MeasureWidget( parent, Vec2f( 400.f, 200.f ) );
+    ArrangeWidget( parent, Rectf{ .Origin = { 0.f, 0.f }, .Size = { 400.f, 200.f } } );
+
+    RequireApproxEqual( child.Layout.FinalRect.Size, Vec2f( 400.f, 200.f ) );
+    RequireApproxEqual( child.Layout.FinalRect.Origin, Vec2f( 0.f, 0.f ) );
+}
