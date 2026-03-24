@@ -68,7 +68,7 @@ namespace RatUI
     using Color = RATUI_COLOR_IMPL;
 
     /**
-     * @brief A simple axis-aligned rectangle structure defined by its center and half-extents.
+     * @brief A simple axis-aligned rectangle structure defined by its origin (top-left) and size.
      * @tparam T The type of the rectangle's coordinates and dimensions (e.g., float, int).
      */
     template<typename T>
@@ -77,29 +77,26 @@ namespace RatUI
         using ValueType = T;
         using Vec2Type = Vec<T, 2>;
 
-        Vec2<T> Center{ static_cast<T>( 0 ), static_cast<T>( 0 ) };
-        Vec2<T> HalfExtents{ static_cast<T>( 0 ), static_cast<T>( 0 ) };
+        Vec2<T> Origin{ static_cast<T>( 0 ), static_cast<T>( 0 ) };
+        Vec2<T> Size{ static_cast<T>( 0 ), static_cast<T>( 0 ) };
 
         static constexpr Rect FromMinMax( Vec2<T> a_Min, Vec2<T> a_Max )
         {
-            const Vec2<T> Size = a_Max - a_Min;
-            return { a_Min + ( Size * static_cast<T>( 0.5 ) ), Size * static_cast<T>( 0.5 ) };
+            return { a_Min, a_Max - a_Min };
         }
 
-        constexpr T Top() const { return Center[ 1 ] - HalfExtents[ 1 ]; }
-        constexpr T Bottom() const { return Center[ 1 ] + HalfExtents[ 1 ]; }
-        constexpr T Left() const { return Center[ 0 ] - HalfExtents[ 0 ]; }
-        constexpr T Right() const { return Center[ 0 ] + HalfExtents[ 0 ]; }
+        constexpr T Top() const { return Origin[ 1 ]; }
+        constexpr T Bottom() const { return Origin[ 1 ] + Size[ 1 ]; }
+        constexpr T Left() const { return Origin[ 0 ]; }
+        constexpr T Right() const { return Origin[ 0 ] + Size[ 0 ]; }
 
-        constexpr Vec2<T> TopLeft() const { return Center - HalfExtents; }
-        constexpr Vec2<T> TopRight() const { return Vec2<T>{ Center[ 0 ] + HalfExtents[ 0 ], Center[ 1 ] - HalfExtents[ 1 ] }; }
-        constexpr Vec2<T> BottomLeft() const { return Vec2<T>{ Center[ 0 ] - HalfExtents[ 0 ], Center[ 1 ] + HalfExtents[ 1 ] }; }
-        constexpr Vec2<T> BottomRight() const { return Center + HalfExtents; }
+        constexpr Vec2<T> TopLeft() const { return Origin; }
+        constexpr Vec2<T> TopRight() const { return Vec2<T>{ Origin[ 0 ] + Size[ 0 ], Origin[ 1 ] }; }
+        constexpr Vec2<T> BottomLeft() const { return Vec2<T>{ Origin[ 0 ], Origin[ 1 ] + Size[ 1 ] }; }
+        constexpr Vec2<T> BottomRight() const { return Origin + Size; }
 
         constexpr Vec2<T> Min() const { return TopLeft(); }
         constexpr Vec2<T> Max() const { return BottomRight(); }
-
-        constexpr Vec2<T> Size() const { return HalfExtents * static_cast<T>( 2 ); }
 
         constexpr bool Intersects( const Rect<T>& a_Other ) const
         {
