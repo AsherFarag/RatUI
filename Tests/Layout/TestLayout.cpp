@@ -271,12 +271,6 @@ TEST_CASE( "LayoutStyle defaults to TopLeft child alignment", "[layout][style]" 
     REQUIRE( s.ChildAlign == EAlignment::TopLeft );
 }
 
-TEST_CASE( "LayoutStyle defaults to Horizontal axis", "[layout][style]" )
-{
-    LayoutStyle s{};
-    REQUIRE( s.Axis == EAxis::Horizontal );
-}
-
 TEST_CASE( "LayoutStyle defaults to NoWrap wrap mode", "[layout][style]" )
 {
     LayoutStyle s{};

@@ -78,15 +78,6 @@ namespace RatUI
         Wrap    ///< Child elements wrap to the next line when they exceed the container's size, similar to text wrapping.
     };
 
-    /** 
-     * @brief Enumerates the possible axes for layout operations.
-     */
-    enum class EAxis : u8
-    {
-        Horizontal,
-        Vertical
-    };
-
     /**
      * @brief Defines how child elements are arranged and sized within a container.
      */
@@ -215,7 +206,6 @@ namespace RatUI
         f32         Spacing{ 0.0f };                    ///< The spacing to apply between child elements in a container, in pixels.
         ELayoutType LayoutType{ ELayoutType::Overlay }; ///< The layout type to use for arranging child elements (if this element is a container).
         EAlignment  ChildAlign{ EAlignment::TopLeft };  ///< Default alignment for child elements within this container.
-        EAxis       Axis{ EAxis::Horizontal };          ///< The primary axis for layout operations, used by certain layout types to determine the direction of child arrangement.
         EWrapMode   WrapMode{ EWrapMode::NoWrap };      ///< The wrap mode to use when child elements exceed the available space in a container.
 
         // Positioning properties
