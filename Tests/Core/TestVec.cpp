@@ -186,10 +186,10 @@ TEST_CASE( "Vec2f equality", "[math][vec]" )
 TEST_CASE( "Rectf default construction", "[math][rect]" )
 {
     Rectf r;
-    REQUIRE( r.Center[ 0 ] == 0.0f );
-    REQUIRE( r.Center[ 1 ] == 0.0f );
-    REQUIRE( r.HalfExtents[ 0 ] == 0.0f );
-    REQUIRE( r.HalfExtents[ 1 ] == 0.0f );
+    REQUIRE( r.Origin[ 0 ] == 0.0f );
+    REQUIRE( r.Origin[ 1 ] == 0.0f );
+    REQUIRE( r.Size[ 0 ] == 0.0f );
+    REQUIRE( r.Size[ 1 ] == 0.0f );
 }
 
 TEST_CASE( "Rectf FromMinMax produces correct bounds", "[math][rect]" )
@@ -220,7 +220,7 @@ TEST_CASE( "Rectf Min and Max match TopLeft and BottomRight", "[math][rect]" )
 TEST_CASE( "Rectf Size returns correct dimensions", "[math][rect]" )
 {
     Rectf r = Rectf::FromMinMax( Vec2f( 0.0f, 0.0f ), Vec2f( 200.0f, 100.0f ) );
-    RequireApproxEqual( r.Size(), Vec2f( 200.0f, 100.0f ) );
+    RequireApproxEqual( r.Size, Vec2f( 200.0f, 100.0f ) );
 }
 
 // =============================================================================
@@ -279,6 +279,6 @@ TEST_CASE( "Rectf Intersection of non-overlapping rects is empty", "[math][rect]
     Rectf b = Rectf::FromMinMax( Vec2f( 200.0f, 200.0f ), Vec2f( 300.0f, 300.0f ) );
     Rectf i = a.Intersection( b );
     // An empty intersection has Max < Min after clamping, resulting in zero rect.
-    REQUIRE( i.Size()[ 0 ] == 0.0f );
-    REQUIRE( i.Size()[ 1 ] == 0.0f );
+    REQUIRE( i.Size[ 0 ] == 0.0f );
+    REQUIRE( i.Size[ 1 ] == 0.0f );
 }
