@@ -219,9 +219,9 @@ namespace RatUI
         EWrapMode   WrapMode{ EWrapMode::NoWrap };      ///< The wrap mode to use when child elements exceed the available space in a container.
 
         // Positioning properties
-        Edges Padding; ///< The padding to apply around the content of the element, in pixels.
-        Edges Margin;  ///< The margin to apply around the element itself, in pixels.
-        Anchor Anchor; ///< The anchor points for the element, used when PositionMode is set to Anchored.
+        Edges Padding{};        ///< The padding to apply around the content of the element, in pixels.
+        Edges Margin{};         ///< The margin to apply around the element itself, in pixels.
+        struct Anchor Anchor{}; ///< The anchor points for the element, used when PositionMode is set to Anchored.
         EPositioningMode PositionMode{ EPositioningMode::Flow }; ///< The positioning mode for the element, determining how it is positioned relative to its parent container.
 
         // Alignment properties
@@ -247,7 +247,7 @@ namespace RatUI
         Rectf FinalRect{};    ///< The final position and size of the element after layout, in absolute coordinates. Filled by the Arrange step.
         Vec2f DesiredSize{};  ///< The desired size of the element based on its content and constraints. Filled by the Measure step.
         bool IsDirty{ true }; ///< Whether the layout needs to be recalculated. Set to true when properties affecting layout are changed.
-        Visibility Visibility{}; ///< The visibility state of the element, which can affect both rendering and layout.
+        struct Visibility Visibility{}; ///< The visibility state of the element, which can affect both rendering and layout.
     };
 
 } // namespace RatUI
