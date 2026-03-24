@@ -8,9 +8,6 @@
  */
 
 #include "../Core.h"
-#include <algorithm>
-#include <cmath>
-#include <limits>
 
 namespace RatUI
 {
