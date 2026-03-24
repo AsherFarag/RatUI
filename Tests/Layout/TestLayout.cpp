@@ -73,44 +73,6 @@ TEST_CASE( "Constraints::AtMost leaves min at zero and sets max", "[layout][cons
     RequireApproxEqual( c.MaxSize, Vec2f( 300.0f, 400.0f ) );
 }
 // =============================================================================
-// EPositioningMode
-// =============================================================================
-
-TEST_CASE( "EPositioningMode enum values are distinct", "[layout][positioning-mode]" )
-{
-    REQUIRE( EPositioningMode::Flow     != EPositioningMode::Anchored );
-}
-
-// =============================================================================
-// ESizingMode
-// =============================================================================
-
-TEST_CASE( "ESizingMode enum values are distinct", "[layout][sizing-mode]" )
-{
-    REQUIRE( ESizingMode::Content != ESizingMode::Fill  );
-    REQUIRE( ESizingMode::Content != ESizingMode::Fixed );
-    REQUIRE( ESizingMode::Fill    != ESizingMode::Fixed );
-}
-
-// =============================================================================
-// EWrapMode
-// =============================================================================
-
-TEST_CASE( "EWrapMode enum values are distinct", "[layout][wrap-mode]" )
-{
-    REQUIRE( EWrapMode::NoWrap != EWrapMode::Wrap );
-}
-
-// =============================================================================
-// EAxis
-// =============================================================================
-
-TEST_CASE( "EAxis enum values are distinct", "[layout][axis]" )
-{
-    REQUIRE( EAxis::Horizontal != EAxis::Vertical );
-}
-
-// =============================================================================
 // Visibility
 // =============================================================================
 

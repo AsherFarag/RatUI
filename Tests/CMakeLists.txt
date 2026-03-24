@@ -13,6 +13,7 @@ add_executable(RatUI_Tests
     Core/TestContainers.cpp
     Core/TestUnits.cpp
     Layout/TestLayout.cpp
+    Layout/TestWidget.cpp
     StringFormat/TestStringFormat.cpp
 )
 
