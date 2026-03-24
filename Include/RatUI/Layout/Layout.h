@@ -230,12 +230,12 @@ namespace RatUI
         // Sizing properties
         ESizingMode WidthMode{ ESizingMode::Content };  ///< The sizing mode for the width of the element.
         ESizingMode HeightMode{ ESizingMode::Content }; ///< The sizing mode for the height of the element.
-        f32 FixedWidth{ 0.0f };       ///< The fixed width to use when WidthMode is set to Fixed.
-        f32 FixedHeight{ 0.0f };      ///< The fixed height to use when HeightMode is set to Fixed.
-        f32 PercentWidth{ 0.0f };     ///< The percentage of the available width to use when WidthMode is set to Fill.
-        f32 PercentHeight{ 0.0f };    ///< The percentage of the available height to use when HeightMode is set to Fill.
-        f32 FlexGrow{ 0.0f };         ///< Determines how much of the remaining space the element should occupy relative to its siblings.
-        Constraints  SizeConstraints; ///< The size constraints to consider when laying out the element.
+        f32 FixedWidth{ 0.0f };        ///< The fixed width to use when WidthMode is set to Fixed.
+        f32 FixedHeight{ 0.0f };       ///< The fixed height to use when HeightMode is set to Fixed.
+        f32 PercentWidth{ 0.0f };      ///< The percentage of the available width to use when WidthMode is set to Fill.
+        f32 PercentHeight{ 0.0f };     ///< The percentage of the available height to use when HeightMode is set to Fill.
+        f32 FlexGrow{ 0.0f };          ///< Determines how much of the remaining space the element should occupy relative to its siblings.
+        Constraints SizeConstraints{}; ///< The size constraints to consider when laying out the element.
     };
 
     /**

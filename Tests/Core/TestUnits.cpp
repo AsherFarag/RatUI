@@ -163,7 +163,7 @@ TEST_CASE( "Radians negation", "[units][radians]" )
 TEST_CASE( "Radians converts to Degrees", "[units][radians]" )
 {
     Radians<f32> r{ Pi<f32> };
-    Degrees<f32> d = r;
+    Degrees<f32> d{ r };
     REQUIRE( d.Value == Catch::Approx( 180.0f ).epsilon( k_FloatEpsilon ) );
 }
 
@@ -234,7 +234,7 @@ TEST_CASE( "Degrees negation", "[units][degrees]" )
 TEST_CASE( "Degrees converts to Radians", "[units][degrees]" )
 {
     Degrees<f32> d{ 180.0f };
-    Radians<f32> r = d;
+    Radians<f32> r{ d };
     REQUIRE( r.Value == Catch::Approx( Pi<f32> ).epsilon( k_FloatEpsilon ) );
 }
 
