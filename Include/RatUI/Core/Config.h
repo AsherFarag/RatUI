@@ -7,6 +7,8 @@
 #define RATUI_VERSION_PATCH 0
 #define RATUI_VERSION_STRING "0.0.0"
 
+#define RATUI_NODISCARD [[nodiscard]]
+
 // === Configuration Options ===
 
 // === StringFormat.inl ===

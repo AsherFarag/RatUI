@@ -295,6 +295,12 @@ namespace RatUI
 
             u32 Packed{ ~0u };    ///< The packed representation of the NodeID, combining the index and version into a single 32-bit value for efficient storage and comparison.
         };
+
+        constexpr NodeID() = default;
+        constexpr NodeID( u32 a_Index, u8 a_Version ) : Index( a_Index ), Version( a_Version ) {}
+        constexpr explicit NodeID( u32 a_Packed ) : Packed( a_Packed ) {}
+
+        constexpr bool operator==( const NodeID& a_Other ) const { return Packed == a_Other.Packed; }
     };
 
     static constexpr NodeID c_InvalidNodeID{};
@@ -308,10 +314,6 @@ namespace RatUI
     {
         LayoutStyle Style{};   ///< The layout style properties that define how this widget should be sized and positioned.
         LayoutResult Layout{}; ///< The cached layout result for this widget computed during the layout process.
-
-        // TODO: This requires the LayoutNode storage to be pointer stable.
-        // Should switch over NodeID's or somehow ensure the storage is stable like std::deque.
-        // Though NodeID's would be slightly slower to traverse and be awkard to use.
         u32 NumChildren{ 0 };
         LayoutNode* Parent{ nullptr };
         LayoutNode* FirstChild{ nullptr };
