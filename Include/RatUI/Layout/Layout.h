@@ -144,6 +144,9 @@ namespace RatUI
 
         /** @brief Returns true if the element should be rendered (i.e., it is Visible). */
         constexpr bool IsRendered() const { return Value == Visible; }
+
+        /** @brief Returns true if the element should be hit-testable (i.e., it is Visible). */
+        constexpr bool IsHitTestable() const { return Value == Visible; }
     };
 
     /**

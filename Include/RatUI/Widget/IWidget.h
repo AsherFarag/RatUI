@@ -31,8 +31,8 @@ namespace RatUI
         virtual void OnHoverExit() {}
 
         // TODO: These would require an input button type and not sure how I want to go about that yet
-        //virtual void OnPressed() {}
-        //virtual void OnReleased() {}
+        virtual void OnPressed() {}
+        virtual void OnReleased() {}
         //virtual void OnInput() {}
     };
 

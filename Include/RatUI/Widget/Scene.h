@@ -97,6 +97,30 @@ namespace RatUI
                 root->OnPaint( *this, a_Context );
         }
 
+        void ProcessInput( Vec2f a_PhysicalMousePos, bool a_MouseDown, f32 a_Scale )
+        {
+            Vec2f logicalPos = a_PhysicalMousePos / a_Scale;
+
+            WidgetID hovered = HitTest( RootWidget, logicalPos );
+
+            // Hover enter/exit
+            if ( hovered != m_HoveredWidget )
+            {
+                if ( IWidget* prev = GetWidget( m_HoveredWidget ) ) prev->OnHoverExit();
+                if ( IWidget* next = GetWidget( hovered ) )         next->OnHoverEnter();
+                m_HoveredWidget = hovered;
+            }
+
+            // Press/release
+            if ( a_MouseDown && !m_MouseWasDown )
+                if ( IWidget* w = GetWidget( hovered ) ) w->OnPressed();
+
+            if ( !a_MouseDown && m_MouseWasDown )
+                if ( IWidget* w = GetWidget( hovered ) ) w->OnReleased();
+
+            m_MouseWasDown = a_MouseDown;
+        }
+
         template<std::invocable<IWidget&> Func>
         void ForEachChildWidget( WidgetID a_WidgetID, Func&& a_Func )
         {
@@ -128,6 +152,32 @@ namespace RatUI
                 if ( childWidget ) a_Func( *childWidget );
             });
 		}
+
+    protected:
+        WidgetID HitTest( WidgetID a_ID, Vec2f a_LogicalPos )
+        {
+            IWidget* widget = GetWidget( a_ID );
+            if ( !widget ) return c_InvalidPoolID;
+
+            LayoutNode* node = Layouts.Get( widget->LayoutID );
+            if ( !node || !node->Layout.Visibility.IsHitTestable() ) return c_InvalidPoolID;
+
+            if ( !node->Layout.FinalRect.Contains( a_LogicalPos ) ) return c_InvalidPoolID;
+
+            // Check children first (front-to-back, last child wins)
+            WidgetID result = a_ID; // self is the fallback
+            node->ForEachChild( [&]( LayoutNode& child )
+            {
+                WidgetID childHit = HitTest( child.WidgetID, a_LogicalPos );
+                if ( childHit != c_InvalidPoolID )
+                    result = childHit; // deepest child takes priority
+            });
+
+            return result;
+        }
+
+        WidgetID m_HoveredWidget{ c_InvalidPoolID };
+        bool     m_MouseWasDown{ false };
     };
 
 } // namespace RatUI

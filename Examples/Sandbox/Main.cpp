@@ -13,10 +13,11 @@ static SDL_Renderer* g_SDLRenderer = nullptr;
 class RectWidget : public IWidget
 {
 public:
-    RectWidget( const SDL_Color& a_Color )
-        : Color( a_Color )
+	RectWidget( const SDL_Color& a_Color, StringView a_Name )
+		: Color( a_Color ), Name( a_Name )
     {}
 
+	StringView Name;
     SDL_Color Color{ 255, 255, 255, 255 };
 
     void OnPaint( Scene& a_Scene, const RenderContext& a_Context ) override
@@ -42,6 +43,16 @@ public:
             child.OnPaint( a_Scene, a_Context );
 		} );
     }
+
+    void OnHoverEnter() override
+    {
+		std::cout << "Hover Enter: " << Name << std::endl;
+    }
+
+    void OnHoverExit() override
+	{
+		std::cout << "Hover Exit: " << Name << std::endl;
+	}
 };
 
 /**
@@ -66,7 +77,7 @@ protected:
         g_SDLRenderer = GetRenderer();
 
         // Root container
-        WidgetID root = m_Scene.CreateRootWidget<RectWidget>( SDL_Color{ 0, 0, 0, 0 } );
+        WidgetID root = m_Scene.CreateRootWidget<RectWidget>( SDL_Color{ 0, 0, 0, 0 }, "Root" );
         m_Scene.RootWidget = root;
 
         LayoutNode* rootNode = m_Scene.Layouts.Get( m_Scene.GetWidget( root )->LayoutID );
@@ -77,7 +88,7 @@ protected:
         rootNode->Style.HeightMode = ESizingMode::Fill;
 
         // ---------------- RED ----------------
-        WidgetID red = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 255, 0, 0, 255 } );
+        WidgetID red = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 255, 0, 0, 255 }, "Red" );
         auto* redNode = m_Scene.Layouts.Get( m_Scene.GetWidget( red )->LayoutID );
 
         redNode->Style.FixedHeight = 100.f;
@@ -86,7 +97,7 @@ protected:
         redNode->Style.Margin = Edges{ 10.f };
 
         // ---------------- HBOX ----------------
-        WidgetID hbox = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 0, 0, 50, 0 } );
+        WidgetID hbox = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 0, 0, 50, 0 }, "HBox" );
         auto* hboxNode = m_Scene.Layouts.Get( m_Scene.GetWidget( hbox )->LayoutID );
 
         hboxNode->Style.LayoutType = ELayoutType::Horizontal;
@@ -97,7 +108,7 @@ protected:
         hboxNode->Style.WidthMode = ESizingMode::Fill;
 
         // ---------------- GREEN ----------------
-        WidgetID green = m_Scene.CreateWidget<RectWidget>( hbox, SDL_Color{ 0, 255, 0, 0 } );
+        WidgetID green = m_Scene.CreateWidget<RectWidget>( hbox, SDL_Color{ 0, 255, 0, 0 }, "Green" );
         auto* greenNode = m_Scene.Layouts.Get( m_Scene.GetWidget( green )->LayoutID );
 
         greenNode->Style.WidthMode = ESizingMode::Fill;
@@ -106,7 +117,7 @@ protected:
         greenNode->Style.PercentWidth = 0.5f; // This will be ignored since the parent is an HBox with Spacing, so it falls back to FlexGrow behavior.
 
         // ---------------- YELLOW ----------------
-        WidgetID yellow = m_Scene.CreateWidget<RectWidget>( hbox, SDL_Color{ 255, 255, 0, 0 } );
+        WidgetID yellow = m_Scene.CreateWidget<RectWidget>( hbox, SDL_Color{ 255, 255, 0, 0 }, "Yellow" );
         auto* yellowNode = m_Scene.Layouts.Get( m_Scene.GetWidget( yellow )->LayoutID );
 
         yellowNode->Style.WidthMode = ESizingMode::Fill;
@@ -115,7 +126,7 @@ protected:
         yellowNode->Style.FlexGrow = 1.f;
 
         // ---------------- BLUE ----------------
-        WidgetID blue = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 0, 0, 255, 255 } );
+        WidgetID blue = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 0, 0, 255, 255 }, "Blue" );
         auto* blueNode = m_Scene.Layouts.Get( m_Scene.GetWidget( blue )->LayoutID );
 
         blueNode->Style.FixedHeight = 120.f;
@@ -128,6 +139,12 @@ protected:
     void OnUpdate() override
     {
         // TODO: Update the RatUI widget tree
+
+        // Process input
+        int mouseX, mouseY;
+		bool mouseDown = SDL_GetMouseState( &mouseX, &mouseY ) & SDL_BUTTON( 1 );
+
+		m_Scene.ProcessInput( Vec2f{ (f32)mouseX, (f32)mouseY }, mouseDown, 1.f );
     }
 
     void OnRender() override
