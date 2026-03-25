@@ -21,7 +21,7 @@ public:
 
     void OnPaint( Scene& a_Scene, const RenderContext& a_Context ) override
     {
-        const LayoutNode* node = a_Scene.LayoutPool.Get( LayoutID );
+        const LayoutNode* node = a_Scene.Layouts.Get( LayoutID );
         if ( !node )
             return;
 
@@ -66,10 +66,10 @@ protected:
         g_SDLRenderer = GetRenderer();
 
         // Root container
-        WidgetID root = m_Scene.CreateWidget<RectWidget>( SDL_Color{ 0, 0, 0, 0 } );
+        WidgetID root = m_Scene.CreateRootWidget<RectWidget>( SDL_Color{ 0, 0, 0, 0 } );
         m_Scene.RootWidget = root;
 
-        LayoutNode* rootNode = m_Scene.LayoutPool.Get( m_Scene.GetWidget( root )->LayoutID );
+        LayoutNode* rootNode = m_Scene.Layouts.Get( m_Scene.GetWidget( root )->LayoutID );
         rootNode->Style.LayoutType = ELayoutType::Vertical;
         rootNode->Style.Spacing = 10.f;
         rootNode->Style.Padding = Edges{ 10.f };
@@ -77,60 +77,50 @@ protected:
         rootNode->Style.HeightMode = ESizingMode::Fill;
 
         // ---------------- RED ----------------
-        WidgetID red = m_Scene.CreateWidget<RectWidget>( SDL_Color{ 255, 0, 0, 255 } );
-        auto* redNode = m_Scene.LayoutPool.Get( m_Scene.GetWidget( red )->LayoutID );
+        WidgetID red = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 255, 0, 0, 255 } );
+        auto* redNode = m_Scene.Layouts.Get( m_Scene.GetWidget( red )->LayoutID );
 
         redNode->Style.FixedHeight = 100.f;
         redNode->Style.WidthMode = ESizingMode::Fill;
         redNode->Style.HeightMode = ESizingMode::Fixed;
         redNode->Style.Margin = Edges{ 10.f };
 
-        rootNode->AddChild( *redNode );
-
         // ---------------- HBOX ----------------
-        WidgetID hbox = m_Scene.CreateWidget<RectWidget>( SDL_Color{ 0, 0, 50, 0 } );
-        auto* hboxNode = m_Scene.LayoutPool.Get( m_Scene.GetWidget( hbox )->LayoutID );
+        WidgetID hbox = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 0, 0, 50, 0 } );
+        auto* hboxNode = m_Scene.Layouts.Get( m_Scene.GetWidget( hbox )->LayoutID );
 
         hboxNode->Style.LayoutType = ELayoutType::Horizontal;
-        hboxNode->Style.Spacing = 10.f;
+        hboxNode->Style.Spacing = 0.f;
 		hboxNode->Style.Padding = Edges{ 10.f };
         hboxNode->Style.HeightMode = ESizingMode::Fixed;
         hboxNode->Style.FixedHeight = 150.f;
         hboxNode->Style.WidthMode = ESizingMode::Fill;
 
-        rootNode->AddChild( *hboxNode );
-
         // ---------------- GREEN ----------------
-        WidgetID green = m_Scene.CreateWidget<RectWidget>( SDL_Color{ 0, 255, 0, 0 } );
-        auto* greenNode = m_Scene.LayoutPool.Get( m_Scene.GetWidget( green )->LayoutID );
+        WidgetID green = m_Scene.CreateWidget<RectWidget>( hbox, SDL_Color{ 0, 255, 0, 0 } );
+        auto* greenNode = m_Scene.Layouts.Get( m_Scene.GetWidget( green )->LayoutID );
 
         greenNode->Style.WidthMode = ESizingMode::Fill;
         greenNode->Style.HeightMode = ESizingMode::Fill;
         greenNode->Style.FlexGrow = 1.f;
         greenNode->Style.PercentWidth = 0.5f; // This will be ignored since the parent is an HBox with Spacing, so it falls back to FlexGrow behavior.
 
-        hboxNode->AddChild( *greenNode );
-
         // ---------------- YELLOW ----------------
-        WidgetID yellow = m_Scene.CreateWidget<RectWidget>( SDL_Color{ 255, 255, 0, 0 } );
-        auto* yellowNode = m_Scene.LayoutPool.Get( m_Scene.GetWidget( yellow )->LayoutID );
+        WidgetID yellow = m_Scene.CreateWidget<RectWidget>( hbox, SDL_Color{ 255, 255, 0, 0 } );
+        auto* yellowNode = m_Scene.Layouts.Get( m_Scene.GetWidget( yellow )->LayoutID );
 
         yellowNode->Style.WidthMode = ESizingMode::Fill;
         yellowNode->Style.HeightMode = ESizingMode::Fill;
 		yellowNode->Style.PercentWidth = 0.5f; // This will be ignored since the parent is an HBox with Spacing, so it falls back to FlexGrow behavior.
         yellowNode->Style.FlexGrow = 1.f;
 
-        hboxNode->AddChild( *yellowNode );
-
         // ---------------- BLUE ----------------
-        WidgetID blue = m_Scene.CreateWidget<RectWidget>( SDL_Color{ 0, 0, 255, 255 } );
-        auto* blueNode = m_Scene.LayoutPool.Get( m_Scene.GetWidget( blue )->LayoutID );
+        WidgetID blue = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 0, 0, 255, 255 } );
+        auto* blueNode = m_Scene.Layouts.Get( m_Scene.GetWidget( blue )->LayoutID );
 
         blueNode->Style.FixedHeight = 120.f;
         blueNode->Style.WidthMode = ESizingMode::Fill;
         blueNode->Style.HeightMode = ESizingMode::Fixed;
-
-        rootNode->AddChild( *blueNode );
 
         return true;
     }

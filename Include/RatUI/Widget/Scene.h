@@ -10,33 +10,50 @@ namespace RatUI
 
     struct Scene
     {
-        LayoutNodePool LayoutPool{};
-        WidgetPool WidgetPool{};
+        LayoutNodePool Layouts{};
+        WidgetPool Widgets{};
         WidgetID RootWidget{ c_InvalidPoolID };
 
         template<std::derived_from<IWidget> WidgetType, typename... Args>
-        WidgetID CreateWidget( Args&&... a_Args )
+        WidgetID CreateWidget( WidgetID a_ParentID, Args&&... a_Args )
         {
 			Unique<IWidget> widgetPtr = MakeUnique<WidgetType>( std::forward<Args>( a_Args )... );
 			IWidget* widget = widgetPtr.get();
 
             // Allocate layout node and widget
-            NodeID     nodeID   = LayoutPool.Allocate();
-			WidgetID   widgetID = WidgetPool.Allocate( std::move( widgetPtr ) );
+            NodeID     nodeID   = Layouts.Allocate();
+			WidgetID   widgetID = Widgets.Allocate( std::move( widgetPtr ) );
 
-            LayoutNode* node   = LayoutPool.Get( nodeID );
+            LayoutNode* node   = Layouts.Get( nodeID );
 
             // Wire widget <-> node
             widget->ID       = widgetID;
             widget->LayoutID = nodeID;
             node->WidgetID   = widgetID;
 
+			if ( a_ParentID != c_InvalidPoolID )
+            {
+                if ( IWidget* parentWidget = GetWidget( a_ParentID ) )
+                {
+                    if ( LayoutNode* parentNode = Layouts.Get( parentWidget->LayoutID ) )
+                        parentNode->AddChild( *node );
+                }
+            }
+
             return widgetID;
+        }
+
+        template<std::derived_from<IWidget> WidgetType, typename... Args>
+        WidgetID CreateRootWidget( Args&&... a_Args )
+        {
+            WidgetID id = CreateWidget<WidgetType>( c_InvalidPoolID, std::forward<Args>( a_Args )... );
+            RootWidget = id;
+            return id;
         }
 
         RATUI_NODISCARD IWidget* GetWidget( WidgetID a_ID )
         {
-            if ( Unique<IWidget>* widget = WidgetPool.Get( a_ID ) )
+            if ( Unique<IWidget>* widget = Widgets.Get( a_ID ) )
                 return widget->get();
 
             return nullptr;
@@ -44,7 +61,7 @@ namespace RatUI
 
         RATUI_NODISCARD const IWidget* GetWidget( WidgetID a_ID ) const
         {
-            if ( const Unique<IWidget>* widget = WidgetPool.Get( a_ID ) )
+            if ( const Unique<IWidget>* widget = Widgets.Get( a_ID ) )
                 return widget->get();
 
             return nullptr;
@@ -66,7 +83,7 @@ namespace RatUI
         {
             if ( IWidget* root = GetWidget( RootWidget ) )
             {
-                if ( LayoutNode* rootNode = LayoutPool.Get( root->LayoutID ) )
+                if ( LayoutNode* rootNode = Layouts.Get( root->LayoutID ) )
                 {
                     MeasureLayoutNode( *rootNode, a_AvailableSize );
                     ArrangeLayoutNode( *rootNode, Rectf{ Vec2f{ 0.f, 0.f }, a_AvailableSize } );
@@ -86,7 +103,7 @@ namespace RatUI
             IWidget* widget = GetWidget( a_WidgetID );
             if ( !widget ) return;
         
-            LayoutNode* node = LayoutPool.Get( widget->LayoutID );
+            LayoutNode* node = Layouts.Get( widget->LayoutID );
             if ( !node ) return;
         
             node->ForEachChild( [&]( LayoutNode& childNode )
@@ -102,7 +119,7 @@ namespace RatUI
             const IWidget* widget = GetWidget( a_WidgetID );
             if ( !widget ) return;
         
-            const LayoutNode* node = LayoutPool.Get( widget->LayoutID );
+            const LayoutNode* node = Layouts.Get( widget->LayoutID );
             if ( !node ) return;
         
             node->ForEachChild( [&]( const LayoutNode& childNode )
