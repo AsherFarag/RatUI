@@ -35,7 +35,7 @@ protected:
 		using namespace RatUI;
 
         // Demo of a vertical stack of 3 rectangles with different colors, sizes, and margins
-        Widget rootWidget;
+        LayoutNode rootWidget;
         rootWidget.Style.LayoutType = ELayoutType::Vertical;
         rootWidget.Style.Spacing = 10.f;
 		//rootWidget.Style.Padding = Edges::Uniform( 10.f );
@@ -43,7 +43,7 @@ protected:
         rootWidget.Style.WidthMode = ESizingMode::Content;
         rootWidget.Style.HeightMode = ESizingMode::Content;
 
-        Widget redWidget;
+        LayoutNode redWidget;
         redWidget.Style.FixedHeight = 100.f;
         redWidget.Style.WidthMode = ESizingMode::Fill;
 		redWidget.Style.HeightMode = ESizingMode::Fixed;
@@ -51,7 +51,7 @@ protected:
 		redWidget.Style.Margin = Edges{ 10.f };
         rootWidget.AddChild( redWidget );
 
-        Widget greenWidget;
+        LayoutNode greenWidget;
         greenWidget.Style.FixedHeight = 150.f;
         greenWidget.Style.WidthMode = ESizingMode::Fill;
 		greenWidget.Style.HeightMode = ESizingMode::Fixed;
@@ -59,7 +59,7 @@ protected:
         greenWidget.Style.Margin = Edges{ 20.f };
         rootWidget.AddChild( greenWidget );
 
-        Widget blueWidget;
+        LayoutNode blueWidget;
         blueWidget.Style.FixedHeight = 120.f;
         blueWidget.Style.WidthMode = ESizingMode::Fill;
 		blueWidget.Style.HeightMode = ESizingMode::Fill;
@@ -75,9 +75,9 @@ protected:
 		SDL_GetWindowSize( GetWindow(), &windowWidth, &windowHeight );
 
         const Vec2f availableSize{ static_cast<f32>( windowWidth ), static_cast<f32>( windowHeight ) };
-        MeasureWidget( rootWidget, availableSize );
+        MeasureLayoutNode( rootWidget, availableSize );
         const Rectf rootRect{ .Origin = Vec2f{ 0.f, 0.f }, .Size = availableSize };
-        ArrangeWidget( rootWidget, rootRect );
+        ArrangeLayoutNode( rootWidget, rootRect );
 
         // Render the widgets using the SDL2Renderer
         SDL_Renderer* sdl = GetRenderer();

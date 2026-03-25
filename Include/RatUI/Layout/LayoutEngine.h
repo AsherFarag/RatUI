@@ -1,18 +1,18 @@
 #pragma once
 #include "Layout.h"
-#include "Widget.h"
+#include <algorithm>
 
 namespace RatUI
 {
     // Forward declarations of layout functions
-    Vec2f MeasureWidget   ( Widget& a_Widget, Vec2f a_AvailableSize );
-    void  ArrangeWidget   ( Widget& a_Widget, Rectf a_AllocatedRect );
+    Vec2f MeasureLayoutNode   ( LayoutNode& a_LayoutNode, Vec2f a_AvailableSize );
+    void  ArrangeLayoutNode   ( LayoutNode& a_LayoutNode, Rectf a_AllocatedRect );
     
-    void  ArrangeAnchored ( Widget& a_Widget, Rectf a_Container );
-    void  ArrangeOverlay  ( Widget& a_Widget, Rectf a_Inner );
-    void  ArrangeLinear   ( Widget& a_Widget, Rectf a_Inner );
+    void  ArrangeAnchored ( LayoutNode& a_LayoutNode, Rectf a_Container );
+    void  ArrangeOverlay  ( LayoutNode& a_LayoutNode, Rectf a_Inner );
+    void  ArrangeLinear   ( LayoutNode& a_LayoutNode, Rectf a_Inner );
 
-    EAlignment ResolveAlign( const Widget& a_Child, const Widget& a_Parent );
+    EAlignment ResolveAlign( const LayoutNode& a_Child, const LayoutNode& a_Parent );
     Rectf AlignRect( Vec2f a_ContentSize, Rectf a_Container, EAlignment a_Align );
     f32   AlignCrossAxis( f32 a_ChildSize, f32 a_ParentPos,
                           f32 a_ParentSize, EAlignment a_Align, bool a_IsMainAxisHorizontal );
@@ -20,16 +20,16 @@ namespace RatUI
 
     // TODO: These functions are getting pretty fat, should consider making RatUI a static lib or doing something like stb lib
     // TODO: Currently uses recursion but will need to switch to an iterative approach with an explicit stack for deep hierarchies to avoid stack overflow
-    inline Vec2f MeasureWidget( Widget& a_Widget, Vec2f a_AvailableSize )
+    inline Vec2f MeasureLayoutNode( LayoutNode& a_LayoutNode, Vec2f a_AvailableSize )
     {
-        // Collapsed widgets take no space
-        if (!a_Widget.Layout.Visibility.AffectsLayout())
+        // Collapsed LayoutNodes take no space
+        if (!a_LayoutNode.Layout.Visibility.AffectsLayout())
         {
-            a_Widget.Layout.DesiredSize = { 0.f, 0.f };
+            a_LayoutNode.Layout.DesiredSize = { 0.f, 0.f };
             return { 0.f, 0.f };
         }
     
-        const LayoutStyle& s = a_Widget.Style;
+        const LayoutStyle& s = a_LayoutNode.Style;
         Vec2f desired{ 0.0f, 0.0f };
     
         // Resolve width
@@ -55,14 +55,14 @@ namespace RatUI
             Vec2f       childAvailSize = a_AvailableSize - padding;
             u32         numFlow = 0;
         
-            a_Widget.ForEachChild( [&]( Widget& child )
+            a_LayoutNode.ForEachChild( [&]( LayoutNode& child )
             {
                 if ( !child.Layout.Visibility.AffectsLayout() )
                     return;
             
                 if ( child.Style.PositionMode == EPositioningMode::Anchored )
                 {
-                    MeasureWidget( child, a_AvailableSize );
+                    MeasureLayoutNode( child, a_AvailableSize );
                     return;
                 }
             
@@ -79,14 +79,14 @@ namespace RatUI
                 if ( s.HeightMode == ESizingMode::Content && effectiveH == ESizingMode::Fill )
                     effectiveH = ESizingMode::Content;
             
-                // Temporarily override sizing mode so recursive MeasureWidget sees the fallback
+                // Temporarily override sizing mode so recursive MeasureLayoutNode sees the fallback
                 const ESizingMode savedW = child.Style.WidthMode;
                 const ESizingMode savedH = child.Style.HeightMode;
             
                 child.Style.WidthMode  = effectiveW;
                 child.Style.HeightMode = effectiveH;
             
-                const Vec2f childDesired = MeasureWidget( child, childAvailSize )
+                const Vec2f childDesired = MeasureLayoutNode( child, childAvailSize )
                                          + Vec2f{ child.Style.Margin.Horizontal(),
                                                   child.Style.Margin.Vertical() };
                                         
@@ -133,12 +133,12 @@ namespace RatUI
         desired[0] = std::clamp( desired[0], s.SizeConstraints.MinSize[0], s.SizeConstraints.MaxSize[0] );
         desired[1] = std::clamp( desired[1], s.SizeConstraints.MinSize[1], s.SizeConstraints.MaxSize[1] );
     
-        a_Widget.Layout.DesiredSize = desired;
+        a_LayoutNode.Layout.DesiredSize = desired;
         return desired;
     }
 
     /** Resolves which alignment to use — child's SelfAlign overrides parent's ChildAlign */
-    inline EAlignment ResolveAlign( const Widget& a_Child, const Widget& a_Parent )
+    inline EAlignment ResolveAlign( const LayoutNode& a_Child, const LayoutNode& a_Parent )
     {
         return (a_Child.Style.SelfAlign != EAlignment::Inherit)
                ? a_Child.Style.SelfAlign
@@ -163,33 +163,33 @@ namespace RatUI
         return Rectf{ .Origin = a_Container.Origin + offset, .Size = a_ContentSize };
     }
 
-    /** Aligns a widget with an anchored position within a container. */
-    inline void ArrangeAnchored( Widget& a_Widget, Rectf a_Container )
+    /** Aligns a LayoutNode with an anchored position within a container. */
+    inline void ArrangeAnchored( LayoutNode& a_LayoutNode, Rectf a_Container )
     {
-        const Anchor& anchor   = a_Widget.Style.Anchor;
+        const Anchor& anchor   = a_LayoutNode.Style.Anchor;
         const Vec2f   parentSz = a_Container.Size;
 
-        // Stretch case: Min != Max means the widget spans a region
+        // Stretch case: Min != Max means the LayoutNode spans a region
         if (anchor.Min[0] != anchor.Max[0] || anchor.Min[1] != anchor.Max[1])
         {
             Vec2f finalMin = a_Container.Origin + parentSz * anchor.Min + anchor.Offset;
             Vec2f finalMax = a_Container.Origin + parentSz * anchor.Max - anchor.Offset;
-            ArrangeWidget( a_Widget, { .Origin = finalMin, .Size = finalMax - finalMin } );
+            ArrangeLayoutNode( a_LayoutNode, { .Origin = finalMin, .Size = finalMax - finalMin } );
             return;
         }
 
-        // Point anchor: position widget relative to anchor point, offset by pivot
+        // Point anchor: position LayoutNode relative to anchor point, offset by pivot
         Vec2f anchorPoint = a_Container.Origin + parentSz * anchor.Min + anchor.Offset;
-        Vec2f size        = a_Widget.Layout.DesiredSize;
+        Vec2f size        = a_LayoutNode.Layout.DesiredSize;
         Vec2f origin      = anchorPoint - size * anchor.Pivot; // pivot shifts origin
 
-        ArrangeWidget( a_Widget, { .Origin = origin, .Size = size } );
+        ArrangeLayoutNode( a_LayoutNode, { .Origin = origin, .Size = size } );
     }
 
     /** Arranges children in an overlay layout, aligning each child within the inner rect according to its alignment flags. */
-    inline void ArrangeOverlay( Widget& a_Widget, Rectf a_Inner )
+    inline void ArrangeOverlay( LayoutNode& a_LayoutNode, Rectf a_Inner )
     {
-        a_Widget.ForEachChild( [&]( Widget& child )
+        a_LayoutNode.ForEachChild( [&]( LayoutNode& child )
         {
             if (child.Style.PositionMode == EPositioningMode::Anchored)
             {
@@ -197,12 +197,12 @@ namespace RatUI
                 return;
             }
 
-            Rectf childRect = AlignRect(child.Layout.DesiredSize, a_Inner, ResolveAlign(child, a_Widget));
-            ArrangeWidget(child, childRect);
+            Rectf childRect = AlignRect(child.Layout.DesiredSize, a_Inner, ResolveAlign(child, a_LayoutNode));
+            ArrangeLayoutNode(child, childRect);
         });
     }
 
-    /** @brief Aligns a child widget along the cross axis - used by linear layouts to position children that don't stretch */
+    /** @brief Aligns a child LayoutNode along the cross axis - used by linear layouts to position children that don't stretch */
     inline f32 AlignCrossAxis( f32 a_ChildSize, f32 a_ParentPos,
                                f32 a_ParentSize, EAlignment a_Align, bool a_IsMainAxisHorizontal )
     {
@@ -218,9 +218,9 @@ namespace RatUI
     }
 
     /** Arranges children in a linear layout, positioning them along the main axis and aligning them on the cross axis. */
-    inline void ArrangeLinear( Widget& a_Widget, Rectf a_Inner )
+    inline void ArrangeLinear( LayoutNode& a_LayoutNode, Rectf a_Inner )
     {
-        const LayoutStyle& s    = a_Widget.Style;
+        const LayoutStyle& s    = a_LayoutNode.Style;
         const bool         isHz = s.LayoutType == ELayoutType::Horizontal;
 
         // Pass 1: sum fixed space and total grow weight
@@ -228,7 +228,7 @@ namespace RatUI
         f32 totalGrow  = 0.f;
         u32 numFlow    = 0;
 
-        a_Widget.ForEachChild( [&]( const Widget& child )
+        a_LayoutNode.ForEachChild( [&]( const LayoutNode& child )
         {
             if ( child.Style.PositionMode == EPositioningMode::Anchored ) return;
             if ( !child.Layout.Visibility.AffectsLayout() )               return;
@@ -245,7 +245,7 @@ namespace RatUI
 
         // Fill children that were measured as Content (due to circular dependency) also
         // claim a share of leftover space — treat them as FlexGrow 1 if they have no grow set.
-        a_Widget.ForEachChild( [&]( const Widget& child )
+        a_LayoutNode.ForEachChild( [&]( const LayoutNode& child )
         {
             if ( child.Style.PositionMode == EPositioningMode::Anchored ) return;
             if ( !child.Layout.Visibility.AffectsLayout() )               return;
@@ -261,7 +261,7 @@ namespace RatUI
         // Pass 2: assign rects
         f32 cursor = isHz ? a_Inner.Origin[0] : a_Inner.Origin[1];
 
-        a_Widget.ForEachChild( [&]( Widget& child )
+        a_LayoutNode.ForEachChild( [&]( LayoutNode& child )
         {
             if ( child.Style.PositionMode == EPositioningMode::Anchored )
             {
@@ -299,7 +299,7 @@ namespace RatUI
             }
 
             // Fill on the cross axis — always expand regardless of grow
-            EAlignment align = ResolveAlign( child, a_Widget );
+            EAlignment align = ResolveAlign( child, a_LayoutNode );
             if (  isHz && ( align & EAlignment::VStretch ) == EAlignment::VStretch ) childSize[1] = a_Inner.Size[1];
             if ( !isHz && ( align & EAlignment::HStretch ) == EAlignment::HStretch ) childSize[0] = a_Inner.Size[0];
 
@@ -334,21 +334,21 @@ namespace RatUI
             cursor += isHz ? childSize[0] + child.Style.Margin.Horizontal()
                            : childSize[1] + child.Style.Margin.Vertical();
 
-            ArrangeWidget( child, childRect );
+            ArrangeLayoutNode( child, childRect );
         } );
     }
 
-    inline void ArrangeGrid( Widget& a_Widget, Rectf a_Inner )
+    inline void ArrangeGrid( LayoutNode& a_LayoutNode, Rectf a_Inner )
     {
         // TODO:
     }
 
-    inline void ArrangeWidget( Widget& a_Widget, Rectf a_AllocatedRect )
+    inline void ArrangeLayoutNode( LayoutNode& a_LayoutNode, Rectf a_AllocatedRect )
     {
-        const LayoutStyle& s = a_Widget.Style;
-        a_Widget.Layout.FinalRect = a_AllocatedRect;
+        const LayoutStyle& s = a_LayoutNode.Style;
+        a_LayoutNode.Layout.FinalRect = a_AllocatedRect;
 
-        if (!a_Widget.FirstChild)
+        if (!a_LayoutNode.FirstChild)
             return; // No need to arrange children if there are none
 
         
@@ -358,11 +358,11 @@ namespace RatUI
         {
             case ELayoutType::Horizontal:
             case ELayoutType::Vertical:
-                ArrangeLinear(a_Widget, inner);
+                ArrangeLinear(a_LayoutNode, inner);
                 break;
 
             case ELayoutType::Overlay:
-                ArrangeOverlay(a_Widget, inner);
+                ArrangeOverlay(a_LayoutNode, inner);
                 break;
 
             case ELayoutType::Grid:

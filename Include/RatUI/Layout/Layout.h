@@ -8,6 +8,7 @@
  */
 
 #include "../Core.h"
+#include <concepts>
 
 namespace RatUI
 {
@@ -249,6 +250,71 @@ namespace RatUI
         Vec2f DesiredSize{};  ///< The desired size of the element based on its content and constraints. Filled by the Measure step.
         bool IsDirty{ true }; ///< Whether the layout needs to be recalculated. Set to true when properties affecting layout are changed.
         struct Visibility Visibility{}; ///< The visibility state of the element, which can affect both rendering and layout.
+    };
+
+    /**
+     * @brief Represents a UI element in the RatUI layout system, containing layout styles, results, and hierarchical relationships with other nodes.
+     * The hierarchy is represented as a doubly-linked list of children for efficient insertion and removal.
+     * This avoids the overhead of dynamic arrays for child management, with minimal traversal costs as LayoutNodes are stored in pools.
+     */
+    struct LayoutNode
+    {
+        LayoutStyle Style{};   ///< The layout style properties that define how this widget should be sized and positioned.
+        LayoutResult Layout{}; ///< The cached layout result for this widget computed during the layout process.
+        LayoutNode* Parent{ nullptr };
+        LayoutNode* FirstChild{ nullptr };
+        LayoutNode* LastChild{ nullptr };
+        LayoutNode* PrevSibling{ nullptr };
+        LayoutNode* NextSibling{ nullptr };
+        u32 NumChildren{ 0 };
+
+        // TODO: Add proper hierarchy functionality
+
+        /**
+         * @brief Adds a child widget to this widget, updating the linked list pointers accordingly.
+         * @param a_Child The child widget to add. It will be added as the last child of this widget.
+         */
+        void AddChild( LayoutNode& a_Child )
+        {
+            a_Child.Parent     = this;
+            a_Child.NextSibling = nullptr;
+            if ( LastChild )
+            {
+                LastChild->NextSibling = &a_Child;
+                a_Child.PrevSibling = LastChild;
+            }
+            else
+            {
+                FirstChild = &a_Child;
+                a_Child.PrevSibling = nullptr;
+            }
+            LastChild = &a_Child;
+            ++NumChildren;
+        }
+
+        /**
+         * @brief Applies the given function to each child widget of this widget.
+         * @tparam Func The type of the function to apply to each child widget. It must be invocable with a LayoutNode reference.
+         * @param a_Func A callable that takes a LayoutNode reference. It will be invoked for each child widget of this widget.
+         */
+        template<std::invocable<LayoutNode&> Func>
+        void ForEachChild( Func&& a_Func )
+        {
+            for (LayoutNode* child = FirstChild; child != nullptr; child = child->NextSibling)
+                std::forward<Func>(a_Func)(*child);
+        }
+
+        /**
+         * @brief Applies the given function to each child widget of this widget (const version).
+         * @tparam Func The type of the function to apply to each child widget. It must be invocable with a const LayoutNode reference.
+         * @param a_Func A callable that takes a const LayoutNode reference. It will be invoked for each child widget of this widget.
+         */
+        template<std::invocable<const LayoutNode&> Func>
+        void ForEachChild( Func&& a_Func ) const
+        {
+            for (const LayoutNode* child = FirstChild; child != nullptr; child = child->NextSibling)
+                std::forward<Func>(a_Func)(*child);
+        }
     };
 
 } // namespace RatUI
