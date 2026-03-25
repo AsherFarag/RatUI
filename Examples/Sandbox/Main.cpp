@@ -71,6 +71,7 @@ public:
 protected:
 
     Scene m_Scene;
+    WidgetID green;
 
     bool OnInitialize() override
     {
@@ -108,7 +109,7 @@ protected:
         hboxNode->Style.WidthMode = ESizingMode::Fill;
 
         // ---------------- GREEN ----------------
-        WidgetID green = m_Scene.CreateWidget<RectWidget>( hbox, SDL_Color{ 0, 255, 0, 0 }, "Green" );
+        green = m_Scene.CreateWidget<RectWidget>( hbox, SDL_Color{ 0, 255, 0, 0 }, "Green" );
         auto* greenNode = m_Scene.Layouts.Get( m_Scene.GetWidget( green )->LayoutID );
 
         greenNode->Style.WidthMode = ESizingMode::Fill;
@@ -138,19 +139,16 @@ protected:
 
     void OnUpdate() override
     {
-        // TODO: Update the RatUI widget tree
+		f32 time = SDL_GetTicks() / 1000.f;
 
-        // Process input
-        int mouseX, mouseY;
-		bool mouseDown = SDL_GetMouseState( &mouseX, &mouseY ) & SDL_BUTTON( 1 );
+		// Animate green widget's width with a sine wave
+        if ( auto* greenNode = m_Scene.Layouts.Get( m_Scene.GetWidget( green )->LayoutID ) )
+        {
+            greenNode->Style.PercentWidth = 0.25f + 0.25f * std::sin( time );
+            greenNode->Layout.IsDirty = true; // Mark layout dirty to trigger recalculation
+		}
 
-		m_Scene.ProcessInput( Vec2f{ (f32)mouseX, (f32)mouseY }, mouseDown, 1.f );
-    }
-
-    void OnRender() override
-    {
-        using namespace RatUI;
-
+		// Get window size
         i32 windowWidth, windowHeight;
         SDL_GetWindowSize( GetWindow(), &windowWidth, &windowHeight );
 
@@ -162,6 +160,17 @@ protected:
 
         // Layout
         m_Scene.UpdateLayout( size );
+
+        // Process input
+        int mouseX, mouseY;
+		bool mouseDown = SDL_GetMouseState( &mouseX, &mouseY ) & SDL_BUTTON( 1 );
+
+		m_Scene.ProcessInput( Vec2f{ (f32)mouseX, (f32)mouseY }, mouseDown, 1.f );
+    }
+
+    void OnRender() override
+    {
+        using namespace RatUI;
 
         // Render
         RenderContext ctx{};
