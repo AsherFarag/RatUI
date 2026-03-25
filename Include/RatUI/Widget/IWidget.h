@@ -5,8 +5,9 @@
 
 namespace RatUI
 {
-    // TODO: Widgets are a layer above LayoutNodes.
-    // Should define things like a UIScene or something 
+    struct Scene;
+
+    using NodeID = PoolID;
 
     /**
      * @brief
@@ -14,13 +15,15 @@ namespace RatUI
     class IWidget
     {
     public:
+        NodeID LayoutID{};
+
         virtual ~IWidget() = default;
 
         /**
          * @brief Called once per frame after layout is resolved.
          * @param a_Context The rendering context used for painting this widget.
          */
-        virtual void OnPaint( const RenderContext& a_Context ) {}
+        virtual void OnPaint( const Scene& a_Scene, const RenderContext& a_Context ) {}
 
         /** @brief Called when a pointer (e.g., mouse cursor) enters the widget's bounds. */
         virtual void OnHoverEnter() {}
@@ -32,9 +35,6 @@ namespace RatUI
         //virtual void OnPressed() {}
         //virtual void OnReleased() {}
         //virtual void OnInput() {}
-
-    private:
-        NodeID m_LayoutID{ c_InvalidNodeID };
     };
 
 } // namespace RatUI

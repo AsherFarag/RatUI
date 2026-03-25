@@ -64,16 +64,16 @@ namespace RatUI
                                             f32 a_Thickness ) = 0;
 
         /** 
-         * @brief Sets the color override for the renderer.
-         * @param a_Color The color to override with.
-         */
-        void SetColorOverride( Color a_Color ) { m_Color = a_Color; }
-
-        /** 
          * @brief Sets the color for the renderer.
          * @param a_Color The color to set.
          */
-        void SetColor( Color a_Color ) { SetColorOverride( m_Color * a_Color ); }
+        void SetColor( Color a_Color ) { m_Color = a_Color; }
+
+        /** 
+         * @brief Tints the current color by multiplying it with the specified color.
+         * @param a_Color The color to tint with.
+         */
+        void TintColor( Color a_Color ) { SetColor( m_Color * a_Color ); }
 
     protected:
 
