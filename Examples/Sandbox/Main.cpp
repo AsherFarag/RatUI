@@ -40,6 +40,7 @@ protected:
         rootWidget.Style.Spacing = 10.f;
         rootWidget.Style.WidthMode = ESizingMode::Content;
         rootWidget.Style.HeightMode = ESizingMode::Content;
+		rootWidget.Style.Padding = Edges{ 10.f };
 
         // ---------------- RED ----------------
         LayoutNode redWidget;

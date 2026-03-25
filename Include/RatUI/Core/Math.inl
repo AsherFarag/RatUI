@@ -5,25 +5,47 @@
 #include <limits>
 #include <type_traits>
 #include <utility>
+#include <concepts>
+#include <numbers>
 
-#ifndef RATUI_VEC_IMPL
+/**
+ * If you want to use your own math library, define RATUI_MATH_IMPL and the following macros before including this header:
+ * - RATUI_VEC_IMPL<T, Dim>: A template for a vector type with scalar components, where T is the scalar type and Dim is the dimensionality (e.g., 2, 3, or 4).
+ * - RATUI_MATRIX_IMPL<T, Dim>: A template for a square matrix type with scalar components, where T is the scalar type and Dim is the dimensionality (e.g., 2, 3, or 4).
+ * - RATUI_COLOR_IMPL: A type representing a color (e.g., RGBA), which should be constructible from 4 scalar components (e.g., r, g, b, a).
+ * 
+ * Required for RATUI_VEC_IMPL & RATUI_COLOR_IMPL:
+ * - operator[](size_t)
+ * - operator+(Vec, Vec)
+ * - operator-(Vec, Vec)
+ * - operator*(Vec, Scalar)
+ * - operator/(Vec, Scalar)
+ * - operator*(Scalar, Vec)
+ * - operator/(Scalar, Vec)
+ * - constructible from individual scalar components (e.g., Vec3(float x, float y, float z))
+ * 
+ * Required for RATUI_MATRIX_IMPL:
+ * - operator[](size_t) returning a column vector
+ * 
+ * @note If you're using GLM, you'll need to do:
+ * #define RATUI_VEC_IMPL(T, Dim) glm::vec<Dim, T>
+ * #define RATUI_MATRIX_IMPL(T, Dim) glm::mat<Dim, Dim, T>
+ */
+#ifndef RATUI_MATH_IMPL
+
+    #define RATUI_BUILTIN_MATH
+
     #include "../Extern/nicemath.h"
     #define RATUI_VEC_IMPL ::nm::vec
-#endif // Default to Vec template if no custom vector implementation is provided.
-
-#ifndef RATUI_MATRIX_IMPL
-    #include "../Extern/nicemath.h"
     #define RATUI_MATRIX_IMPL ::nm::mat
-#endif // Default to Mat template if no custom matrix implementation is provided.
-
-#ifndef RATUI_COLOR_IMPL
     #define RATUI_COLOR_IMPL RATUI_VEC_IMPL<RatUI::f32, 4>
-#endif // Default to Vec<f32, 4> if no custom Color implementation is provided.
+
+#endif // RATUI_MATH_IMPL
 
 namespace RatUI
 {
     template<typename T>
-    inline constexpr T Pi = static_cast<T>( 3.14159265358979323846 );
+    inline constexpr T Pi = std::numbers::pi_v<T>;
 
     template<typename T>
     constexpr T DegToRad( T a_Degrees ) { return a_Degrees * ( Pi<T> / static_cast<T>( 180 ) ); }
@@ -33,7 +55,7 @@ namespace RatUI
 
     // === Vector Types ===
 
-    template<typename T, size Dim>
+    template<typename T, size Dim> requires std::is_arithmetic_v<T>
     using Vec = RATUI_VEC_IMPL<T, Dim>;
 
     template<typename T> using Vec2 = Vec<T, 2>;
@@ -41,18 +63,18 @@ namespace RatUI
     template<typename T> using Vec4 = Vec<T, 4>;
 
     using Vec2f = Vec<f32, 2>;
-    using Vec2i = Vec<i32, 2>;
-    using Vec2u = Vec<u32, 2>;
     using Vec3f = Vec<f32, 3>;
-    using Vec3i = Vec<i32, 3>;
-    using Vec3u = Vec<u32, 3>;
     using Vec4f = Vec<f32, 4>;
+    using Vec2i = Vec<i32, 2>;
+    using Vec3i = Vec<i32, 3>;
     using Vec4i = Vec<i32, 4>;
+    using Vec2u = Vec<u32, 2>;
+    using Vec3u = Vec<u32, 3>;
     using Vec4u = Vec<u32, 4>;
 
     // === Matrix Types ===
 
-    template<typename T, size Dim>
+    template<typename T, size Dim> requires std::is_arithmetic_v<T>
     using Mat = RATUI_MATRIX_IMPL<T, Dim>;
 
     template<typename T> using Mat2 = Mat<T, 2>;
@@ -62,16 +84,51 @@ namespace RatUI
     using Mat2f = Mat<f32, 2>;
     using Mat3f = Mat<f32, 3>;
     using Mat4f = Mat<f32, 4>;
+    using Mat2i = Mat<i32, 2>;
+    using Mat3i = Mat<i32, 3>;
+    using Mat4i = Mat<i32, 4>;
+    using Mat2u = Mat<u32, 2>;
+    using Mat3u = Mat<u32, 3>;
+    using Mat4u = Mat<u32, 4>;
 
-    // === Color Type ===
+    // === Color ===
 
     using Color = RATUI_COLOR_IMPL;
+
+    /** @brief Creates a color from f32 RGBA components in the range [0, 1]. */
+    constexpr Color MakeColorF32( f32 a_Red, f32 a_Green, f32 a_Blue, f32 a_Alpha = 1.f );
+
+    /** @brief Creates a color from u8 RGBA components in the range [0, 255]. */
+    constexpr Color MakeColorU8( u8 a_Red, u8 a_Green, u8 a_Blue, u8 a_Alpha = 255 );
+
+#ifdef RATUI_BUILTIN_MATH
+
+    inline constexpr Color MakeColorF32( f32 a_Red, f32 a_Green, f32 a_Blue, f32 a_Alpha )
+    {
+        // Built-in Color is Vec4<f32> with RGBA components in [0, 1], so we can just construct it directly
+        return Color{ a_Red, a_Green, a_Blue, a_Alpha };
+    }
+
+    inline constexpr Color MakeColorU8( u8 a_Red, u8 a_Green, u8 a_Blue, u8 a_Alpha )
+    {
+        // Built-in Color is Vec4<f32> with RGBA components in [0, 1], so we need to convert from [0, 255] to [0, 1]
+        return Color{
+            static_cast<f32>(a_Red) / 255.f,
+            static_cast<f32>(a_Green) / 255.f,
+            static_cast<f32>(a_Blue) / 255.f,
+            static_cast<f32>(a_Alpha) / 255.f
+        };
+    }
+
+#endif // RATUI_BUILTIN_MATH
+
+    // === Rectangles ===
 
     /**
      * @brief A simple axis-aligned rectangle structure defined by its origin (top-left) and size.
      * @tparam T The type of the rectangle's coordinates and dimensions (e.g., float, int).
      */
-    template<typename T>
+    template<typename T> requires std::is_arithmetic_v<T>
     struct Rect
     {
         using ValueType = T;
@@ -79,11 +136,6 @@ namespace RatUI
 
         Vec2<T> Origin{ static_cast<T>( 0 ), static_cast<T>( 0 ) };
         Vec2<T> Size{ static_cast<T>( 0 ), static_cast<T>( 0 ) };
-
-        static constexpr Rect FromMinMax( Vec2<T> a_Min, Vec2<T> a_Max )
-        {
-            return { a_Min, a_Max - a_Min };
-        }
 
         constexpr T Top() const { return Origin[ 1 ]; }
         constexpr T Bottom() const { return Origin[ 1 ] + Size[ 1 ]; }
@@ -100,36 +152,82 @@ namespace RatUI
 
         constexpr bool Intersects( const Rect<T>& a_Other ) const
         {
-            return Left() <= a_Other.Right() && Right() >= a_Other.Left() &&
-                   Top() <= a_Other.Bottom() && Bottom() >= a_Other.Top();
+            return Left() < a_Other.Right() && Right() > a_Other.Left() &&
+                   Top() < a_Other.Bottom() && Bottom() > a_Other.Top();
         }
 
         constexpr bool Contains( Vec2<T> a_Point ) const
         {
-            Vec2<T> TopLeft = this->TopLeft();
-            Vec2<T> BottomRight = this->BottomRight();
-            return ( a_Point[ 0 ] >= TopLeft[ 0 ] && a_Point[ 0 ] <= BottomRight[ 0 ] ) &&
-                   ( a_Point[ 1 ] >= TopLeft[ 1 ] && a_Point[ 1 ] <= BottomRight[ 1 ] );
+            return a_Point[ 0 ] >= Left() && a_Point[ 0 ] <= Right() &&
+                   a_Point[ 1 ] >= Top() && a_Point[ 1 ] <= Bottom();
         }
 
-        constexpr Rect<T> Intersection( const Rect<T>& a_Other ) const
+        static constexpr Rect FromMinMax( Vec2<T> a_Min, Vec2<T> a_Max )
         {
-            const Vec2<T> NewMin{ ( Left() > a_Other.Left() ) ? Left() : a_Other.Left(),
-                                  ( Top() > a_Other.Top() ) ? Top() : a_Other.Top() };
-            const Vec2<T> NewMax{ ( Right() < a_Other.Right() ) ? Right() : a_Other.Right(),
-                                  ( Bottom() < a_Other.Bottom() ) ? Bottom() : a_Other.Bottom() };
-
-            if ( NewMax[ 0 ] < NewMin[ 0 ] || NewMax[ 1 ] < NewMin[ 1 ] )
-            {
-                return {};
-            }
-
-            return Rect<T>::FromMinMax( NewMin, NewMax );
+            return { a_Min, a_Max - a_Min };
         }
     };
 
     using Rectf = Rect<f32>;
     using Recti = Rect<i32>;
     using Rectu = Rect<u32>;
+
+    namespace Colors
+    {
+        // - Common Colors
+
+        inline constexpr Color Red      = MakeColorF32( 1.f, 0.f, 0.f );
+        inline constexpr Color Yellow   = MakeColorF32( 1.f, 1.f, 0.f );
+        inline constexpr Color Green    = MakeColorF32( 0.f, 1.f, 0.f );
+        inline constexpr Color Cyan     = MakeColorF32( 0.f, 1.f, 1.f );
+        inline constexpr Color Blue     = MakeColorF32( 0.f, 0.f, 1.f );
+        inline constexpr Color Magenta  = MakeColorF32( 1.f, 0.f, 1.f );
+        inline constexpr Color White    = MakeColorF32( 1.f, 1.f, 1.f, 1.f );
+        inline constexpr Color Gray     = MakeColorF32( 0.5f, 0.5f, 0.5f, 1.f );
+        inline constexpr Color Black    = MakeColorF32( 0.f, 0.f, 0.f, 1.f );
+        inline constexpr Color Transparent = MakeColorF32( 0.f, 0.f, 0.f, 0.f );
+
+        // - Light Colors
+
+        inline constexpr Color LightRed     = MakeColorF32( 1.f, 0.5f, 0.5f, 1.f );
+        inline constexpr Color LightYellow  = MakeColorF32( 1.f, 1.f, 0.5f, 1.f );
+        inline constexpr Color LightGreen   = MakeColorF32( 0.5f, 1.f, 0.5f, 1.f );
+        inline constexpr Color LightCyan    = MakeColorF32( 0.5f, 1.f, 1.f, 1.f );
+        inline constexpr Color LightBlue    = MakeColorF32( 0.5f, 0.5f, 1.f, 1.f );
+        inline constexpr Color LightMagenta = MakeColorF32( 1.f, 0.5f, 1.f, 1.f );
+        inline constexpr Color LightGray    = MakeColorF32( 0.75f, 0.75f, 0.75f, 1.f );
+
+        // - Dark Colors
+
+        inline constexpr Color DarkRed     = MakeColorF32( 0.5f, 0.f, 0.f, 1.f );
+        inline constexpr Color DarkYellow  = MakeColorF32( 0.5f, 0.5f, 0.f, 1.f );
+        inline constexpr Color DarkGreen   = MakeColorF32( 0.f, 0.5f, 0.f, 1.f );
+        inline constexpr Color DarkCyan    = MakeColorF32( 0.f, 0.5f, 0.5f, 1.f );
+        inline constexpr Color DarkBlue    = MakeColorF32( 0.f, 0.f, 0.5f, 1.f );
+        inline constexpr Color DarkMagenta = MakeColorF32( 0.5f, 0.f, 0.5f, 1.f );
+        inline constexpr Color DarkGray    = MakeColorF32( 0.25f, 0.25f, 0.25f, 1.f );
+
+        // - Pretty Colors
+
+        inline constexpr Color Orange    = MakeColorF32( 1.f, 0.65f, 0.f, 1.f );
+        inline constexpr Color Pink      = MakeColorF32( 1.f, 0.75f, 0.8f, 1.f );
+        inline constexpr Color Purple    = MakeColorF32( 0.5f, 0.f, 0.5f, 1.f );
+        inline constexpr Color Teal      = MakeColorF32( 0.f, 0.5f, 0.5f, 1.f );
+        inline constexpr Color Lime      = MakeColorF32( 0.75f, 1.f, 0.f, 1.f );
+        inline constexpr Color Indigo    = MakeColorF32( 0.29f, 0.f, 0.51f, 1.f );
+        inline constexpr Color Violet    = MakeColorF32( 0.93f, 0.51f, 0.93f, 1.f );
+        inline constexpr Color Brown     = MakeColorF32( 0.65f, 0.16f, 0.16f, 1.f );
+        inline constexpr Color Maroon    = MakeColorF32( 0.5f, 0.f, 0.f, 1.f );
+        inline constexpr Color Olive     = MakeColorF32( 0.5f, 0.5f, 0.f, 1.f );
+        inline constexpr Color Navy      = MakeColorF32( 0.f, 0.f, 0.5f, 1.f );
+        inline constexpr Color Silver    = MakeColorF32( 0.75f, 0.75f, 0.75f, 1.f );
+        inline constexpr Color Gold      = MakeColorF32( 1.f, 0.84f, 0.f, 1.f );
+        inline constexpr Color Salmon    = MakeColorF32( 0.98f, 0.5f, 0.45f, 1.f );
+        inline constexpr Color Coral     = MakeColorF32( 1.f, 0.5f, 0.31f, 1.f );
+        inline constexpr Color Turquoise = MakeColorF32( 0.25f, 0.88f, 0.82f, 1.f );
+        inline constexpr Color PowderBlue= MakeColorF32( 0.69f, 0.88f, 0.9f, 1.f );
+        inline constexpr Color LightPink = MakeColorF32( 1.f, 0.71f, 0.76f, 1.f );
+
+    } // namespace Colors
 
 } // namespace RatUI

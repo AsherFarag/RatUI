@@ -263,22 +263,3 @@ TEST_CASE( "Rectf Intersects non-overlapping rects returns false", "[math][rect]
     Rectf b = Rectf::FromMinMax( Vec2f( 200.0f, 200.0f ), Vec2f( 300.0f, 300.0f ) );
     REQUIRE_FALSE( a.Intersects( b ) );
 }
-
-TEST_CASE( "Rectf Intersection of overlapping rects", "[math][rect]" )
-{
-    Rectf a = Rectf::FromMinMax( Vec2f( 0.0f,  0.0f  ), Vec2f( 100.0f, 100.0f ) );
-    Rectf b = Rectf::FromMinMax( Vec2f( 50.0f, 50.0f ), Vec2f( 150.0f, 150.0f ) );
-    Rectf i = a.Intersection( b );
-    RequireApproxEqual( i.Min(), Vec2f( 50.0f,  50.0f  ) );
-    RequireApproxEqual( i.Max(), Vec2f( 100.0f, 100.0f ) );
-}
-
-TEST_CASE( "Rectf Intersection of non-overlapping rects is empty", "[math][rect]" )
-{
-    Rectf a = Rectf::FromMinMax( Vec2f( 0.0f,   0.0f   ), Vec2f( 100.0f, 100.0f ) );
-    Rectf b = Rectf::FromMinMax( Vec2f( 200.0f, 200.0f ), Vec2f( 300.0f, 300.0f ) );
-    Rectf i = a.Intersection( b );
-    // An empty intersection has Max < Min after clamping, resulting in zero rect.
-    REQUIRE( i.Size[ 0 ] == 0.0f );
-    REQUIRE( i.Size[ 1 ] == 0.0f );
-}
