@@ -8,6 +8,8 @@
 #include <concepts>
 #include <numbers>
 
+// TODO: Might make more sense to have a Vec and Mat traits class with the specified operations but this is probably good enough for now. 
+
 /**
  * If you want to use your own math library, define RATUI_MATH_IMPL and the following macros before including this header:
  * - RATUI_VEC_IMPL<T, Dim>: A template for a vector type with scalar components, where T is the scalar type and Dim is the dimensionality (e.g., 2, 3, or 4).

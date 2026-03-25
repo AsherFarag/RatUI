@@ -45,10 +45,6 @@ namespace RatUI
     template<typename T>
     using Limits = std::numeric_limits<T>;
 
-    // === Config Definitions ===
-
-    inline constexpr size c_ChildrenSBOSize = RATUI_CONFIG_CHILDREN_SBO_SIZE;
-
 } // namespace RatUI
 
 #include "Core/Containers.inl"

@@ -9,17 +9,6 @@
 
 // === Configuration Options ===
 
-// === IWidget.h ===
-
-/**
- * @brief The size of the small buffer used for storing arranged child widgets inline.
- * This is an optimization to avoid heap allocations for common cases where a widget has only a few children.
- * If your applications have widgets with many children, consider increasing this value.
- */
-#ifndef RATUI_CONFIG_CHILDREN_SBO_SIZE
-    #define RATUI_CONFIG_CHILDREN_SBO_SIZE 4
-#endif
-
 // === StringFormat.inl ===
 
 /**

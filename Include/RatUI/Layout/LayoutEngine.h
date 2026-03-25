@@ -5,12 +5,12 @@
 namespace RatUI
 {
     // Forward declarations of layout functions
-    Vec2f MeasureLayoutNode   ( LayoutNode& a_LayoutNode, Vec2f a_AvailableSize );
-    void  ArrangeLayoutNode   ( LayoutNode& a_LayoutNode, Rectf a_AllocatedRect );
+    Vec2f MeasureLayoutNode   ( LayoutNode& a_Node, Vec2f a_AvailableSize );
+    void  ArrangeLayoutNode   ( LayoutNode& a_Node, Rectf a_AllocatedRect );
     
-    void  ArrangeAnchored ( LayoutNode& a_LayoutNode, Rectf a_Container );
-    void  ArrangeOverlay  ( LayoutNode& a_LayoutNode, Rectf a_Inner );
-    void  ArrangeLinear   ( LayoutNode& a_LayoutNode, Rectf a_Inner );
+    void  ArrangeAnchored ( LayoutNode& a_Node, Rectf a_Container );
+    void  ArrangeOverlay  ( LayoutNode& a_Node, Rectf a_Inner );
+    void  ArrangeLinear   ( LayoutNode& a_Node, Rectf a_Inner );
 
     EAlignment ResolveAlign( const LayoutNode& a_Child, const LayoutNode& a_Parent );
     Rectf AlignRect( Vec2f a_ContentSize, Rectf a_Container, EAlignment a_Align );
@@ -20,16 +20,16 @@ namespace RatUI
 
     // TODO: These functions are getting pretty fat, should consider making RatUI a static lib or doing something like stb lib
     // TODO: Currently uses recursion but will need to switch to an iterative approach with an explicit stack for deep hierarchies to avoid stack overflow
-    inline Vec2f MeasureLayoutNode( LayoutNode& a_LayoutNode, Vec2f a_AvailableSize )
+    inline Vec2f MeasureLayoutNode( LayoutNode& a_Node, Vec2f a_AvailableSize )
     {
         // Collapsed LayoutNodes take no space
-        if (!a_LayoutNode.Layout.Visibility.AffectsLayout())
+        if (!a_Node.Layout.Visibility.AffectsLayout())
         {
-            a_LayoutNode.Layout.DesiredSize = { 0.f, 0.f };
+            a_Node.Layout.DesiredSize = { 0.f, 0.f };
             return { 0.f, 0.f };
         }
     
-        const LayoutStyle& s = a_LayoutNode.Style;
+        const LayoutStyle& s = a_Node.Style;
         Vec2f desired{ 0.0f, 0.0f };
     
         // Resolve width
@@ -55,7 +55,7 @@ namespace RatUI
             Vec2f       childAvailSize = a_AvailableSize - padding;
             u32         numFlow = 0;
         
-            a_LayoutNode.ForEachChild( [&]( LayoutNode& child )
+            a_Node.ForEachChild( [&]( LayoutNode& child )
             {
                 if ( !child.Layout.Visibility.AffectsLayout() )
                     return;
@@ -133,7 +133,7 @@ namespace RatUI
         desired[0] = std::clamp( desired[0], s.SizeConstraints.MinSize[0], s.SizeConstraints.MaxSize[0] );
         desired[1] = std::clamp( desired[1], s.SizeConstraints.MinSize[1], s.SizeConstraints.MaxSize[1] );
     
-        a_LayoutNode.Layout.DesiredSize = desired;
+        a_Node.Layout.DesiredSize = desired;
         return desired;
     }
 
@@ -164,32 +164,53 @@ namespace RatUI
     }
 
     /** Aligns a LayoutNode with an anchored position within a container. */
-    inline void ArrangeAnchored( LayoutNode& a_LayoutNode, Rectf a_Container )
+    inline void ArrangeAnchored( LayoutNode& a_Node, Rectf a_Container )
     {
-        const Anchor& anchor   = a_LayoutNode.Style.Anchor;
+        const Anchor& anchor = a_Node.Style.Anchor;
         const Vec2f   parentSz = a_Container.Size;
 
-        // Stretch case: Min != Max means the LayoutNode spans a region
-        if (anchor.Min[0] != anchor.Max[0] || anchor.Min[1] != anchor.Max[1])
+        const bool stretchX = anchor.Min[0] != anchor.Max[0];
+        const bool stretchY = anchor.Min[1] != anchor.Max[1];
+
+		Vec2f origin{}; // Top left corner of the node's final rect
+        Vec2f size = a_Node.Layout.DesiredSize;
+
+        // X axis
+        if ( stretchX )
         {
-            Vec2f finalMin = a_Container.Origin + parentSz * anchor.Min + anchor.Offset;
-            Vec2f finalMax = a_Container.Origin + parentSz * anchor.Max - anchor.Offset;
-            ArrangeLayoutNode( a_LayoutNode, { .Origin = finalMin, .Size = finalMax - finalMin } );
-            return;
+            // Span the anchor region - offset pushes the edges inward symmetrically
+            origin[0] = a_Container.Origin[0] + parentSz[0] * anchor.Min[0] + anchor.Offset[0];
+            f32 right = a_Container.Origin[0] + parentSz[0] * anchor.Max[0] - anchor.Offset[0];
+            size[0] = std::max( 0.f, right - origin[0] );
+        }
+        else
+        {
+            // Point anchor - place pivot at anchor point, then nudge by offset
+            f32 anchorX = a_Container.Origin[0] + parentSz[0] * anchor.Min[0];
+            origin[0] = anchorX - size[0] * anchor.Pivot[0] + anchor.Offset[0];
         }
 
-        // Point anchor: position LayoutNode relative to anchor point, offset by pivot
-        Vec2f anchorPoint = a_Container.Origin + parentSz * anchor.Min + anchor.Offset;
-        Vec2f size        = a_LayoutNode.Layout.DesiredSize;
-        Vec2f origin      = anchorPoint - size * anchor.Pivot; // pivot shifts origin
+        // Y axis
+        if ( stretchY )
+        {
+            origin[1] = a_Container.Origin[1] + parentSz[1] * anchor.Min[1] + anchor.Offset[1];
+            f32 bottom = a_Container.Origin[1] + parentSz[1] * anchor.Max[1] - anchor.Offset[1];
+            size[1] = std::max( 0.f, bottom - origin[1] );
+        }
+        else
+        {
+            // Point anchor - place pivot at anchor point, then nudge by offset
+            f32 anchorY = a_Container.Origin[1] + parentSz[1] * anchor.Min[1];
+            origin[1] = anchorY - size[1] * anchor.Pivot[1] + anchor.Offset[1];
+        }
 
-        ArrangeLayoutNode( a_LayoutNode, { .Origin = origin, .Size = size } );
+        ArrangeLayoutNode( a_Node, { .Origin = origin, .Size = size } );
     }
 
     /** Arranges children in an overlay layout, aligning each child within the inner rect according to its alignment flags. */
-    inline void ArrangeOverlay( LayoutNode& a_LayoutNode, Rectf a_Inner )
+    inline void ArrangeOverlay( LayoutNode& a_Node, Rectf a_Inner )
     {
-        a_LayoutNode.ForEachChild( [&]( LayoutNode& child )
+        a_Node.ForEachChild( [&]( LayoutNode& child )
         {
             if (child.Style.PositionMode == EPositioningMode::Anchored)
             {
@@ -197,7 +218,7 @@ namespace RatUI
                 return;
             }
 
-            Rectf childRect = AlignRect(child.Layout.DesiredSize, a_Inner, ResolveAlign(child, a_LayoutNode));
+            Rectf childRect = AlignRect(child.Layout.DesiredSize, a_Inner, ResolveAlign(child, a_Node));
             ArrangeLayoutNode(child, childRect);
         });
     }
@@ -218,9 +239,9 @@ namespace RatUI
     }
 
     /** Arranges children in a linear layout, positioning them along the main axis and aligning them on the cross axis. */
-    inline void ArrangeLinear( LayoutNode& a_LayoutNode, Rectf a_Inner )
+    inline void ArrangeLinear( LayoutNode& a_Node, Rectf a_Inner )
     {
-        const LayoutStyle& s    = a_LayoutNode.Style;
+        const LayoutStyle& s    = a_Node.Style;
         const bool         isHz = s.LayoutType == ELayoutType::Horizontal;
 
         // Pass 1: sum fixed space and total grow weight
@@ -228,7 +249,7 @@ namespace RatUI
         f32 totalGrow  = 0.f;
         u32 numFlow    = 0;
 
-        a_LayoutNode.ForEachChild( [&]( const LayoutNode& child )
+        a_Node.ForEachChild( [&]( const LayoutNode& child )
         {
             if ( child.Style.PositionMode == EPositioningMode::Anchored ) return;
             if ( !child.Layout.Visibility.AffectsLayout() )               return;
@@ -245,7 +266,7 @@ namespace RatUI
 
         // Fill children that were measured as Content (due to circular dependency) also
         // claim a share of leftover space — treat them as FlexGrow 1 if they have no grow set.
-        a_LayoutNode.ForEachChild( [&]( const LayoutNode& child )
+        a_Node.ForEachChild( [&]( const LayoutNode& child )
         {
             if ( child.Style.PositionMode == EPositioningMode::Anchored ) return;
             if ( !child.Layout.Visibility.AffectsLayout() )               return;
@@ -261,7 +282,7 @@ namespace RatUI
         // Pass 2: assign rects
         f32 cursor = isHz ? a_Inner.Origin[0] : a_Inner.Origin[1];
 
-        a_LayoutNode.ForEachChild( [&]( LayoutNode& child )
+        a_Node.ForEachChild( [&]( LayoutNode& child )
         {
             if ( child.Style.PositionMode == EPositioningMode::Anchored )
             {
@@ -299,7 +320,7 @@ namespace RatUI
             }
 
             // Fill on the cross axis — always expand regardless of grow
-            EAlignment align = ResolveAlign( child, a_LayoutNode );
+            EAlignment align = ResolveAlign( child, a_Node );
             if (  isHz && ( align & EAlignment::VStretch ) == EAlignment::VStretch ) childSize[1] = a_Inner.Size[1];
             if ( !isHz && ( align & EAlignment::HStretch ) == EAlignment::HStretch ) childSize[0] = a_Inner.Size[0];
 
@@ -346,17 +367,17 @@ namespace RatUI
         } );
     }
 
-    inline void ArrangeGrid( LayoutNode& a_LayoutNode, Rectf a_Inner )
+    inline void ArrangeGrid( LayoutNode& a_Node, Rectf a_Inner )
     {
         // TODO:
     }
 
-    inline void ArrangeLayoutNode( LayoutNode& a_LayoutNode, Rectf a_AllocatedRect )
+    inline void ArrangeLayoutNode( LayoutNode& a_Node, Rectf a_AllocatedRect )
     {
-        const LayoutStyle& s = a_LayoutNode.Style;
-        a_LayoutNode.Layout.FinalRect = a_AllocatedRect;
+        const LayoutStyle& s = a_Node.Style;
+        a_Node.Layout.FinalRect = a_AllocatedRect;
 
-        if (!a_LayoutNode.FirstChild)
+        if (!a_Node.FirstChild)
             return; // No need to arrange children if there are none
 
         
@@ -366,11 +387,11 @@ namespace RatUI
         {
             case ELayoutType::Horizontal:
             case ELayoutType::Vertical:
-                ArrangeLinear(a_LayoutNode, inner);
+                ArrangeLinear(a_Node, inner);
                 break;
 
             case ELayoutType::Overlay:
-                ArrangeOverlay(a_LayoutNode, inner);
+                ArrangeOverlay(a_Node, inner);
                 break;
 
             case ELayoutType::Grid:
