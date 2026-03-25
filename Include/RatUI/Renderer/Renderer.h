@@ -4,6 +4,8 @@
 
 namespace RatUI
 {
+    // TODO: Should we instead use DrawList's instead of using a direct renderer?
+
     /** 
      * @brief IRenderer is an interface that defines the basic drawing operations for rendering UI elements.
      * It can be implemented using different graphics APIs (e.g., DirectX, OpenGL, Vulkan) or software rendering techniques.

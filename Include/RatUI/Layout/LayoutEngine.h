@@ -36,7 +36,7 @@ namespace RatUI
         switch (s.WidthMode)
         {
             case ESizingMode::Fixed:   desired[0] = s.FixedWidth;                        break;
-            case ESizingMode::Fill:    desired[0] = a_AvailableSize[0] * s.PercentWidth; break;
+			case ESizingMode::Fill:    desired[0] = a_AvailableSize[0] * ( s.PercentWidth > 0.f ? s.PercentWidth : 1.f ); break;
             case ESizingMode::Content: desired[0] = 0.f;                                 break;
         }
     
@@ -44,7 +44,7 @@ namespace RatUI
         switch (s.HeightMode)
         {
             case ESizingMode::Fixed:   desired[1] = s.FixedHeight;                        break;
-            case ESizingMode::Fill:    desired[1] = a_AvailableSize[1] * s.PercentHeight; break;
+            case ESizingMode::Fill:    desired[1] = a_AvailableSize[1] * ( s.PercentHeight > 0.f ? s.PercentHeight : 1.f ); break;
             case ESizingMode::Content: desired[1] = 0.f;                                  break;
         }
     
@@ -303,9 +303,17 @@ namespace RatUI
             if (  isHz && ( align & EAlignment::VStretch ) == EAlignment::VStretch ) childSize[1] = a_Inner.Size[1];
             if ( !isHz && ( align & EAlignment::HStretch ) == EAlignment::HStretch ) childSize[0] = a_Inner.Size[0];
 
-            // Fill on cross axis from SizingMode (not just alignment stretch)
-            if (  isHz && child.Style.HeightMode == ESizingMode::Fill ) childSize[1] = a_Inner.Size[1] * child.Style.PercentHeight;
-            if ( !isHz && child.Style.WidthMode  == ESizingMode::Fill ) childSize[0] = a_Inner.Size[0] * child.Style.PercentWidth;
+            // Fill on cross axis from SizingMode
+            if ( isHz && child.Style.HeightMode == ESizingMode::Fill )
+            {
+                f32 pct = child.Style.PercentHeight > 0.f ? child.Style.PercentHeight : 1.f;
+                childSize[1] = a_Inner.Size[1] * pct;
+            }
+            if ( !isHz && child.Style.WidthMode == ESizingMode::Fill )
+            {
+                f32 pct = child.Style.PercentWidth > 0.f ? child.Style.PercentWidth : 1.f;
+                childSize[0] = a_Inner.Size[0] * pct;
+            }
 
             // Position on main axis, align on cross axis
             Rectf childRect;

@@ -34,72 +34,120 @@ protected:
     {
 		using namespace RatUI;
 
-        // Demo of a vertical stack of 3 rectangles with different colors, sizes, and margins
+        // Root (vertical stack)
         LayoutNode rootWidget;
         rootWidget.Style.LayoutType = ELayoutType::Vertical;
         rootWidget.Style.Spacing = 10.f;
-		//rootWidget.Style.Padding = Edges::Uniform( 10.f );
-		//rootWidget.Style.Margin = Edges::Uniform( 20.f );
         rootWidget.Style.WidthMode = ESizingMode::Content;
         rootWidget.Style.HeightMode = ESizingMode::Content;
 
+        // ---------------- RED ----------------
         LayoutNode redWidget;
         redWidget.Style.FixedHeight = 100.f;
         redWidget.Style.WidthMode = ESizingMode::Fill;
-		redWidget.Style.HeightMode = ESizingMode::Fixed;
+        redWidget.Style.HeightMode = ESizingMode::Fixed;
         redWidget.Style.PercentWidth = 1.f;
-		redWidget.Style.Margin = Edges{ 10.f };
+        redWidget.Style.Margin = Edges{ 10.f };
         rootWidget.AddChild( redWidget );
 
-        LayoutNode greenWidget;
-        greenWidget.Style.FixedHeight = 150.f;
-        greenWidget.Style.WidthMode = ESizingMode::Fill;
-		greenWidget.Style.HeightMode = ESizingMode::Fixed;
-        greenWidget.Style.PercentWidth = 1.f;
-        greenWidget.Style.Margin = Edges{ 20.f };
-        rootWidget.AddChild( greenWidget );
+        // ---------------- HBOX (replaces green) ----------------
+        LayoutNode hbox;
+        hbox.Style.LayoutType = ELayoutType::Horizontal;
+        hbox.Style.Spacing = 10.f;
+        hbox.Style.WidthMode = ESizingMode::Fill;
+        hbox.Style.HeightMode = ESizingMode::Fixed;
+        hbox.Style.FixedHeight = 150.f; // controls row height
+        hbox.Style.PercentWidth = 1.f;
+        rootWidget.AddChild( hbox );
 
+        // ---------------- GREEN ----------------
+        LayoutNode greenWidget;
+        greenWidget.Style.WidthMode = ESizingMode::Fill;
+        greenWidget.Style.HeightMode = ESizingMode::Fill;
+        greenWidget.Style.PercentWidth = 0.5f; // share space
+        hbox.AddChild( greenWidget );
+
+        // ---------------- YELLOW ----------------
+        LayoutNode yellowWidget;
+        yellowWidget.Style.WidthMode = ESizingMode::Fill;
+        yellowWidget.Style.HeightMode = ESizingMode::Fill;
+        yellowWidget.Style.PercentWidth = 0.5f; // other half
+        hbox.AddChild( yellowWidget );
+
+        // ---------------- BLUE ----------------
         LayoutNode blueWidget;
         blueWidget.Style.FixedHeight = 120.f;
         blueWidget.Style.WidthMode = ESizingMode::Fill;
-		blueWidget.Style.HeightMode = ESizingMode::Fill;
+        blueWidget.Style.HeightMode = ESizingMode::Fill;
         blueWidget.Style.PercentWidth = 1.f;
         rootWidget.AddChild( blueWidget );
 
-		// Make bottom blue widget fill based on sine wave to demonstrate dynamic layout updates
-		f32 time = static_cast<f32>( SDL_GetTicks() ) / 1000.f;
-        greenWidget.Style.FixedHeight = 150 * ( 0.5f + 0.5f * std::sin( time ) );
+        // ---------------- ANIMATION ----------------
+        f32 time = static_cast<f32>( SDL_GetTicks() ) / 1000.f;
 
-        // Measure and arrange the widget tree to compute final positions and sizes
-		i32 windowWidth, windowHeight;
-		SDL_GetWindowSize( GetWindow(), &windowWidth, &windowHeight );
+        // Animate the HBOX height instead of green directly
+        hbox.Style.FixedHeight = 50 + 150 * ( 0.5f + 0.5f * std::sin( time ) );
 
-        const Vec2f availableSize{ static_cast<f32>( windowWidth ), static_cast<f32>( windowHeight ) };
+        // Animate how much width green takes vs yellow
+        greenWidget.Style.FlexGrow = 0.5f + 0.5f * std::sin( time * 0.5f );
+        yellowWidget.Style.FlexGrow = 2.f;
+
+        // ---------------- LAYOUT PASS ----------------
+        i32 windowWidth, windowHeight;
+        SDL_GetWindowSize( GetWindow(), &windowWidth, &windowHeight );
+
+        const Vec2f availableSize{ (f32)windowWidth, (f32)windowHeight };
         MeasureLayoutNode( rootWidget, availableSize );
+
         const Rectf rootRect{ .Origin = Vec2f{ 0.f, 0.f }, .Size = availableSize };
         ArrangeLayoutNode( rootWidget, rootRect );
 
-        // Render the widgets using the SDL2Renderer
+        // ---------------- RENDER ----------------
         SDL_Renderer* sdl = GetRenderer();
-        
+
         SDL_SetRenderDrawColor( sdl, 255, 255, 255, 255 );
         SDL_Rect d{ 0,0, windowWidth, windowHeight };
         SDL_RenderFillRect( sdl, &d );
 
-		SDL_SetRenderDrawColor( sdl, 255, 0, 0, 255 );
-        SDL_Rect redRect{ static_cast<i32>( redWidget.Layout.FinalRect.Origin[ 0 ] ), static_cast<i32>( redWidget.Layout.FinalRect.Origin[ 1 ] ),
-					  static_cast<i32>( redWidget.Layout.FinalRect.Size[0] ), static_cast<i32>( redWidget.Layout.FinalRect.Size[1] ) };
-		SDL_RenderFillRect( sdl, &redRect );
+        // RED
+        SDL_SetRenderDrawColor( sdl, 255, 0, 0, 255 );
+        SDL_Rect redRect{
+            (i32)redWidget.Layout.FinalRect.Origin[0],
+            (i32)redWidget.Layout.FinalRect.Origin[1],
+            (i32)redWidget.Layout.FinalRect.Size[0],
+            (i32)redWidget.Layout.FinalRect.Size[1]
+        };
+        SDL_RenderFillRect( sdl, &redRect );
 
-		SDL_SetRenderDrawColor( sdl, 0, 255, 0, 255 );
-		SDL_Rect greenRect{ static_cast<i32>( greenWidget.Layout.FinalRect.Origin[0] ), static_cast<i32>( greenWidget.Layout.FinalRect.Origin[1] ),
-                        static_cast<i32>( greenWidget.Layout.FinalRect.Size[0] ), static_cast<i32>( greenWidget.Layout.FinalRect.Size[1] ) };
-		SDL_RenderFillRect( sdl, &greenRect );
+        // GREEN
+        SDL_SetRenderDrawColor( sdl, 0, 255, 0, 255 );
+        SDL_Rect greenRect{
+            (i32)greenWidget.Layout.FinalRect.Origin[0],
+            (i32)greenWidget.Layout.FinalRect.Origin[1],
+            (i32)greenWidget.Layout.FinalRect.Size[0],
+            (i32)greenWidget.Layout.FinalRect.Size[1]
+        };
+        SDL_RenderFillRect( sdl, &greenRect );
 
-		SDL_SetRenderDrawColor( sdl, 0, 0, 255, 255 );
-		SDL_Rect blueRect{ static_cast<i32>( blueWidget.Layout.FinalRect.Origin[0] ), static_cast<i32>( blueWidget.Layout.FinalRect.Origin[1] ),
-                       static_cast<i32>( blueWidget.Layout.FinalRect.Size[0] ), static_cast<i32>( blueWidget.Layout.FinalRect.Size[1] ) };
-		SDL_RenderFillRect( sdl, &blueRect );
+        // YELLOW
+        SDL_SetRenderDrawColor( sdl, 255, 255, 0, 255 );
+        SDL_Rect yellowRect{
+            (i32)yellowWidget.Layout.FinalRect.Origin[0],
+            (i32)yellowWidget.Layout.FinalRect.Origin[1],
+            (i32)yellowWidget.Layout.FinalRect.Size[0],
+            (i32)yellowWidget.Layout.FinalRect.Size[1]
+        };
+        SDL_RenderFillRect( sdl, &yellowRect );
+
+        // BLUE
+        SDL_SetRenderDrawColor( sdl, 0, 0, 255, 255 );
+        SDL_Rect blueRect{
+            (i32)blueWidget.Layout.FinalRect.Origin[0],
+            (i32)blueWidget.Layout.FinalRect.Origin[1],
+            (i32)blueWidget.Layout.FinalRect.Size[0],
+            (i32)blueWidget.Layout.FinalRect.Size[1]
+        };
+        SDL_RenderFillRect( sdl, &blueRect );
 
         static bool once = false;
         if ( !once )

@@ -152,10 +152,10 @@ namespace RatUI
      */
     struct Edges
     {
-        f32 Top{ 0.0f };
-        f32 Right{ 0.0f };
-        f32 Bottom{ 0.0f };
-        f32 Left{ 0.0f };
+        f32 Top;
+        f32 Right;
+        f32 Bottom;
+        f32 Left;
 
         /** @brief Calculates the total horizontal inset. */
         constexpr f32 Horizontal() const { return Left + Right; }
@@ -169,14 +169,42 @@ namespace RatUI
         /** @brief Applies the edge insets to a given rectangle, returning a new rectangle that is reduced by the specified insets. */
         constexpr Rectf Apply( Rectf a_Rect ) const
         {
-			return a_Rect.FromMinMax( a_Rect.Min() + Vec2f{ Left, Top }, a_Rect.Max() - Vec2f{ Right, Bottom } );
+			return a_Rect.FromMinMax( a_Rect.Min() + Vec2f{ Left, Top },
+                                      a_Rect.Max() - Vec2f{ Right, Bottom } );
         }
 
+        /** @brief Combines two Edges by adding their respective values together. */
+        constexpr Edges operator+( const Edges& a_Other ) const
+        {
+            return { Top + a_Other.Top, Right + a_Other.Right, Bottom + a_Other.Bottom, Left + a_Other.Left };
+		}
+
+        /** @brief Scales the edge insets by a scalar value, multiplying each edge by the specified factor. */
+        constexpr Edges operator*( f32 a_Scalar ) const
+        {
+            return { Top * a_Scalar, Right * a_Scalar, Bottom * a_Scalar, Left * a_Scalar };
+		}
+
+        /** @brief Scales the edge insets by a scalar value, dividing each edge by the specified factor. */
+        constexpr Edges operator/( f32 a_Scalar ) const
+        {
+            return { Top / a_Scalar, Right / a_Scalar, Bottom / a_Scalar, Left / a_Scalar };
+        }
+
+		/** @brief Initializes all edges to the same value. */
+		constexpr Edges( f32 a_UniformValue = 0.0f ) : Top( a_UniformValue ), Right( a_UniformValue ), Bottom( a_UniformValue ), Left( a_UniformValue ) {}
+
+		/** @brief Initializes horizontal and vertical edges separately. */
+		constexpr Edges( f32 a_Horizontal, f32 a_Vertical ) : Top( a_Vertical ), Right( a_Horizontal ), Bottom( a_Vertical ), Left( a_Horizontal ) {}
+
+		/** @brief Initializes each edge individually. */
+		constexpr Edges( f32 a_Top, f32 a_Right, f32 a_Bottom, f32 a_Left ) : Top( a_Top ), Right( a_Right ), Bottom( a_Bottom ), Left( a_Left ) {}
+
         /** @brief Initializes all edges to the same value. */
-        static constexpr Edges Uniform( f32 a_Value ) { return { a_Value, a_Value, a_Value, a_Value }; }
+        static constexpr Edges Uniform( f32 a_Value ) { return { a_Value }; }
 
         /** @brief Initializes horizontal and vertical edges separately. */
-        static constexpr Edges Symmetric( f32 a_Horizontal, f32 a_Vertical ) { return { a_Vertical, a_Horizontal, a_Vertical, a_Horizontal }; }
+        static constexpr Edges Symmetric( f32 a_Horizontal, f32 a_Vertical ) { return { a_Horizontal, a_Vertical }; }
 
         /** @brief Initializes each edge individually. */
         static constexpr Edges Asymmetric( f32 a_Top, f32 a_Right, f32 a_Bottom, f32 a_Left ) { return { a_Top, a_Right, a_Bottom, a_Left }; }
@@ -253,6 +281,25 @@ namespace RatUI
     };
 
     /**
+     * @brief Represents a safe and unique identifier for a layout node.
+     */
+    struct NodeID
+    {
+        union
+        {
+            struct
+            {
+                u32 Index   : 24; ///< The index of the node in the layout system's internal storage.
+                u32 Version : 8;  ///< A version number that can be used to detect stale references to nodes that have been removed and potentially reused.
+            };
+
+            u32 Packed{ ~0u };    ///< The packed representation of the NodeID, combining the index and version into a single 32-bit value for efficient storage and comparison.
+        };
+    };
+
+    static constexpr NodeID c_InvalidNodeID{};
+
+    /**
      * @brief Represents a UI element in the RatUI layout system, containing layout styles, results, and hierarchical relationships with other nodes.
      * The hierarchy is represented as a doubly-linked list of children for efficient insertion and removal.
      * This avoids the overhead of dynamic arrays for child management, with minimal traversal costs as LayoutNodes are stored in pools.
@@ -261,12 +308,16 @@ namespace RatUI
     {
         LayoutStyle Style{};   ///< The layout style properties that define how this widget should be sized and positioned.
         LayoutResult Layout{}; ///< The cached layout result for this widget computed during the layout process.
+
+        // TODO: This requires the LayoutNode storage to be pointer stable.
+        // Should switch over NodeID's or somehow ensure the storage is stable like std::deque.
+        // Though NodeID's would be slightly slower to traverse and be awkard to use.
+        u32 NumChildren{ 0 };
         LayoutNode* Parent{ nullptr };
         LayoutNode* FirstChild{ nullptr };
         LayoutNode* LastChild{ nullptr };
         LayoutNode* PrevSibling{ nullptr };
         LayoutNode* NextSibling{ nullptr };
-        u32 NumChildren{ 0 };
 
         // TODO: Add proper hierarchy functionality
 
