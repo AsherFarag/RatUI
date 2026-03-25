@@ -1,7 +1,7 @@
 /**
  * @file TestArrange.cpp
- * @brief Advanced tests for RatUI widget layout and arranging functions:
- *   AlignRect, AlignCrossAxis, ResolveAlign, ArrangeWidget, ArrangeOverlay,
+ * @brief Advanced tests for RatUI LayoutNode layout and arranging functions:
+ *   AlignRect, AlignCrossAxis, ResolveAlign, ArrangeLayoutNode, ArrangeOverlay,
  *   ArrangeLinear (Horizontal / Vertical), ArrangeAnchored, and integrated
  *   Measure + Arrange round-trips with FlexGrow, margins, padding, visibility,
  *   SizeConstraints clamping, nested hierarchies, and edge-cases.
@@ -11,33 +11,11 @@
 
 using namespace RatUI;
 
-// =============================================================================
-// Helpers (mirror of TestWidget.cpp)
-// =============================================================================
-
-static void AddChild( Widget& a_Parent, Widget& a_Child )
+/** Runs MeasureLayoutNode then ArrangeLayoutNode on the root LayoutNode. */
+static void DoLayout( LayoutNode& a_Root, Vec2f a_AvailSize )
 {
-    a_Child.Parent     = &a_Parent;
-    a_Child.NextSibling = nullptr;
-    if ( a_Parent.LastChild )
-    {
-        a_Parent.LastChild->NextSibling = &a_Child;
-        a_Child.PrevSibling = a_Parent.LastChild;
-    }
-    else
-    {
-        a_Parent.FirstChild = &a_Child;
-        a_Child.PrevSibling = nullptr;
-    }
-    a_Parent.LastChild = &a_Child;
-    ++a_Parent.NumChildren;
-}
-
-/** Runs MeasureWidget then ArrangeWidget on the root widget. */
-static void DoLayout( Widget& a_Root, Vec2f a_AvailSize )
-{
-    MeasureWidget( a_Root, a_AvailSize );
-    ArrangeWidget( a_Root, Rectf{ .Origin = { 0.0f, 0.0f }, .Size = a_AvailSize } );
+    MeasureLayoutNode( a_Root, a_AvailSize );
+    ArrangeLayoutNode( a_Root, Rectf{ .Origin = { 0.0f, 0.0f }, .Size = a_AvailSize } );
 }
 
 /** Checks Rectf origin and size. */
@@ -169,10 +147,10 @@ TEST_CASE( "AlignCrossAxis with non-zero parent position offsets result", "[arra
 
 TEST_CASE( "ResolveAlign returns parent ChildAlign when child SelfAlign is Inherit", "[arrange][resolve]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.ChildAlign = EAlignment::Center;
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.SelfAlign = EAlignment::Inherit;
 
     EAlignment result = ResolveAlign( child, parent );
@@ -181,10 +159,10 @@ TEST_CASE( "ResolveAlign returns parent ChildAlign when child SelfAlign is Inher
 
 TEST_CASE( "ResolveAlign returns child SelfAlign when it is not Inherit", "[arrange][resolve]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.ChildAlign = EAlignment::Center;
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.SelfAlign = EAlignment::BottomRight;
 
     EAlignment result = ResolveAlign( child, parent );
@@ -193,31 +171,31 @@ TEST_CASE( "ResolveAlign returns child SelfAlign when it is not Inherit", "[arra
 
 TEST_CASE( "ResolveAlign TopLeft parent: child Inherit resolves to TopLeft", "[arrange][resolve]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.ChildAlign = EAlignment::TopLeft;
-    Widget child{};
+    LayoutNode child{};
     child.Style.SelfAlign = EAlignment::Inherit;
     REQUIRE( ResolveAlign( child, parent ) == EAlignment::TopLeft );
 }
 
 // =============================================================================
-// ArrangeWidget – FinalRect is set to allocated rect
+// ArrangeLayoutNode – FinalRect is set to allocated rect
 // =============================================================================
 
-TEST_CASE( "ArrangeWidget stores the allocated rect as FinalRect", "[arrange][widget]" )
+TEST_CASE( "ArrangeLayoutNode stores the allocated rect as FinalRect", "[arrange][LayoutNode]" )
 {
-    Widget w{};
+    LayoutNode w{};
     Rectf rect{ .Origin = { 10.0f, 20.0f }, .Size = { 150.0f, 80.0f } };
-    ArrangeWidget( w, rect );
+    ArrangeLayoutNode( w, rect );
     RequireRect( w.Layout.FinalRect, { 10.0f, 20.0f }, { 150.0f, 80.0f } );
 }
 
-TEST_CASE( "ArrangeWidget with no children sets FinalRect and returns", "[arrange][widget]" )
+TEST_CASE( "ArrangeLayoutNode with no children sets FinalRect and returns", "[arrange][LayoutNode]" )
 {
-    Widget w{};
+    LayoutNode w{};
     w.Style.LayoutType = ELayoutType::Horizontal;
     Rectf rect{ .Origin = { 5.0f, 5.0f }, .Size = { 200.0f, 100.0f } };
-    ArrangeWidget( w, rect );
+    ArrangeLayoutNode( w, rect );
     RequireRect( w.Layout.FinalRect, { 5.0f, 5.0f }, { 200.0f, 100.0f } );
 }
 
@@ -227,17 +205,17 @@ TEST_CASE( "ArrangeWidget with no children sets FinalRect and returns", "[arrang
 
 TEST_CASE( "ArrangeOverlay TopLeft child is placed at container origin", "[arrange][overlay]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Overlay;
     parent.Style.ChildAlign = EAlignment::TopLeft;
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.WidthMode   = ESizingMode::Fixed;
     child.Style.HeightMode  = ESizingMode::Fixed;
     child.Style.FixedWidth  = 50.0f;
     child.Style.FixedHeight = 30.0f;
 
-    AddChild( parent, child );
+    parent.AddChild( child );
 
     DoLayout( parent, { 200.0f, 100.0f } );
 
@@ -246,17 +224,17 @@ TEST_CASE( "ArrangeOverlay TopLeft child is placed at container origin", "[arran
 
 TEST_CASE( "ArrangeOverlay Center child is placed at the container center", "[arrange][overlay]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Overlay;
     parent.Style.ChildAlign = EAlignment::Center;
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.WidthMode   = ESizingMode::Fixed;
     child.Style.HeightMode  = ESizingMode::Fixed;
     child.Style.FixedWidth  = 40.0f;
     child.Style.FixedHeight = 20.0f;
 
-    AddChild( parent, child );
+    parent.AddChild( child );
 
     DoLayout( parent, { 200.0f, 100.0f } );
 
@@ -266,17 +244,17 @@ TEST_CASE( "ArrangeOverlay Center child is placed at the container center", "[ar
 
 TEST_CASE( "ArrangeOverlay BottomRight child is placed at container bottom-right", "[arrange][overlay]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Overlay;
     parent.Style.ChildAlign = EAlignment::BottomRight;
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.WidthMode   = ESizingMode::Fixed;
     child.Style.HeightMode  = ESizingMode::Fixed;
     child.Style.FixedWidth  = 30.0f;
     child.Style.FixedHeight = 20.0f;
 
-    AddChild( parent, child );
+    parent.AddChild( child );
 
     DoLayout( parent, { 200.0f, 100.0f } );
 
@@ -285,18 +263,18 @@ TEST_CASE( "ArrangeOverlay BottomRight child is placed at container bottom-right
 
 TEST_CASE( "ArrangeOverlay child SelfAlign overrides parent ChildAlign", "[arrange][overlay]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Overlay;
     parent.Style.ChildAlign = EAlignment::TopLeft;
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.WidthMode   = ESizingMode::Fixed;
     child.Style.HeightMode  = ESizingMode::Fixed;
     child.Style.FixedWidth  = 40.0f;
     child.Style.FixedHeight = 20.0f;
     child.Style.SelfAlign   = EAlignment::Center;
 
-    AddChild( parent, child );
+    parent.AddChild( child );
 
     DoLayout( parent, { 200.0f, 100.0f } );
 
@@ -305,25 +283,25 @@ TEST_CASE( "ArrangeOverlay child SelfAlign overrides parent ChildAlign", "[arran
 
 TEST_CASE( "ArrangeOverlay multiple children each aligned independently", "[arrange][overlay]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Overlay;
     parent.Style.WidthMode  = ESizingMode::Fixed;
     parent.Style.HeightMode = ESizingMode::Fixed;
     parent.Style.FixedWidth  = 200.0f;
     parent.Style.FixedHeight = 100.0f;
 
-    Widget c1{};
+    LayoutNode c1{};
     c1.Style.WidthMode   = ESizingMode::Fixed; c1.Style.HeightMode  = ESizingMode::Fixed;
     c1.Style.FixedWidth  = 20.0f;             c1.Style.FixedHeight  = 10.0f;
     c1.Style.SelfAlign   = EAlignment::TopLeft;
 
-    Widget c2{};
+    LayoutNode c2{};
     c2.Style.WidthMode   = ESizingMode::Fixed; c2.Style.HeightMode  = ESizingMode::Fixed;
     c2.Style.FixedWidth  = 20.0f;             c2.Style.FixedHeight  = 10.0f;
     c2.Style.SelfAlign   = EAlignment::BottomRight;
 
-    AddChild( parent, c1 );
-    AddChild( parent, c2 );
+    parent.AddChild( c1 );
+    parent.AddChild( c2 );
 
     DoLayout( parent, { 200.0f, 100.0f } );
 
@@ -333,18 +311,18 @@ TEST_CASE( "ArrangeOverlay multiple children each aligned independently", "[arra
 
 TEST_CASE( "ArrangeOverlay with padding reduces inner area for children", "[arrange][overlay]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Overlay;
     parent.Style.ChildAlign = EAlignment::TopLeft;
     parent.Style.Padding    = Edges::Uniform( 10.0f );
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.WidthMode   = ESizingMode::Fixed;
     child.Style.HeightMode  = ESizingMode::Fixed;
     child.Style.FixedWidth  = 30.0f;
     child.Style.FixedHeight = 20.0f;
 
-    AddChild( parent, child );
+    parent.AddChild( child );
 
     DoLayout( parent, { 100.0f, 80.0f } );
 
@@ -358,18 +336,18 @@ TEST_CASE( "ArrangeOverlay with padding reduces inner area for children", "[arra
 
 TEST_CASE( "ArrangeLinear Horizontal places children side by side from left", "[arrange][linear][horizontal]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Horizontal;
     parent.Style.ChildAlign = EAlignment::TopLeft;
 
-    Widget c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
     c1.Style.FixedWidth = 50.0f; c1.Style.FixedHeight = 30.0f;
 
-    Widget c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
     c2.Style.FixedWidth = 80.0f; c2.Style.FixedHeight = 30.0f;
 
-    AddChild( parent, c1 );
-    AddChild( parent, c2 );
+    parent.AddChild( c1 );
+    parent.AddChild( c2 );
 
     DoLayout( parent, { 400.0f, 100.0f } );
 
@@ -380,19 +358,19 @@ TEST_CASE( "ArrangeLinear Horizontal places children side by side from left", "[
 
 TEST_CASE( "ArrangeLinear Horizontal with spacing adds gap between children", "[arrange][linear][horizontal]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Horizontal;
     parent.Style.Spacing    = 15.0f;
     parent.Style.ChildAlign = EAlignment::TopLeft;
 
-    Widget c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
     c1.Style.FixedWidth = 40.0f; c1.Style.FixedHeight = 20.0f;
 
-    Widget c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
     c2.Style.FixedWidth = 60.0f; c2.Style.FixedHeight = 20.0f;
 
-    AddChild( parent, c1 );
-    AddChild( parent, c2 );
+    parent.AddChild( c1 );
+    parent.AddChild( c2 );
 
     DoLayout( parent, { 400.0f, 100.0f } );
 
@@ -403,17 +381,17 @@ TEST_CASE( "ArrangeLinear Horizontal with spacing adds gap between children", "[
 
 TEST_CASE( "ArrangeLinear Horizontal cross-axis VCenter aligns child vertically", "[arrange][linear][horizontal]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Horizontal;
     parent.Style.ChildAlign = EAlignment::Center;   // VCenter + HCenter
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.WidthMode   = ESizingMode::Fixed;
     child.Style.HeightMode  = ESizingMode::Fixed;
     child.Style.FixedWidth  = 50.0f;
     child.Style.FixedHeight = 20.0f;
 
-    AddChild( parent, child );
+    parent.AddChild( child );
 
     DoLayout( parent, { 200.0f, 100.0f } );
 
@@ -423,17 +401,17 @@ TEST_CASE( "ArrangeLinear Horizontal cross-axis VCenter aligns child vertically"
 
 TEST_CASE( "ArrangeLinear Horizontal child with VStretch fills cross axis", "[arrange][linear][horizontal]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Horizontal;
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.WidthMode   = ESizingMode::Fixed;
     child.Style.HeightMode  = ESizingMode::Fixed;
     child.Style.FixedWidth  = 50.0f;
     child.Style.FixedHeight = 20.0f;
     child.Style.SelfAlign   = EAlignment::VStretch;
 
-    AddChild( parent, child );
+    parent.AddChild( child );
 
     DoLayout( parent, { 200.0f, 100.0f } );
 
@@ -442,18 +420,18 @@ TEST_CASE( "ArrangeLinear Horizontal child with VStretch fills cross axis", "[ar
 
 TEST_CASE( "ArrangeLinear Horizontal with padding offsets children inside inner rect", "[arrange][linear][horizontal]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Horizontal;
     parent.Style.ChildAlign = EAlignment::TopLeft;
     parent.Style.Padding    = Edges::Uniform( 10.0f );
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.WidthMode   = ESizingMode::Fixed;
     child.Style.HeightMode  = ESizingMode::Fixed;
     child.Style.FixedWidth  = 50.0f;
     child.Style.FixedHeight = 30.0f;
 
-    AddChild( parent, child );
+    parent.AddChild( child );
 
     DoLayout( parent, { 200.0f, 100.0f } );
 
@@ -463,18 +441,18 @@ TEST_CASE( "ArrangeLinear Horizontal with padding offsets children inside inner 
 
 TEST_CASE( "ArrangeLinear Horizontal single-child margin shifts position and shrinks size", "[arrange][linear][horizontal]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Horizontal;
     parent.Style.ChildAlign = EAlignment::TopLeft;
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.WidthMode   = ESizingMode::Fixed;
     child.Style.HeightMode  = ESizingMode::Fixed;
     child.Style.FixedWidth  = 60.0f;
     child.Style.FixedHeight = 40.0f;
     child.Style.Margin      = Edges::Asymmetric( 5.0f, 10.0f, 5.0f, 8.0f ); // top=5, right=10, bottom=5, left=8
 
-    AddChild( parent, child );
+    parent.AddChild( child );
 
     DoLayout( parent, { 300.0f, 100.0f } );
 
@@ -484,23 +462,23 @@ TEST_CASE( "ArrangeLinear Horizontal single-child margin shifts position and shr
 
 TEST_CASE( "ArrangeLinear Horizontal multiple children cursor advances correctly", "[arrange][linear][horizontal]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Horizontal;
     parent.Style.ChildAlign = EAlignment::TopLeft;
     parent.Style.Spacing    = 5.0f;
 
-    Widget c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
     c1.Style.FixedWidth = 20.0f; c1.Style.FixedHeight = 10.0f;
 
-    Widget c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
     c2.Style.FixedWidth = 30.0f; c2.Style.FixedHeight = 10.0f;
 
-    Widget c3{}; c3.Style.WidthMode = ESizingMode::Fixed; c3.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c3{}; c3.Style.WidthMode = ESizingMode::Fixed; c3.Style.HeightMode = ESizingMode::Fixed;
     c3.Style.FixedWidth = 40.0f; c3.Style.FixedHeight = 10.0f;
 
-    AddChild( parent, c1 );
-    AddChild( parent, c2 );
-    AddChild( parent, c3 );
+    parent.AddChild( c1 );
+    parent.AddChild( c2 );
+    parent.AddChild( c3 );
 
     DoLayout( parent, { 400.0f, 100.0f } );
 
@@ -516,18 +494,18 @@ TEST_CASE( "ArrangeLinear Horizontal multiple children cursor advances correctly
 
 TEST_CASE( "ArrangeLinear Vertical places children top to bottom", "[arrange][linear][vertical]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Vertical;
     parent.Style.ChildAlign = EAlignment::TopLeft;
 
-    Widget c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
     c1.Style.FixedWidth = 50.0f; c1.Style.FixedHeight = 30.0f;
 
-    Widget c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
     c2.Style.FixedWidth = 50.0f; c2.Style.FixedHeight = 40.0f;
 
-    AddChild( parent, c1 );
-    AddChild( parent, c2 );
+    parent.AddChild( c1 );
+    parent.AddChild( c2 );
 
     DoLayout( parent, { 200.0f, 400.0f } );
 
@@ -537,19 +515,19 @@ TEST_CASE( "ArrangeLinear Vertical places children top to bottom", "[arrange][li
 
 TEST_CASE( "ArrangeLinear Vertical with spacing adds gap between children", "[arrange][linear][vertical]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Vertical;
     parent.Style.Spacing    = 10.0f;
     parent.Style.ChildAlign = EAlignment::TopLeft;
 
-    Widget c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
     c1.Style.FixedWidth = 50.0f; c1.Style.FixedHeight = 20.0f;
 
-    Widget c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
     c2.Style.FixedWidth = 50.0f; c2.Style.FixedHeight = 30.0f;
 
-    AddChild( parent, c1 );
-    AddChild( parent, c2 );
+    parent.AddChild( c1 );
+    parent.AddChild( c2 );
 
     DoLayout( parent, { 200.0f, 400.0f } );
 
@@ -560,17 +538,17 @@ TEST_CASE( "ArrangeLinear Vertical with spacing adds gap between children", "[ar
 
 TEST_CASE( "ArrangeLinear Vertical cross-axis HCenter centers child horizontally", "[arrange][linear][vertical]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Vertical;
     parent.Style.ChildAlign = EAlignment::Center;
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.WidthMode   = ESizingMode::Fixed;
     child.Style.HeightMode  = ESizingMode::Fixed;
     child.Style.FixedWidth  = 40.0f;
     child.Style.FixedHeight = 20.0f;
 
-    AddChild( parent, child );
+    parent.AddChild( child );
 
     DoLayout( parent, { 200.0f, 100.0f } );
 
@@ -580,17 +558,17 @@ TEST_CASE( "ArrangeLinear Vertical cross-axis HCenter centers child horizontally
 
 TEST_CASE( "ArrangeLinear Vertical child with HStretch fills cross axis", "[arrange][linear][vertical]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Vertical;
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.WidthMode   = ESizingMode::Fixed;
     child.Style.HeightMode  = ESizingMode::Fixed;
     child.Style.FixedWidth  = 40.0f;
     child.Style.FixedHeight = 20.0f;
     child.Style.SelfAlign   = EAlignment::HStretch;
 
-    AddChild( parent, child );
+    parent.AddChild( child );
 
     DoLayout( parent, { 200.0f, 100.0f } );
 
@@ -603,22 +581,22 @@ TEST_CASE( "ArrangeLinear Vertical child with HStretch fills cross axis", "[arra
 
 TEST_CASE( "FlexGrow single child takes all leftover space", "[arrange][flex]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Horizontal;
     parent.Style.WidthMode  = ESizingMode::Fixed;
     parent.Style.HeightMode = ESizingMode::Fixed;
     parent.Style.FixedWidth  = 300.0f;
     parent.Style.FixedHeight = 50.0f;
 
-    Widget c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
     c1.Style.FixedWidth = 100.0f; c1.Style.FixedHeight = 50.0f;
 
-    Widget c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
     c2.Style.FixedWidth = 50.0f; c2.Style.FixedHeight = 50.0f;
     c2.Style.FlexGrow = 1.0f; // takes leftover
 
-    AddChild( parent, c1 );
-    AddChild( parent, c2 );
+    parent.AddChild( c1 );
+    parent.AddChild( c2 );
 
     DoLayout( parent, { 300.0f, 50.0f } );
 
@@ -628,23 +606,23 @@ TEST_CASE( "FlexGrow single child takes all leftover space", "[arrange][flex]" )
 
 TEST_CASE( "FlexGrow two equal-weight children split leftover equally", "[arrange][flex]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Horizontal;
     parent.Style.WidthMode  = ESizingMode::Fixed;
     parent.Style.HeightMode = ESizingMode::Fixed;
     parent.Style.FixedWidth  = 300.0f;
     parent.Style.FixedHeight = 50.0f;
 
-    Widget c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
     c1.Style.FixedWidth = 0.0f; c1.Style.FixedHeight = 50.0f;
     c1.Style.FlexGrow = 1.0f;
 
-    Widget c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
     c2.Style.FixedWidth = 0.0f; c2.Style.FixedHeight = 50.0f;
     c2.Style.FlexGrow = 1.0f;
 
-    AddChild( parent, c1 );
-    AddChild( parent, c2 );
+    parent.AddChild( c1 );
+    parent.AddChild( c2 );
 
     DoLayout( parent, { 300.0f, 50.0f } );
 
@@ -655,23 +633,23 @@ TEST_CASE( "FlexGrow two equal-weight children split leftover equally", "[arrang
 
 TEST_CASE( "FlexGrow 2:1 ratio distributes leftover proportionally", "[arrange][flex]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Horizontal;
     parent.Style.WidthMode  = ESizingMode::Fixed;
     parent.Style.HeightMode = ESizingMode::Fixed;
     parent.Style.FixedWidth  = 300.0f;
     parent.Style.FixedHeight = 50.0f;
 
-    Widget c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
     c1.Style.FixedWidth = 0.0f; c1.Style.FixedHeight = 50.0f;
     c1.Style.FlexGrow = 2.0f;
 
-    Widget c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
     c2.Style.FixedWidth = 0.0f; c2.Style.FixedHeight = 50.0f;
     c2.Style.FlexGrow = 1.0f;
 
-    AddChild( parent, c1 );
-    AddChild( parent, c2 );
+    parent.AddChild( c1 );
+    parent.AddChild( c2 );
 
     DoLayout( parent, { 300.0f, 50.0f } );
 
@@ -682,14 +660,14 @@ TEST_CASE( "FlexGrow 2:1 ratio distributes leftover proportionally", "[arrange][
 
 TEST_CASE( "FlexGrow is clamped by SizeConstraints max", "[arrange][flex]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Horizontal;
     parent.Style.WidthMode  = ESizingMode::Fixed;
     parent.Style.HeightMode = ESizingMode::Fixed;
     parent.Style.FixedWidth  = 300.0f;
     parent.Style.FixedHeight = 50.0f;
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.WidthMode   = ESizingMode::Fixed;
     child.Style.HeightMode  = ESizingMode::Fixed;
     child.Style.FixedWidth  = 0.0f;
@@ -697,7 +675,7 @@ TEST_CASE( "FlexGrow is clamped by SizeConstraints max", "[arrange][flex]" )
     child.Style.FlexGrow    = 1.0f;
     child.Style.SizeConstraints = Constraints::AtMost( { 100.0f, 100.0f } );
 
-    AddChild( parent, child );
+    parent.AddChild( child );
 
     DoLayout( parent, { 300.0f, 50.0f } );
 
@@ -707,22 +685,22 @@ TEST_CASE( "FlexGrow is clamped by SizeConstraints max", "[arrange][flex]" )
 
 TEST_CASE( "FlexGrow Vertical: child grows along vertical axis", "[arrange][flex][vertical]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Vertical;
     parent.Style.WidthMode  = ESizingMode::Fixed;
     parent.Style.HeightMode = ESizingMode::Fixed;
     parent.Style.FixedWidth  = 100.0f;
     parent.Style.FixedHeight = 200.0f;
 
-    Widget c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
     c1.Style.FixedWidth = 100.0f; c1.Style.FixedHeight = 50.0f;
 
-    Widget c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
     c2.Style.FixedWidth = 100.0f; c2.Style.FixedHeight = 0.0f;
     c2.Style.FlexGrow = 1.0f;
 
-    AddChild( parent, c1 );
-    AddChild( parent, c2 );
+    parent.AddChild( c1 );
+    parent.AddChild( c2 );
 
     DoLayout( parent, { 100.0f, 200.0f } );
 
@@ -736,14 +714,14 @@ TEST_CASE( "FlexGrow Vertical: child grows along vertical axis", "[arrange][flex
 
 TEST_CASE( "ArrangeAnchored TopLeft point anchor places child at top-left of parent", "[arrange][anchored]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Overlay;
     parent.Style.WidthMode  = ESizingMode::Fixed;
     parent.Style.HeightMode = ESizingMode::Fixed;
     parent.Style.FixedWidth  = 200.0f;
     parent.Style.FixedHeight = 100.0f;
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.WidthMode      = ESizingMode::Fixed;
     child.Style.HeightMode     = ESizingMode::Fixed;
     child.Style.FixedWidth     = 40.0f;
@@ -751,7 +729,7 @@ TEST_CASE( "ArrangeAnchored TopLeft point anchor places child at top-left of par
     child.Style.PositionMode   = EPositioningMode::Anchored;
     child.Style.Anchor         = Anchor::TopLeft();  // Min=(0,0), Pivot=(0,0)
 
-    AddChild( parent, child );
+    parent.AddChild( child );
 
     DoLayout( parent, { 200.0f, 100.0f } );
 
@@ -760,14 +738,14 @@ TEST_CASE( "ArrangeAnchored TopLeft point anchor places child at top-left of par
 
 TEST_CASE( "ArrangeAnchored Center point anchor places child at parent center", "[arrange][anchored]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Overlay;
     parent.Style.WidthMode  = ESizingMode::Fixed;
     parent.Style.HeightMode = ESizingMode::Fixed;
     parent.Style.FixedWidth  = 200.0f;
     parent.Style.FixedHeight = 100.0f;
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.WidthMode    = ESizingMode::Fixed;
     child.Style.HeightMode   = ESizingMode::Fixed;
     child.Style.FixedWidth   = 40.0f;
@@ -775,7 +753,7 @@ TEST_CASE( "ArrangeAnchored Center point anchor places child at parent center", 
     child.Style.PositionMode = EPositioningMode::Anchored;
     child.Style.Anchor       = Anchor::Center(); // Min=(0.5,0.5), Pivot=(0.5,0.5)
 
-    AddChild( parent, child );
+    parent.AddChild( child );
 
     DoLayout( parent, { 200.0f, 100.0f } );
 
@@ -785,14 +763,14 @@ TEST_CASE( "ArrangeAnchored Center point anchor places child at parent center", 
 
 TEST_CASE( "ArrangeAnchored BottomRight point anchor places child at bottom-right", "[arrange][anchored]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Overlay;
     parent.Style.WidthMode  = ESizingMode::Fixed;
     parent.Style.HeightMode = ESizingMode::Fixed;
     parent.Style.FixedWidth  = 200.0f;
     parent.Style.FixedHeight = 100.0f;
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.WidthMode    = ESizingMode::Fixed;
     child.Style.HeightMode   = ESizingMode::Fixed;
     child.Style.FixedWidth   = 40.0f;
@@ -800,7 +778,7 @@ TEST_CASE( "ArrangeAnchored BottomRight point anchor places child at bottom-righ
     child.Style.PositionMode = EPositioningMode::Anchored;
     child.Style.Anchor       = Anchor::BottomRight(); // Min=(1,1), Pivot=(1,1)
 
-    AddChild( parent, child );
+    parent.AddChild( child );
 
     DoLayout( parent, { 200.0f, 100.0f } );
 
@@ -810,14 +788,14 @@ TEST_CASE( "ArrangeAnchored BottomRight point anchor places child at bottom-righ
 
 TEST_CASE( "ArrangeAnchored StretchAll fills the entire parent", "[arrange][anchored]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Overlay;
     parent.Style.WidthMode  = ESizingMode::Fixed;
     parent.Style.HeightMode = ESizingMode::Fixed;
     parent.Style.FixedWidth  = 200.0f;
     parent.Style.FixedHeight = 100.0f;
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.WidthMode    = ESizingMode::Fixed;
     child.Style.HeightMode   = ESizingMode::Fixed;
     child.Style.FixedWidth   = 0.0f;
@@ -825,7 +803,7 @@ TEST_CASE( "ArrangeAnchored StretchAll fills the entire parent", "[arrange][anch
     child.Style.PositionMode = EPositioningMode::Anchored;
     child.Style.Anchor       = Anchor::StretchAll(); // Min=(0,0), Max=(1,1), offset=(0,0)
 
-    AddChild( parent, child );
+    parent.AddChild( child );
 
     DoLayout( parent, { 200.0f, 100.0f } );
 
@@ -836,14 +814,14 @@ TEST_CASE( "ArrangeAnchored StretchAll fills the entire parent", "[arrange][anch
 
 TEST_CASE( "ArrangeAnchored with pixel offset shifts position", "[arrange][anchored]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Overlay;
     parent.Style.WidthMode  = ESizingMode::Fixed;
     parent.Style.HeightMode = ESizingMode::Fixed;
     parent.Style.FixedWidth  = 200.0f;
     parent.Style.FixedHeight = 100.0f;
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.WidthMode    = ESizingMode::Fixed;
     child.Style.HeightMode   = ESizingMode::Fixed;
     child.Style.FixedWidth   = 40.0f;
@@ -852,7 +830,7 @@ TEST_CASE( "ArrangeAnchored with pixel offset shifts position", "[arrange][ancho
     // Point anchor at top-left with a pixel offset of (10, 5)
     child.Style.Anchor = { .Min = { 0.0f, 0.0f }, .Max = { 0.0f, 0.0f }, .Pivot = { 0.0f, 0.0f }, .Offset = { 10.0f, 5.0f } };
 
-    AddChild( parent, child );
+    parent.AddChild( child );
 
     DoLayout( parent, { 200.0f, 100.0f } );
 
@@ -862,14 +840,14 @@ TEST_CASE( "ArrangeAnchored with pixel offset shifts position", "[arrange][ancho
 
 TEST_CASE( "ArrangeAnchored StretchTop stretches across top edge with zero height", "[arrange][anchored]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Overlay;
     parent.Style.WidthMode  = ESizingMode::Fixed;
     parent.Style.HeightMode = ESizingMode::Fixed;
     parent.Style.FixedWidth  = 200.0f;
     parent.Style.FixedHeight = 100.0f;
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.WidthMode    = ESizingMode::Fixed;
     child.Style.HeightMode   = ESizingMode::Fixed;
     child.Style.FixedWidth   = 0.0f;
@@ -877,7 +855,7 @@ TEST_CASE( "ArrangeAnchored StretchTop stretches across top edge with zero heigh
     child.Style.PositionMode = EPositioningMode::Anchored;
     child.Style.Anchor       = Anchor::StretchTop(); // Min=(0,0), Max=(1,0)
 
-    AddChild( parent, child );
+    parent.AddChild( child );
 
     DoLayout( parent, { 200.0f, 100.0f } );
 
@@ -889,12 +867,12 @@ TEST_CASE( "ArrangeAnchored StretchTop stretches across top edge with zero heigh
 
 TEST_CASE( "ArrangeAnchored anchored child does not affect parent content size", "[arrange][anchored]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Overlay;
     parent.Style.WidthMode  = ESizingMode::Content;
     parent.Style.HeightMode = ESizingMode::Content;
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.WidthMode    = ESizingMode::Fixed;
     child.Style.HeightMode   = ESizingMode::Fixed;
     child.Style.FixedWidth   = 300.0f;
@@ -902,9 +880,9 @@ TEST_CASE( "ArrangeAnchored anchored child does not affect parent content size",
     child.Style.PositionMode = EPositioningMode::Anchored;
     child.Style.Anchor       = Anchor::TopLeft();
 
-    AddChild( parent, child );
+    parent.AddChild( child );
 
-    Vec2f desired = MeasureWidget( parent, { 400.0f, 300.0f } );
+    Vec2f desired = MeasureLayoutNode( parent, { 400.0f, 300.0f } );
     // Anchored child is excluded from content measurement → parent stays 0x0
     RequireApproxEqual( desired, Vec2f( 0.0f, 0.0f ) );
 }
@@ -915,27 +893,27 @@ TEST_CASE( "ArrangeAnchored anchored child does not affect parent content size",
 
 TEST_CASE( "ArrangeLinear Collapsed child is skipped and does not advance cursor", "[arrange][visibility]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Horizontal;
     parent.Style.ChildAlign = EAlignment::TopLeft;
 
-    Widget c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
     c1.Style.FixedWidth = 50.0f; c1.Style.FixedHeight = 30.0f;
 
-    Widget c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
     c2.Style.FixedWidth = 50.0f; c2.Style.FixedHeight = 30.0f;
     c2.Layout.Visibility = { Visibility::Collapsed };
 
-    Widget c3{}; c3.Style.WidthMode = ESizingMode::Fixed; c3.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c3{}; c3.Style.WidthMode = ESizingMode::Fixed; c3.Style.HeightMode = ESizingMode::Fixed;
     c3.Style.FixedWidth = 70.0f; c3.Style.FixedHeight = 30.0f;
 
-    AddChild( parent, c1 );
-    AddChild( parent, c2 );
-    AddChild( parent, c3 );
+    parent.AddChild( c1 );
+    parent.AddChild( c2 );
+    parent.AddChild( c3 );
 
     // Measure first so DesiredSizes are set
-    MeasureWidget( parent, { 400.0f, 100.0f } );
-    ArrangeWidget( parent, { .Origin = { 0.0f, 0.0f }, .Size = { 400.0f, 100.0f } } );
+    MeasureLayoutNode( parent, { 400.0f, 100.0f } );
+    ArrangeLayoutNode( parent, { .Origin = { 0.0f, 0.0f }, .Size = { 400.0f, 100.0f } } );
 
     // c2 is collapsed, so c3 should start right after c1 (no gap for c2)
     REQUIRE( c1.Layout.FinalRect.Origin[0] == Catch::Approx( 0.0f  ) );
@@ -944,26 +922,26 @@ TEST_CASE( "ArrangeLinear Collapsed child is skipped and does not advance cursor
 
 TEST_CASE( "ArrangeLinear Hidden child still occupies space in layout", "[arrange][visibility]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Horizontal;
     parent.Style.ChildAlign = EAlignment::TopLeft;
 
-    Widget c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
     c1.Style.FixedWidth = 50.0f; c1.Style.FixedHeight = 30.0f;
 
-    Widget c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
     c2.Style.FixedWidth = 60.0f; c2.Style.FixedHeight = 30.0f;
     c2.Layout.Visibility = { Visibility::Hidden }; // affects layout, not rendered
 
-    Widget c3{}; c3.Style.WidthMode = ESizingMode::Fixed; c3.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c3{}; c3.Style.WidthMode = ESizingMode::Fixed; c3.Style.HeightMode = ESizingMode::Fixed;
     c3.Style.FixedWidth = 40.0f; c3.Style.FixedHeight = 30.0f;
 
-    AddChild( parent, c1 );
-    AddChild( parent, c2 );
-    AddChild( parent, c3 );
+    parent.AddChild( c1 );
+    parent.AddChild( c2 );
+    parent.AddChild( c3 );
 
-    MeasureWidget( parent, { 400.0f, 100.0f } );
-    ArrangeWidget( parent, { .Origin = { 0.0f, 0.0f }, .Size = { 400.0f, 100.0f } } );
+    MeasureLayoutNode( parent, { 400.0f, 100.0f } );
+    ArrangeLayoutNode( parent, { .Origin = { 0.0f, 0.0f }, .Size = { 400.0f, 100.0f } } );
 
     // c1@0, c2@50, c3@110
     REQUIRE( c1.Layout.FinalRect.Origin[0] == Catch::Approx( 0.0f   ) );
@@ -975,10 +953,10 @@ TEST_CASE( "ArrangeLinear Hidden child still occupies space in layout", "[arrang
 // Nested hierarchy arrange
 // =============================================================================
 
-TEST_CASE( "ArrangeWidget nested Horizontal inside Vertical positions grandchildren correctly", "[arrange][nested]" )
+TEST_CASE( "ArrangeLayoutNode nested Horizontal inside Vertical positions grandchildren correctly", "[arrange][nested]" )
 {
     // Root: Vertical
-    Widget root{};
+    LayoutNode root{};
     root.Style.LayoutType = ELayoutType::Vertical;
     root.Style.ChildAlign = EAlignment::TopLeft;
     root.Style.WidthMode  = ESizingMode::Fixed;
@@ -987,30 +965,30 @@ TEST_CASE( "ArrangeWidget nested Horizontal inside Vertical positions grandchild
     root.Style.FixedHeight = 200.0f;
 
     // row: Horizontal with two fixed children
-    Widget row{};
+    LayoutNode row{};
     row.Style.LayoutType = ELayoutType::Horizontal;
     row.Style.ChildAlign = EAlignment::TopLeft;
     row.Style.WidthMode  = ESizingMode::Fill; row.Style.PercentWidth  = 1.0f;
     row.Style.HeightMode = ESizingMode::Fixed; row.Style.FixedHeight  = 50.0f;
 
-    Widget gc1{}; gc1.Style.WidthMode = ESizingMode::Fixed; gc1.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode gc1{}; gc1.Style.WidthMode = ESizingMode::Fixed; gc1.Style.HeightMode = ESizingMode::Fixed;
     gc1.Style.FixedWidth = 60.0f; gc1.Style.FixedHeight = 50.0f;
 
-    Widget gc2{}; gc2.Style.WidthMode = ESizingMode::Fixed; gc2.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode gc2{}; gc2.Style.WidthMode = ESizingMode::Fixed; gc2.Style.HeightMode = ESizingMode::Fixed;
     gc2.Style.FixedWidth = 80.0f; gc2.Style.FixedHeight = 50.0f;
 
-    AddChild( row, gc1 );
-    AddChild( row, gc2 );
+    row.AddChild( gc1 );
+    row.AddChild( gc2 );
 
     // single fixed child below the row
-    Widget below{};
+    LayoutNode below{};
     below.Style.WidthMode   = ESizingMode::Fixed;
     below.Style.HeightMode  = ESizingMode::Fixed;
     below.Style.FixedWidth  = 100.0f;
     below.Style.FixedHeight = 30.0f;
 
-    AddChild( root, row );
-    AddChild( root, below );
+    root.AddChild( row );
+    root.AddChild( below );
 
     DoLayout( root, { 200.0f, 200.0f } );
 
@@ -1025,26 +1003,26 @@ TEST_CASE( "ArrangeWidget nested Horizontal inside Vertical positions grandchild
     REQUIRE( gc2.Layout.FinalRect.Origin[1] == Catch::Approx( 0.0f  ) );
 }
 
-TEST_CASE( "ArrangeWidget deeply nested: 3 levels of Overlay widgets set FinalRect", "[arrange][nested]" )
+TEST_CASE( "ArrangeLayoutNode deeply nested: 3 levels of Overlay LayoutNodes set FinalRect", "[arrange][nested]" )
 {
-    Widget l1{};
+    LayoutNode l1{};
     l1.Style.LayoutType = ELayoutType::Overlay;
     l1.Style.WidthMode  = ESizingMode::Fixed; l1.Style.HeightMode = ESizingMode::Fixed;
     l1.Style.FixedWidth = 200.0f; l1.Style.FixedHeight = 200.0f;
 
-    Widget l2{};
+    LayoutNode l2{};
     l2.Style.LayoutType = ELayoutType::Overlay;
     l2.Style.WidthMode  = ESizingMode::Fixed; l2.Style.HeightMode = ESizingMode::Fixed;
     l2.Style.FixedWidth = 100.0f; l2.Style.FixedHeight = 100.0f;
     l2.Style.SelfAlign  = EAlignment::Center;
 
-    Widget l3{};
+    LayoutNode l3{};
     l3.Style.WidthMode  = ESizingMode::Fixed; l3.Style.HeightMode = ESizingMode::Fixed;
     l3.Style.FixedWidth = 40.0f; l3.Style.FixedHeight = 40.0f;
     l3.Style.SelfAlign  = EAlignment::Center;
 
-    AddChild( l2, l3 );
-    AddChild( l1, l2 );
+    l2.AddChild( l3 );
+    l1.AddChild( l2 );
 
     DoLayout( l1, { 200.0f, 200.0f } );
 
@@ -1056,19 +1034,19 @@ TEST_CASE( "ArrangeWidget deeply nested: 3 levels of Overlay widgets set FinalRe
 }
 
 // =============================================================================
-// Measure + Arrange round-trip: Collapsed widgets
+// Measure + Arrange round-trip: Collapsed LayoutNodes
 // =============================================================================
 
-TEST_CASE( "Collapsed widget has zero desired size and empty FinalRect after full layout", "[arrange][visibility][roundtrip]" )
+TEST_CASE( "Collapsed LayoutNode has zero desired size and empty FinalRect after full layout", "[arrange][visibility][roundtrip]" )
 {
-    Widget w{};
+    LayoutNode w{};
     w.Style.WidthMode   = ESizingMode::Fixed;
     w.Style.HeightMode  = ESizingMode::Fixed;
     w.Style.FixedWidth  = 100.0f;
     w.Style.FixedHeight = 50.0f;
     w.Layout.Visibility = { Visibility::Collapsed };
 
-    Vec2f desired = MeasureWidget( w, { 500.0f, 500.0f } );
+    Vec2f desired = MeasureLayoutNode( w, { 500.0f, 500.0f } );
     RequireApproxEqual( desired, Vec2f( 0.0f, 0.0f ) );
 }
 
@@ -1078,7 +1056,7 @@ TEST_CASE( "Collapsed widget has zero desired size and empty FinalRect after ful
 
 TEST_CASE( "FlexGrow respects padding: leftover excludes padding from available space", "[arrange][flex][padding]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Horizontal;
     parent.Style.WidthMode  = ESizingMode::Fixed;
     parent.Style.HeightMode = ESizingMode::Fixed;
@@ -1086,14 +1064,14 @@ TEST_CASE( "FlexGrow respects padding: leftover excludes padding from available 
     parent.Style.FixedHeight = 50.0f;
     parent.Style.Padding     = Edges::Symmetric( 25.0f, 0.0f ); // 25px each side = 50px total H padding
 
-    Widget child{};
+    LayoutNode child{};
     child.Style.WidthMode   = ESizingMode::Fixed;
     child.Style.HeightMode  = ESizingMode::Fixed;
     child.Style.FixedWidth  = 0.0f;
     child.Style.FixedHeight = 50.0f;
     child.Style.FlexGrow    = 1.0f;
 
-    AddChild( parent, child );
+    parent.AddChild( child );
 
     DoLayout( parent, { 300.0f, 50.0f } );
 
@@ -1108,20 +1086,20 @@ TEST_CASE( "FlexGrow respects padding: leftover excludes padding from available 
 
 TEST_CASE( "ArrangeLinear Horizontal margin and spacing interact correctly", "[arrange][linear][margin][spacing]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Horizontal;
     parent.Style.Spacing    = 10.0f;
     parent.Style.ChildAlign = EAlignment::TopLeft;
 
-    Widget c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
     c1.Style.FixedWidth = 50.0f; c1.Style.FixedHeight = 30.0f;
     c1.Style.Margin = Edges::Asymmetric( 0.0f, 5.0f, 0.0f, 5.0f ); // top=0, right=5, bottom=0, left=5
 
-    Widget c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
     c2.Style.FixedWidth = 60.0f; c2.Style.FixedHeight = 30.0f;
 
-    AddChild( parent, c1 );
-    AddChild( parent, c2 );
+    parent.AddChild( c1 );
+    parent.AddChild( c2 );
 
     DoLayout( parent, { 400.0f, 100.0f } );
 
@@ -1140,20 +1118,20 @@ TEST_CASE( "ArrangeLinear Horizontal margin and spacing interact correctly", "[a
 
 TEST_CASE( "Content-sized parent resizes correctly after full Measure+Arrange round-trip", "[arrange][roundtrip]" )
 {
-    Widget parent{};
+    LayoutNode parent{};
     parent.Style.LayoutType = ELayoutType::Horizontal;
     parent.Style.WidthMode  = ESizingMode::Content;
     parent.Style.HeightMode = ESizingMode::Content;
     parent.Style.Spacing    = 5.0f;
 
-    Widget c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
     c1.Style.FixedWidth = 100.0f; c1.Style.FixedHeight = 40.0f;
 
-    Widget c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
+    LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
     c2.Style.FixedWidth = 80.0f; c2.Style.FixedHeight = 60.0f;
 
-    AddChild( parent, c1 );
-    AddChild( parent, c2 );
+    parent.AddChild( c1 );
+    parent.AddChild( c2 );
 
     DoLayout( parent, { 1000.0f, 1000.0f } );
 
