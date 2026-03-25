@@ -8,15 +8,13 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(Catch2)
 
-add_executable(RatUI_Tests
-    Core/TestVec.cpp
-    Core/TestContainers.cpp
-    Core/TestUnits.cpp
-    Layout/TestLayout.cpp
-    Layout/TestWidget.cpp
-    Layout/TestArrange.cpp
-    StringFormat/TestStringFormat.cpp
+# Gather all test source files - Note all .cpp files in the directory are Tests, so we can use GLOB_RECURSE to find them
+file(GLOB_RECURSE TEST_SOURCES
+    CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
 )
+
+add_executable(RatUI_Tests ${TEST_SOURCES})
 
 target_include_directories(RatUI_Tests
     PRIVATE
