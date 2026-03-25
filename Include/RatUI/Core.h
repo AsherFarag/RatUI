@@ -52,5 +52,6 @@ namespace RatUI
 #include "Core/String.inl"
 #include "Core/Memory.inl"
 #include "Core/Units.inl"
+#include "Core/Pool.inl"
 
 #undef RATUI_TRY_EXPR

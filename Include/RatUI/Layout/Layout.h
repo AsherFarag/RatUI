@@ -281,31 +281,6 @@ namespace RatUI
     };
 
     /**
-     * @brief Represents a safe and unique identifier for a layout node.
-     */
-    struct NodeID
-    {
-        union
-        {
-            struct
-            {
-                u32 Index   : 24; ///< The index of the node in the layout system's internal storage.
-                u32 Version : 8;  ///< A version number that can be used to detect stale references to nodes that have been removed and potentially reused.
-            };
-
-            u32 Packed{ ~0u };    ///< The packed representation of the NodeID, combining the index and version into a single 32-bit value for efficient storage and comparison.
-        };
-
-        constexpr NodeID() = default;
-        constexpr NodeID( u32 a_Index, u8 a_Version ) : Index( a_Index ), Version( a_Version ) {}
-        constexpr explicit NodeID( u32 a_Packed ) : Packed( a_Packed ) {}
-
-        constexpr bool operator==( const NodeID& a_Other ) const { return Packed == a_Other.Packed; }
-    };
-
-    static constexpr NodeID c_InvalidNodeID{};
-
-    /**
      * @brief Represents a UI element in the RatUI layout system, containing layout styles, results, and hierarchical relationships with other nodes.
      * The hierarchy is represented as a doubly-linked list of children for efficient insertion and removal.
      * This avoids the overhead of dynamic arrays for child management, with minimal traversal costs as LayoutNodes are stored in pools.
