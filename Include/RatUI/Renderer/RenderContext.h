@@ -6,7 +6,7 @@ namespace RatUI
 
     struct RenderContext
     {
-        IRenderer& Renderer;
+        //IRenderer& Renderer;
     };
 
 } // namespace RatUI

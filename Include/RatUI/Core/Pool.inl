@@ -156,6 +156,38 @@ namespace RatUI
             FreeList.clear();
         }
 
+        template<std::invocable<T&> Func>
+        void ForEach( Func&& a_Func )
+        {
+            for ( const auto& bucket : Buckets )
+            {
+                if ( bucket == nullptr )
+                    continue;
+
+                for ( u32 i = 0; i < c_ItemsPerBucket; ++i )
+                {
+                    if ( bucket->Occupancy.test( i ) )
+                        std::forward<Func>( a_Func )( bucket->GetItems()[ i ] );
+                }
+            }
+        }
+
+        template<std::invocable<const T&> Func>
+        void ForEach( Func&& a_Func ) const
+        {
+            for ( const auto& bucket : Buckets )
+            {
+                if ( bucket == nullptr )
+                    continue;
+
+                for ( u32 i = 0; i < c_ItemsPerBucket; ++i )
+                {
+                    if ( bucket->Occupancy.test( i ) )
+                        std::forward<Func>( a_Func )( bucket->GetItems()[ i ] );
+                }
+            }
+        }
+
     private:
 
         Bucket* BucketAt( u32 a_BucketIndex )

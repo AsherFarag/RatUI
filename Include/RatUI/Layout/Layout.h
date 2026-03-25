@@ -280,6 +280,9 @@ namespace RatUI
         struct Visibility Visibility{}; ///< The visibility state of the element, which can affect both rendering and layout.
     };
 
+    using WidgetID = PoolID;
+    using NodeID = PoolID;
+
     /**
      * @brief Represents a UI element in the RatUI layout system, containing layout styles, results, and hierarchical relationships with other nodes.
      * The hierarchy is represented as a doubly-linked list of children for efficient insertion and removal.
@@ -295,6 +298,12 @@ namespace RatUI
         LayoutNode* LastChild{ nullptr };
         LayoutNode* PrevSibling{ nullptr };
         LayoutNode* NextSibling{ nullptr };
+
+        union
+        {
+			PoolID WidgetID;          ///< The ID of the widget associated with this layout node.
+			void* UserData = nullptr; ///< Incase LayoutNode is not being used with the IWidget system, this can store arbitrary user data.
+        };
 
         // TODO: Add proper hierarchy functionality
 

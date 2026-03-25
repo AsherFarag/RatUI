@@ -7,14 +7,13 @@ namespace RatUI
 {
     struct Scene;
 
-    using NodeID = PoolID;
-
     /**
      * @brief
      */
     class IWidget
     {
     public:
+        WidgetID ID{};
         NodeID LayoutID{};
 
         virtual ~IWidget() = default;
@@ -23,7 +22,7 @@ namespace RatUI
          * @brief Called once per frame after layout is resolved.
          * @param a_Context The rendering context used for painting this widget.
          */
-        virtual void OnPaint( const Scene& a_Scene, const RenderContext& a_Context ) {}
+        virtual void OnPaint( Scene& a_Scene, const RenderContext& a_Context ) {}
 
         /** @brief Called when a pointer (e.g., mouse cursor) enters the widget's bounds. */
         virtual void OnHoverEnter() {}
