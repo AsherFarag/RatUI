@@ -158,6 +158,24 @@ namespace RatUI
                    Top() < a_Other.Bottom() && Bottom() > a_Other.Top();
         }
 
+        constexpr Rect<T> Intersection( const Rect<T>& a_Other ) const
+        {
+            if ( !Intersects( a_Other ) )
+                return Rect<T>{};
+
+            Vec2f newMin{
+                std::max( Left(), a_Other.Left() ),
+                std::max( Top(), a_Other.Top() )
+			};
+
+            Vec2f newMax{
+                std::min( Right(), a_Other.Right() ),
+                std::min( Bottom(), a_Other.Bottom() )
+            };
+
+            return FromMinMax( newMin, newMax );
+        }
+
         constexpr bool Contains( Vec2<T> a_Point ) const
         {
             return a_Point[ 0 ] >= Left() && a_Point[ 0 ] <= Right() &&
@@ -167,6 +185,20 @@ namespace RatUI
         static constexpr Rect FromMinMax( Vec2<T> a_Min, Vec2<T> a_Max )
         {
             return { a_Min, a_Max - a_Min };
+        }
+
+        static constexpr Rect FromCenter( Vec2<T> a_Center, Vec2<T> a_Size )
+        {
+            Vec2<T> halfSize = a_Size * static_cast<T>( 0.5 );
+            return { a_Center - halfSize, a_Size };
+        }
+
+        static constexpr Rect Infite()
+        {
+            return {
+                Vec2<T>{ Limits<T>::lowest(), Limits<T>::lowest() },
+                Vec2<T>{ Limits<T>::max(), Limits<T>::max() }
+            };
         }
     };
 

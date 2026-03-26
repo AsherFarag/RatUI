@@ -9,7 +9,7 @@
  * pipeline.  Widgets that require low-level drawing access can obtain the
  * underlying handle via GetSDLRenderer().
  */
-class SDL2Renderer : public RatUI::IRenderer
+class SDL2Renderer : public RatUI::IRenderInterface
 {
 public:
     explicit SDL2Renderer( SDL_Renderer* a_Renderer ) : m_Renderer( a_Renderer ) {}

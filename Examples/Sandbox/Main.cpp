@@ -1,6 +1,7 @@
 #include <Application.h>
 #include <SDL2Renderer.h>
 #include "RatUI/RatUI.h"
+#include <RatUI/Renderer/DrawList.h>
 #include <print>
 #include <format>
 #include <iostream>
@@ -76,6 +77,16 @@ protected:
     bool OnInitialize() override
     {
         g_SDLRenderer = GetRenderer();
+
+        Brush brush = SolidBrush{ .Color = Colors::PowderBlue };
+		DrawList testDrawList;
+		testDrawList
+			.AddRect( brush, Rectf::FromCenter( Vec2f{ 100.f, 100.f }, Vec2f{ 50.f, 50.f } ) )
+			.AddRectBorder( brush, Rectf::FromCenter( Vec2f{ 200.f, 100.f }, Vec2f{ 50.f, 50.f } ), 5.f )
+            .PushClipRect( Rectf::FromCenter( Vec2f{ 300.f, 100.f }, Vec2f{ 50.f, 50.f } ) )
+                .AddRect( brush, Rectf::FromCenter( Vec2f{ 300.f, 100.f }, Vec2f{ 50.f, 50.f } ) )
+                .AddCustom( nullptr )
+			.PopClipRect();
 
         // Root container
         WidgetID root = m_Scene.CreateRootWidget<RectWidget>( SDL_Color{ 0, 0, 0, 0 }, "Root" );
