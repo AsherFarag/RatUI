@@ -91,10 +91,10 @@ namespace RatUI
             }
         }
 
-        void Render( const RenderContext& a_Context )
+		void Render( DrawList& a_DrawList )
         {
             if ( IWidget* root = GetWidget( RootWidget ) )
-                root->OnPaint( *this, a_Context );
+                root->OnPaint( *this, a_DrawList );
         }
 
         void ProcessInput( Vec2f a_PhysicalMousePos, bool a_MouseDown, f32 a_Scale )

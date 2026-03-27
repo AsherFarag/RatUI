@@ -1,5 +1,4 @@
 #include <Application.h>
-#include <SDL2Renderer.h>
 #include "RatUI/RatUI.h"
 #include <RatUI/Renderer/DrawList.h>
 #include <print>
@@ -15,34 +14,37 @@ class RectWidget : public IWidget
 {
 public:
 	RectWidget( const SDL_Color& a_Color, StringView a_Name )
-		: Color( a_Color ), Name( a_Name )
+		: Col( a_Color.r, a_Color.g, a_Color.b, a_Color.a ), Name( a_Name )
     {}
 
 	StringView Name;
-    SDL_Color Color{ 255, 255, 255, 255 };
+    Color Col;
+	f32 time = 0.f;
 
-    void OnPaint( Scene& a_Scene, const RenderContext& a_Context ) override
+	void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
     {
+		time += 1.f / 60.f;
+
         const LayoutNode* node = a_Scene.Layouts.Get( LayoutID );
         if ( !node )
             return;
 
         const Rectf& rect = node->Layout.FinalRect;
 
-        SDL_Rect sdlRect{
-            (i32)rect.Origin[0],
-            (i32)rect.Origin[1],
-            (i32)rect.Size[0],
-            (i32)rect.Size[1]
-        };
+		// rotate between -30 and 30 degrees based on time, using the center of the rect as the pivot
+		f32 angle = std::sin( time ) * 5.f;
 
-        SDL_SetRenderDrawColor( g_SDLRenderer, Color.r, Color.g, Color.b, Color.a );
-        SDL_RenderFillRect( g_SDLRenderer, &sdlRect );
+        RenderTransform transform{}; transform.Angle = Radians{ Degreesf{ angle } };
+
+		a_DrawList.PushTransform( transform.ToMatrix( rect ) );
+		a_DrawList.AddRect( SolidBrush{ .Color = Col }, rect );
 
         a_Scene.ForEachChildWidget( ID, [&]( IWidget& child )
         {
-            child.OnPaint( a_Scene, a_Context );
+            child.OnPaint( a_Scene, a_DrawList );
 		} );
+
+        a_DrawList.PopTransform();
     }
 
     void OnHoverEnter() override
@@ -183,19 +185,45 @@ protected:
     {
         using namespace RatUI;
 
-        // Render
-        RenderContext ctx{};
-        m_Scene.Render( ctx );
+		DrawList drawList;
+        m_Scene.Render( drawList );
+
+        for ( const DrawCmd& cmd : drawList.Commands )
+        {
+            if ( std::holds_alternative<DrawCmd::RectCmd>( cmd.Payload ) )
+            {
+                const auto& rectCmd = std::get<DrawCmd::RectCmd>( cmd.Payload );
+                const Rectf& rect = rectCmd.Rect;
+
+                if ( std::holds_alternative<SolidBrush>( cmd.DrawBrush ) )
+                {
+                    const auto& solid = std::get<SolidBrush>( cmd.DrawBrush );
+					SDL_SetRenderDrawColor( g_SDLRenderer, solid.Color[0], solid.Color[1], solid.Color[2], solid.Color[3] );
+
+                    const Mat3f& transform = cmd.Transform;
+
+                    // Apply transform to rect corners
+                    Vec3f topLeft = transform * Vec3f{ rect.Left(), rect.Top(), 1.f };
+                    Vec3f topRight = transform * Vec3f{ rect.Right(), rect.Top(), 1.f };
+                    Vec3f bottomLeft = transform * Vec3f{ rect.Left(), rect.Bottom(), 1.f };
+                    Vec3f bottomRight = transform * Vec3f{ rect.Right(), rect.Bottom(), 1.f };
+
+                    // Draw filled rect (as two triangles)
+                    SDL_RenderDrawLine( g_SDLRenderer, (int)topLeft[0], (int)topLeft[1], (int)topRight[0], (int)topRight[1] );
+                    SDL_RenderDrawLine( g_SDLRenderer, (int)topRight[0], (int)topRight[1], (int)bottomRight[0], (int)bottomRight[1] );
+                    SDL_RenderDrawLine( g_SDLRenderer, (int)bottomRight[0], (int)bottomRight[1], (int)bottomLeft[0], (int)bottomLeft[1] );
+                    SDL_RenderDrawLine( g_SDLRenderer, (int)bottomLeft[0], (int)bottomLeft[1], (int)topLeft[0], (int)topLeft[1] );
+                }
+            }
+		}
     }
 
     bool OnShutdown() override
     {
-        m_Renderer.reset();
         return true;
     }
 
-private:
-    std::unique_ptr<SDL2Renderer> m_Renderer;
+
 };
 
 #undef main // SDL2 redefines main() on some platforms, so we undefine it here to avoid conflicts with our own main() function.

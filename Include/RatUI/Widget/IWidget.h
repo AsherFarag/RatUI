@@ -1,7 +1,7 @@
 #pragma once
 #include "../Core.h"
 #include "../Layout/Layout.h"
-#include "../Renderer/RenderContext.h"
+#include "../Renderer/DrawList.h"
 
 namespace RatUI
 {
@@ -22,7 +22,7 @@ namespace RatUI
          * @brief Called once per frame after layout is resolved.
          * @param a_Context The rendering context used for painting this widget.
          */
-        virtual void OnPaint( Scene& a_Scene, const RenderContext& a_Context ) {}
+        virtual void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) {}
 
         /** @brief Called when a pointer (e.g., mouse cursor) enters the widget's bounds. */
         virtual void OnHoverEnter() {}

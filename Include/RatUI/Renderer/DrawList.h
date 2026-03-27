@@ -5,76 +5,56 @@
 
 namespace RatUI
 {
+    /**
+     * @brief Used for custom rendering commands that don't fit into the predefined categories. 
+     * @param a_Renderer The renderer to use for drawing.
+     * @param a_Cmd The draw command containing the necessary information for rendering.
+     */
     using CustomDrawFunc = void(*)( class IRenderInterface& a_Renderer, const struct DrawCmd& a_Cmd );
 
+    /**
+     * @brief Represents a single drawing command, which are buffered in a DrawList and later executed by the renderer. 
+     */
     struct DrawCmd
     {
-        enum class EType : u8
-        {
-            Unknown = 0,
-            Rect,
-            RectBorder,
-            RoundedRect,
-            RoundedRectBorder,
-            Circle,
-            CircleBorder,
-            Custom = 255u
-        };
+        struct RectCmd { Rectf Rect; };
+
+        struct RectBorderCmd { Rectf Rect; f32 BorderThickness; };
+
+        struct RoundedRectCmd { Rectf Rect; f32 CornerRadius; };
+
+        struct RoundedRectBorderCmd { Rectf Rect; f32 CornerRadius; f32 BorderThickness; };
+
+        struct CircleCmd { Vec2f Center; f32 Radius; };
+
+        struct CircleBorderCmd { Vec2f Center; f32 Radius; f32 BorderThickness; };
+
+        struct CustomCmd { CustomDrawFunc Func; void* UserData; };
 
         Brush DrawBrush;
         Mat3f Transform{ c_Identity<Mat3f> };
         Rectf ClipRect;
-        EType Type{ EType::Unknown };
 
-        union
-        {
-            Rectf Rect;
-
-            struct
-            {
-                Rectf Rect;
-                f32 CornerRadius;
-            } RoundedRect;
-
-            struct 
-            {
-                Rectf Rect;
-                f32 BorderThickness;
-            } RectBorder;
-
-            struct 
-            {
-                Rectf Rect;
-                f32 CornerRadius;
-                f32 BorderThickness;
-            } RoundedRectBorder;
-            
-            struct 
-            {
-                Vec2f Center;
-                f32 Radius;
-            } Circle;
-
-            struct
-            {
-                Vec2f Center;
-                f32 Radius;
-                f32 BorderThickness;
-            } CircleBorder;
-
-            struct 
-            {
-                CustomDrawFunc Func;
-                void* UserData;
-            } Custom;
-        };
+        Variant<
+            RectCmd,
+            RectBorderCmd,
+            RoundedRectCmd,
+            RoundedRectBorderCmd,
+            CircleCmd,
+            CircleBorderCmd,
+            CustomCmd
+        > Payload;
     };
 
+    /**
+     * @brief A DrawList is a collection of draw commands that can be recorded and then executed by the renderer.
+     * It also maintains a stack of clipping rectangles and transformation matrices, allowing for hierarchical transformations and clipping.
+     */
     struct DrawList
     {
-        Array<DrawCmd> Commands;
-        Array<Rectf> ClipStack;
-        Array<Mat3f> TransformStack;
+        Array<DrawCmd> Commands;     ///< Buffered draw commands to be executed by the renderer.
+        Array<Rectf> ClipStack;      ///< Stack of clipping rectangles. The current clipping rectangle is the intersection of all rectangles in the stack.
+        Array<Mat3f> TransformStack; ///< Stack of transformation matrices. The current transformation is the product of all matrices in the stack.
 
         void Clear()
         {
@@ -134,8 +114,7 @@ namespace RatUI
                 .DrawBrush = std::move( a_Brush ),
                 .Transform = CurrentTransform(),
                 .ClipRect = CurrentClipRect(),
-				.Type = DrawCmd::EType::Rect,
-                .Rect = a_Rect
+                .Payload = DrawCmd::RectCmd{ .Rect = a_Rect }
 			} );
             return *this;
         }
@@ -146,8 +125,7 @@ namespace RatUI
                 .DrawBrush = std::move( a_Brush ),
                 .Transform = CurrentTransform(),
                 .ClipRect = CurrentClipRect(),
-                .Type = DrawCmd::EType::RoundedRect,
-                .RoundedRect = {.Rect = a_Rect, .CornerRadius = a_CornerRadius }
+                .Payload = DrawCmd::RoundedRectCmd{ .Rect = a_Rect, .CornerRadius = a_CornerRadius }
 			} );
             return *this;
         }
@@ -158,8 +136,7 @@ namespace RatUI
                 .DrawBrush = std::move( a_Brush ),
                 .Transform = CurrentTransform(),
                 .ClipRect = CurrentClipRect(),
-                .Type = DrawCmd::EType::RectBorder,
-                .RectBorder = {.Rect = a_Rect, .BorderThickness = a_Thickness }
+                .Payload = DrawCmd::RectBorderCmd{ .Rect = a_Rect, .BorderThickness = a_Thickness }
             } );
             return *this;
         }
@@ -170,8 +147,7 @@ namespace RatUI
                 .DrawBrush = std::move( a_Brush ),
                 .Transform = CurrentTransform(),
                 .ClipRect = CurrentClipRect(),
-                .Type = DrawCmd::EType::RoundedRectBorder,
-                .RoundedRectBorder = {.Rect = a_Rect, .CornerRadius = a_CornerRadius, .BorderThickness = a_Thickness }
+                .Payload = DrawCmd::RoundedRectBorderCmd{ .Rect = a_Rect, .CornerRadius = a_CornerRadius, .BorderThickness = a_Thickness }
             } );
             return *this;
         }
@@ -182,8 +158,7 @@ namespace RatUI
                 .DrawBrush = std::move( a_Brush ),
                 .Transform = CurrentTransform(),
                 .ClipRect = CurrentClipRect(),
-                .Type = DrawCmd::EType::Circle,
-                .Circle = {.Center = a_Center, .Radius = a_Radius }
+                .Payload = DrawCmd::CircleCmd{ .Center = a_Center, .Radius = a_Radius }
             } );
             return *this;
         }
@@ -194,8 +169,7 @@ namespace RatUI
                 .DrawBrush = std::move( a_Brush ),
                 .Transform = CurrentTransform(),
                 .ClipRect = CurrentClipRect(),
-                .Type = DrawCmd::EType::CircleBorder,
-                .CircleBorder = {.Center = a_Center, .Radius = a_Radius, .BorderThickness = a_Thickness }
+                .Payload = DrawCmd::CircleBorderCmd{ .Center = a_Center, .Radius = a_Radius, .BorderThickness = a_Thickness }
             } );
             return *this;
         }
@@ -206,8 +180,7 @@ namespace RatUI
                 .DrawBrush = std::move( a_Brush ),
                 .Transform = CurrentTransform(),
                 .ClipRect = CurrentClipRect(),
-                .Type = DrawCmd::EType::Custom,
-                .Custom = {.Func = a_Func, .UserData = a_UserData }
+                .Payload = DrawCmd::CustomCmd{ .Func = a_Func, .UserData = a_UserData }
             } );
             return *this;
         }

@@ -3,6 +3,16 @@
 
 namespace RatUI
 {
+    enum class EUnit : u8
+    {
+        // Length
+        Pixel,
+
+        // Angle
+        Radians,
+        Degrees,
+    };
+
     /** 
      * @brief A unit representing a pixel, similar to CSS pixels.
      * @note _px literals for this type are defined in the Literals namespace, e.g., 16_px.
@@ -83,8 +93,6 @@ namespace RatUI
     template<typename T>
     constexpr Radians<T> operator*( T a_Scalar, Radians<T> a_Radians ) { return a_Radians * a_Scalar; }
 
-    using Radiansf = Radians<f32>;
-
     template<typename T>
     struct Degrees
     {
@@ -124,6 +132,7 @@ namespace RatUI
     constexpr Degrees<T> operator*( T a_Scalar, Degrees<T> a_Degrees ) { return a_Degrees * a_Scalar; }
 
     using Degreesf = Degrees<f32>;
+    using Radiansf = Radians<f32>;
 
     /** 
      * @brief A namespace containing user-defined literals for RatUI units.
