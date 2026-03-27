@@ -114,6 +114,7 @@ void OnRender()
   centerWidget.Style.HeightMode = ESizingMode::Fixed;
   centerWidget.Style.FixedWidth = 120.f;
   centerWidget.Style.FixedHeight = 60.f;
+  centerWidget.Style.BorderRadius = 10;
   screenRoot.AddChild( centerWidget );
 
   // ---------------- STRETCH ANCHOR (full-width bottom bar) ----------------
@@ -163,7 +164,8 @@ void OnRender()
           (f32)node.Layout.FinalRect.Size[0],
           (f32)node.Layout.FinalRect.Size[1]
       };
-      DrawRectangleRec(rect, rectCol);
+
+      DrawRectangleRounded(rect, (f32)node.Style.BorderRadius, (f32)node.Style.BorderRadius ? 10.f : 0.f, rectCol);
   };
 
   // Clear
