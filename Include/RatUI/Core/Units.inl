@@ -83,6 +83,8 @@ namespace RatUI
     template<typename T>
     constexpr Radians<T> operator*( T a_Scalar, Radians<T> a_Radians ) { return a_Radians * a_Scalar; }
 
+    using Radiansf = Radians<f32>;
+
     template<typename T>
     struct Degrees
     {
@@ -120,6 +122,8 @@ namespace RatUI
 
     template<typename T>
     constexpr Degrees<T> operator*( T a_Scalar, Degrees<T> a_Degrees ) { return a_Degrees * a_Scalar; }
+
+    using Degreesf = Degrees<f32>;
 
     /** 
      * @brief A namespace containing user-defined literals for RatUI units.

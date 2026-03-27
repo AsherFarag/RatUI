@@ -93,6 +93,10 @@ namespace RatUI
     using Mat3u = Mat<u32, 3>;
     using Mat4u = Mat<u32, 4>;
 
+    template<typename T> requires requires { T::identity(); }
+    constexpr T c_Identity = T::identity();
+
+
     // === Color ===
 
     using Color = RATUI_COLOR_IMPL;
@@ -139,6 +143,8 @@ namespace RatUI
         Vec2<T> Origin{ static_cast<T>( 0 ), static_cast<T>( 0 ) };
         Vec2<T> Size{ static_cast<T>( 0 ), static_cast<T>( 0 ) };
 
+        constexpr T Width() const { return Size[ 0 ]; }
+        constexpr T Height() const { return Size[ 1 ]; }
         constexpr T Top() const { return Origin[ 1 ]; }
         constexpr T Bottom() const { return Origin[ 1 ] + Size[ 1 ]; }
         constexpr T Left() const { return Origin[ 0 ]; }

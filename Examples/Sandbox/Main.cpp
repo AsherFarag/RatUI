@@ -85,7 +85,7 @@ protected:
 			.AddRectBorder( brush, Rectf::FromCenter( Vec2f{ 200.f, 100.f }, Vec2f{ 50.f, 50.f } ), 5.f )
             .PushClipRect( Rectf::FromCenter( Vec2f{ 300.f, 100.f }, Vec2f{ 50.f, 50.f } ) )
                 .AddRect( brush, Rectf::FromCenter( Vec2f{ 300.f, 100.f }, Vec2f{ 50.f, 50.f } ) )
-                .AddCustom( nullptr )
+                .AddCustom( brush, nullptr )
 			.PopClipRect();
 
         // Root container
