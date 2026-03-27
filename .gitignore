@@ -47,4 +47,4 @@
 # build directory
 build/
 out/
-Examples/RaylibDemo/CMakeLists.txt
+compile_commands.json
