@@ -30,3 +30,4 @@ target_link_libraries(RatUI_Examples_Common
 
 # ─── Examples ────────────────────────────────────────────────────────────────
 add_subdirectory(Sandbox)
+add_subdirectory(Raylib_Demo)

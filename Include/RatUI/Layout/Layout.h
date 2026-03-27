@@ -251,6 +251,8 @@ namespace RatUI
         // - Alignment properties
         EAlignment SelfAlign{ EAlignment::Inherit }; ///< Overrides parent's ChildAlign for this element. Only applicable when PositionMode is Flow.
 
+        i32 BorderRadius { 0 };
+
         // - Sizing properties
         ESizingMode WidthMode{ ESizingMode::Content };  ///< The sizing mode for the width of the element.
         ESizingMode HeightMode{ ESizingMode::Content }; ///< The sizing mode for the height of the element.
