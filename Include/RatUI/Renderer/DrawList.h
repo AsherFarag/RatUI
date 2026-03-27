@@ -13,8 +13,8 @@ namespace RatUI
         {
             Unknown = 0,
             Rect,
-            RoundedRect,
             RectBorder,
+            RoundedRect,
             RoundedRectBorder,
             Circle,
             CircleBorder,
