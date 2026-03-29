@@ -176,11 +176,71 @@ protected:
         // Layout
         m_Scene.UpdateLayout( size );
 
-        // Process input
-        int mouseX, mouseY;
-		bool mouseDown = SDL_GetMouseState( &mouseX, &mouseY ) & SDL_BUTTON( 1 );
+        // Process SDL events and dispatch them to the scene
+        {
+            SDL_Event sdlEvent;
+            while ( SDL_PollEvent( &sdlEvent ) )
+            {
+                if ( sdlEvent.type == SDL_QUIT )
+                {
+                    RequestExit();
+                    return;
+                }
+                else if ( sdlEvent.type == SDL_KEYDOWN || sdlEvent.type == SDL_KEYUP )
+                {
+                    InputEvent event{
+                        .Device = EDeviceID::Keyboard,
+                        .Payload = ButtonEvent{
+                            .Button = static_cast<EButtonID>( sdlEvent.key.keysym.sym ),
+                            .Pressed = sdlEvent.type == SDL_KEYDOWN,
+                            .Released = sdlEvent.type == SDL_KEYUP,
+                            .Held = false // Held state can be tracked separately if needed
+                        }
+                    };
 
-		//m_Scene.ProcessInput( Vec2f{ (f32)mouseX, (f32)mouseY }, mouseDown, 1.f );
+                    m_Scene.DispatchInputEvent( event );
+                }
+                else if ( sdlEvent.type == SDL_MOUSEBUTTONDOWN || sdlEvent.type == SDL_MOUSEBUTTONUP )
+                {
+                    InputEvent event{
+                        .Device = EDeviceID::Mouse,
+                        .Payload = ButtonEvent{
+                            .Button = static_cast<EButtonID>( SDL_BUTTON( sdlEvent.button.button ) ),
+                            .Pressed = sdlEvent.type == SDL_MOUSEBUTTONDOWN,
+                            .Released = sdlEvent.type == SDL_MOUSEBUTTONUP,
+                            .Held = false // Held state can be tracked separately if needed
+                        }
+                    };
+
+                    m_Scene.DispatchInputEvent( event );
+                }
+                else if ( sdlEvent.type == SDL_MOUSEWHEEL )
+                {
+                    InputEvent event{
+                        .Device = EDeviceID::Mouse,
+                        .Payload = PointerEvent{
+                            .Type = EPointerType::Mouse,
+                            .ScrollDelta = Vec2f{ (f32)sdlEvent.wheel.x, (f32)sdlEvent.wheel.y }
+                        }
+                    };
+
+                    m_Scene.DispatchInputEvent( event );
+                }
+                else if ( sdlEvent.type == SDL_MOUSEMOTION )
+                {
+                    InputEvent event{
+                        .Device = EDeviceID::Mouse,
+                        .Payload = PointerEvent{
+                            .Position = Vec2f{ (f32)sdlEvent.motion.x, (f32)sdlEvent.motion.y },
+                            .Delta = Vec2f{ (f32)sdlEvent.motion.xrel, (f32)sdlEvent.motion.yrel },
+                            .Type = EPointerType::Mouse
+                        }
+                    };
+
+                    m_Scene.DispatchInputEvent( event );
+                }
+            }
+        }
     }
 
     void OnRender() override
