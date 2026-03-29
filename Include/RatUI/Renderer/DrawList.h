@@ -84,7 +84,7 @@ namespace RatUI
         Rectf CurrentClipRect() const
         {
             if ( Empty( ClipStack ) )
-                return Rectf::Infite();
+                return Rectf::Infinite();
 
             return Back( ClipStack );
         }

@@ -44,7 +44,7 @@ public:
         {
             while ( IsRunning() )
             {
-                ProcessEvents();
+                //ProcessEvents();
                 OnUpdate();
 
                 SDL_SetRenderDrawColor( m_Renderer, 0, 0, 0, 255 );

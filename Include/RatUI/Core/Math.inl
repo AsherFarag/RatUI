@@ -154,6 +154,7 @@ namespace RatUI
         constexpr Vec2<T> TopRight() const { return Vec2<T>{ Origin[ 0 ] + Size[ 0 ], Origin[ 1 ] }; }
         constexpr Vec2<T> BottomLeft() const { return Vec2<T>{ Origin[ 0 ], Origin[ 1 ] + Size[ 1 ] }; }
         constexpr Vec2<T> BottomRight() const { return Origin + Size; }
+		constexpr Vec2<T> Center() const { return Origin + Size * static_cast<T>( 0.5 ); }
 
         constexpr Vec2<T> Min() const { return TopLeft(); }
         constexpr Vec2<T> Max() const { return BottomRight(); }
@@ -162,6 +163,14 @@ namespace RatUI
         {
             return Left() < a_Other.Right() && Right() > a_Other.Left() &&
                    Top() < a_Other.Bottom() && Bottom() > a_Other.Top();
+        }
+
+        constexpr Rect<T> Expanded( T a_Amount ) const
+        {
+            return {
+                Vec2<T>{ Origin[ 0 ] - a_Amount, Origin[ 1 ] - a_Amount },
+                Vec2<T>{ Size[ 0 ] + static_cast<T>( 2 ) * a_Amount, Size[ 1 ] + static_cast<T>( 2 ) * a_Amount }
+            };
         }
 
         constexpr Rect<T> Intersection( const Rect<T>& a_Other ) const
@@ -199,7 +208,7 @@ namespace RatUI
             return { a_Center - halfSize, a_Size };
         }
 
-        static constexpr Rect Infite()
+        static constexpr Rect Infinite()
         {
             return {
                 Vec2<T>{ Limits<T>::lowest(), Limits<T>::lowest() },

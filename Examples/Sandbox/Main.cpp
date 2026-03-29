@@ -2,6 +2,7 @@
 #include "RatUI/RatUI.h"
 #include <RatUI/Renderer/DrawList.h>
 #include <RatUI/Input/InputEvent.h>
+#include <RatUI/Input/Navigation.h>
 #include <print>
 #include <format>
 #include <iostream>
@@ -11,11 +12,34 @@ using namespace RatUI;
 
 static SDL_Renderer* g_SDLRenderer = nullptr;
 
+EButtonID SDLKeyboardToButtonID( SDL_Keycode a_Keycode )
+{
+    // Map SDL keycodes to our EButtonID enum. This is a simplified mapping for demonstration purposes.
+    if ( a_Keycode >= SDLK_a && a_Keycode <= SDLK_z )
+        return static_cast<EButtonID>( (int)EButtonID::KeyA + ( a_Keycode - SDLK_a ) );
+    if ( a_Keycode >= SDLK_0 && a_Keycode <= SDLK_9 )
+        return static_cast<EButtonID>( (int)EButtonID::Key0 + ( a_Keycode - SDLK_0 ) );
+    switch ( a_Keycode )
+    {
+        case SDLK_RETURN: return EButtonID::KeyEnter;
+        case SDLK_ESCAPE: return EButtonID::KeyEscape;
+        case SDLK_SPACE:  return EButtonID::KeySpace;
+        case SDLK_TAB:    return EButtonID::KeyTab;
+        case SDLK_BACKSPACE: return EButtonID::KeyBackspace;
+        case SDLK_UP:     return EButtonID::KeyUp;
+        case SDLK_DOWN:   return EButtonID::KeyDown;
+        case SDLK_LEFT:   return EButtonID::KeyLeft;
+        case SDLK_RIGHT:  return EButtonID::KeyRight;
+        default:          return EButtonID::Unknown; // Add more mappings as needed
+    }
+}
+
 class RectWidget : public IWidget
 {
 public:
 	RectWidget( const SDL_Color& a_Color, StringView a_Name )
-		: Col( a_Color.r, a_Color.g, a_Color.b, a_Color.a ), Name( a_Name )
+		: Col( MakeColorU8( a_Color.r, a_Color.g, a_Color.b, a_Color.a ) )
+		, Name( a_Name )
     {}
 
 	StringView Name;
@@ -36,9 +60,13 @@ public:
 		f32 angle = std::sin( time ) * 1.f;
 
         RenderTransform transform{}; transform.Angle = Radians{ Degreesf{ angle } };
-		transform.Scale = Vec2f{ 1.f + 0.5f * std::sin( time * 0.5f ), 1.f + 0.5f * std::sin( time * 0.5f ) } * 0.5f; // Scale between 0.5 and 1.5
+        transform.Scale = Vec2f{0.75,0.75} + Vec2f{ 1.f + 0.5f * std::sin( time * 0.5f ), 1.f + 0.5f * std::sin( time * 0.5f ) } * 0.1f; // Scale between 0.5 and 1.5
 
-		//a_DrawList.PushTransform( transform.ToMatrix( rect ) );
+		a_DrawList.PushTransform( transform.ToMatrix( rect ) );
+
+        if ( a_Scene.IsWidgetFocused( GetID() ) )
+            a_DrawList.AddRect( SolidBrush{ .Color = Colors::White }, rect.Expanded( 10.f ) );
+
 		a_DrawList.AddRect( SolidBrush{ .Color = Col }, rect );
 
         a_Scene.ForEachChildWidget( GetID(), [&](IWidget& child)
@@ -46,8 +74,13 @@ public:
             child.OnPaint( a_Scene, a_DrawList );
 		} );
 
-        //a_DrawList.PopTransform();
+        a_DrawList.PopTransform();
     }
+
+    bool IsFocusable( Scene& a_Scene ) const override
+    {
+        return true;
+	}
 
     void OnHoverEnter( Scene& a_Scene ) override
     {
@@ -113,7 +146,7 @@ protected:
         redNode->Style.Margin = Edges{ 10.f };
 
         // ---------------- HBOX ----------------
-        WidgetID hbox = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 0, 0, 50, 0 }, "HBox" );
+        WidgetID hbox = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 0, 0, 50, 255 }, "HBox" );
         auto* hboxNode = m_Scene.Layouts.Get( m_Scene.GetWidget( hbox )->GetLayoutID() );
 
         hboxNode->Style.LayoutType = ELayoutType::Horizontal;
@@ -124,7 +157,7 @@ protected:
         hboxNode->Style.WidthMode = ESizingMode::Fill;
 
         // ---------------- GREEN ----------------
-        green = m_Scene.CreateWidget<RectWidget>( hbox, SDL_Color{ 0, 255, 0, 0 }, "Green" );
+        green = m_Scene.CreateWidget<RectWidget>( hbox, SDL_Color{ 0, 255, 0, 255 }, "Green" );
         auto* greenNode = m_Scene.Layouts.Get( m_Scene.GetWidget( green )->GetLayoutID() );
 
         greenNode->Style.WidthMode = ESizingMode::Fill;
@@ -133,7 +166,7 @@ protected:
         greenNode->Style.PercentWidth = 0.5f; // This will be ignored since the parent is an HBox with Spacing, so it falls back to FlexGrow behavior.
 
         // ---------------- YELLOW ----------------
-        WidgetID yellow = m_Scene.CreateWidget<RectWidget>( hbox, SDL_Color{ 255, 255, 0, 0 }, "Yellow" );
+        WidgetID yellow = m_Scene.CreateWidget<RectWidget>( hbox, SDL_Color{ 255, 255, 0, 255 }, "Yellow" );
         auto* yellowNode = m_Scene.Layouts.Get( m_Scene.GetWidget( yellow )->GetLayoutID() );
 
         yellowNode->Style.WidthMode = ESizingMode::Fill;
@@ -191,7 +224,7 @@ protected:
                     InputEvent event{
                         .Device = EDeviceID::Keyboard,
                         .Payload = ButtonEvent{
-                            .Button = static_cast<EButtonID>( sdlEvent.key.keysym.sym ),
+							.Button = SDLKeyboardToButtonID( sdlEvent.key.keysym.sym ),
                             .Pressed = sdlEvent.type == SDL_KEYDOWN,
                             .Released = sdlEvent.type == SDL_KEYUP,
                             .Held = false // Held state can be tracked separately if needed
@@ -199,6 +232,33 @@ protected:
                     };
 
                     m_Scene.DispatchInputEvent( event );
+
+                    // TEst out navigation with arrow keys
+                    if ( event.Device == EDeviceID::Keyboard )
+                    {
+                        const ButtonEvent& btnEvent = std::get<ButtonEvent>( event.Payload );
+
+                        ENavAction navAction = ENavAction::None;
+                        switch ( btnEvent.Button )
+                        {
+                            case EButtonID::KeyUp:    navAction = ENavAction::MoveUp; break;
+                            case EButtonID::KeyDown:  navAction = ENavAction::MoveDown; break;
+                            case EButtonID::KeyLeft:  navAction = ENavAction::MoveLeft; break;
+                            case EButtonID::KeyRight: navAction = ENavAction::MoveRight; break;
+                            default: break; // Unsupported key
+                        }
+
+						if ( btnEvent.Pressed && navAction != ENavAction::None )
+                        {
+                            static bool test = [&]()
+                            {
+								m_Scene.SetFocus( green ); // Test setting focus to the green widget on first navigation input
+                                return true;
+                            }( );
+
+							m_Scene.Navigate( navAction );
+                        }
+                    }
                 }
                 else if ( sdlEvent.type == SDL_MOUSEBUTTONDOWN || sdlEvent.type == SDL_MOUSEBUTTONUP )
                 {
@@ -260,7 +320,13 @@ protected:
                 if ( std::holds_alternative<SolidBrush>( cmd.DrawBrush ) )
                 {
                     const auto& solid = std::get<SolidBrush>( cmd.DrawBrush );
-					SDL_SetRenderDrawColor( g_SDLRenderer, solid.Color[0], solid.Color[1], solid.Color[2], solid.Color[3] );
+                    SDL_Color sdlColor = {
+                        static_cast<Uint8>( solid.Color[0] * 255.f ),
+                        static_cast<Uint8>( solid.Color[1] * 255.f ),
+                        static_cast<Uint8>( solid.Color[2] * 255.f ),
+                        static_cast<Uint8>( solid.Color[3] * 255.f )
+					};
+					SDL_SetRenderDrawColor( g_SDLRenderer, sdlColor.r, sdlColor.g, sdlColor.b, sdlColor.a );
 
                     const Mat3f& transform = cmd.Transform;
 
@@ -270,11 +336,19 @@ protected:
                     Vec3f bottomLeft = transform * Vec3f{ rect.Left(), rect.Bottom(), 1.f };
                     Vec3f bottomRight = transform * Vec3f{ rect.Right(), rect.Bottom(), 1.f };
 
+                    SDL_Vertex vertices[4] = {
+						{ .position = { topLeft[0], topLeft[1] }, .color = sdlColor, .tex_coord = { 0.f, 0.f } },
+                        { .position = { topRight[0], topRight[1] }, .color = sdlColor, .tex_coord = { 1.f, 0.f } },
+                        { .position = { bottomRight[0], bottomRight[1] }, .color = sdlColor, .tex_coord = { 1.f, 1.f } },
+                        { .position = { bottomLeft[0], bottomLeft[1] }, .color = sdlColor, .tex_coord = { 0.f, 1.f } }
+					};
+
+					int indices[6] = { 0, 1, 2, 0, 2, 3 };
+
                     // Draw filled rect (as two triangles)
-                    SDL_RenderDrawLine( g_SDLRenderer, (int)topLeft[0], (int)topLeft[1], (int)topRight[0], (int)topRight[1] );
-                    SDL_RenderDrawLine( g_SDLRenderer, (int)topRight[0], (int)topRight[1], (int)bottomRight[0], (int)bottomRight[1] );
-                    SDL_RenderDrawLine( g_SDLRenderer, (int)bottomRight[0], (int)bottomRight[1], (int)bottomLeft[0], (int)bottomLeft[1] );
-                    SDL_RenderDrawLine( g_SDLRenderer, (int)bottomLeft[0], (int)bottomLeft[1], (int)topLeft[0], (int)topLeft[1] );
+                    SDL_RenderGeometry( g_SDLRenderer, nullptr, 
+						vertices, 4,
+						indices, 6 );
                 }
             }
 		}
