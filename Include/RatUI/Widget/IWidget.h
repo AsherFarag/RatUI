@@ -32,6 +32,9 @@ namespace RatUI
         /** @brief Called when this widget receives focus for input. */
         virtual void OnFocusReceived() {}
 
+		/** @brief Called when this widget loses focus for input. */
+        virtual void OnFocusLost() {}
+
         /** @brief Called when a pointer (e.g., mouse cursor) enters the widget's bounds. */
         virtual void OnHoverEnter() {}
 
