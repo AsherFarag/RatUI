@@ -70,25 +70,9 @@ namespace RatUI
             
                 numFlow++;
             
-                // If a child wants to Flex but the parent is Content-sized on that axis,
-                // the dependency is circular — treat the child as Content for measure so
-                // the parent can resolve its own size. Arrange will expand it correctly.
-                ESizingMode effectiveW = child.Style.WidthMode;
-                ESizingMode effectiveH = child.Style.HeightMode;
-            
-                // Temporarily override sizing mode so recursive MeasureLayoutNode sees the fallback
-                const ESizingMode savedW = child.Style.WidthMode;
-                const ESizingMode savedH = child.Style.HeightMode;
-            
-                child.Style.WidthMode  = effectiveW;
-                child.Style.HeightMode = effectiveH;
-            
                 const Vec2f childDesired = MeasureLayoutNode( child, childAvailSize )
                                          + Vec2f{ child.Style.Margin.Horizontal(),
                                                   child.Style.Margin.Vertical() };
-                                        
-                child.Style.WidthMode  = savedW;
-                child.Style.HeightMode = savedH;
                                         
                 switch ( s.LayoutType )
                 {
@@ -134,7 +118,7 @@ namespace RatUI
         return desired;
     }
 
-    /** Resolves which alignment to use — child's SelfAlign overrides parent's ChildAlign */
+    /** Resolves which alignment to use - child's SelfAlign overrides parent's ChildAlign */
     inline EAlignment ResolveAlign( const LayoutNode& a_Child, const LayoutNode& a_Parent )
     {
         return (a_Child.Style.SelfAlign != EAlignment::Inherit)
@@ -224,7 +208,7 @@ namespace RatUI
     inline f32 AlignCrossAxis( f32 a_ChildSize, f32 a_ParentPos,
                                f32 a_ParentSize, EAlignment a_Align, bool a_IsMainAxisHorizontal )
     {
-        // Cross axis of horizontal layout is vertical — check V flags
+        // Cross axis of horizontal layout is vertical - check V flags
         bool center = a_IsMainAxisHorizontal ? (a_Align & EAlignment::VCenter)
                                              : (a_Align & EAlignment::HCenter);
         bool end    = a_IsMainAxisHorizontal ? (a_Align & EAlignment::Bottom)
@@ -262,7 +246,7 @@ namespace RatUI
         f32 leftover  = std::max( 0.f, available - totalFixed );
 
         // Flex children that were measured as Content (due to circular dependency) also
-        // claim a share of leftover space — treat them as FlexGrow 1 if they have no grow set.
+        // claim a share of leftover space - treat them as FlexGrow 1 if they have no grow set.
         a_Node.ForEachChild( [&]( const LayoutNode& child )
         {
             if ( child.Style.PositionMode == EPositioningMode::Anchored ) return;
@@ -292,7 +276,7 @@ namespace RatUI
 
             Vec2f childSize = child.Layout.DesiredSize;
 
-            // Determine effective grow weight — explicit FlexGrow or implicit 1 for Flex children
+            // Determine effective grow weight - explicit FlexGrow or implicit 1 for Flex children
             f32 growWeight = child.Style.FlexGrow;
             if ( growWeight == 0.f )
             {
@@ -308,7 +292,7 @@ namespace RatUI
                 const Constraints& c     = child.Style.SizeConstraints;
                 f32                share = leftover * ( growWeight / totalGrow );
 
-                // TODO: Iterative clamped distribution — if a child hits MaxSize, remaining
+                // TODO: Iterative clamped distribution - if a child hits MaxSize, remaining
                 // leftover should redistribute to uncapped siblings. Not worth doing until needed.
                 if ( isHz )
                     childSize[0] = std::clamp( childSize[0] + share, c.MinSize[0], c.MaxSize[0] );
@@ -316,22 +300,17 @@ namespace RatUI
                     childSize[1] = std::clamp( childSize[1] + share, c.MinSize[1], c.MaxSize[1] );
             }
 
-            // Fill on the cross axis — always expand regardless of grow
+            // Fill on the cross axis - always expand regardless of grow
             EAlignment align = ResolveAlign( child, a_Node );
             if (  isHz && ( align & EAlignment::VStretch ) == EAlignment::VStretch ) childSize[1] = a_Inner.Size[1];
             if ( !isHz && ( align & EAlignment::HStretch ) == EAlignment::HStretch ) childSize[0] = a_Inner.Size[0];
 
-            // Flex on cross axis from SizingMode
+            // Fallback for children that want to Flex but had to be measured as Content due to circular dependency - expand them fully on the main axis
             if ( isHz && child.Style.HeightMode == ESizingMode::Flex )
-            {
-                f32 pct = child.Style.PercentHeight > 0.f ? child.Style.PercentHeight : 1.f;
-                childSize[1] = a_Inner.Size[1] * pct;
-            }
+                childSize[1] = a_Inner.Size[1];
+
             if ( !isHz && child.Style.WidthMode == ESizingMode::Flex )
-            {
-                f32 pct = child.Style.PercentWidth > 0.f ? child.Style.PercentWidth : 1.f;
-                childSize[0] = a_Inner.Size[0] * pct;
-            }
+                childSize[0] = a_Inner.Size[0];
 
             // Position on main axis, align on cross axis
             Rectf childRect;

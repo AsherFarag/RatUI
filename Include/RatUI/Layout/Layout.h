@@ -264,10 +264,10 @@ namespace RatUI
          * @note PercentWidth/PercentHeight are only meaningful when the parent axis is Fixed or Flex.
          * Inside a Content-sized parent, Flex children fall back to Content (zero intrinsic size) and PercentWidth/Height is ignored.
          */
-        f32 PercentWidth{ 1.0f };      ///< The percentage of the available width to use when WidthMode is set to Fill.
-        f32 PercentHeight{ 1.0f };     ///< The percentage of the available height to use when HeightMode is set to Fill.
+        f32 PercentWidth{ 0.0f };      ///< The percentage of the available width to use when WidthMode is set to Fill.
+        f32 PercentHeight{ 0.0f };     ///< The percentage of the available height to use when HeightMode is set to Fill.
 
-        f32 FlexGrow{ 1.0f };          ///< Determines how much of the remaining space the element should occupy relative to its siblings.
+        f32 FlexGrow{ 0.0f };          ///< Determines how much of the remaining space the element should occupy relative to its siblings.
         Constraints SizeConstraints{}; ///< The size constraints to consider when laying out the element.
     };
 
