@@ -11,21 +11,6 @@
 #include <iterator>
 #include <utility>
 
-namespace RatUI
-{
-    /**
-     * @brief Primary template for ContainerTraits — unspecialized; triggers a static_assert if used on an unknown container type.
-     * Specialize this for custom containers to enable the global container functions.
-     */
-    template<typename _Container>
-    struct ContainerTraits
-    {
-        static_assert(AlwaysFalse<_Container>,
-            "No ContainerTraits specialization found for this type. "
-            "Specialize RatUI::ContainerTraits<T> to use the generic container functions.");
-    };
-} // namespace RatUI
-
 #ifndef RATUI_OVERRIDE_SPAN_IMPL
     #include <span>
 
@@ -35,16 +20,20 @@ namespace RatUI
         using SpanImpl = std::span<T>;
 
         template<typename _ElementType>
-        struct ContainerTraits<SpanImpl<_ElementType>>
+        struct CoreTraits<SpanImpl<_ElementType>>
         {
             using Type        = SpanImpl<_ElementType>;
             using ElementType = typename Type::element_type;
             using SizeType    = typename Type::size_type;
             using Iter        = typename Type::iterator;
-            using ConstIter   = typename Type::const_iterator;
             using RIter       = typename Type::reverse_iterator;
-            using ConstRIter  = typename Type::const_reverse_iterator;
 
+        // C++23 added const reverse iterators to std::span
+        #if __cplusplus >= 202300L
+            using ConstIter   = typename Type::const_iterator;
+            using ConstRIter  = typename Type::const_reverse_iterator;
+        #endif
+        
             static constexpr SizeType DynamicExtent = std::dynamic_extent;
 
             // Capacity
@@ -104,18 +93,19 @@ namespace RatUI
             // Iterators
 
             static constexpr Iter Begin(Type& a_Container) { return a_Container.begin(); }
-            static constexpr ConstIter Begin(const Type& a_Container) { return a_Container.begin(); }
-
             static constexpr Iter End(Type& a_Container) { return a_Container.end(); }
-            static constexpr ConstIter End(const Type& a_Container) { return a_Container.end(); }
 
             // Reverse Iterators
 
             static constexpr RIter RBegin(Type& a_Container) { return a_Container.rbegin(); }
-            static constexpr ConstRIter RBegin(const Type& a_Container) { return a_Container.rbegin(); }
-
             static constexpr RIter REnd(Type& a_Container) { return a_Container.rend(); }
-            static constexpr ConstRIter REnd(const Type& a_Container) { return a_Container.rend(); }
+
+		#if __cplusplus >= 202300L
+			static constexpr ConstIter Begin( const Type& a_Container ) { return a_Container.begin(); }
+			static constexpr ConstIter End( const Type& a_Container ) { return a_Container.end(); }
+			static constexpr ConstRIter RBegin( const Type& a_Container ) { return a_Container.rbegin(); }
+			static constexpr ConstRIter REnd( const Type& a_Container ) { return a_Container.rend(); }
+        #endif 
         };
 
     } // namespace RatUI
@@ -131,7 +121,7 @@ namespace RatUI
         using ArrayImpl = std::vector<T>;
 
         template<typename _ElementType>
-        struct ContainerTraits<ArrayImpl<_ElementType>>
+        struct CoreTraits<ArrayImpl<_ElementType>>
         {
             using Type        = ArrayImpl<_ElementType>;
             using ElementType = typename Type::value_type;
@@ -283,7 +273,7 @@ namespace RatUI
         using FixedArrayImpl = std::array<T, N>;
 
         template<typename _ElementType, size_t N>
-        struct ContainerTraits<FixedArrayImpl<_ElementType, N>>
+        struct CoreTraits<FixedArrayImpl<_ElementType, N>>
         {
             using Type        = FixedArrayImpl<_ElementType, N>;
             using ElementType = typename Type::value_type;
@@ -389,7 +379,7 @@ namespace RatUI
         using MonostateImpl = std::monostate;
         
         template<typename... Types>
-        struct ContainerTraits<VariantImpl<Types...>>
+        struct CoreTraits<VariantImpl<Types...>>
         {
             using Type = VariantImpl<Types...>;
             using SizeType = size_t;
@@ -452,7 +442,7 @@ namespace RatUI
         inline constexpr auto NullOptImpl = std::nullopt;
 
         template<typename T>
-        struct ContainerTraits<OptionalImpl<T>>
+        struct CoreTraits<OptionalImpl<T>>
         {
             using Type = OptionalImpl<T>;
             using ValueType = typename Type::value_type;
@@ -528,61 +518,61 @@ namespace RatUI
     template<typename Container>
     constexpr decltype(auto) Begin(Container& a_Container)
     {
-        return ContainerTraits<Container>::Begin(a_Container);
+        return CoreTraits<Container>::Begin(a_Container);
     }
 
     template<typename Container>
     constexpr decltype(auto) Begin(const Container& a_Container)
     {
-        return ContainerTraits<Container>::Begin(a_Container);
+        return CoreTraits<Container>::Begin(a_Container);
     }
 
     template<typename Container>
     constexpr decltype(auto) End(Container& a_Container)
     {
-        return ContainerTraits<Container>::End(a_Container);
+        return CoreTraits<Container>::End(a_Container);
     }
 
     template<typename Container>
     constexpr decltype(auto) End(const Container& a_Container)
     {
-        return ContainerTraits<Container>::End(a_Container);
+        return CoreTraits<Container>::End(a_Container);
     }
 
     template<typename Container>
     constexpr decltype(auto) RBegin(Container& a_Container)
     {
-        return ContainerTraits<Container>::RBegin(a_Container);
+        return CoreTraits<Container>::RBegin(a_Container);
     }
 
     template<typename Container>
     constexpr decltype(auto) RBegin(const Container& a_Container)
     {
-        return ContainerTraits<Container>::RBegin(a_Container);
+        return CoreTraits<Container>::RBegin(a_Container);
     }
 
     template<typename Container>
     constexpr decltype(auto) REnd(Container& a_Container)
     {
-        return ContainerTraits<Container>::REnd(a_Container);
+        return CoreTraits<Container>::REnd(a_Container);
     }
 
     template<typename Container>
     constexpr decltype(auto) REnd(const Container& a_Container)
     {
-        return ContainerTraits<Container>::REnd(a_Container);
+        return CoreTraits<Container>::REnd(a_Container);
     }
 
     template<typename Container>
     constexpr decltype(auto) Size(const Container& a_Container)
     {
-        return ContainerTraits<Container>::Size(a_Container);
+        return CoreTraits<Container>::Size(a_Container);
     }
 
     template<typename Container>
     constexpr decltype(auto) Empty(const Container& a_Container)
     {
-        return ContainerTraits<Container>::Empty(a_Container);
+        return CoreTraits<Container>::Empty(a_Container);
     }
 
     // === Container Modification ===
@@ -590,49 +580,49 @@ namespace RatUI
     template<typename Container, typename... Args>
     constexpr decltype(auto) PushBack(Container& a_Container, Args&&... a_Args)
     {
-        return ContainerTraits<Container>::PushBack(a_Container, std::forward<Args>(a_Args)...);
+        return CoreTraits<Container>::PushBack(a_Container, std::forward<Args>(a_Args)...);
     }
 
     template<typename Container, typename... Args>
     constexpr decltype(auto) EmplaceBack(Container& a_Container, Args&&... a_Args)
     {
-        return ContainerTraits<Container>::EmplaceBack(a_Container, std::forward<Args>(a_Args)...);
+        return CoreTraits<Container>::EmplaceBack(a_Container, std::forward<Args>(a_Args)...);
     }
 
     template<typename Container, typename... Args>
     constexpr decltype(auto) Insert(Container& a_Container, Args&&... a_Args)
     {
-        return ContainerTraits<Container>::Insert(a_Container, std::forward<Args>(a_Args)...);
+        return CoreTraits<Container>::Insert(a_Container, std::forward<Args>(a_Args)...);
     }
 
     template<typename Container, typename... Args>
     constexpr decltype(auto) Erase(Container& a_Container, Args&&... a_Args)
     {
-        return ContainerTraits<Container>::Erase(a_Container, std::forward<Args>(a_Args)...);
+        return CoreTraits<Container>::Erase(a_Container, std::forward<Args>(a_Args)...);
     }
 
     template<typename Container>
     constexpr void PopBack(Container& a_Container)
     {
-        ContainerTraits<Container>::PopBack(a_Container);
+        CoreTraits<Container>::PopBack(a_Container);
     }
 
     template<typename Container>
     constexpr void Clear(Container& a_Container)
     {
-        ContainerTraits<Container>::Clear(a_Container);
+        CoreTraits<Container>::Clear(a_Container);
     }
 
     template<typename Container>
     constexpr void Reserve(Container& a_Container, const size a_Capacity)
     {
-        ContainerTraits<Container>::Reserve(a_Container, a_Capacity);
+        CoreTraits<Container>::Reserve(a_Container, a_Capacity);
     }
 
     template<typename Container>
     constexpr void Resize(Container& a_Container, const size a_Size)
     {
-        ContainerTraits<Container>::Resize(a_Container, a_Size);
+        CoreTraits<Container>::Resize(a_Container, a_Size);
     }
 
     // === Element Access ===
@@ -640,61 +630,61 @@ namespace RatUI
     template<typename Container>
     constexpr decltype(auto) Front(Container& a_Container)
     {
-        return ContainerTraits<Container>::Front(a_Container);
+        return CoreTraits<Container>::Front(a_Container);
     }
 
     template<typename Container>
     constexpr decltype(auto) Front(const Container& a_Container)
     {
-        return ContainerTraits<Container>::Front(a_Container);
+        return CoreTraits<Container>::Front(a_Container);
     }
 
     template<typename Container>
     constexpr decltype(auto) Back(Container& a_Container)
     {
-        return ContainerTraits<Container>::Back(a_Container);
+        return CoreTraits<Container>::Back(a_Container);
     }
 
     template<typename Container>
     constexpr decltype(auto) Back(const Container& a_Container)
     {
-        return ContainerTraits<Container>::Back(a_Container);
+        return CoreTraits<Container>::Back(a_Container);
+    }
+
+    template<typename Container>
+    constexpr decltype(auto) RawAt( Container& a_Container, const size a_Index)
+    {
+        return CoreTraits<Container>::RawAt(a_Container, a_Index);
+	}
+
+    template<typename Container>
+    constexpr decltype( auto ) RawAt( const Container& a_Container, const size a_Index )
+    {
+        return CoreTraits<Container>::RawAt( a_Container, a_Index );
     }
 
     template<typename Container>
     constexpr decltype(auto) At(Container& a_Container, const size a_Index)
     {
-        return ContainerTraits<Container>::At(a_Container, a_Index);
+        return CoreTraits<Container>::At(a_Container, a_Index);
     }
 
     template<typename Container>
     constexpr decltype(auto) At(const Container& a_Container, const size a_Index)
     {
-        return ContainerTraits<Container>::At(a_Container, a_Index);
-    }
-
-    template<typename Container>
-    constexpr decltype(auto) RawAt(Container& a_Container, const size a_Index)
-    {
-        return ContainerTraits<Container>::RawAt(a_Container, a_Index);
-    }
-
-    template<typename Container>
-    constexpr decltype(auto) RawAt(const Container& a_Container, const size a_Index)
-    {
-        return ContainerTraits<Container>::RawAt(a_Container, a_Index);
+        return CoreTraits<Container>::At(a_Container, a_Index);
     }
 
     template<typename Container>
     constexpr decltype(auto) Data(Container& a_Container)
     {
-        return ContainerTraits<Container>::Data(a_Container);
+        return CoreTraits<Container>::Data(a_Container);
     }
 
     template<typename Container>
     constexpr decltype(auto) Data(const Container& a_Container)
     {
-        return ContainerTraits<Container>::Data(a_Container);
+        return CoreTraits<Container>::Data(a_Container);
     }
 
     // === Variant Access ===
@@ -702,31 +692,31 @@ namespace RatUI
 	template<typename Container>
     constexpr decltype( auto ) Index( const Container& a_Container )
     {
-        return ContainerTraits<Container>::Index( a_Container );
+        return CoreTraits<Container>::Index( a_Container );
 	}
 
     template<typename T, typename Container>
     constexpr bool Holds( const Container& a_Container )
     {
-        return ContainerTraits<Container>::template Holds<T>( a_Container );
+        return CoreTraits<Container>::template Holds<T>( a_Container );
     }
 
     template<auto I, typename Container>
     constexpr bool Holds( const Container& a_Container )
     {
-        return ContainerTraits<Container>::template Holds<I>( a_Container );
+        return CoreTraits<Container>::template Holds<I>( a_Container );
     }
 
     template<typename T, typename Container>
     constexpr decltype( auto ) Get( Container&& a_Container )
     {
-        return ContainerTraits<std::remove_cvref_t<Container>>::template Get<T>( std::forward<Container>( a_Container ) );
+        return CoreTraits<std::remove_cvref_t<Container>>::template Get<T>( std::forward<Container>( a_Container ) );
     }
 
 	template<auto I, typename Container>
     constexpr decltype( auto ) Get( Container&& a_Container )
     {
-        return ContainerTraits<std::remove_cvref_t<Container>>::template Get<I>( std::forward<Container>( a_Container ) );
+        return CoreTraits<std::remove_cvref_t<Container>>::template Get<I>( std::forward<Container>( a_Container ) );
 	}
 
     // === Optional Access ===
@@ -734,14 +724,14 @@ namespace RatUI
     template<typename Container>
     constexpr bool HasValue(const Container& a_Container)
     {
-        return ContainerTraits<Container>::HasValue(a_Container);
+        return CoreTraits<Container>::HasValue(a_Container);
     }
 
     template<typename Container>
     constexpr decltype(auto) Value(Container&& a_Container)
     {
         using DecayedContainer = std::remove_cvref_t<Container>;
-        return ContainerTraits<DecayedContainer>::Value(std::forward<Container>(a_Container));
+        return CoreTraits<DecayedContainer>::Value(std::forward<Container>(a_Container));
     }
 
 } // namespace RatUI

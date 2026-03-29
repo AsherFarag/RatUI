@@ -148,9 +148,9 @@ TEST_CASE( "Span over Array gives correct size and elements", "[containers][span
 
     Span<int> sp( arr );
     REQUIRE( Size( sp ) == 3 );
-    REQUIRE( At( sp, 0 ) == 10 );
-    REQUIRE( At( sp, 1 ) == 20 );
-    REQUIRE( At( sp, 2 ) == 30 );
+    REQUIRE( RawAt( sp, 0 ) == 10 );
+    REQUIRE( RawAt( sp, 1 ) == 20 );
+    REQUIRE( RawAt( sp, 2 ) == 30 );
 }
 
 TEST_CASE( "Span Begin and End iterate over all elements", "[containers][span]" )
