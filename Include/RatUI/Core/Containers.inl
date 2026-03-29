@@ -34,6 +34,7 @@
 #ifndef RATUI_VARIANT_IMPL
     #include <variant>
     #define RATUI_VARIANT_IMPL std::variant
+    #define RATUI_MONOSTATE_IMPL std::monostate
 #endif // Default to std::variant if no custom variant implementation is provided.
 
 #ifndef RATUI_OPTIONAL_IMPL
@@ -86,6 +87,12 @@ namespace RatUI
      */
     template<typename... Types>
     using Variant = RATUI_VARIANT_IMPL<Types...>;
+
+    /**
+     * @brief Monostate is a type that represents an empty state in a variant, similar to std::monostate.
+     * It can be used as one of the alternative types in a Variant to represent a "no value" state.
+     */
+    using Monostate = RATUI_MONOSTATE_IMPL;
 
     /**
      * @brief Optional is a type that may or may not contain a value, similar to std::optional.
