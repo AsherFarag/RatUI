@@ -106,33 +106,22 @@ namespace RatUI
 
         // - Focus Management
 
-        /** @brief Gets the currently focused widget by returning the top WidgetID from the focus stack, or an invalid ID if the stack is empty. */
-        WidgetID GetFocusedWidget() const { return Empty( m_FocusStack ) ? c_InvalidPoolID : Back( m_FocusStack ); }
+        /** @brief Returns the WidgetID of the currently focused widget, or c_InvalidPoolID if no widget is focused. */
+        WidgetID GetFocusedWidget() const { return m_FocusedWidget; }
 
-        /** @brief Checks if the specified widget is currently focused by comparing its WidgetID to the top of the focus stack. */
-        bool IsWidgetFocused( WidgetID a_WidgetID ) const { return a_WidgetID != c_InvalidPoolID && a_WidgetID == GetFocusedWidget(); }
-
-        /**
-         * @brief Pushes a widget onto the focus stack, making it the currently focused widget.
-         * @param a_WidgetID The ID of the widget to focus.
-         */
-        void PushFocus( WidgetID a_WidgetID );
-
-        /** @brief Removes the currently focused widget from the focus stack. */
-        void PopFocus();
+        /** @brief Sets the focus to the specified widget, if it is focusable. */
+        void SetFocus( WidgetID a_WidgetID );
 
         /** @brief Clears the focus from the current focused widget. */
-        void ClearFocus();
-
-        /**
-         * @brief Clears the current focus stack and sets the focus to the specified widget.
-         * @param a_WidgetID The ID of the widget to set focus to. This widget will become the only focused widget after this call.
-         */
-        void SetFocus( WidgetID a_WidgetID );
+        void ClearFocus() { SetFocus( c_InvalidPoolID ); }
 
         // - Navigation
 
         void Navigate( ENavAction a_Action );
+
+        void PushNavScope( WidgetID a_ScopeID );
+        void PopNavScope();
+        WidgetID GetCurrentNavScope() const { return Empty( m_NavStack ) ? RootWidget : Back( m_NavStack ).Scope; }
 
         // - Widget Management
 
@@ -169,10 +158,16 @@ namespace RatUI
         bool ProcessButtonEvent( const ButtonEvent& a_Event );
         WidgetID HitTest( WidgetID a_ID, Vec2f a_LogicalPos );
 
-        Array<WidgetID> m_FocusStack{}; ///< Stack of WidgetIDs representing the current focus hierarchy, with the top of the stack being the currently focused widget.
-
+        WidgetID m_FocusedWidget{ c_InvalidPoolID };
         WidgetID m_HoveredWidget{ c_InvalidPoolID };
         bool     m_MouseWasDown{ false };
+
+        struct NavScope
+        {
+            WidgetID Scope{ c_InvalidPoolID };    ///< The container widget
+            WidgetID Restored{ c_InvalidPoolID }; ///< The widget to restore on pop
+        };
+        Array<NavScope> m_NavStack{}; ///< Stack of navigation scopes used to manage focus during keyboard/gamepad navigation, allowing for nested navigation contexts.
     };
 
     // === Inline Implementations ===
@@ -206,99 +201,125 @@ namespace RatUI
             root->OnPaint( *this, a_DrawList );
     }
 
-    inline void Scene::PushFocus( WidgetID a_WidgetID )
-    {
-        IWidget* widget = GetWidget( a_WidgetID );
-        if ( !widget || !widget->IsFocusable( *this ) )
-            return; // Only focus if widget exists and is focusable
-
-        // Notify previous focused widget that it lost focus (if any)
-        if ( !Empty( m_FocusStack ) )
-        {
-            WidgetID currentFocus = Back( m_FocusStack );
-            if ( IWidget* currentWidget = GetWidget( currentFocus ) )
-                currentWidget->OnFocusLost( *this );
-        }
-
-        // Push new widget onto focus stack and notify it that it received focus
-        PushBack( m_FocusStack, a_WidgetID );
-        widget->OnFocusReceived( *this );
-    }
-
-    inline void Scene::PopFocus()
-    {
-        if ( Empty( m_FocusStack ) )
-            return; // No widget to pop
-
-        // Notify current focused widget that it lost focus
-        WidgetID currentFocus = Back( m_FocusStack );
-        if ( IWidget* currentWidget = GetWidget( currentFocus ) )
-            currentWidget->OnFocusLost( *this );
-
-        // Pop the focus stack
-        PopBack( m_FocusStack );
-
-        // Notify new focused widget that it received focus (if any)
-        if ( !Empty( m_FocusStack ) )
-        {
-            WidgetID newFocus = Back( m_FocusStack );
-            if ( IWidget* newWidget = GetWidget( newFocus ) )
-                newWidget->OnFocusReceived( *this );
-        }
-    }
-
-    inline void Scene::ClearFocus()
-    {
-        if ( !Empty( m_FocusStack ) )
-        {
-            WidgetID currentFocus = Back( m_FocusStack );
-            if ( IWidget* currentWidget = GetWidget( currentFocus ) )
-                currentWidget->OnFocusLost( *this ); // Notify current focused widget that it lost focus
-
-            Clear( m_FocusStack );
-        }
-    }
-
     inline void Scene::SetFocus( WidgetID a_WidgetID )
     {
-        ClearFocus();
-        PushFocus( a_WidgetID );
+        if ( IWidget* currentFocus = GetWidget( m_FocusedWidget ) )
+        {
+            if ( currentFocus->GetID() == a_WidgetID )
+                return; // Already focused
+
+            currentFocus->OnFocusLost( *this );
+        }
+
+        m_FocusedWidget = a_WidgetID;
+        if ( IWidget* newFocus = GetWidget( m_FocusedWidget ) )
+            newFocus->OnFocusReceived( *this );
     }
 
     inline void Scene::Navigate( ENavAction a_Action )
     {
-        WidgetID focused = GetFocusedWidget();
-        if ( focused == c_InvalidPoolID )
-            return; // No widget is currently focused, so we can't navigate
-
-        IWidget* focusedWidget = GetWidget( focused );
-        if ( !focusedWidget )
-            return; // Focused widget not found (shouldn't happen)
-
-        LayoutNode* focusedNode = Layouts.Get( focusedWidget->GetLayoutID() );
-        if ( !focusedNode )
-            return; // Focused widget's layout node not found (shouldn't happen)
-
-        IWidget* rootWidget = GetWidget( RootWidget );
-        if ( !rootWidget )
-            return; // Root widget not found (shouldn't happen)
-
-        LayoutNode* rootNode = Layouts.Get( rootWidget->GetLayoutID() );
-        if ( !rootNode )
-            return; // Root layout node not found (shouldn't happen)
-
-        // Lazily filter direct children down to focusable navigation candidates.
-        auto focusableNodes = Detail::LayoutChildRange{ rootNode->FirstChild } | std::views::filter( [&]( LayoutNode* node )
+        const auto FocusFirstIn = [&]( WidgetID a_ScopeID )
         {
-            if ( !node ) return false;
-            IWidget* widget = GetWidget( node->WidgetID );
-            return widget && widget->IsFocusable( *this );
-        } );
+            IWidget* scopeWidget = GetWidget( a_ScopeID );
+            if ( !scopeWidget ) return;
+
+            LayoutNode* scopeNode = Layouts.Get( scopeWidget->GetLayoutID() );
+            if ( !scopeNode ) return;
+
+            // Walk children in layout order, find first focusable
+            for ( LayoutNode* child = scopeNode->FirstChild; child; child = child->NextSibling )
+            {
+                IWidget* w = GetWidget( child->WidgetID );
+                if ( w && w->IsFocusable( *this ) )
+                {
+                    SetFocus( child->WidgetID );
+                    return;
+                }
+            }
+        };
+
+        if ( a_Action == ENavAction::Cancel )
+        {
+            PopNavScope();
+            return;
+        }
+
+        if ( a_Action == ENavAction::Activate )
+        {
+            // If focused widget is itself a scope, enter it
+            WidgetID focused = GetFocusedWidget();
+            if ( IWidget* w = GetWidget( focused ) )
+            {
+                LayoutNode* node = Layouts.Get( w->GetLayoutID() );
+                if ( node && node->Style.IsFocusScope )
+                {
+                    PushNavScope( focused );
+                    // Auto-focus first focusable child in new scope
+                    FocusFirstIn( focused );
+                    return;
+                }
+            }
+            // Otherwise activate the leaf
+            if ( IWidget* w = GetWidget( focused ) )
+                w->OnPressed( *this, ButtonEvent{ .Button = EButtonID::KeyEnter, .Pressed = true } );
+            return;
+        }
+
+        // Directional nav within current scope
+        WidgetID scopeID  = GetCurrentNavScope();
+        WidgetID focused  = GetFocusedWidget();
+
+        IWidget*    scopeWidget = GetWidget( scopeID );
+        LayoutNode* scopeNode   = scopeWidget ? Layouts.Get( scopeWidget->GetLayoutID() ) : nullptr;
+        IWidget*    focusedWidget  = GetWidget( focused );
+        LayoutNode* focusedNode = focusedWidget ? Layouts.Get( focusedWidget->GetLayoutID() ) : nullptr;
+
+        if ( !scopeNode ) return;
+
+        if ( !focusedNode )
+        {
+            FocusFirstIn( scopeID );
+            return;
+        }
+
+        auto focusableNodes = Detail::LayoutChildRange{ scopeNode->FirstChild }
+            | std::views::filter( [&]( LayoutNode* node ) -> bool
+            {
+                if ( !node ) return false;
+                IWidget* w = GetWidget( node->WidgetID );
+                // Include both leaf-focusable widgets and scope containers
+                return w && ( w->IsFocusable( *this ) || node->Style.IsFocusScope );
+            });
 
         const LayoutNode* nextNode = FindNavigatableNode( a_Action, focusedNode, focusableNodes );
 
         if ( nextNode )
-            SetFocus( nextNode->WidgetID ); // Set focus to the newly navigated widget
+        {
+            SetFocus( nextNode->WidgetID );
+        }
+
+        // If no candidate found, optionally pop scope (navigated off the edge)
+        // else PopScope();
+    }
+
+    inline void Scene::PushNavScope( WidgetID a_ScopeID )
+    {
+        PushBack( m_NavStack, NavScope{ 
+            .Scope = a_ScopeID, 
+            .Restored = GetFocusedWidget() 
+        } );
+    }
+
+    inline void Scene::PopNavScope()
+    {
+        if ( Empty( m_NavStack ) )
+            return; // No scope to pop
+            
+        ClearFocus();
+        WidgetID restored = Back( m_NavStack ).Restored;
+        PopBack( m_NavStack );
+        if ( restored != c_InvalidPoolID )
+            SetFocus( restored );
     }
 
     inline IWidget* Scene::GetWidget( WidgetID a_ID )
@@ -345,9 +366,10 @@ namespace RatUI
         Layouts.Clear();
         Widgets.Clear();
         RootWidget = c_InvalidPoolID;
-        Clear( m_FocusStack );
         m_HoveredWidget = c_InvalidPoolID;
         m_MouseWasDown = false;
+        ClearFocus();
+        Clear( m_NavStack );
     }
 
     template<std::derived_from<IWidget> WidgetType, typename... Args>

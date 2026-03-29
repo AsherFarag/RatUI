@@ -244,6 +244,7 @@ namespace RatUI
         ELayoutType LayoutType{ ELayoutType::Overlay }; ///< The layout type to use for arranging child elements (if this element is a container).
         EAlignment  ChildAlign{ EAlignment::TopLeft };  ///< Default alignment for child elements within this container.
         EWrapMode   WrapMode{ EWrapMode::NoWrap };      ///< The wrap mode to use when child elements exceed the available space in a container.
+		bool        IsFocusScope{ false };              ///< Whether this element should be considered a focus scope for navigation. (e.g., a menu or panel that can receive focus and contain navigatable child elements)
 
         // - Positioning properties
         Edges Padding{};        ///< The padding to apply around the content of the element, in pixels.

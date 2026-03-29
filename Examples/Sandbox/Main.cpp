@@ -64,7 +64,7 @@ public:
 
 		a_DrawList.PushTransform( transform.ToMatrix( rect ) );
 
-        if ( a_Scene.IsWidgetFocused( GetID() ) )
+		if ( a_Scene.GetFocusedWidget() == GetID() )
             a_DrawList.AddRect( SolidBrush{ .Color = Colors::White }, rect.Expanded( 10.f ) );
 
 		a_DrawList.AddRect( SolidBrush{ .Color = Col }, rect );
@@ -135,6 +135,7 @@ protected:
         rootNode->Style.Padding = Edges{ 10.f };
         rootNode->Style.WidthMode = ESizingMode::Fill;
         rootNode->Style.HeightMode = ESizingMode::Fill;
+		//rootNode->Style.IsFocusScope = true; // Make the root a focus scope to test navigation between its children
 
         // ---------------- RED ----------------
         WidgetID red = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 255, 0, 0, 255 }, "Red" );
@@ -155,6 +156,7 @@ protected:
         hboxNode->Style.HeightMode = ESizingMode::Fixed;
         hboxNode->Style.FixedHeight = 150.f;
         hboxNode->Style.WidthMode = ESizingMode::Fill;
+		hboxNode->Style.IsFocusScope = true; // Make the HBox a focus scope to test navigation between its children
 
         // ---------------- GREEN ----------------
         green = m_Scene.CreateWidget<RectWidget>( hbox, SDL_Color{ 0, 255, 0, 255 }, "Green" );
@@ -245,18 +247,14 @@ protected:
                             case EButtonID::KeyDown:  navAction = ENavAction::MoveDown; break;
                             case EButtonID::KeyLeft:  navAction = ENavAction::MoveLeft; break;
                             case EButtonID::KeyRight: navAction = ENavAction::MoveRight; break;
+							case EButtonID::KeyEnter: navAction = ENavAction::Activate; break;
+							case EButtonID::KeyEscape: navAction = ENavAction::Cancel; break;
                             default: break; // Unsupported key
                         }
 
 						if ( btnEvent.Pressed && navAction != ENavAction::None )
                         {
-                            static bool test = [&]()
-                            {
-								m_Scene.SetFocus( green ); // Test setting focus to the green widget on first navigation input
-                                return true;
-                            }( );
-
-							m_Scene.Navigate( navAction );
+                            m_Scene.Navigate( navAction );
                         }
                     }
                 }
