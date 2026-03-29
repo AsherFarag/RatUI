@@ -12,7 +12,7 @@ namespace RatUI
     {
         LayoutNodePool Layouts{};
         WidgetPool Widgets{};
-        WidgetID RootWidget{ c_InvalidPoolID };
+        WidgetID RootWidget{};
 
         template<std::derived_from<IWidget> WidgetType, typename... Args>
         WidgetID CreateWidget( WidgetID a_ParentID, Args&&... a_Args )
@@ -27,15 +27,15 @@ namespace RatUI
             LayoutNode* node   = Layouts.Get( nodeID );
 
             // Wire widget <-> node
-            widget->ID       = widgetID;
-            widget->LayoutID = nodeID;
-            node->WidgetID   = widgetID;
+            widget->m_ID       = widgetID;
+            widget->m_LayoutID = nodeID;
+            node->WidgetID     = widgetID;
 
 			if ( a_ParentID != c_InvalidPoolID )
             {
                 if ( IWidget* parentWidget = GetWidget( a_ParentID ) )
                 {
-                    if ( LayoutNode* parentNode = Layouts.Get( parentWidget->LayoutID ) )
+                    if ( LayoutNode* parentNode = Layouts.Get( parentWidget->GetLayoutID() ) )
                         parentNode->AddChild( *node );
                 }
             }
@@ -83,7 +83,7 @@ namespace RatUI
         {
             if ( IWidget* root = GetWidget( RootWidget ) )
             {
-                if ( LayoutNode* rootNode = Layouts.Get( root->LayoutID ) )
+                if ( LayoutNode* rootNode = Layouts.Get( root->GetLayoutID() ) )
                 {
                     MeasureLayoutNode( *rootNode, a_AvailableSize );
                     ArrangeLayoutNode( *rootNode, Rectf{ Vec2f{ 0.f, 0.f }, a_AvailableSize } );
@@ -127,7 +127,7 @@ namespace RatUI
             IWidget* widget = GetWidget( a_WidgetID );
             if ( !widget ) return;
         
-            LayoutNode* node = Layouts.Get( widget->LayoutID );
+            LayoutNode* node = Layouts.Get( widget->GetLayoutID() );
             if ( !node ) return;
         
             node->ForEachChild( [&]( LayoutNode& childNode )
@@ -143,7 +143,7 @@ namespace RatUI
             const IWidget* widget = GetWidget( a_WidgetID );
             if ( !widget ) return;
         
-            const LayoutNode* node = Layouts.Get( widget->LayoutID );
+            const LayoutNode* node = Layouts.Get( widget->GetLayoutID() );
             if ( !node ) return;
         
             node->ForEachChild( [&]( const LayoutNode& childNode )
@@ -159,7 +159,7 @@ namespace RatUI
             IWidget* widget = GetWidget( a_ID );
             if ( !widget ) return c_InvalidPoolID;
 
-            LayoutNode* node = Layouts.Get( widget->LayoutID );
+            LayoutNode* node = Layouts.Get( widget->GetLayoutID() );
             if ( !node || !node->Layout.Visibility.IsHitTestable() ) return c_InvalidPoolID;
 
             if ( !node->Layout.FinalRect.Contains( a_LogicalPos ) ) return c_InvalidPoolID;

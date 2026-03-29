@@ -25,26 +25,27 @@ public:
     {
 		time += 1.f / 60.f;
 
-        const LayoutNode* node = a_Scene.Layouts.Get( LayoutID );
+        const LayoutNode* node = a_Scene.Layouts.Get( GetLayoutID() );
         if ( !node )
             return;
 
         const Rectf& rect = node->Layout.FinalRect;
 
 		// rotate between -30 and 30 degrees based on time, using the center of the rect as the pivot
-		f32 angle = std::sin( time ) * 5.f;
+		f32 angle = std::sin( time ) * 1.f;
 
         RenderTransform transform{}; transform.Angle = Radians{ Degreesf{ angle } };
+		transform.Scale = Vec2f{ 1.f + 0.5f * std::sin( time * 0.5f ), 1.f + 0.5f * std::sin( time * 0.5f ) } * 0.5f; // Scale between 0.5 and 1.5
 
-		a_DrawList.PushTransform( transform.ToMatrix( rect ) );
+		//a_DrawList.PushTransform( transform.ToMatrix( rect ) );
 		a_DrawList.AddRect( SolidBrush{ .Color = Col }, rect );
 
-        a_Scene.ForEachChildWidget( ID, [&]( IWidget& child )
+        a_Scene.ForEachChildWidget( GetID(), [&](IWidget& child)
         {
             child.OnPaint( a_Scene, a_DrawList );
 		} );
 
-        a_DrawList.PopTransform();
+        //a_DrawList.PopTransform();
     }
 
     void OnHoverEnter() override
@@ -94,7 +95,7 @@ protected:
         WidgetID root = m_Scene.CreateRootWidget<RectWidget>( SDL_Color{ 0, 0, 0, 0 }, "Root" );
         m_Scene.RootWidget = root;
 
-        LayoutNode* rootNode = m_Scene.Layouts.Get( m_Scene.GetWidget( root )->LayoutID );
+        LayoutNode* rootNode = m_Scene.Layouts.Get( m_Scene.GetWidget( root )->GetLayoutID() );
         rootNode->Style.LayoutType = ELayoutType::Vertical;
         rootNode->Style.Spacing = 10.f;
         rootNode->Style.Padding = Edges{ 10.f };
@@ -103,7 +104,7 @@ protected:
 
         // ---------------- RED ----------------
         WidgetID red = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 255, 0, 0, 255 }, "Red" );
-        auto* redNode = m_Scene.Layouts.Get( m_Scene.GetWidget( red )->LayoutID );
+        auto* redNode = m_Scene.Layouts.Get( m_Scene.GetWidget( red )->GetLayoutID() );
 
         redNode->Style.FixedHeight = 100.f;
         redNode->Style.WidthMode = ESizingMode::Fill;
@@ -112,7 +113,7 @@ protected:
 
         // ---------------- HBOX ----------------
         WidgetID hbox = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 0, 0, 50, 0 }, "HBox" );
-        auto* hboxNode = m_Scene.Layouts.Get( m_Scene.GetWidget( hbox )->LayoutID );
+        auto* hboxNode = m_Scene.Layouts.Get( m_Scene.GetWidget( hbox )->GetLayoutID() );
 
         hboxNode->Style.LayoutType = ELayoutType::Horizontal;
         hboxNode->Style.Spacing = 0.f;
@@ -123,7 +124,7 @@ protected:
 
         // ---------------- GREEN ----------------
         green = m_Scene.CreateWidget<RectWidget>( hbox, SDL_Color{ 0, 255, 0, 0 }, "Green" );
-        auto* greenNode = m_Scene.Layouts.Get( m_Scene.GetWidget( green )->LayoutID );
+        auto* greenNode = m_Scene.Layouts.Get( m_Scene.GetWidget( green )->GetLayoutID() );
 
         greenNode->Style.WidthMode = ESizingMode::Fill;
         greenNode->Style.HeightMode = ESizingMode::Fill;
@@ -132,7 +133,7 @@ protected:
 
         // ---------------- YELLOW ----------------
         WidgetID yellow = m_Scene.CreateWidget<RectWidget>( hbox, SDL_Color{ 255, 255, 0, 0 }, "Yellow" );
-        auto* yellowNode = m_Scene.Layouts.Get( m_Scene.GetWidget( yellow )->LayoutID );
+        auto* yellowNode = m_Scene.Layouts.Get( m_Scene.GetWidget( yellow )->GetLayoutID() );
 
         yellowNode->Style.WidthMode = ESizingMode::Fill;
         yellowNode->Style.HeightMode = ESizingMode::Fill;
@@ -141,7 +142,7 @@ protected:
 
         // ---------------- BLUE ----------------
         WidgetID blue = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 0, 0, 255, 255 }, "Blue" );
-        auto* blueNode = m_Scene.Layouts.Get( m_Scene.GetWidget( blue )->LayoutID );
+        auto* blueNode = m_Scene.Layouts.Get( m_Scene.GetWidget( blue )->GetLayoutID() );
 
         blueNode->Style.FixedHeight = 120.f;
         blueNode->Style.WidthMode = ESizingMode::Fill;
@@ -155,7 +156,7 @@ protected:
 		f32 time = SDL_GetTicks() / 1000.f;
 
 		// Animate green widget's width with a sine wave
-        if ( auto* greenNode = m_Scene.Layouts.Get( m_Scene.GetWidget( green )->LayoutID ) )
+        if ( auto* greenNode = m_Scene.Layouts.Get( m_Scene.GetWidget( green )->GetLayoutID() ) )
         {
             greenNode->Style.PercentWidth = 0.25f + 0.25f * std::sin( time );
             greenNode->Layout.IsDirty = true; // Mark layout dirty to trigger recalculation

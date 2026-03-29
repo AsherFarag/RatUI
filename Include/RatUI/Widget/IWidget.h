@@ -8,21 +8,29 @@ namespace RatUI
     struct Scene;
 
     /**
-     * @brief
+     * @brief The base class for all UI elements.
+     * Widgets are responsible for rendering themselves and handling input events. 
+     * They are organized in a tree structure, with each widget having a corresponding layout node.
      */
     class IWidget
     {
     public:
-        WidgetID ID{};
-        NodeID LayoutID{};
-
         virtual ~IWidget() = default;
 
-        /**
-         * @brief Called once per frame after layout is resolved.
-         * @param a_Context The rendering context used for painting this widget.
-         */
+        /** @brief Returns the unique identifier for this widget. */
+        WidgetID GetID() const { return m_ID; }
+
+        /** @brief Returns the layout identifier for this widget. */
+        NodeID GetLayoutID() const { return m_LayoutID; }
+
+        /** @brief Called when the widget should render itself and its children. */
         virtual void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) {}
+
+        /** @brief Returns whether this widget can receive focus for input. */
+        virtual bool IsFocusable() const { return false; }
+
+        /** @brief Called when this widget receives focus for input. */
+        virtual void OnFocusReceived() {}
 
         /** @brief Called when a pointer (e.g., mouse cursor) enters the widget's bounds. */
         virtual void OnHoverEnter() {}
@@ -34,6 +42,11 @@ namespace RatUI
         virtual void OnPressed() {}
         virtual void OnReleased() {}
         //virtual void OnInput() {}
+
+    protected:
+        friend Scene;
+        WidgetID m_ID{};
+        NodeID m_LayoutID{};
     };
 
 } // namespace RatUI

@@ -10,7 +10,7 @@ namespace RatUI
      * @param a_Renderer The renderer to use for drawing.
      * @param a_Cmd The draw command containing the necessary information for rendering.
      */
-    using CustomDrawFunc = void(*)( class IRenderInterface& a_Renderer, const struct DrawCmd& a_Cmd );
+    using CustomDrawFunc = void(*)( class IRenderer& a_Renderer, const struct DrawCmd& a_Cmd );
 
     /**
      * @brief Represents a single drawing command, which are buffered in a DrawList and later executed by the renderer. 
@@ -76,9 +76,8 @@ namespace RatUI
 
         DrawList& PopTransform()
         {
-            if ( !Empty( TransformStack ) )
-                PopBack( TransformStack );
-
+            RATUI_USER_ASSERT( !Empty( TransformStack ), "Called PopTransform too many times: no transform to pop." );
+            PopBack( TransformStack );      
             return *this;
         }
 
@@ -102,9 +101,8 @@ namespace RatUI
 
         DrawList& PopClipRect()
         {
-            if ( !Empty( ClipStack ) )
-                PopBack( ClipStack );
-
+            RATUI_USER_ASSERT( !Empty( ClipStack ), "Called PopClipRect too many times: no clip rect to pop." );
+            PopBack( ClipStack );
             return *this;
         }
 
