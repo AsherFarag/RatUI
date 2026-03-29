@@ -312,10 +312,11 @@ namespace RatUI
 
     inline void Scene::PopNavScope()
     {
-        if ( Empty( m_NavStack ) )
-            return; // No scope to pop
-            
         ClearFocus();
+
+        if ( Empty( m_NavStack ) )
+			return; // No scopes to pop, already at root
+            
         WidgetID restored = Back( m_NavStack ).Restored;
         PopBack( m_NavStack );
         if ( restored != c_InvalidPoolID )
