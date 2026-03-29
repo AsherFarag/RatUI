@@ -49,12 +49,12 @@ public:
         //a_DrawList.PopTransform();
     }
 
-    void OnHoverEnter() override
+    void OnHoverEnter( Scene& a_Scene ) override
     {
 		std::cout << "Hover Enter: " << Name << std::endl;
     }
 
-    void OnHoverExit() override
+    void OnHoverExit( Scene& a_Scene ) override
 	{
 		std::cout << "Hover Exit: " << Name << std::endl;
 	}
@@ -180,7 +180,7 @@ protected:
         int mouseX, mouseY;
 		bool mouseDown = SDL_GetMouseState( &mouseX, &mouseY ) & SDL_BUTTON( 1 );
 
-		m_Scene.ProcessInput( Vec2f{ (f32)mouseX, (f32)mouseY }, mouseDown, 1.f );
+		//m_Scene.ProcessInput( Vec2f{ (f32)mouseX, (f32)mouseY }, mouseDown, 1.f );
     }
 
     void OnRender() override

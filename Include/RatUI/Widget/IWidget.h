@@ -1,5 +1,6 @@
 #pragma once
 #include "../Core.h"
+#include "../Input/InputEvent.h"
 #include "../Layout/Layout.h"
 #include "../Renderer/DrawList.h"
 
@@ -27,24 +28,25 @@ namespace RatUI
         virtual void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) {}
 
         /** @brief Returns whether this widget can receive focus for input. */
-        virtual bool IsFocusable() const { return false; }
+        virtual bool IsFocusable( Scene& a_Scene ) const { return false; }
 
         /** @brief Called when this widget receives focus for input. */
-        virtual void OnFocusReceived() {}
+        virtual void OnFocusReceived( Scene& a_Scene ) {}
 
 		/** @brief Called when this widget loses focus for input. */
-        virtual void OnFocusLost() {}
+        virtual void OnFocusLost( Scene& a_Scene ) {}
 
         /** @brief Called when a pointer (e.g., mouse cursor) enters the widget's bounds. */
-        virtual void OnHoverEnter() {}
+        virtual void OnHoverEnter( Scene& a_Scene ) {}
 
         /** @brief Called when a pointer (e.g., mouse cursor) exits the widget's bounds. */
-        virtual void OnHoverExit() {}
+        virtual void OnHoverExit( Scene& a_Scene ) {}
 
-        // TODO: These would require an input button type and not sure how I want to go about that yet
-        virtual void OnPressed() {}
-        virtual void OnReleased() {}
-        //virtual void OnInput() {}
+        /** @brief Called when an input button is pressed while this widget is focused. */
+        virtual void OnPressed( Scene& a_Scene, const ButtonEvent& a_Event ) {}
+
+        /** @brief Called when an input button is released while this widget is focused. */
+        virtual void OnReleased( Scene& a_Scene, const ButtonEvent& a_Event ) {}
 
     protected:
         friend Scene;

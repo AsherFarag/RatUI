@@ -44,6 +44,7 @@ namespace RatUI
 
 #include "Core/Debug.inl"
 #include "Core/Containers.inl"
+#include "Core/Callback.inl"
 #include "Core/Math.inl"
 #include "Core/String.inl"
 #include "Core/Memory.inl"

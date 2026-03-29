@@ -1,6 +1,7 @@
 #pragma once
 #include "../Core.h"
 #include "../Layout/LayoutEngine.h"
+#include "../Input/InputEvent.h"
 #include "IWidget.h"
 
 namespace RatUI
@@ -42,14 +43,7 @@ namespace RatUI
 
         // - Scene Management
 
-        /**
-         * @brief Processes input events such as mouse movement and clicks, 
-         * performing hit testing to determine which widget is being interacted with and invoking the appropriate event handlers.
-         * @param a_PhysicalMousePos The current position of the mouse in physical pixels.
-         * @param a_MouseDown Whether the mouse button is currently pressed.
-         * @param a_Scale The current UI scale factor, used to convert physical mouse position to logical coordinates for hit testing.
-         */
-        void ProcessInput( Vec2f a_PhysicalMousePos, bool a_MouseDown, f32 a_Scale );
+        bool DispatchInputEvent( const InputEvent& a_Event );
 
         /**
          * @brief Updates the layout of all widgets in the scene based on the given available size. 
@@ -102,6 +96,9 @@ namespace RatUI
         template<std::derived_from<IWidget> WidgetType, typename... Args>
         WidgetID CreateRootWidget( Args&&... a_Args );
 
+        /** @brief Destroys the widget with the specified ID, including its children. */
+        bool DestroyWidget( WidgetID a_WidgetID );
+
         RATUI_NODISCARD IWidget* GetWidget( WidgetID a_ID );
 
         RATUI_NODISCARD const IWidget* GetWidget( WidgetID a_ID ) const;
@@ -122,6 +119,8 @@ namespace RatUI
         void Reset();
 
     protected:
+        bool ProcessPointerEvent( const PointerEvent& a_Event );
+        bool ProcessButtonEvent( const ButtonEvent& a_Event );
         WidgetID HitTest( WidgetID a_ID, Vec2f a_LogicalPos );
 
         Array<WidgetID> m_FocusStack{}; ///< Stack of WidgetIDs representing the current focus hierarchy, with the top of the stack being the currently focused widget.
@@ -132,44 +131,15 @@ namespace RatUI
 
     // === Inline Implementations ===
 
-    inline IWidget* Scene::GetWidget( WidgetID a_ID )
+    inline bool Scene::DispatchInputEvent( const InputEvent& a_Event )
     {
-        if ( Unique<IWidget>* widget = Widgets.Get( a_ID ) )
-            return widget->get();
+        if ( Holds<PointerEvent>( a_Event.Payload ) )
+            return ProcessPointerEvent( Get<PointerEvent>( a_Event.Payload ) );
 
-        return nullptr;
-    }
+        if ( Holds<ButtonEvent>( a_Event.Payload ) )
+            return ProcessButtonEvent( Get<ButtonEvent>( a_Event.Payload ) );
 
-    inline const IWidget* Scene::GetWidget( WidgetID a_ID ) const
-    {
-        if ( const Unique<IWidget>* widget = Widgets.Get( a_ID ) )
-            return widget->get();
-
-        return nullptr;
-	}
-
-    inline void Scene::ProcessInput( Vec2f a_PhysicalMousePos, bool a_MouseDown, f32 a_Scale )
-    {
-        Vec2f logicalPos = a_PhysicalMousePos / a_Scale;
-
-        WidgetID hovered = HitTest( RootWidget, logicalPos );
-
-        // Hover enter/exit
-        if ( hovered != m_HoveredWidget )
-        {
-            if ( IWidget* prev = GetWidget( m_HoveredWidget ) ) prev->OnHoverExit();
-            if ( IWidget* next = GetWidget( hovered ) )         next->OnHoverEnter();
-            m_HoveredWidget = hovered;
-        }
-
-        // Press/release
-        if ( a_MouseDown && !m_MouseWasDown )
-            if ( IWidget* w = GetWidget( hovered ) ) w->OnPressed();
-
-        if ( !a_MouseDown && m_MouseWasDown )
-            if ( IWidget* w = GetWidget( hovered ) ) w->OnReleased();
-
-        m_MouseWasDown = a_MouseDown;
+        return false; // Event type not handled
     }
 
     inline void Scene::UpdateLayout( Vec2f a_AvailableSize )
@@ -193,7 +163,7 @@ namespace RatUI
     inline void Scene::PushFocus( WidgetID a_WidgetID )
     {
         IWidget* widget = GetWidget( a_WidgetID );
-        if ( !widget || !widget->IsFocusable() )
+        if ( !widget || !widget->IsFocusable( *this ) )
             return; // Only focus if widget exists and is focusable
 
         // Notify previous focused widget that it lost focus (if any)
@@ -201,12 +171,12 @@ namespace RatUI
         {
             WidgetID currentFocus = Back( m_FocusStack );
             if ( IWidget* currentWidget = GetWidget( currentFocus ) )
-                currentWidget->OnFocusLost();
+                currentWidget->OnFocusLost( *this );
         }
 
         // Push new widget onto focus stack and notify it that it received focus
         PushBack( m_FocusStack, a_WidgetID );
-        widget->OnFocusReceived();
+        widget->OnFocusReceived( *this );
     }
 
     inline void Scene::PopFocus()
@@ -217,7 +187,7 @@ namespace RatUI
         // Notify current focused widget that it lost focus
         WidgetID currentFocus = Back( m_FocusStack );
         if ( IWidget* currentWidget = GetWidget( currentFocus ) )
-            currentWidget->OnFocusLost();
+            currentWidget->OnFocusLost( *this );
 
         // Pop the focus stack
         PopBack( m_FocusStack );
@@ -227,7 +197,7 @@ namespace RatUI
         {
             WidgetID newFocus = Back( m_FocusStack );
             if ( IWidget* newWidget = GetWidget( newFocus ) )
-                newWidget->OnFocusReceived();
+                newWidget->OnFocusReceived( *this );
         }
     }
 
@@ -237,10 +207,49 @@ namespace RatUI
         {
             WidgetID currentFocus = Back( m_FocusStack );
             if ( IWidget* currentWidget = GetWidget( currentFocus ) )
-                currentWidget->OnFocusLost(); // Notify current focused widget that it lost focus
+                currentWidget->OnFocusLost( *this ); // Notify current focused widget that it lost focus
 
             Clear( m_FocusStack );
         }
+    }
+
+    inline IWidget* Scene::GetWidget( WidgetID a_ID )
+    {
+        if ( Unique<IWidget>* widget = Widgets.Get( a_ID ) )
+            return widget->get();
+
+        return nullptr;
+    }
+
+    inline const IWidget* Scene::GetWidget( WidgetID a_ID ) const
+    {
+        if ( const Unique<IWidget>* widget = Widgets.Get( a_ID ) )
+            return widget->get();
+
+        return nullptr;
+	}
+
+    inline bool Scene::DestroyWidget( WidgetID a_WidgetID )
+    {
+        IWidget* widget = GetWidget( a_WidgetID );
+        if ( !widget )
+            return false; // Widget not found
+
+        LayoutNode* node = Layouts.Get( widget->GetLayoutID() );
+        if ( !node )
+            return false; // Layout node not found
+
+        // Recursively destroy child widgets
+        node->ForEachChild( [&]( LayoutNode& childNode )
+        {
+            DestroyWidget( childNode.WidgetID );
+        });
+
+        // Deallocate widget and layout node
+        Widgets.Deallocate( widget->GetID() );
+        Layouts.Deallocate( widget->GetLayoutID() );
+
+        return true;
     }
 
     inline void Scene::Reset()
@@ -343,5 +352,31 @@ namespace RatUI
 
         return result;
     }
+
+    inline bool Scene::ProcessPointerEvent( const PointerEvent& a_Event )
+    {
+        return false; // Event not handled
+    }
+
+    inline bool Scene::ProcessButtonEvent( const ButtonEvent& a_Event )
+    {
+        WidgetID focused = GetFocusedWidget();
+
+        if ( focused != c_InvalidPoolID )
+        {
+            if ( IWidget* widget = GetWidget( focused ) )
+            {
+                if ( a_Event.Pressed )
+                    widget->OnPressed( *this, a_Event );
+                else
+                    widget->OnReleased( *this, a_Event );
+
+                return true; // Event handled
+            }
+        }
+
+        return false; // Event not handled
+    }
+
 
 } // namespace RatUI
