@@ -99,26 +99,26 @@ namespace RatUI
 
     // === Color ===
 
-    using Color = RATUI_COLOR_IMPL;
+    using Colorf = RATUI_COLOR_IMPL;
 
     /** @brief Creates a color from f32 RGBA components in the range [0, 1]. */
-    constexpr Color MakeColorF32( f32 a_Red, f32 a_Green, f32 a_Blue, f32 a_Alpha = 1.f );
+    constexpr Colorf MakeColorF32( f32 a_Red, f32 a_Green, f32 a_Blue, f32 a_Alpha = 1.f );
 
     /** @brief Creates a color from u8 RGBA components in the range [0, 255]. */
-    constexpr Color MakeColorU8( u8 a_Red, u8 a_Green, u8 a_Blue, u8 a_Alpha = 255 );
+    constexpr Colorf MakeColorU8( u8 a_Red, u8 a_Green, u8 a_Blue, u8 a_Alpha = 255 );
 
 #ifdef RATUI_BUILTIN_MATH
 
-    inline constexpr Color MakeColorF32( f32 a_Red, f32 a_Green, f32 a_Blue, f32 a_Alpha )
+    inline constexpr Colorf MakeColorF32( f32 a_Red, f32 a_Green, f32 a_Blue, f32 a_Alpha )
     {
         // Built-in Color is Vec4<f32> with RGBA components in [0, 1], so we can just construct it directly
-        return Color{ a_Red, a_Green, a_Blue, a_Alpha };
+        return Colorf{ a_Red, a_Green, a_Blue, a_Alpha };
     }
 
-    inline constexpr Color MakeColorU8( u8 a_Red, u8 a_Green, u8 a_Blue, u8 a_Alpha )
+    inline constexpr Colorf MakeColorU8( u8 a_Red, u8 a_Green, u8 a_Blue, u8 a_Alpha )
     {
         // Built-in Color is Vec4<f32> with RGBA components in [0, 1], so we need to convert from [0, 255] to [0, 1]
-        return Color{
+        return Colorf{
             static_cast<f32>(a_Red) / 255.f,
             static_cast<f32>(a_Green) / 255.f,
             static_cast<f32>(a_Blue) / 255.f,
@@ -216,57 +216,57 @@ namespace RatUI
     {
         // - Common Colors
 
-        inline constexpr Color Red      = MakeColorF32( 1.f, 0.f, 0.f );
-        inline constexpr Color Yellow   = MakeColorF32( 1.f, 1.f, 0.f );
-        inline constexpr Color Green    = MakeColorF32( 0.f, 1.f, 0.f );
-        inline constexpr Color Cyan     = MakeColorF32( 0.f, 1.f, 1.f );
-        inline constexpr Color Blue     = MakeColorF32( 0.f, 0.f, 1.f );
-        inline constexpr Color Magenta  = MakeColorF32( 1.f, 0.f, 1.f );
-        inline constexpr Color White    = MakeColorF32( 1.f, 1.f, 1.f, 1.f );
-        inline constexpr Color Gray     = MakeColorF32( 0.5f, 0.5f, 0.5f, 1.f );
-        inline constexpr Color Black    = MakeColorF32( 0.f, 0.f, 0.f, 1.f );
-        inline constexpr Color Transparent = MakeColorF32( 0.f, 0.f, 0.f, 0.f );
+        inline constexpr Colorf Red         = MakeColorF32( 1.f, 0.f, 0.f );
+        inline constexpr Colorf Yellow      = MakeColorF32( 1.f, 1.f, 0.f );
+        inline constexpr Colorf Green       = MakeColorF32( 0.f, 1.f, 0.f );
+        inline constexpr Colorf Cyan        = MakeColorF32( 0.f, 1.f, 1.f );
+        inline constexpr Colorf Blue        = MakeColorF32( 0.f, 0.f, 1.f );
+        inline constexpr Colorf Magenta     = MakeColorF32( 1.f, 0.f, 1.f );
+        inline constexpr Colorf White       = MakeColorF32( 1.f, 1.f, 1.f, 1.f );
+        inline constexpr Colorf Gray        = MakeColorF32( 0.5f, 0.5f, 0.5f, 1.f );
+        inline constexpr Colorf Black       = MakeColorF32( 0.f, 0.f, 0.f, 1.f );
+        inline constexpr Colorf Transparent = MakeColorF32( 0.f, 0.f, 0.f, 0.f );
 
         // - Light Colors
 
-        inline constexpr Color LightRed     = MakeColorF32( 1.f, 0.5f, 0.5f, 1.f );
-        inline constexpr Color LightYellow  = MakeColorF32( 1.f, 1.f, 0.5f, 1.f );
-        inline constexpr Color LightGreen   = MakeColorF32( 0.5f, 1.f, 0.5f, 1.f );
-        inline constexpr Color LightCyan    = MakeColorF32( 0.5f, 1.f, 1.f, 1.f );
-        inline constexpr Color LightBlue    = MakeColorF32( 0.5f, 0.5f, 1.f, 1.f );
-        inline constexpr Color LightMagenta = MakeColorF32( 1.f, 0.5f, 1.f, 1.f );
-        inline constexpr Color LightGray    = MakeColorF32( 0.75f, 0.75f, 0.75f, 1.f );
+        inline constexpr Colorf LightRed     = MakeColorF32( 1.f, 0.5f, 0.5f, 1.f );
+        inline constexpr Colorf LightYellow  = MakeColorF32( 1.f, 1.f, 0.5f, 1.f );
+        inline constexpr Colorf LightGreen   = MakeColorF32( 0.5f, 1.f, 0.5f, 1.f );
+        inline constexpr Colorf LightCyan    = MakeColorF32( 0.5f, 1.f, 1.f, 1.f );
+        inline constexpr Colorf LightBlue    = MakeColorF32( 0.5f, 0.5f, 1.f, 1.f );
+        inline constexpr Colorf LightMagenta = MakeColorF32( 1.f, 0.5f, 1.f, 1.f );
+        inline constexpr Colorf LightGray    = MakeColorF32( 0.75f, 0.75f, 0.75f, 1.f );
 
         // - Dark Colors
 
-        inline constexpr Color DarkRed     = MakeColorF32( 0.5f, 0.f, 0.f, 1.f );
-        inline constexpr Color DarkYellow  = MakeColorF32( 0.5f, 0.5f, 0.f, 1.f );
-        inline constexpr Color DarkGreen   = MakeColorF32( 0.f, 0.5f, 0.f, 1.f );
-        inline constexpr Color DarkCyan    = MakeColorF32( 0.f, 0.5f, 0.5f, 1.f );
-        inline constexpr Color DarkBlue    = MakeColorF32( 0.f, 0.f, 0.5f, 1.f );
-        inline constexpr Color DarkMagenta = MakeColorF32( 0.5f, 0.f, 0.5f, 1.f );
-        inline constexpr Color DarkGray    = MakeColorF32( 0.25f, 0.25f, 0.25f, 1.f );
+        inline constexpr Colorf DarkRed     = MakeColorF32( 0.5f, 0.f, 0.f, 1.f );
+        inline constexpr Colorf DarkYellow  = MakeColorF32( 0.5f, 0.5f, 0.f, 1.f );
+        inline constexpr Colorf DarkGreen   = MakeColorF32( 0.f, 0.5f, 0.f, 1.f );
+        inline constexpr Colorf DarkCyan    = MakeColorF32( 0.f, 0.5f, 0.5f, 1.f );
+        inline constexpr Colorf DarkBlue    = MakeColorF32( 0.f, 0.f, 0.5f, 1.f );
+        inline constexpr Colorf DarkMagenta = MakeColorF32( 0.5f, 0.f, 0.5f, 1.f );
+        inline constexpr Colorf DarkGray    = MakeColorF32( 0.25f, 0.25f, 0.25f, 1.f );
 
         // - Pretty Colors
 
-        inline constexpr Color Orange    = MakeColorF32( 1.f, 0.65f, 0.f, 1.f );
-        inline constexpr Color Pink      = MakeColorF32( 1.f, 0.75f, 0.8f, 1.f );
-        inline constexpr Color Purple    = MakeColorF32( 0.5f, 0.f, 0.5f, 1.f );
-        inline constexpr Color Teal      = MakeColorF32( 0.f, 0.5f, 0.5f, 1.f );
-        inline constexpr Color Lime      = MakeColorF32( 0.75f, 1.f, 0.f, 1.f );
-        inline constexpr Color Indigo    = MakeColorF32( 0.29f, 0.f, 0.51f, 1.f );
-        inline constexpr Color Violet    = MakeColorF32( 0.93f, 0.51f, 0.93f, 1.f );
-        inline constexpr Color Brown     = MakeColorF32( 0.65f, 0.16f, 0.16f, 1.f );
-        inline constexpr Color Maroon    = MakeColorF32( 0.5f, 0.f, 0.f, 1.f );
-        inline constexpr Color Olive     = MakeColorF32( 0.5f, 0.5f, 0.f, 1.f );
-        inline constexpr Color Navy      = MakeColorF32( 0.f, 0.f, 0.5f, 1.f );
-        inline constexpr Color Silver    = MakeColorF32( 0.75f, 0.75f, 0.75f, 1.f );
-        inline constexpr Color Gold      = MakeColorF32( 1.f, 0.84f, 0.f, 1.f );
-        inline constexpr Color Salmon    = MakeColorF32( 0.98f, 0.5f, 0.45f, 1.f );
-        inline constexpr Color Coral     = MakeColorF32( 1.f, 0.5f, 0.31f, 1.f );
-        inline constexpr Color Turquoise = MakeColorF32( 0.25f, 0.88f, 0.82f, 1.f );
-        inline constexpr Color PowderBlue= MakeColorF32( 0.69f, 0.88f, 0.9f, 1.f );
-        inline constexpr Color LightPink = MakeColorF32( 1.f, 0.71f, 0.76f, 1.f );
+        inline constexpr Colorf Orange    = MakeColorF32( 1.f, 0.65f, 0.f, 1.f );
+        inline constexpr Colorf Pink      = MakeColorF32( 1.f, 0.75f, 0.8f, 1.f );
+        inline constexpr Colorf Purple    = MakeColorF32( 0.5f, 0.f, 0.5f, 1.f );
+        inline constexpr Colorf Teal      = MakeColorF32( 0.f, 0.5f, 0.5f, 1.f );
+        inline constexpr Colorf Lime      = MakeColorF32( 0.75f, 1.f, 0.f, 1.f );
+        inline constexpr Colorf Indigo    = MakeColorF32( 0.29f, 0.f, 0.51f, 1.f );
+        inline constexpr Colorf Violet    = MakeColorF32( 0.93f, 0.51f, 0.93f, 1.f );
+        inline constexpr Colorf Brown     = MakeColorF32( 0.65f, 0.16f, 0.16f, 1.f );
+        inline constexpr Colorf Maroon    = MakeColorF32( 0.5f, 0.f, 0.f, 1.f );
+        inline constexpr Colorf Olive     = MakeColorF32( 0.5f, 0.5f, 0.f, 1.f );
+        inline constexpr Colorf Navy      = MakeColorF32( 0.f, 0.f, 0.5f, 1.f );
+        inline constexpr Colorf Silver    = MakeColorF32( 0.75f, 0.75f, 0.75f, 1.f );
+        inline constexpr Colorf Gold      = MakeColorF32( 1.f, 0.84f, 0.f, 1.f );
+        inline constexpr Colorf Salmon    = MakeColorF32( 0.98f, 0.5f, 0.45f, 1.f );
+        inline constexpr Colorf Coral     = MakeColorF32( 1.f, 0.5f, 0.31f, 1.f );
+        inline constexpr Colorf Turquoise = MakeColorF32( 0.25f, 0.88f, 0.82f, 1.f );
+        inline constexpr Colorf PowderBlue= MakeColorF32( 0.69f, 0.88f, 0.9f, 1.f );
+        inline constexpr Colorf LightPink = MakeColorF32( 1.f, 0.71f, 0.76f, 1.f );
 
     } // namespace Colors
 

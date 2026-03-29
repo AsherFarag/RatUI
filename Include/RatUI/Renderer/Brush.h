@@ -5,7 +5,7 @@ namespace RatUI
 {
     struct SolidBrush
     {
-        Color Color{ 1.0f, 1.0f, 1.0f, 1.0f };
+        Colorf Color{ 1.0f, 1.0f, 1.0f, 1.0f };
     };
 
     struct GradientBrush

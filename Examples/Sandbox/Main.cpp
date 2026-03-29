@@ -19,7 +19,7 @@ public:
     {}
 
 	StringView Name;
-    Color Col;
+    Colorf Col;
 	f32 time = 0.f;
 
 	void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
