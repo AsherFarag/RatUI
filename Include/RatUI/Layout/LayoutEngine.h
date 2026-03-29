@@ -35,17 +35,19 @@ namespace RatUI
         // Resolve width
         switch (s.WidthMode)
         {
-            case ESizingMode::Fixed:   desired[0] = s.FixedWidth;                        break;
-			case ESizingMode::Fill:    desired[0] = a_AvailableSize[0] * ( s.PercentWidth > 0.f ? s.PercentWidth : 1.f ); break;
-            case ESizingMode::Content: desired[0] = 0.f;                                 break;
+            case ESizingMode::Content: break; // Need to measure children to determine size
+            case ESizingMode::Fixed:   desired[0] = s.FixedWidth; break;
+            case ESizingMode::Percent: desired[0] = s.PercentWidth * a_AvailableSize[0]; break;
+            case ESizingMode::Flex:    break; // Need to measure children to determine size
         }
     
         // Resolve height
         switch (s.HeightMode)
         {
-            case ESizingMode::Fixed:   desired[1] = s.FixedHeight;                        break;
-            case ESizingMode::Fill:    desired[1] = a_AvailableSize[1] * ( s.PercentHeight > 0.f ? s.PercentHeight : 1.f ); break;
-            case ESizingMode::Content: desired[1] = 0.f;                                  break;
+            case ESizingMode::Content: break; // Need to measure children to determine size
+            case ESizingMode::Fixed:   desired[1] = s.FixedHeight; break;
+            case ESizingMode::Percent: desired[1] = s.PercentHeight * a_AvailableSize[1]; break;
+            case ESizingMode::Flex:    break; // Need to measure children to determine size
         }
     
         // Accumulate children for content mode
@@ -68,16 +70,11 @@ namespace RatUI
             
                 numFlow++;
             
-                // If a child wants to Fill but the parent is Content-sized on that axis,
+                // If a child wants to Flex but the parent is Content-sized on that axis,
                 // the dependency is circular — treat the child as Content for measure so
                 // the parent can resolve its own size. Arrange will expand it correctly.
                 ESizingMode effectiveW = child.Style.WidthMode;
                 ESizingMode effectiveH = child.Style.HeightMode;
-            
-                if ( s.WidthMode  == ESizingMode::Content && effectiveW == ESizingMode::Fill )
-                    effectiveW = ESizingMode::Content;
-                if ( s.HeightMode == ESizingMode::Content && effectiveH == ESizingMode::Fill )
-                    effectiveH = ESizingMode::Content;
             
                 // Temporarily override sizing mode so recursive MeasureLayoutNode sees the fallback
                 const ESizingMode savedW = child.Style.WidthMode;
@@ -264,7 +261,7 @@ namespace RatUI
                       - ( s.Spacing * std::max( 0u, numFlow - 1 ) );
         f32 leftover  = std::max( 0.f, available - totalFixed );
 
-        // Fill children that were measured as Content (due to circular dependency) also
+        // Flex children that were measured as Content (due to circular dependency) also
         // claim a share of leftover space — treat them as FlexGrow 1 if they have no grow set.
         a_Node.ForEachChild( [&]( const LayoutNode& child )
         {
@@ -272,11 +269,11 @@ namespace RatUI
             if ( !child.Layout.Visibility.AffectsLayout() )               return;
             if ( child.Style.FlexGrow > 0.f )                             return;
 
-            bool wantsFillW = child.Style.WidthMode  == ESizingMode::Fill && isHz;
-            bool wantsFillH = child.Style.HeightMode == ESizingMode::Fill && !isHz;
+            bool wantsFillW = child.Style.WidthMode  == ESizingMode::Flex && isHz;
+            bool wantsFillH = child.Style.HeightMode == ESizingMode::Flex && !isHz;
 
             if ( wantsFillW || wantsFillH )
-                totalGrow += 1.f; // implicit grow weight for Fill children with no explicit FlexGrow
+                totalGrow += 1.f; // implicit grow weight for Flex children with no explicit FlexGrow
         } );
 
         // Pass 2: assign rects
@@ -295,12 +292,12 @@ namespace RatUI
 
             Vec2f childSize = child.Layout.DesiredSize;
 
-            // Determine effective grow weight — explicit FlexGrow or implicit 1 for Fill children
+            // Determine effective grow weight — explicit FlexGrow or implicit 1 for Flex children
             f32 growWeight = child.Style.FlexGrow;
             if ( growWeight == 0.f )
             {
-                bool wantsFillW = child.Style.WidthMode  == ESizingMode::Fill && isHz;
-                bool wantsFillH = child.Style.HeightMode == ESizingMode::Fill && !isHz;
+                bool wantsFillW = child.Style.WidthMode  == ESizingMode::Flex && isHz;
+                bool wantsFillH = child.Style.HeightMode == ESizingMode::Flex && !isHz;
                 if ( wantsFillW || wantsFillH )
                     growWeight = 1.f;
             }
@@ -324,13 +321,13 @@ namespace RatUI
             if (  isHz && ( align & EAlignment::VStretch ) == EAlignment::VStretch ) childSize[1] = a_Inner.Size[1];
             if ( !isHz && ( align & EAlignment::HStretch ) == EAlignment::HStretch ) childSize[0] = a_Inner.Size[0];
 
-            // Fill on cross axis from SizingMode
-            if ( isHz && child.Style.HeightMode == ESizingMode::Fill )
+            // Flex on cross axis from SizingMode
+            if ( isHz && child.Style.HeightMode == ESizingMode::Flex )
             {
                 f32 pct = child.Style.PercentHeight > 0.f ? child.Style.PercentHeight : 1.f;
                 childSize[1] = a_Inner.Size[1] * pct;
             }
-            if ( !isHz && child.Style.WidthMode == ESizingMode::Fill )
+            if ( !isHz && child.Style.WidthMode == ESizingMode::Flex )
             {
                 f32 pct = child.Style.PercentWidth > 0.f ? child.Style.PercentWidth : 1.f;
                 childSize[0] = a_Inner.Size[0] * pct;

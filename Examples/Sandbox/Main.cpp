@@ -115,34 +115,31 @@ protected:
     {
         g_SDLRenderer = GetRenderer();
 
-        Brush brush = SolidBrush{ .Color = Colors::PowderBlue };
-		DrawList testDrawList;
-		testDrawList
-			.AddRect( brush, Rectf::FromCenter( Vec2f{ 100.f, 100.f }, Vec2f{ 50.f, 50.f } ) )
-			.AddRectBorder( brush, Rectf::FromCenter( Vec2f{ 200.f, 100.f }, Vec2f{ 50.f, 50.f } ), 5.f )
-            .PushClipRect( Rectf::FromCenter( Vec2f{ 300.f, 100.f }, Vec2f{ 50.f, 50.f } ) )
-                .AddRect( brush, Rectf::FromCenter( Vec2f{ 300.f, 100.f }, Vec2f{ 50.f, 50.f } ) )
-                .AddCustom( brush, nullptr )
-			.PopClipRect();
-
         // Root container
-        WidgetID root = m_Scene.CreateRootWidget<RectWidget>( SDL_Color{ 0, 0, 0, 0 }, "Root" );
-        m_Scene.RootWidget = root;
+        WidgetID trueRoot = m_Scene.CreateRootWidget<RectWidget>( SDL_Color{ 0, 0, 0, 0 }, "TrueRoot" );
+        LayoutNode* trueRootNode = m_Scene.Layouts.Get( m_Scene.GetWidget( trueRoot )->GetLayoutID() );
+        trueRootNode->Style.LayoutType = ELayoutType::Vertical;
+        trueRootNode->Style.Spacing = 10.f;
+        trueRootNode->Style.Padding = Edges{ 10.f };
+        trueRootNode->Style.WidthMode = ESizingMode::Flex;
+        trueRootNode->Style.HeightMode = ESizingMode::Flex;
+
+        WidgetID root = m_Scene.CreateWidget<RectWidget>( trueRoot, SDL_Color{ 50, 100, 150, 255 }, "Root" );
 
         LayoutNode* rootNode = m_Scene.Layouts.Get( m_Scene.GetWidget( root )->GetLayoutID() );
         rootNode->Style.LayoutType = ELayoutType::Vertical;
         rootNode->Style.Spacing = 10.f;
         rootNode->Style.Padding = Edges{ 10.f };
-        rootNode->Style.WidthMode = ESizingMode::Fill;
-        rootNode->Style.HeightMode = ESizingMode::Fill;
-		//rootNode->Style.IsFocusScope = true; // Make the root a focus scope to test navigation between its children
+        rootNode->Style.WidthMode = ESizingMode::Flex;
+        rootNode->Style.HeightMode = ESizingMode::Flex;
+		rootNode->Style.IsFocusScope = true; // Make the root a focus scope to test navigation between its children
 
         // ---------------- RED ----------------
         WidgetID red = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 255, 0, 0, 255 }, "Red" );
         auto* redNode = m_Scene.Layouts.Get( m_Scene.GetWidget( red )->GetLayoutID() );
 
         redNode->Style.FixedHeight = 100.f;
-        redNode->Style.WidthMode = ESizingMode::Fill;
+        redNode->Style.WidthMode = ESizingMode::Flex;
         redNode->Style.HeightMode = ESizingMode::Fixed;
         redNode->Style.Margin = Edges{ 10.f };
 
@@ -155,15 +152,15 @@ protected:
 		hboxNode->Style.Padding = Edges{ 10.f };
         hboxNode->Style.HeightMode = ESizingMode::Fixed;
         hboxNode->Style.FixedHeight = 150.f;
-        hboxNode->Style.WidthMode = ESizingMode::Fill;
+        hboxNode->Style.WidthMode = ESizingMode::Flex;
 		hboxNode->Style.IsFocusScope = true; // Make the HBox a focus scope to test navigation between its children
 
         // ---------------- GREEN ----------------
         green = m_Scene.CreateWidget<RectWidget>( hbox, SDL_Color{ 0, 255, 0, 255 }, "Green" );
         auto* greenNode = m_Scene.Layouts.Get( m_Scene.GetWidget( green )->GetLayoutID() );
 
-        greenNode->Style.WidthMode = ESizingMode::Fill;
-        greenNode->Style.HeightMode = ESizingMode::Fill;
+        greenNode->Style.WidthMode = ESizingMode::Flex;
+        greenNode->Style.HeightMode = ESizingMode::Flex;
         greenNode->Style.FlexGrow = 1.f;
         greenNode->Style.PercentWidth = 0.5f; // This will be ignored since the parent is an HBox with Spacing, so it falls back to FlexGrow behavior.
 
@@ -171,8 +168,8 @@ protected:
         WidgetID yellow = m_Scene.CreateWidget<RectWidget>( hbox, SDL_Color{ 255, 255, 0, 255 }, "Yellow" );
         auto* yellowNode = m_Scene.Layouts.Get( m_Scene.GetWidget( yellow )->GetLayoutID() );
 
-        yellowNode->Style.WidthMode = ESizingMode::Fill;
-        yellowNode->Style.HeightMode = ESizingMode::Fill;
+        yellowNode->Style.WidthMode = ESizingMode::Flex;
+        yellowNode->Style.HeightMode = ESizingMode::Flex;
 		yellowNode->Style.PercentWidth = 0.5f; // This will be ignored since the parent is an HBox with Spacing, so it falls back to FlexGrow behavior.
         yellowNode->Style.FlexGrow = 1.f;
 
@@ -181,7 +178,7 @@ protected:
         auto* blueNode = m_Scene.Layouts.Get( m_Scene.GetWidget( blue )->GetLayoutID() );
 
         blueNode->Style.FixedHeight = 120.f;
-        blueNode->Style.WidthMode = ESizingMode::Fill;
+        blueNode->Style.WidthMode = ESizingMode::Flex;
         blueNode->Style.HeightMode = ESizingMode::Fixed;
 
         return true;
@@ -194,7 +191,7 @@ protected:
 		// Animate green widget's width with a sine wave
         if ( auto* greenNode = m_Scene.Layouts.Get( m_Scene.GetWidget( green )->GetLayoutID() ) )
         {
-            greenNode->Style.PercentWidth = 0.25f + 0.25f * std::sin( time );
+			greenNode->Style.FlexGrow = 0.5f + 0.5f * std::sin( time ); // FlexGrow oscillates between 0 and 1
             greenNode->Layout.IsDirty = true; // Mark layout dirty to trigger recalculation
 		}
 

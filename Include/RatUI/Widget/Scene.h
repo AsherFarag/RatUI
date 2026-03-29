@@ -403,7 +403,7 @@ namespace RatUI
             if ( IWidget* parentWidget = GetWidget( a_ParentID ) )
             {
                 if ( LayoutNode* parentNode = Layouts.Get( parentWidget->GetLayoutID() ) )
-                    parentNode->AddChild( *node );
+                    parentNode->PushBackChild( *node );
             }
         }
 

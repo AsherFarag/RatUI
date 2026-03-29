@@ -66,10 +66,9 @@ namespace RatUI
     enum class ESizingMode : u8
     {
         Content, ///< Size is determined by the content of the element.
-        Fill,    ///< Size fills the available space in the parent container.
-        Fixed    ///< Size is explicitly specified and does not change based on content or available space.
-
-        // TODO: There should be Flex and Percent modes instead of Fill.
+        Fixed,   ///< Size is fixed to the specified dimensions.
+		Percent, ///< Size is a percentage of the parent container's size.
+        Flex,    ///< Size is determined by available space and the element's FlexGrow weight relative to siblings.
     };
 
     /**
@@ -262,13 +261,13 @@ namespace RatUI
         f32 FixedHeight{ 0.0f }; ///< The fixed height to use when HeightMode is set to Fixed.
         
         /**
-         * @note PercentWidth/PercentHeight are only meaningful when the parent axis is Fixed or Fill. 
-         * Inside a Content-sized parent, Fill children fall back to Content (zero intrinsic size) and PercentWidth/Height is ignored.
+         * @note PercentWidth/PercentHeight are only meaningful when the parent axis is Fixed or Flex.
+         * Inside a Content-sized parent, Flex children fall back to Content (zero intrinsic size) and PercentWidth/Height is ignored.
          */
-        f32 PercentWidth{ 0.0f };      ///< The percentage of the available width to use when WidthMode is set to Fill.
-        f32 PercentHeight{ 0.0f };     ///< The percentage of the available height to use when HeightMode is set to Fill.
+        f32 PercentWidth{ 1.0f };      ///< The percentage of the available width to use when WidthMode is set to Fill.
+        f32 PercentHeight{ 1.0f };     ///< The percentage of the available height to use when HeightMode is set to Fill.
 
-        f32 FlexGrow{ 0.0f };          ///< Determines how much of the remaining space the element should occupy relative to its siblings.
+        f32 FlexGrow{ 1.0f };          ///< Determines how much of the remaining space the element should occupy relative to its siblings.
         Constraints SizeConstraints{}; ///< The size constraints to consider when laying out the element.
     };
 
@@ -291,6 +290,8 @@ namespace RatUI
      * @brief Represents a UI element in the RatUI layout system, containing layout styles, results, and hierarchical relationships with other nodes.
      * The hierarchy is represented as a doubly-linked list of children for efficient insertion and removal.
      * This avoids the overhead of dynamic arrays for child management, with minimal traversal costs as LayoutNodes are stored in pools.
+     * @warning LayoutNodes do not own their children and are not responsible for their lifetime. 
+     * It is the caller's responsibility to ensure that child nodes remain valid as long as they are part of the layout hierarchy.
      */
     struct LayoutNode
     {
@@ -309,29 +310,28 @@ namespace RatUI
 			void* UserData = nullptr; ///< Incase LayoutNode is not being used with the IWidget system, this can store arbitrary user data.
         };
 
-        // TODO: Add proper hierarchy functionality
+        /** @brief Detaches this node from its parent, updating the linked list pointers of siblings and parent accordingly. */
+        void DetachFromParent();
+
+        /** @brief Attaches the given child node to the end of this node's children. */
+        void PushBackChild( LayoutNode& a_Child );
+
+        /** @brief Attaches the given child node to the front of this node's children. */
+        void PushFrontChild( LayoutNode& a_Child );
 
         /**
-         * @brief Adds a child widget to this widget, updating the linked list pointers accordingly.
-         * @param a_Child The child widget to add. It will be added as the last child of this widget.
+         * @brief Inserts the given child node after the specified sibling node in this node's children.
+         * @param a_Child The child node to insert.
+         * @param a_Sibling The sibling node after which the child should be inserted. This sibling must already be a child of this node.
          */
-        void AddChild( LayoutNode& a_Child )
-        {
-            a_Child.Parent     = this;
-            a_Child.NextSibling = nullptr;
-            if ( LastChild )
-            {
-                LastChild->NextSibling = &a_Child;
-                a_Child.PrevSibling = LastChild;
-            }
-            else
-            {
-                FirstChild = &a_Child;
-                a_Child.PrevSibling = nullptr;
-            }
-            LastChild = &a_Child;
-            ++NumChildren;
-        }
+        void InsertChildAfter( LayoutNode& a_Child, LayoutNode& a_Sibling );
+
+        /**
+         * @brief Inserts the given child node before the specified sibling node in this node's children.
+         * @param a_Child The child node to insert.
+         * @param a_Sibling The sibling node before which the child should be inserted. This sibling must already be a child of this node.
+         */
+        void InsertChildBefore( LayoutNode& a_Child, LayoutNode& a_Sibling );
 
         /**
          * @brief Applies the given function to each child widget of this widget.
@@ -339,11 +339,7 @@ namespace RatUI
          * @param a_Func A callable that takes a LayoutNode reference. It will be invoked for each child widget of this widget.
          */
         template<std::invocable<LayoutNode&> Func>
-        void ForEachChild( Func&& a_Func )
-        {
-            for (LayoutNode* child = FirstChild; child != nullptr; child = child->NextSibling)
-                std::forward<Func>(a_Func)(*child);
-        }
+        void ForEachChild( Func&& a_Func );
 
         /**
          * @brief Applies the given function to each child widget of this widget (const version).
@@ -351,11 +347,148 @@ namespace RatUI
          * @param a_Func A callable that takes a const LayoutNode reference. It will be invoked for each child widget of this widget.
          */
         template<std::invocable<const LayoutNode&> Func>
-        void ForEachChild( Func&& a_Func ) const
-        {
-            for (const LayoutNode* child = FirstChild; child != nullptr; child = child->NextSibling)
-                std::forward<Func>(a_Func)(*child);
-        }
+        void ForEachChild( Func&& a_Func ) const;
+
+        /**
+         * @brief Applies the given function to this widget and all of its descendant widgets in a depth-first manner.
+         * @tparam Func The type of the function to apply to each descendant widget. It must be invocable with a LayoutNode reference.
+         * @param a_Func A callable that takes a LayoutNode reference.
+         */
+        template<std::invocable<LayoutNode&> Func>
+        void ForEachDescendant( Func&& a_Func );
     };
+
+    // === Inline Implementations ===
+
+    inline void LayoutNode::DetachFromParent()
+    {
+        if ( !Parent ) return; // Not attached to any parent
+
+        // Link siblings together, bypassing this node
+        if ( PrevSibling ) PrevSibling->NextSibling = NextSibling;
+        else               Parent->FirstChild = NextSibling;
+
+        if ( NextSibling ) NextSibling->PrevSibling = PrevSibling;
+        else               Parent->LastChild = PrevSibling;
+
+        Parent->NumChildren--;
+        Parent = nullptr;
+        PrevSibling = nullptr;
+        NextSibling = nullptr;
+    }
+
+    inline void LayoutNode::PushBackChild( LayoutNode& a_Child )
+    {
+        a_Child.DetachFromParent(); // Ensure child is not currently attached to another parent
+
+        a_Child.Parent      = this;
+        a_Child.NextSibling = nullptr;
+
+        if ( LastChild )
+        {
+            LastChild->NextSibling = &a_Child;
+            a_Child.PrevSibling = LastChild;
+        }
+        else
+        {
+            FirstChild = &a_Child;
+            a_Child.PrevSibling = nullptr;
+        }
+
+        LastChild = &a_Child;
+        ++NumChildren;
+    }
+
+    inline void LayoutNode::PushFrontChild( LayoutNode& a_Child )
+    {
+        a_Child.DetachFromParent(); // Ensure child is not currently attached to another parent
+
+        a_Child.Parent = this;
+        a_Child.PrevSibling = nullptr;
+
+        if ( FirstChild )
+        {
+            FirstChild->PrevSibling = &a_Child;
+            a_Child.NextSibling = FirstChild;
+        }
+        else
+        {
+            LastChild = &a_Child;
+            a_Child.NextSibling = nullptr;
+        }
+
+        FirstChild = &a_Child;
+        ++NumChildren;
+    }
+
+    inline void LayoutNode::InsertChildAfter( LayoutNode& a_Child, LayoutNode& a_Sibling )
+    {
+        if ( !a_Sibling.Parent || a_Sibling.Parent != this )
+        {
+            RATUI_USER_ASSERT( false, "Sibling node is not a child of this parent" );
+            return;
+        }
+
+        a_Child.DetachFromParent(); // Ensure child is not currently attached to another parent
+
+        a_Child.Parent = this;
+        a_Child.PrevSibling = &a_Sibling;
+        a_Child.NextSibling = a_Sibling.NextSibling;
+
+        if ( a_Sibling.NextSibling )
+            a_Sibling.NextSibling->PrevSibling = &a_Child;
+        else
+            LastChild = &a_Child;
+
+        a_Sibling.NextSibling = &a_Child;
+        ++NumChildren;
+    }
+
+    inline void LayoutNode::InsertChildBefore( LayoutNode& a_Child, LayoutNode& a_Sibling )
+    {
+        if ( !a_Sibling.Parent || a_Sibling.Parent != this )
+        {
+            RATUI_USER_ASSERT( false, "Sibling node is not a child of this parent" );
+            return;
+        }
+
+        a_Child.DetachFromParent(); // Ensure child is not currently attached to another parent
+
+        a_Child.Parent = this;
+        a_Child.NextSibling = &a_Sibling;
+        a_Child.PrevSibling = a_Sibling.PrevSibling;
+
+        if ( a_Sibling.PrevSibling )
+            a_Sibling.PrevSibling->NextSibling = &a_Child;
+        else
+            FirstChild = &a_Child;
+
+        a_Sibling.PrevSibling = &a_Child;
+        ++NumChildren;
+    }
+
+    template<std::invocable<LayoutNode&> Func>
+    void LayoutNode::ForEachChild( Func&& a_Func )
+    {
+        for (LayoutNode* child = FirstChild; child != nullptr; child = child->NextSibling)
+            std::forward<Func>(a_Func)(*child);
+    }
+
+    template<std::invocable<const LayoutNode&> Func>
+    void LayoutNode::ForEachChild( Func&& a_Func ) const
+    {
+        for (const LayoutNode* child = FirstChild; child != nullptr; child = child->NextSibling)
+            std::forward<Func>(a_Func)(*child);
+    }
+
+    template<std::invocable<LayoutNode&> Func>
+    void LayoutNode::ForEachDescendant( Func&& a_Func )
+    {
+        ForEachChild( [&]( LayoutNode& child )
+        {
+            std::forward<Func>(a_Func)( child );
+            child.ForEachDescendant( std::forward<Func>( a_Func ) );
+        });
+    }
 
 } // namespace RatUI
