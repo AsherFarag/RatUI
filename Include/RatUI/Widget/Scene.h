@@ -83,9 +83,9 @@ namespace RatUI
         Scene( Scene&& ) = default;
         Scene& operator=( Scene&& ) = default;
 
-        LayoutNodePool Layouts{}; ///< Pool of layout nodes representing the hierarchical structure and layout information of widgets in the scene.
-        WidgetPool Widgets{};     ///< Pool of widgets in the scene, each associated with a layout node via the WidgetID and LayoutID.
-        WidgetID RootWidget{};    ///< The WidgetID of the root widget in the scene, which serves as the entry point for layout and rendering.
+        LayoutNodePool Layouts{};     ///< Pool of layout nodes representing the hierarchical structure and layout information of widgets in the scene.
+        WidgetPool     Widgets{};     ///< Pool of widgets in the scene, each associated with a layout node via the WidgetID and LayoutID.
+        WidgetID       RootWidget{};  ///< The WidgetID of the root widget in the scene, which serves as the entry point for layout and rendering.
 
         // - Scene Management
 
@@ -160,7 +160,6 @@ namespace RatUI
 
         WidgetID m_FocusedWidget{ c_InvalidPoolID };
         WidgetID m_HoveredWidget{ c_InvalidPoolID };
-        bool     m_MouseWasDown{ false };
 
         struct NavScope
         {
@@ -368,7 +367,6 @@ namespace RatUI
         Widgets.Clear();
         RootWidget = c_InvalidPoolID;
         m_HoveredWidget = c_InvalidPoolID;
-        m_MouseWasDown = false;
         ClearFocus();
         Clear( m_NavStack );
     }
@@ -466,24 +464,50 @@ namespace RatUI
 
     inline bool Scene::ProcessPointerEvent( const PointerEvent& a_Event )
     {
-        return false; // Event not handled
+        if ( !a_Event.IsMouse() ) 
+			return false; // TODO: Only process mouse events for now
+
+        WidgetID hovered = HitTest( RootWidget, a_Event.Position );
+        if ( hovered != m_HoveredWidget )
+        {
+            if ( IWidget* prevHovered = GetWidget( m_HoveredWidget ) )
+                prevHovered->OnPointerExit( *this, a_Event );
+
+            m_HoveredWidget = hovered;
+
+            if ( IWidget* newHovered = GetWidget( m_HoveredWidget ) )
+                newHovered->OnPointerEnter( *this, a_Event );
+        }
+
+        return false;
     }
 
     inline bool Scene::ProcessButtonEvent( const ButtonEvent& a_Event )
     {
-        WidgetID focused = GetFocusedWidget();
-
-        if ( focused != c_InvalidPoolID )
+        if ( IWidget* hovered = GetWidget( m_HoveredWidget ) )
         {
-            if ( IWidget* widget = GetWidget( focused ) )
-            {
-                if ( a_Event.Pressed )
-                    widget->OnPressed( *this, a_Event );
-                else
-                    widget->OnReleased( *this, a_Event );
+            bool consumed = false;
 
-                return true; // Event handled
-            }
+            if ( a_Event.Pressed )
+                consumed |= hovered->OnPressed( *this, a_Event );
+            else
+                consumed |= hovered->OnReleased( *this, a_Event );
+
+            if ( consumed )
+				return true; // Event handled by hovered widget
+		}
+
+        if ( IWidget* focused = GetWidget( GetFocusedWidget() ) )
+        {
+            bool consumed = false;
+
+            if ( a_Event.Pressed )
+                consumed |= focused->OnPressed( *this, a_Event );
+            else
+                consumed |= focused->OnReleased( *this, a_Event );
+
+            if ( consumed )
+                return true; // Event handled by focused widget
         }
 
         return false; // Event not handled

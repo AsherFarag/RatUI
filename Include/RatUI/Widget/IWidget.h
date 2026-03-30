@@ -37,16 +37,16 @@ namespace RatUI
         virtual void OnFocusLost( Scene& a_Scene ) {}
 
         /** @brief Called when a pointer (e.g., mouse cursor) enters the widget's bounds. */
-        virtual void OnHoverEnter( Scene& a_Scene ) {}
+        virtual void OnPointerEnter( Scene& a_Scene, const PointerEvent& a_Event ) {}
 
         /** @brief Called when a pointer (e.g., mouse cursor) exits the widget's bounds. */
-        virtual void OnHoverExit( Scene& a_Scene ) {}
+        virtual void OnPointerExit( Scene& a_Scene, const PointerEvent& a_Event ) {}
 
         /** @brief Called when an input button is pressed while this widget is focused. */
-        virtual void OnPressed( Scene& a_Scene, const ButtonEvent& a_Event ) {}
+        virtual bool OnPressed( Scene& a_Scene, const ButtonEvent& a_Event ) { return false; }
 
         /** @brief Called when an input button is released while this widget is focused. */
-        virtual void OnReleased( Scene& a_Scene, const ButtonEvent& a_Event ) {}
+        virtual bool OnReleased( Scene& a_Scene, const ButtonEvent& a_Event ) { return false; }
 
     protected:
         friend Scene;

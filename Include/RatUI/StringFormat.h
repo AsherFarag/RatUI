@@ -1,17 +1,6 @@
 #pragma once
 #include "RatUI.h"
-
-/**
- * @file StringFormat.inl
- * @brief This file contains string formatting utilities for RatUI, including std::format-based formatting functions.
- * It is included by RatUI.h and should not be included directly by user code.
- */
-
-#if RATUI_CONFIG_ENABLE_STRING_FORMATTERS
-
 #include <format>
-
-// std::formatter specializations must live outside namespace RatUI.
 
 // === Math.inl ===
 template<typename T, unsigned Dim>
@@ -179,5 +168,3 @@ struct std::formatter<RatUI::Degrees<T>>
         return std::format_to(ctx.out(), "{} degrees", value.Value);
     }
 };
-
-#endif // RATUI_CONFIG_ENABLE_STRING_FORMATTERS
