@@ -243,7 +243,14 @@ namespace RatUI
         ELayoutType LayoutType{ ELayoutType::Overlay }; ///< The layout type to use for arranging child elements (if this element is a container).
         EAlignment  ChildAlign{ EAlignment::TopLeft };  ///< Default alignment for child elements within this container.
         EWrapMode   WrapMode{ EWrapMode::NoWrap };      ///< The wrap mode to use when child elements exceed the available space in a container.
-		bool        IsFocusScope{ false };              ///< Whether this element should be considered a focus scope for navigation. (e.g., a menu or panel that can receive focus and contain navigatable child elements)
+		bool        IsFocusScope{ false };              ///< Whether this element should be considered a focus scope for navigation.
+
+        /**
+         * @note For grid layouts, at least one of GridColumns or GridRows must be set to a non-zero value. 
+         * The layout engine will auto-calculate the other dimension based on the number of children and the specified dimension.
+         */
+        u16         GridColumns{ 0 };                   ///< For grid layouts, the number of columns to arrange child elements into. 0 will auto-calculate.
+        u16         GridRows{ 1 };                      ///< For grid layouts, the number of rows to arrange child elements into. 0 will auto-calculate.
 
         // - Positioning properties
         Edges Padding{};        ///< The padding to apply around the content of the element, in pixels.
@@ -277,10 +284,16 @@ namespace RatUI
      */
     struct LayoutResult
     {
-        Rectf FinalRect{};    ///< The final position and size of the element after layout, in absolute coordinates. Filled by the Arrange step.
-        Vec2f DesiredSize{};  ///< The desired size of the element based on its content and constraints. Filled by the Measure step.
-        bool IsDirty{ true }; ///< Whether the layout needs to be recalculated. Set to true when properties affecting layout are changed.
-        struct Visibility Visibility{}; ///< The visibility state of the element, which can affect both rendering and layout.
+        Rectf FinalRect{};               ///< The final position and size of the element after layout, in absolute coordinates. Filled by the Arrange step.
+        Vec2f DesiredSize{};             ///< The desired size of the element based on its content and constraints. Filled by the Measure step.
+
+		// TODO: This works as a hot fix for text support but it doesnt work with text wrapping etc.
+        // Figure out a clean solution without coupling the layout engine to the widgets.
+		Vec2f IntrinsicSize{};           ///< The natural content size set by the user before layout. (e.g., the size of an image or text block).
+
+        struct Visibility Visibility {}; ///< The visibility state of the element, which can affect both rendering and layout.
+        bool IsDirty{ true };            ///< Whether the layout needs to be recalculated. Set to true when properties affecting layout are changed.
+		bool IsDescendantDirty{ true };  ///< Whether any descendant elements are dirty and require layout recalculation.
     };
 
     using WidgetID = PoolID;
@@ -290,6 +303,7 @@ namespace RatUI
      * @brief Represents a UI element in the RatUI layout system, containing layout styles, results, and hierarchical relationships with other nodes.
      * The hierarchy is represented as a doubly-linked list of children for efficient insertion and removal.
      * This avoids the overhead of dynamic arrays for child management, with minimal traversal costs as LayoutNodes are stored in pools.
+	 * @warning LayoutNodes require either pointer stability from their storage (e.g., pool allocator) or careful management to ensure that pointers to child nodes remain valid.
      * @warning LayoutNodes do not own their children and are not responsible for their lifetime. 
      * It is the caller's responsibility to ensure that child nodes remain valid as long as they are part of the layout hierarchy.
      */

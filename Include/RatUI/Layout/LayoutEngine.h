@@ -35,7 +35,7 @@ namespace RatUI
         // Resolve width
         switch (s.WidthMode)
         {
-            case ESizingMode::Content: break; // Need to measure children to determine size
+            case ESizingMode::Content: desired[0] = a_Node.Layout.IntrinsicSize[0]; break;
             case ESizingMode::Fixed:   desired[0] = s.FixedWidth; break;
             case ESizingMode::Percent: desired[0] = s.PercentWidth * a_AvailableSize[0]; break;
             case ESizingMode::Flex:    break; // Need to measure children to determine size
@@ -44,7 +44,7 @@ namespace RatUI
         // Resolve height
         switch (s.HeightMode)
         {
-            case ESizingMode::Content: break; // Need to measure children to determine size
+            case ESizingMode::Content: desired[1] = a_Node.Layout.IntrinsicSize[1]; break;
             case ESizingMode::Fixed:   desired[1] = s.FixedHeight; break;
             case ESizingMode::Percent: desired[1] = s.PercentHeight * a_AvailableSize[1]; break;
             case ESizingMode::Flex:    break; // Need to measure children to determine size
@@ -92,7 +92,17 @@ namespace RatUI
                         break;
                 
                     case ELayoutType::Grid:
-                        // TODO: Implement grid layout measurement
+                        RATUI_USER_ASSERT( s.GridColumns != 0 || s.GridRows != 0, 
+                            "Grid layout requires at least one of GridColumns or GridRows to be set" );
+
+                        // TODO:
+                        // This is harder than I thought.
+                        // First we need to determine the number of columns and rows.
+                        // Then we need to measure each child and keep track of the max width for each column and max height for each row.
+                        // Then can sum them up to get the total content size.
+
+                        // TODO: Might need to implement a frame allocator or something and give it to this function 
+
                         break;
                 }
             } );

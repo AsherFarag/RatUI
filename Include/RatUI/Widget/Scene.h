@@ -3,6 +3,7 @@
 #include "../Layout/LayoutEngine.h"
 #include "../Input/InputEvent.h"
 #include "../Input/Navigation.h"
+#include "../Text/ITextMetrics.h"
 #include "IWidget.h"
 
 #include <iterator>
@@ -86,6 +87,7 @@ namespace RatUI
         LayoutNodePool Layouts{};     ///< Pool of layout nodes representing the hierarchical structure and layout information of widgets in the scene.
         WidgetPool     Widgets{};     ///< Pool of widgets in the scene, each associated with a layout node via the WidgetID and LayoutID.
         WidgetID       RootWidget{};  ///< The WidgetID of the root widget in the scene, which serves as the entry point for layout and rendering.
+        ITextMetrics*  TextMetrics{}; ///< Pointer to a text metrics provider used for measuring text during layout, set by the user.
 
         // - Scene Management
 

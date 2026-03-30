@@ -1,5 +1,6 @@
 #pragma once
 #include "../Core.h"
+#include "../Text/Text.h"
 #include "Brush.h"
 #include "RenderTransform.h"
 
@@ -29,6 +30,11 @@ namespace RatUI
 
         struct CircleBorderCmd { Vec2f Center; f32 Radius; f32 BorderThickness; };
 
+        // TODO: Would be safer to store the string but not too sure yet for perf
+        struct TextCmd { TextView Text; TextStyle Style; Rectf Rect; ETextAlign Align; };
+
+        struct ShapedTextCmd { ShapedText Text; Vec2f Position; };
+
         struct CustomCmd { CustomDrawFunc Func; void* UserData; };
 
         Brush DrawBrush;
@@ -42,6 +48,8 @@ namespace RatUI
             RoundedRectBorderCmd,
             CircleCmd,
             CircleBorderCmd,
+            TextCmd,
+            ShapedTextCmd,
             CustomCmd
         > Payload;
     };
@@ -168,6 +176,28 @@ namespace RatUI
                 .Transform = CurrentTransform(),
                 .ClipRect = CurrentClipRect(),
                 .Payload = DrawCmd::CircleBorderCmd{ .Center = a_Center, .Radius = a_Radius, .BorderThickness = a_Thickness }
+            } );
+            return *this;
+        }
+
+        DrawList& AddText( Brush a_Brush, TextView a_Text, TextStyle a_Style, Rectf a_Rect, ETextAlign a_Align = ETextAlign::Left )
+        {
+            PushBack( Commands, DrawCmd{
+                .DrawBrush = std::move( a_Brush ),
+                .Transform = CurrentTransform(),
+                .ClipRect = CurrentClipRect(),
+                .Payload = DrawCmd::TextCmd{ .Text = a_Text, .Style = a_Style, .Rect = a_Rect, .Align = a_Align }
+            } );
+            return *this;
+        }
+
+        DrawList& AddShapedText( Brush a_Brush, ShapedText a_Text, Vec2f a_Position )
+        {
+            PushBack( Commands, DrawCmd{
+                .DrawBrush = std::move( a_Brush ),
+                .Transform = CurrentTransform(),
+                .ClipRect = CurrentClipRect(),
+                .Payload = DrawCmd::ShapedTextCmd{ .Text = a_Text, .Position = a_Position }
             } );
             return *this;
         }

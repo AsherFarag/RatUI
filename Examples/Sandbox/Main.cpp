@@ -45,9 +45,17 @@ public:
 	StringView Name;
     Colorf Col;
 	f32 time = 0.f;
+	bool IsHovered = false;
+	bool IsPressed = false;
+	bool IsPressable = true;
 
 	void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
     {
+        a_Scene.ForEachChildWidget( GetID(), [&]( IWidget& child )
+        {
+            IsPressable = false;
+        } );
+
 		time += 1.f / 60.f;
 
         const LayoutNode* node = a_Scene.Layouts.Get( GetLayoutID() );
@@ -56,25 +64,18 @@ public:
 
         const Rectf& rect = node->Layout.FinalRect;
 
-		// rotate between -30 and 30 degrees based on time, using the center of the rect as the pivot
-		f32 angle = std::sin( time ) * 1.f;
-
-        RenderTransform transform{}; transform.Angle = Radians{ Degreesf{ angle } };
-        transform.Scale = Vec2f{0.75,0.75} + Vec2f{ 1.f + 0.5f * std::sin( time * 0.5f ), 1.f + 0.5f * std::sin( time * 0.5f ) } * 0.1f; // Scale between 0.5 and 1.5
-
-		a_DrawList.PushTransform( transform.ToMatrix( rect ) );
+        // rotate when hovered
+		f32 scale = !IsHovered ? 1.0f : 1.f + 0.05f * std::sin( time * 5.f ); // Scale oscillates between 1.0 and 1.1 when hovered
 
 		if ( a_Scene.GetFocusedWidget() == GetID() )
-            a_DrawList.AddRect( SolidBrush{ .Color = Colors::White }, rect.Expanded( 10.f ) );
+			a_DrawList.AddRect( SolidBrush{ .Color = Colors::White }, rect.Expanded( 10.f * scale ) );
 
-		a_DrawList.AddRect( SolidBrush{ .Color = Col }, rect );
+		a_DrawList.AddRect( SolidBrush{ .Color = IsPressed ? Colors::White : Col }, rect.Expanded( 10 * 10 * ( scale - 1.f ) ) );
 
         a_Scene.ForEachChildWidget( GetID(), [&](IWidget& child)
         {
             child.OnPaint( a_Scene, a_DrawList );
 		} );
-
-        a_DrawList.PopTransform();
     }
 
     bool IsFocusable( Scene& a_Scene ) const override
@@ -82,15 +83,39 @@ public:
         return true;
 	}
 
-    void OnHoverEnter( Scene& a_Scene ) override
+	void OnPointerEnter( Scene& a_Scene, const PointerEvent& a_Event ) override
     {
-		std::cout << "Hover Enter: " << Name << std::endl;
+        if ( !IsPressable )
+			return;
+
+		IsHovered = true;
     }
 
-    void OnHoverExit( Scene& a_Scene ) override
+	void OnPointerExit( Scene& a_Scene, const PointerEvent& a_Event ) override
 	{
-		std::cout << "Hover Exit: " << Name << std::endl;
+        if ( !IsPressable )
+            return;
+
+		IsHovered = false;
 	}
+
+    bool OnPressed( Scene& a_Scene, const ButtonEvent& a_Event ) override
+    {
+        if ( !IsPressable )
+            return false;
+
+		IsPressed = true;
+        return true;
+	}
+
+    bool OnReleased( Scene& a_Scene, const ButtonEvent& a_Event ) override
+    {
+        if ( !IsPressable )
+            return false;
+
+		IsPressed = false;
+		return true;
+    }
 };
 
 /**

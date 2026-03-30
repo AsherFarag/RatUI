@@ -1,0 +1,64 @@
+#pragma once
+#include "../Text/Text.h"
+#include "Scene.h"
+#include "IWidget.h"
+
+namespace RatUI
+{
+    class TextWidget : public IWidget
+    {
+    public:
+        virtual ~TextWidget() = default;
+
+        void SetText( Text a_Text ) 
+        { 
+            m_Text = std::move( a_Text );
+            m_ShapedText = {}; 
+        }
+
+        Vec2f Measure( Scene& a_Scene, Vec2f a_AvailableSize )
+        {
+            ITextMetrics* metrics = a_Scene.TextMetrics;
+            if ( !metrics || Empty( m_Text ) )
+                return { 0.f, 0.f };
+
+            // Re-shape if dirty or available width changed (affects wrapping)
+            if ( m_Dirty || m_LastAvail[0] != a_AvailableSize[0] )
+            {
+                if ( m_ShapedText.IsValid() )
+                    metrics->ReleaseShapedText( m_ShapedText );
+
+                m_ShapedText = metrics->Shape( m_Text, m_Style, a_AvailableSize[0] );
+                m_LastAvail  = a_AvailableSize;
+                m_Dirty      = false;
+            }
+
+            return m_ShapedText.Size;
+        }
+
+        void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
+        {
+            if ( !m_ShapedText.IsValid() ) return;
+
+            LayoutNode* node = a_Scene.Layouts.Get( GetLayoutID() );
+            if ( !node || !node->Layout.Visibility.IsRendered() ) return;
+
+            // Align within the final rect
+            const Rectf& rect = node->Layout.FinalRect;
+            Vec2f pos = rect.Origin; // TODO: This only works for left aligned text. Need to calculate the position based on alignment and available space.
+
+            a_DrawList.AddShapedText( SolidBrush{ m_Color }, m_ShapedText, pos );
+        }
+
+    protected:
+        Text       m_Text;       ///< The text content to be displayed by the widget.
+        ShapedText m_ShapedText; ///< Cached shaped text.
+        TextStyle  m_Style;      ///< The style to apply when rendering the text.
+        Colorf     m_Color{ Colors::White };    ///< The color of the text.
+        ETextAlign m_Align{ ETextAlign::Left }; ///< Text alignment within the widget's bounds.
+
+        bool  m_Dirty{ true }; ///< Whether the shaped text needs to be updated due to changes in text content, style, or available width.
+        Vec2f m_LastAvail{}; ///<
+    };
+
+} // namespace RatUI
