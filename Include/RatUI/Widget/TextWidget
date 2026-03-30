@@ -8,7 +8,13 @@ namespace RatUI
     class TextWidget : public IWidget
     {
     public:
-        virtual ~TextWidget() = default;
+        virtual ~TextWidget() override = default;
+
+        void OnDestroy( Scene& a_Scene ) override
+        {
+            if ( m_ShapedText.IsValid() && a_Scene.TextMetrics )
+                a_Scene.TextMetrics->ReleaseShapedText( m_ShapedText );
+        }
 
         void SetText( Text a_Text ) 
         { 
