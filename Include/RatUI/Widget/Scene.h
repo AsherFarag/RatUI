@@ -356,6 +356,8 @@ namespace RatUI
             DestroyWidget( childNode.WidgetID );
         });
 
+        widget->OnDestroy( *this ); // TODO: Does it make more sense to call this before or after destroying children?
+
         // Deallocate widget and layout node
         Widgets.Deallocate( widget->GetID() );
         Layouts.Deallocate( widget->GetLayoutID() );
@@ -406,6 +408,9 @@ namespace RatUI
                     parentNode->PushBackChild( *node );
             }
         }
+
+        // Call construct after fully initialized and linked into hierarchy, in case widget logic depends on that
+        widget->OnConstruct( *this );
 
         return widgetID;
     }

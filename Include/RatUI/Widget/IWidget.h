@@ -24,6 +24,12 @@ namespace RatUI
         /** @brief Returns the layout identifier for this widget. */
         NodeID GetLayoutID() const { return m_LayoutID; }
 
+        /** @brief Called immediately after the widget is constructed and associated with a layout node. */
+        virtual void OnConstruct( Scene& a_Scene ) {}
+
+        /** @brief Called immediately before the widget is destroyed and disassociated from its layout node. */
+        virtual void OnDestroy( Scene& a_Scene ) {} ///< Called immediately before the widget is destroyed and disassociated from its layout node.
+
         /** @brief Called when the widget should render itself and its children. */
         virtual void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) {}
 

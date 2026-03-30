@@ -4,6 +4,8 @@
  */
 
 #include "../Common/Common.h"
+#include "RatUI/RatUI.h"
+#include "RatUI/StringFormat.h"
 #include <format>
 #include <limits>
 
