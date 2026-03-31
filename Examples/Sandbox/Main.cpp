@@ -19,30 +19,41 @@ public:
 
     TextMeasurement Measure( TextView a_Text, const TextStyle& a_Style, f32 a_MaxWidth ) override
     {
-        // Just add up the character widths for a very naive measurement. This is not how real text measurement works, but it serves as a placeholder for testing the TextWidget layout.
-        f32 width = 0.f;
+        const f32 charWidth = a_Style.Size * 0.5f;
+		const f32 advance = charWidth + a_Style.LetterSpacing;
+
+        f32 lineWidth = 0.f;
         f32 maxLineWidth = 0.f;
         u32 lineCount = 1;
+
         for ( char c : a_Text )
         {
             if ( c == '\n' )
             {
                 lineCount++;
-                maxLineWidth = std::max( maxLineWidth, width );
-                width = 0.f;
+                maxLineWidth = std::max( maxLineWidth, lineWidth );
+                lineWidth = 0.f;
             }
             else
             {
-                width += a_Style.Size * 0.5f; // Assume each character is half the font size in width
-                if ( width > a_MaxWidth )
+                // Check wrap BEFORE adding this character, same as the renderer
+                if ( lineWidth > 0.f && lineWidth + charWidth > a_MaxWidth )
                 {
                     lineCount++;
-                    maxLineWidth = std::max( maxLineWidth, width );
-                    width = 0.f;
+                    maxLineWidth = std::max( maxLineWidth, lineWidth );
+                    lineWidth = 0.f;
                 }
+                lineWidth += advance;
             }
         }
-        return TextMeasurement{ .Size = { std::max(maxLineWidth, width), lineCount * a_Style.Size}};
+
+        // Remove trailing spacing from last character on each line
+        if ( lineWidth > 0.f )
+			lineWidth -= a_Style.LetterSpacing;
+
+        maxLineWidth = std::max( maxLineWidth, lineWidth );
+
+        return TextMeasurement{ .Size = { maxLineWidth, static_cast<f32>( lineCount ) * a_Style.Size } };
     }
 
     virtual ShapedText Shape( TextView a_Text, const TextStyle& a_Style, f32 a_MaxWidth = Limits<f32>::max() )
@@ -251,7 +262,7 @@ protected:
         blueNode->Style.HeightMode = ESizingMode::Fixed;
 
         // ---------------- TEXT ----------------
-		WidgetID text = m_Scene.CreateWidget<TextWidget>( blue, "Hello, RatUI!", TextStyle{ .Size = 32.f } );
+		WidgetID text = m_Scene.CreateWidget<TextWidget>( blue, "Hello, RatUI!", TextStyle{ .Size = 32.f, .LetterSpacing = 2.f } );
         auto* textNode = m_Scene.Layouts.Get( m_Scene.GetWidget( text )->GetLayoutID() );
         textNode->Style.WidthMode = ESizingMode::Content;
         textNode->Style.HeightMode = ESizingMode::Content;
@@ -399,7 +410,7 @@ protected:
             {
                 const auto& rectCmd = std::get<DrawCmd::RectCmd>( cmd.Payload );
                 const Rectf& rect = rectCmd.Rect;
-
+                
                 const Mat3f& transform = cmd.Transform;
 
                 // Apply transform to rect corners
@@ -432,7 +443,7 @@ protected:
                 const Rectf& rect = textCmd.Rect;
                 const float  charWidth = textCmd.Style.Size * 0.5f;
                 const float  charHeight = textCmd.Style.Size;
-                const float  spacing = 2.f;
+				const float  spacing = textCmd.Style.LetterSpacing;
 
                 float cursorX = rect.Left();
                 float cursorY = rect.Top();
