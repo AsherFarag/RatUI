@@ -160,6 +160,7 @@ namespace RatUI
 
         WidgetID m_FocusedWidget{ c_InvalidPoolID };
         WidgetID m_HoveredWidget{ c_InvalidPoolID };
+        PointerEvent m_LastPointerEvent{}; ///< The last pointer event received, used for hit testing and hover state management.
 
         struct NavScope
         {
@@ -192,6 +193,10 @@ namespace RatUI
                 ArrangeLayoutNode( *rootNode, Rectf{ Vec2f{ 0.f, 0.f }, a_AvailableSize } );
             }
         }
+
+        // Re-run hit test to update hovered widget based on new layout
+        // TODO: This is a bit unclean and potentially incorrect
+		ProcessPointerEvent( m_LastPointerEvent ); 
     }
 
     inline void Scene::Render( DrawList& a_DrawList )
@@ -471,6 +476,8 @@ namespace RatUI
     {
         if ( !a_Event.IsMouse() ) 
 			return false; // TODO: Only process mouse events for now
+
+		m_LastPointerEvent = a_Event;
 
         WidgetID hovered = HitTest( RootWidget, a_Event.Position );
         if ( hovered != m_HoveredWidget )
