@@ -13,6 +13,48 @@ using namespace RatUI;
 
 static SDL_Renderer* g_SDLRenderer = nullptr;
 
+class TextMetrics : public ITextMetrics
+{
+public:
+
+    TextMeasurement Measure( TextView a_Text, const TextStyle& a_Style, f32 a_MaxWidth ) override
+    {
+        // Just add up the character widths for a very naive measurement. This is not how real text measurement works, but it serves as a placeholder for testing the TextWidget layout.
+        f32 width = 0.f;
+        f32 maxLineWidth = 0.f;
+        u32 lineCount = 1;
+        for ( char c : a_Text )
+        {
+            if ( c == '\n' )
+            {
+                lineCount++;
+                maxLineWidth = std::max( maxLineWidth, width );
+                width = 0.f;
+            }
+            else
+            {
+                width += a_Style.Size * 0.5f; // Assume each character is half the font size in width
+                if ( width > a_MaxWidth )
+                {
+                    lineCount++;
+                    maxLineWidth = std::max( maxLineWidth, width );
+                    width = 0.f;
+                }
+            }
+        }
+        return TextMeasurement{ .Size = { std::max(maxLineWidth, width), lineCount * a_Style.Size}};
+    }
+
+    virtual ShapedText Shape( TextView a_Text, const TextStyle& a_Style, f32 a_MaxWidth = Limits<f32>::max() )
+    {
+        return ShapedText{};
+    }
+
+    void ReleaseShapedText( const ShapedText& a_ShapedText ) override
+    {
+    }
+};
+
 EButtonID SDLKeyboardToButtonID( SDL_Keycode a_Keycode )
 {
     // Map SDL keycodes to our EButtonID enum. This is a simplified mapping for demonstration purposes.
@@ -135,12 +177,13 @@ public:
 protected:
 
     Scene m_Scene;
+    TextMetrics m_TextMetrics;
     WidgetID green;
 
     bool OnInitialize() override
     {
         g_SDLRenderer = GetRenderer();
-
+        m_Scene.TextMetrics = &m_TextMetrics;
         // Root container
         WidgetID trueRoot = m_Scene.CreateRootWidget<RectWidget>( SDL_Color{ 0, 0, 0, 0 }, "TrueRoot" );
         LayoutNode* trueRootNode = m_Scene.Layouts.Get( m_Scene.GetWidget( trueRoot )->GetLayoutID() );
@@ -208,7 +251,7 @@ protected:
         blueNode->Style.HeightMode = ESizingMode::Fixed;
 
         // ---------------- TEXT ----------------
-        WidgetID text = m_Scene.CreateWidget<TextWidget>( blue, "Hello, RatUI!" );
+		WidgetID text = m_Scene.CreateWidget<TextWidget>( blue, "Hello, RatUI!", TextStyle{ .Size = 32.f } );
         auto* textNode = m_Scene.Layouts.Get( m_Scene.GetWidget( text )->GetLayoutID() );
         textNode->Style.WidthMode = ESizingMode::Flex;
         textNode->Style.HeightMode = ESizingMode::Flex;
@@ -381,43 +424,44 @@ protected:
             }
             else if ( Holds<DrawCmd::TextCmd>( cmd.Payload ) )
             {
-                // Fake drawing text by rendering a filled rect for each character, just for demonstration purposes
                 const auto& textCmd = std::get<DrawCmd::TextCmd>( cmd.Payload );
+
+                size_t count = textCmd.Text.size();
+                if ( count == 0 )
+                    continue; // DO NOT return
 
                 const Mat3f& transform = cmd.Transform;
                 const Rectf& rect = textCmd.Rect;
 
-                for ( size_t i = 0; i < textCmd.Text.size(); ++i )
-                {
-                    Mat3f translation = Mat3f::from_columns(
-                        Vec3f{ 1.f, 0.f, 0.f },
-                        Vec3f{ 0.f, 1.f, 0.f },
-                        Vec3f{ i * ( rect.Width() + 5.f ), 0.f, 1.f } // Offset each character by its index
-                    );
-                    
-                    // Offset each character's rect by its index for demonstration
-                    Mat3f charTransform = transform * translation;
+                float charWidth = rect.Width() / static_cast<float>( count );
+                float charHeight = rect.Height();
 
-                    Vec3f topLeft = charTransform * Vec3f{ rect.Left(), rect.Top(), 1.f };
-                    Vec3f topRight = charTransform * Vec3f{ rect.Right(), rect.Top(), 1.f };
-                    Vec3f bottomLeft = charTransform * Vec3f{ rect.Left(), rect.Bottom(), 1.f };
-                    Vec3f bottomRight = charTransform * Vec3f{ rect.Right(), rect.Bottom(), 1.f };
+                for ( size_t i = 0; i < count; ++i )
+                {
+					float x = rect.Left() + i * charWidth + i * 2.f; // Add 2 pixels of spacing between characters
+                    float y = rect.Top();
+
+                    Vec3f tl = transform * Vec3f{ x,              y,               1.f };
+                    Vec3f tr = transform * Vec3f{ x + charWidth,  y,               1.f };
+                    Vec3f bl = transform * Vec3f{ x,              y + charHeight,  1.f };
+                    Vec3f br = transform * Vec3f{ x + charWidth,  y + charHeight,  1.f };
 
                     SDL_Vertex vertices[4] = {
-                        {.position = { topLeft[0], topLeft[1] }, .color = sdlColor, .tex_coord = { 0.f, 0.f } },
-                        {.position = { topRight[0], topRight[1] }, .color = sdlColor, .tex_coord = { 1.f, 0.f } },
-                        {.position = { bottomRight[0], bottomRight[1] }, .color = sdlColor, .tex_coord = { 1.f, 1.f } },
-                        {.position = { bottomLeft[0], bottomLeft[1] }, .color = sdlColor, .tex_coord = { 0.f, 1.f } }
+                        { { tl[0], tl[1] }, sdlColor, {0.f, 0.f} },
+                        { { tr[0], tr[1] }, sdlColor, {1.f, 0.f} },
+                        { { br[0], br[1] }, sdlColor, {1.f, 1.f} },
+                        { { bl[0], bl[1] }, sdlColor, {0.f, 1.f} }
                     };
 
                     int indices[6] = { 0, 1, 2, 0, 2, 3 };
 
-                    // Draw filled rect (as two triangles) for each character
-                    SDL_RenderGeometry( g_SDLRenderer, nullptr,
+                    SDL_RenderGeometry(
+                        g_SDLRenderer,
+                        nullptr,
                         vertices, 4,
-                        indices, 6 );
+                        indices, 6
+                    );
                 }
-
             }
 		}
     }

@@ -63,7 +63,7 @@ namespace RatUI
 
         void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
         {
-            if ( !m_ShapedText.IsValid() ) return;
+           // if ( !m_ShapedText.IsValid() ) return;
 
             LayoutNode* node = a_Scene.Layouts.Get( GetLayoutID() );
             if ( !node || !node->Layout.Visibility.IsRendered() ) return;
@@ -74,7 +74,7 @@ namespace RatUI
 
             //a_DrawList.AddShapedText( SolidBrush{ m_Color }, m_ShapedText, pos ); TODO
 
-            a_DrawList.AddText( SolidBrush{ m_Color }, m_Text, m_Style, rect );
+			a_DrawList.AddText( SolidBrush{ m_Color }, m_Text, m_Style, Rectf{ pos, node->Layout.IntrinsicSize } );
         }
 
     protected:
