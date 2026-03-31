@@ -8,6 +8,11 @@ namespace RatUI
     class TextWidget : public IWidget
     {
     public:
+        TextWidget( Text a_Text = {}, TextStyle a_Style = {} )
+            : m_Text( std::move( a_Text ) )
+            , m_Style( std::move( a_Style ) )
+        {}
+        
         virtual ~TextWidget() override = default;
 
         void OnDestroy( Scene& a_Scene ) override
@@ -22,24 +27,38 @@ namespace RatUI
             m_ShapedText = {}; 
         }
 
-        Vec2f Measure( Scene& a_Scene, Vec2f a_AvailableSize )
+        void OnSyncLayout( Scene& a_Scene, LayoutNode& a_Node ) override
         {
             ITextMetrics* metrics = a_Scene.TextMetrics;
-            if ( !metrics || Empty( m_Text ) )
-                return { 0.f, 0.f };
-
-            // Re-shape if dirty or available width changed (affects wrapping)
-            if ( m_Dirty || m_LastAvail[0] != a_AvailableSize[0] )
+			if ( !metrics || /* TODO: StringTraits Empty( m_Text )*/ m_Text.empty() )
             {
-                if ( m_ShapedText.IsValid() )
-                    metrics->ReleaseShapedText( m_ShapedText );
-
-                m_ShapedText = metrics->Shape( m_Text, m_Style, a_AvailableSize[0] );
-                m_LastAvail  = a_AvailableSize;
-                m_Dirty      = false;
+                a_Node.Layout.IntrinsicSize = { 0.f, 0.f };
+                return;
             }
 
-            return m_ShapedText.Size;
+            // Determine wrapping width from the node's own style if possible,
+            // otherwise unconstrained - the layout pass will constrain it.
+            f32 maxWidth = Limits<f32>::max();
+            if ( a_Node.Style.WidthMode == ESizingMode::Fixed )
+                maxWidth = a_Node.Style.FixedWidth;
+
+            TextMeasurement t = metrics->Measure( m_Text, m_Style, maxWidth );
+
+            a_Node.Layout.IntrinsicSize = t.Size;
+
+            // TODO: Shaped text
+
+            //if ( m_Dirty || m_LastMaxWidth != maxWidth )
+            //{
+            //    if ( m_ShapedText.IsValid() )
+            //        metrics->ReleaseShapedText( m_ShapedText );
+//
+            //    m_ShapedText   = metrics->Shape( m_Text, m_Style, maxWidth );
+            //    m_LastMaxWidth = maxWidth;
+            //    m_Dirty        = false;
+            //}
+//
+            //a_Node.Layout.IntrinsicSize = m_ShapedText.Size;
         }
 
         void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
@@ -53,7 +72,9 @@ namespace RatUI
             const Rectf& rect = node->Layout.FinalRect;
             Vec2f pos = rect.Origin; // TODO: This only works for left aligned text. Need to calculate the position based on alignment and available space.
 
-            a_DrawList.AddShapedText( SolidBrush{ m_Color }, m_ShapedText, pos );
+            //a_DrawList.AddShapedText( SolidBrush{ m_Color }, m_ShapedText, pos ); TODO
+
+            a_DrawList.AddText( SolidBrush{ m_Color }, m_Text, m_Style, rect );
         }
 
     protected:
@@ -64,7 +85,7 @@ namespace RatUI
         ETextAlign m_Align{ ETextAlign::Left }; ///< Text alignment within the widget's bounds.
 
         bool  m_Dirty{ true }; ///< Whether the shaped text needs to be updated due to changes in text content, style, or available width.
-        Vec2f m_LastAvail{}; ///<
+        f32   m_LastMaxWidth{ Limits<f32>::max() }; ///< The last maximum width used for shaping the text.
     };
 
 } // namespace RatUI

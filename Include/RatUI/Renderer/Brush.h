@@ -3,6 +3,8 @@
 
 namespace RatUI
 {
+    // TODO: This api might be to complex for user renderers. Might remove it
+
     struct SolidBrush
     {
         Colorf Color{ 1.0f, 1.0f, 1.0f, 1.0f };

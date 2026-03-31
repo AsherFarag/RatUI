@@ -3,6 +3,7 @@
 #include <RatUI/Renderer/DrawList.h>
 #include <RatUI/Input/InputEvent.h>
 #include <RatUI/Input/Navigation.h>
+#include <RatUI/Widget/TextWidget.h>
 #include <print>
 #include <format>
 #include <iostream>
@@ -206,6 +207,12 @@ protected:
         blueNode->Style.WidthMode = ESizingMode::Flex;
         blueNode->Style.HeightMode = ESizingMode::Fixed;
 
+        // ---------------- TEXT ----------------
+        WidgetID text = m_Scene.CreateWidget<TextWidget>( blue, "Hello, RatUI!" );
+        auto* textNode = m_Scene.Layouts.Get( m_Scene.GetWidget( text )->GetLayoutID() );
+        textNode->Style.WidthMode = ESizingMode::Flex;
+        textNode->Style.HeightMode = ESizingMode::Flex;
+
         return true;
     }
 
@@ -332,44 +339,85 @@ protected:
 
         for ( const DrawCmd& cmd : drawList.Commands )
         {
+			SDL_Color sdlColor = { 255, 255, 255, 255 }; // Default to white if no brush color is specified
+            if ( Holds<SolidBrush>(cmd.DrawBrush) )
+            {
+                const auto& solid = std::get<SolidBrush>( cmd.DrawBrush );
+                sdlColor = {
+                    static_cast<Uint8>( solid.Color[0] * 255.f ),
+                    static_cast<Uint8>( solid.Color[1] * 255.f ),
+                    static_cast<Uint8>( solid.Color[2] * 255.f ),
+                    static_cast<Uint8>( solid.Color[3] * 255.f )
+                };
+                SDL_SetRenderDrawColor( g_SDLRenderer, sdlColor.r, sdlColor.g, sdlColor.b, sdlColor.a );
+			}
+
             if ( std::holds_alternative<DrawCmd::RectCmd>( cmd.Payload ) )
             {
                 const auto& rectCmd = std::get<DrawCmd::RectCmd>( cmd.Payload );
                 const Rectf& rect = rectCmd.Rect;
 
-                if ( std::holds_alternative<SolidBrush>( cmd.DrawBrush ) )
+                const Mat3f& transform = cmd.Transform;
+
+                // Apply transform to rect corners
+                Vec3f topLeft = transform * Vec3f{ rect.Left(), rect.Top(), 1.f };
+                Vec3f topRight = transform * Vec3f{ rect.Right(), rect.Top(), 1.f };
+                Vec3f bottomLeft = transform * Vec3f{ rect.Left(), rect.Bottom(), 1.f };
+                Vec3f bottomRight = transform * Vec3f{ rect.Right(), rect.Bottom(), 1.f };
+
+                SDL_Vertex vertices[4] = {
+                    {.position = { topLeft[0], topLeft[1] }, .color = sdlColor, .tex_coord = {0.f, 0.f}},
+                    {.position = { topRight[0], topRight[1] }, .color = sdlColor, .tex_coord = { 1.f, 0.f } },
+                    {.position = { bottomRight[0], bottomRight[1] }, .color = sdlColor, .tex_coord = { 1.f, 1.f } },
+                    {.position = { bottomLeft[0], bottomLeft[1] }, .color = sdlColor, .tex_coord = { 0.f, 1.f } }
+                };
+
+                int indices[6] = { 0, 1, 2, 0, 2, 3 };
+
+                // Draw filled rect (as two triangles)
+                SDL_RenderGeometry( g_SDLRenderer, nullptr,
+                    vertices, 4,
+                    indices, 6 );
+            }
+            else if ( Holds<DrawCmd::TextCmd>( cmd.Payload ) )
+            {
+                // Fake drawing text by rendering a filled rect for each character, just for demonstration purposes
+                const auto& textCmd = std::get<DrawCmd::TextCmd>( cmd.Payload );
+
+                const Mat3f& transform = cmd.Transform;
+                const Rectf& rect = textCmd.Rect;
+
+                for ( size_t i = 0; i < textCmd.Text.size(); ++i )
                 {
-                    const auto& solid = std::get<SolidBrush>( cmd.DrawBrush );
-                    SDL_Color sdlColor = {
-                        static_cast<Uint8>( solid.Color[0] * 255.f ),
-                        static_cast<Uint8>( solid.Color[1] * 255.f ),
-                        static_cast<Uint8>( solid.Color[2] * 255.f ),
-                        static_cast<Uint8>( solid.Color[3] * 255.f )
-					};
-					SDL_SetRenderDrawColor( g_SDLRenderer, sdlColor.r, sdlColor.g, sdlColor.b, sdlColor.a );
+                    Mat3f translation = Mat3f::from_columns(
+                        Vec3f{ 1.f, 0.f, 0.f },
+                        Vec3f{ 0.f, 1.f, 0.f },
+                        Vec3f{ i * ( rect.Width() + 5.f ), 0.f, 1.f } // Offset each character by its index
+                    );
+                    
+                    // Offset each character's rect by its index for demonstration
+                    Mat3f charTransform = transform * translation;
 
-                    const Mat3f& transform = cmd.Transform;
-
-                    // Apply transform to rect corners
-                    Vec3f topLeft = transform * Vec3f{ rect.Left(), rect.Top(), 1.f };
-                    Vec3f topRight = transform * Vec3f{ rect.Right(), rect.Top(), 1.f };
-                    Vec3f bottomLeft = transform * Vec3f{ rect.Left(), rect.Bottom(), 1.f };
-                    Vec3f bottomRight = transform * Vec3f{ rect.Right(), rect.Bottom(), 1.f };
+                    Vec3f topLeft = charTransform * Vec3f{ rect.Left(), rect.Top(), 1.f };
+                    Vec3f topRight = charTransform * Vec3f{ rect.Right(), rect.Top(), 1.f };
+                    Vec3f bottomLeft = charTransform * Vec3f{ rect.Left(), rect.Bottom(), 1.f };
+                    Vec3f bottomRight = charTransform * Vec3f{ rect.Right(), rect.Bottom(), 1.f };
 
                     SDL_Vertex vertices[4] = {
-						{ .position = { topLeft[0], topLeft[1] }, .color = sdlColor, .tex_coord = { 0.f, 0.f } },
-                        { .position = { topRight[0], topRight[1] }, .color = sdlColor, .tex_coord = { 1.f, 0.f } },
-                        { .position = { bottomRight[0], bottomRight[1] }, .color = sdlColor, .tex_coord = { 1.f, 1.f } },
-                        { .position = { bottomLeft[0], bottomLeft[1] }, .color = sdlColor, .tex_coord = { 0.f, 1.f } }
-					};
+                        {.position = { topLeft[0], topLeft[1] }, .color = sdlColor, .tex_coord = { 0.f, 0.f } },
+                        {.position = { topRight[0], topRight[1] }, .color = sdlColor, .tex_coord = { 1.f, 0.f } },
+                        {.position = { bottomRight[0], bottomRight[1] }, .color = sdlColor, .tex_coord = { 1.f, 1.f } },
+                        {.position = { bottomLeft[0], bottomLeft[1] }, .color = sdlColor, .tex_coord = { 0.f, 1.f } }
+                    };
 
-					int indices[6] = { 0, 1, 2, 0, 2, 3 };
+                    int indices[6] = { 0, 1, 2, 0, 2, 3 };
 
-                    // Draw filled rect (as two triangles)
-                    SDL_RenderGeometry( g_SDLRenderer, nullptr, 
-						vertices, 4,
-						indices, 6 );
+                    // Draw filled rect (as two triangles) for each character
+                    SDL_RenderGeometry( g_SDLRenderer, nullptr,
+                        vertices, 4,
+                        indices, 6 );
                 }
+
             }
 		}
     }

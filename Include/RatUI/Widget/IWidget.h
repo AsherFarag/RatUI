@@ -24,14 +24,21 @@ namespace RatUI
         /** @brief Returns the layout identifier for this widget. */
         NodeID GetLayoutID() const { return m_LayoutID; }
 
+        // - Lifecycle
+
         /** @brief Called immediately after the widget is constructed and associated with a layout node. */
         virtual void OnConstruct( Scene& a_Scene ) {}
 
         /** @brief Called immediately before the widget is destroyed and disassociated from its layout node. */
         virtual void OnDestroy( Scene& a_Scene ) {} ///< Called immediately before the widget is destroyed and disassociated from its layout node.
 
+        /** @brief Called during the layout process, allowing the widget to update its layout properties or perform calculations based on its children. */
+        virtual void OnSyncLayout( Scene& a_Scene, LayoutNode& a_Node ) {}
+
         /** @brief Called when the widget should render itself and its children. */
         virtual void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) {}
+
+        // - Input Events
 
         /** @brief Returns whether this widget can receive focus for input. */
         virtual bool IsFocusable( Scene& a_Scene ) const { return false; }

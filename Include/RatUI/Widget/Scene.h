@@ -186,13 +186,50 @@ namespace RatUI
 
     inline void Scene::UpdateLayout( Vec2f a_AvailableSize )
     {
-        if ( IWidget* root = GetWidget( RootWidget ) )
+        IWidget* root = GetWidget( RootWidget );
+        if ( !root ) return;
+        LayoutNode* rootNode = Layouts.Get( root->GetLayoutID() );
+        if ( !rootNode ) return;
+
+        // TODO: This looks horrible but need to research if theres a faster way to handle wrapping text.
+        // UI is hell
+
+        // - Pass 1: sync with no parent-width knowledge, measure, arrange.
+
+        // Sync intrinsics
+        Widgets.ForEach( [&]( Unique<IWidget>& widgetPtr )
         {
-            if ( LayoutNode* rootNode = Layouts.Get( root->GetLayoutID() ) )
-            {
-                MeasureLayoutNode( *rootNode, a_AvailableSize );
-                ArrangeLayoutNode( *rootNode, Rectf{ Vec2f{ 0.f, 0.f }, a_AvailableSize } );
-            }
+            IWidget* widget = widgetPtr.get();
+            LayoutNode* node = Layouts.Get( widget->GetLayoutID() );
+            if ( !node ) return;
+        
+            widget->OnSyncLayout( *this, *node );
+        });
+
+        MeasureLayoutNode( *rootNode, a_AvailableSize );
+        ArrangeLayoutNode( *rootNode, Rectf{ Vec2f{ 0.f, 0.f }, a_AvailableSize } );
+
+        // - Pass 2: re-sync any widget that needs to wrap at its now-known laid-out width,
+        // then remeasure heights only (widths won't change on the second pass).
+
+        bool anyChanged = false;
+        Widgets.ForEach( [&]( Unique<IWidget>& widgetPtr )
+        {
+            IWidget* widget = widgetPtr.get();
+            LayoutNode* node = Layouts.Get( widget->GetLayoutID() );
+            if ( !node ) return;
+        
+            const f32 prev = node->Layout.IntrinsicSize[1];
+            widget->OnSyncLayout( *this, *node );
+            if ( node->Layout.IntrinsicSize[1] != prev )
+                anyChanged = true;
+        });
+
+        if ( anyChanged )
+        {
+            // If any intrinsic sizes changed during sync, we need to re-run layout to account for it.
+            MeasureLayoutNode( *rootNode, a_AvailableSize );
+            ArrangeLayoutNode( *rootNode, Rectf{ Vec2f{ 0.f, 0.f }, a_AvailableSize } );
         }
     }
 
