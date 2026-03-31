@@ -253,8 +253,8 @@ protected:
         // ---------------- TEXT ----------------
 		WidgetID text = m_Scene.CreateWidget<TextWidget>( blue, "Hello, RatUI!", TextStyle{ .Size = 32.f } );
         auto* textNode = m_Scene.Layouts.Get( m_Scene.GetWidget( text )->GetLayoutID() );
-        textNode->Style.WidthMode = ESizingMode::Flex;
-        textNode->Style.HeightMode = ESizingMode::Flex;
+        textNode->Style.WidthMode = ESizingMode::Content;
+        textNode->Style.HeightMode = ESizingMode::Content;
 
         return true;
     }
@@ -425,42 +425,46 @@ protected:
             else if ( Holds<DrawCmd::TextCmd>( cmd.Payload ) )
             {
                 const auto& textCmd = std::get<DrawCmd::TextCmd>( cmd.Payload );
-
-                size_t count = textCmd.Text.size();
-                if ( count == 0 )
-                    continue; // DO NOT return
+                const size_t count = textCmd.Text.size();
+                if ( count == 0 ) continue;
 
                 const Mat3f& transform = cmd.Transform;
                 const Rectf& rect = textCmd.Rect;
+                const float  charWidth = textCmd.Style.Size * 0.5f;
+                const float  charHeight = textCmd.Style.Size;
+                const float  spacing = 2.f;
 
-                float charWidth = rect.Width() / static_cast<float>( count );
-                float charHeight = rect.Height();
+                float cursorX = rect.Left();
+                float cursorY = rect.Top();
 
                 for ( size_t i = 0; i < count; ++i )
                 {
-					float x = rect.Left() + i * charWidth + i * 2.f; // Add 2 pixels of spacing between characters
-                    float y = rect.Top();
+                    const char c = textCmd.Text[i];
 
-                    Vec3f tl = transform * Vec3f{ x,              y,               1.f };
-                    Vec3f tr = transform * Vec3f{ x + charWidth,  y,               1.f };
-                    Vec3f bl = transform * Vec3f{ x,              y + charHeight,  1.f };
-                    Vec3f br = transform * Vec3f{ x + charWidth,  y + charHeight,  1.f };
+                    // Wrap if we'd exceed the rect right edge (and we're not at line start)
+                    if ( c == '\n' || ( cursorX > rect.Left() && cursorX + charWidth > rect.Right() ) )
+                    {
+                        cursorX = rect.Left();
+                        cursorY += charHeight;
+                    }
+
+                    if ( c == '\n' ) continue;
+
+                    Vec3f tl = transform * Vec3f{ cursorX,             cursorY,              1.f };
+                    Vec3f tr = transform * Vec3f{ cursorX + charWidth, cursorY,              1.f };
+                    Vec3f bl = transform * Vec3f{ cursorX,             cursorY + charHeight, 1.f };
+                    Vec3f br = transform * Vec3f{ cursorX + charWidth, cursorY + charHeight, 1.f };
 
                     SDL_Vertex vertices[4] = {
-                        { { tl[0], tl[1] }, sdlColor, {0.f, 0.f} },
-                        { { tr[0], tr[1] }, sdlColor, {1.f, 0.f} },
-                        { { br[0], br[1] }, sdlColor, {1.f, 1.f} },
-                        { { bl[0], bl[1] }, sdlColor, {0.f, 1.f} }
+                        { { tl[0], tl[1] }, sdlColor, { 0.f, 0.f } },
+                        { { tr[0], tr[1] }, sdlColor, { 1.f, 0.f } },
+                        { { br[0], br[1] }, sdlColor, { 1.f, 1.f } },
+                        { { bl[0], bl[1] }, sdlColor, { 0.f, 1.f } }
                     };
-
                     int indices[6] = { 0, 1, 2, 0, 2, 3 };
+                    SDL_RenderGeometry( g_SDLRenderer, nullptr, vertices, 4, indices, 6 );
 
-                    SDL_RenderGeometry(
-                        g_SDLRenderer,
-                        nullptr,
-                        vertices, 4,
-                        indices, 6
-                    );
+                    cursorX += charWidth + spacing;
                 }
             }
 		}
