@@ -1,7 +1,9 @@
 find_package(SDL2 QUIET)
+find_package(SDL2_ttf QUIET)
+
+include(FetchContent)
 
 if(NOT SDL2_FOUND)
-    include(FetchContent)
     FetchContent_Declare(
         SDL2
         GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
@@ -11,6 +13,19 @@ if(NOT SDL2_FOUND)
     # Provide the SDL2::SDL2 target alias expected by the rest of this file
     if(NOT TARGET SDL2::SDL2)
         add_library(SDL2::SDL2 ALIAS SDL2)
+    endif()
+endif()
+
+if(NOT SDL2_ttf_FOUND)
+    FetchContent_Declare(
+        SDL2_ttf
+        GIT_REPOSITORY https://github.com/libsdl-org/SDL_ttf.git
+        GIT_TAG        release-2.22.0
+    )
+    FetchContent_MakeAvailable(SDL2_ttf)
+    # Provide the SDL2_ttf::SDL2_ttf target alias expected by the rest of this file
+    if(NOT TARGET SDL2_ttf::SDL2_ttf)
+        add_library(SDL2_ttf::SDL2_ttf ALIAS SDL2_ttf)
     endif()
 endif()
 
@@ -26,6 +41,7 @@ target_link_libraries(RatUI_Examples_Common
     INTERFACE
         RatUI
         SDL2::SDL2
+        SDL2_ttf::SDL2_ttf
 )
 
 # ─── Examples ────────────────────────────────────────────────────────────────
