@@ -5,17 +5,20 @@
 #include <functional>
 
 using namespace RatUI;
+using namespace RatUI::Literals;
 
 class RectWidget : public IWidget
 {
 public:
-	RectWidget( const SDL_Color& a_Color, StringView a_Name )
-		: Col( MakeColorU8( a_Color.r, a_Color.g, a_Color.b, a_Color.a ) )
+	RectWidget( Colorf a_Color, StringView a_Name, CornerRounding a_Rounding = CornerRounding::Uniform( 10_deg ) )
+		: Color( a_Color )
 		, Name( a_Name )
+        , Rounding( a_Rounding )
     {}
 
 	StringView Name;
-    Colorf Col;
+    Colorf Color;
+    CornerRounding Rounding;
 	f32 time = 0.f;
 
 	void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
@@ -34,26 +37,19 @@ public:
         RenderTransform transform{}; transform.Angle = Radians{ Degreesf{ angle } };
         transform.Scale = Vec2f{0.75,0.75} + Vec2f{ 1.f + 0.5f * std::sin( time * 0.5f ), 1.f + 0.5f * std::sin( time * 0.5f ) } * 0.1f; // Scale between 0.5 and 1.5
 
-		a_DrawList.PushTransform( transform.ToMatrix( rect ) );
-
-		constexpr CornerRounding rounding = CornerRounding{
-            .TopLeft = Degreesf{ 10.f },
-            .TopRight = Degreesf{ 30.f },
-            .BottomLeft = Degreesf{ 50.f },
-            .BottomRight = Degreesf{ 70.f }
-        };
+		//a_DrawList.PushTransform( transform.ToMatrix( rect ) );
 
 		if ( a_Scene.GetFocusedWidget() == GetID() )
-			a_DrawList.AddRect( Colors::White, rect.Expanded( 4.f ), rounding );
-		using namespace RatUI::Literals;
-		a_DrawList.AddRect( Col, rect, rounding );
+			a_DrawList.AddRect( Colors::White, rect.Expanded( 4.f ), Rounding + 4_deg );
+
+		a_DrawList.AddRect( Color, rect, Rounding );
 
         a_Scene.ForEachChildWidget( GetID(), [&](IWidget& child)
         {
             child.OnPaint( a_Scene, a_DrawList );
 		} );
 
-        a_DrawList.PopTransform();
+        //a_DrawList.PopTransform();
     }
 
     bool IsFocusable( Scene& a_Scene ) const override
@@ -67,11 +63,11 @@ class CircleWidget : public IWidget
 public:
 
     f32 Radius;
-    Colorf Col;
+    Colorf Color;
 
-    CircleWidget( f32 a_Radius, const SDL_Color& a_Color )
+    CircleWidget( f32 a_Radius, Colorf a_Color )
         : Radius( a_Radius )
-        , Col( MakeColorU8( a_Color.r, a_Color.g, a_Color.b, a_Color.a ) )
+        , Color( a_Color )
     {}
 
     void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
@@ -86,7 +82,7 @@ public:
         if ( a_Scene.GetFocusedWidget() == GetID() )
 			a_DrawList.AddCircle( Colors::LightYellow, center, Radius + 4.f );
 
-        a_DrawList.AddCircle( Col, center, Radius );
+        a_DrawList.AddCircle( Color, center, Radius );
     }
 
     bool IsFocusable( Scene& a_Scene ) const override
@@ -113,100 +109,143 @@ protected:
     Scene m_Scene;
     WidgetID green;
 
-    bool OnInitialize() override
+bool OnInitialize() override
+{
+    // Root container - deep app background
+    WidgetID trueRoot = m_Scene.CreateRootWidget<RectWidget>( Colors::Surface900, "AppBackground" );
+    LayoutNode* trueRootNode = m_Scene.Layouts.Get( m_Scene.GetWidget( trueRoot )->GetLayoutID() );
+    trueRootNode->Style.LayoutType = ELayoutType::Vertical;
+    trueRootNode->Style.Spacing = 10.f;
+    trueRootNode->Style.Padding = Edges{ 10.f };
+    trueRootNode->Style.WidthMode = ESizingMode::Flex;
+    trueRootNode->Style.HeightMode = ESizingMode::Flex;
+
+    // Main panel - slightly lighter surface
+    WidgetID root = m_Scene.CreateWidget<RectWidget>( trueRoot, Colors::Surface800, "MainPanel" );
+    LayoutNode* rootNode = m_Scene.Layouts.Get( m_Scene.GetWidget( root )->GetLayoutID() );
+    rootNode->Style.LayoutType = ELayoutType::Vertical;
+    rootNode->Style.Spacing = 10.f;
+    rootNode->Style.Padding = Edges{ 10.f };
+    rootNode->Style.WidthMode = ESizingMode::Flex;
+    rootNode->Style.HeightMode = ESizingMode::Flex;
+    rootNode->Style.IsFocusScope = true;
+
+    // ---------------- HEADER BAR (was Red) ----------------
+    WidgetID headerBar = m_Scene.CreateWidget<RectWidget>( root, Colors::AccentBlue, "HeaderBar" );
+    auto* headerBarNode = m_Scene.Layouts.Get( m_Scene.GetWidget( headerBar )->GetLayoutID() );
+
+    headerBarNode->Style.FixedHeight = 100.f;
+    headerBarNode->Style.WidthMode = ESizingMode::Flex;
+    headerBarNode->Style.HeightMode = ESizingMode::Fixed;
+    headerBarNode->Style.Margin = Edges{ 10.f };
+
+    // ---------------- CONTENT ROW (was HBox) ----------------
+    WidgetID contentRow = m_Scene.CreateWidget<RectWidget>( root, Colors::Surface700, "ContentRow" );
+    auto* contentRowNode = m_Scene.Layouts.Get( m_Scene.GetWidget( contentRow )->GetLayoutID() );
+
+    contentRowNode->Style.LayoutType = ELayoutType::Horizontal;
+    contentRowNode->Style.Spacing = 0.f;
+    contentRowNode->Style.Padding = Edges{ 10.f };
+    contentRowNode->Style.HeightMode = ESizingMode::Fixed;
+    contentRowNode->Style.FixedHeight = 150.f;
+    contentRowNode->Style.WidthMode = ESizingMode::Flex;
+    contentRowNode->Style.Spacing = 20.f;
+    contentRowNode->Style.IsFocusScope = true;
+
+    // ---------------- MAIN CONTENT AREA ----------------
+    green = m_Scene.CreateWidget<RectWidget>( contentRow, Colors::Surface600, "MainContentArea" );
+    auto* mainContentNode = m_Scene.Layouts.Get( m_Scene.GetWidget( green )->GetLayoutID() );
+
+    mainContentNode->Style.WidthMode = ESizingMode::Flex;
+    mainContentNode->Style.HeightMode = ESizingMode::Flex;
+    mainContentNode->Style.FlexGrow = 1.f;
+    mainContentNode->Style.PercentWidth = 0.5f;
+    mainContentNode->Style.Margin = Edges{ 10.f };
+
+    // ---------------- SIDEBAR PANEL ----------------
     {
-        // Root container
-        WidgetID trueRoot = m_Scene.CreateRootWidget<RectWidget>( SDL_Color{ 0, 0, 0, 0 }, "TrueRoot" );
-        LayoutNode* trueRootNode = m_Scene.Layouts.Get( m_Scene.GetWidget( trueRoot )->GetLayoutID() );
-        trueRootNode->Style.LayoutType = ELayoutType::Vertical;
-        trueRootNode->Style.Spacing = 10.f;
-        trueRootNode->Style.Padding = Edges{ 10.f };
-        trueRootNode->Style.WidthMode = ESizingMode::Flex;
-        trueRootNode->Style.HeightMode = ESizingMode::Flex;
+        WidgetID sidebarPanel = m_Scene.CreateWidget<RectWidget>( contentRow, Colors::Surface600, "SidebarPanel" );
+        auto* sidebarNode = m_Scene.Layouts.Get( m_Scene.GetWidget( sidebarPanel )->GetLayoutID() );
 
-        WidgetID root = m_Scene.CreateWidget<RectWidget>( trueRoot, SDL_Color{ 50, 100, 150, 255 }, "Root" );
+        sidebarNode->Style.LayoutType = ELayoutType::Vertical;
+        sidebarNode->Style.Spacing = 10.f;
+        sidebarNode->Style.Padding = Edges{ 10.f };
+        sidebarNode->Style.HeightMode = ESizingMode::Flex;
+        sidebarNode->Style.WidthMode = ESizingMode::Fixed;
+        sidebarNode->Style.FixedWidth = 100.f;
+        sidebarNode->Style.ChildAlign = EAlignment::Center;
+        sidebarNode->Style.IsFocusScope = true;
 
-        LayoutNode* rootNode = m_Scene.Layouts.Get( m_Scene.GetWidget( root )->GetLayoutID() );
-        rootNode->Style.LayoutType = ELayoutType::Vertical;
-        rootNode->Style.Spacing = 10.f;
-        rootNode->Style.Padding = Edges{ 10.f };
-        rootNode->Style.WidthMode = ESizingMode::Flex;
-        rootNode->Style.HeightMode = ESizingMode::Flex;
-		rootNode->Style.IsFocusScope = true; // Make the root a focus scope to test navigation between its children
+        // ---------------- STATUS INDICATOR ----------------
+        WidgetID statusIndicator = m_Scene.CreateWidget<RectWidget>( sidebarPanel, Colors::AccentEmerald, "StatusIndicator" );
+        auto* statusNode = m_Scene.Layouts.Get( m_Scene.GetWidget( statusIndicator )->GetLayoutID() );
 
-        // ---------------- RED ----------------
-        WidgetID red = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 255, 0, 0, 255 }, "Red" );
-        auto* redNode = m_Scene.Layouts.Get( m_Scene.GetWidget( red )->GetLayoutID() );
+        statusNode->Style.WidthMode = ESizingMode::Flex;
+        statusNode->Style.FixedWidth = 40.f;
+        statusNode->Style.HeightMode = ESizingMode::Flex;
+        statusNode->Style.FixedHeight = 60.f;
 
-        redNode->Style.FixedHeight = 100.f;
-        redNode->Style.WidthMode = ESizingMode::Flex;
-        redNode->Style.HeightMode = ESizingMode::Fixed;
-        redNode->Style.Margin = Edges{ 10.f };
+        // ---------------- NOTIFICATION DOT ----------------
+        WidgetID notificationDot = m_Scene.CreateWidget<RectWidget>( sidebarPanel, Colors::AccentRose, "NotificationDot" );
+        auto* notifNode = m_Scene.Layouts.Get( m_Scene.GetWidget( notificationDot )->GetLayoutID() );
 
-        // ---------------- HBOX ----------------
-        WidgetID hbox = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 0, 0, 50, 255 }, "HBox" );
-        auto* hboxNode = m_Scene.Layouts.Get( m_Scene.GetWidget( hbox )->GetLayoutID() );
-
-        hboxNode->Style.LayoutType = ELayoutType::Horizontal;
-        hboxNode->Style.Spacing = 0.f;
-		hboxNode->Style.Padding = Edges{ 10.f };
-        hboxNode->Style.HeightMode = ESizingMode::Fixed;
-        hboxNode->Style.FixedHeight = 150.f;
-        hboxNode->Style.WidthMode = ESizingMode::Flex;
-		hboxNode->Style.IsFocusScope = true; // Make the HBox a focus scope to test navigation between its children
-
-        // ---------------- GREEN ----------------
-        green = m_Scene.CreateWidget<RectWidget>( hbox, SDL_Color{ 0, 255, 0, 255 }, "Green" );
-        auto* greenNode = m_Scene.Layouts.Get( m_Scene.GetWidget( green )->GetLayoutID() );
-
-        greenNode->Style.WidthMode = ESizingMode::Flex;
-        greenNode->Style.HeightMode = ESizingMode::Flex;
-        greenNode->Style.FlexGrow = 1.f;
-        greenNode->Style.PercentWidth = 0.5f; // This will be ignored since the parent is an HBox with Spacing, so it falls back to FlexGrow behavior.
-
-        // ---------------- YELLOW ----------------
-        WidgetID yellow = m_Scene.CreateWidget<RectWidget>( hbox, SDL_Color{ 255, 255, 0, 255 }, "Yellow" );
-        auto* yellowNode = m_Scene.Layouts.Get( m_Scene.GetWidget( yellow )->GetLayoutID() );
-
-        yellowNode->Style.WidthMode = ESizingMode::Flex;
-        yellowNode->Style.HeightMode = ESizingMode::Flex;
-		yellowNode->Style.PercentWidth = 0.5f; // This will be ignored since the parent is an HBox with Spacing, so it falls back to FlexGrow behavior.
-        yellowNode->Style.FlexGrow = 1.f;
-        
-        // ---------------- BLUE ----------------
-        WidgetID blue = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 0, 0, 255, 255 }, "Blue" );
-        auto* blueNode = m_Scene.Layouts.Get( m_Scene.GetWidget( blue )->GetLayoutID() );
-
-        blueNode->Style.FixedHeight = 120.f;
-        blueNode->Style.WidthMode = ESizingMode::Flex;
-        blueNode->Style.HeightMode = ESizingMode::Fixed;
-
-        // ---------------- HBOX of CIRCLES ----------------
-        WidgetID circleHBox = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 50, 0, 50, 255 }, "CircleHBox" );
-        auto* circleHBoxNode = m_Scene.Layouts.Get( m_Scene.GetWidget( circleHBox )->GetLayoutID() );
-        circleHBoxNode->Style.LayoutType = ELayoutType::Horizontal;
-        circleHBoxNode->Style.Spacing = 20.f;
-        circleHBoxNode->Style.Padding = Edges{ 10.f };
-        circleHBoxNode->Style.HeightMode = ESizingMode::Fixed;
-        circleHBoxNode->Style.FixedHeight = 200.f;
-        circleHBoxNode->Style.WidthMode = ESizingMode::Flex;
-        circleHBoxNode->Style.IsFocusScope = true; // Make the HBox a focus scope to test navigation between its children
-
-        for ( int i = 0; i < 5; ++i )
-        {
-            f32 radius = 30.f + i * 10.f;
-            SDL_Color col = { (Uint8)( 255 - i * 40 ), (Uint8)( i * 40 ), 150, 255 };
-            WidgetID circle = m_Scene.CreateWidget<CircleWidget>( circleHBox, radius, col );
-            auto* circleNode = m_Scene.Layouts.Get( m_Scene.GetWidget( circle )->GetLayoutID() );
-            circleNode->Style.WidthMode = ESizingMode::Fixed;
-            circleNode->Style.FixedWidth = radius * 2.f;
-            circleNode->Style.HeightMode = ESizingMode::Fixed;
-            circleNode->Style.FixedHeight = radius * 2.f;
-        }
-
-
-        return true;
+        notifNode->Style.WidthMode = ESizingMode::Flex;
+        notifNode->Style.FixedWidth = 20.f;
+        notifNode->Style.HeightMode = ESizingMode::Flex;
+        notifNode->Style.FixedHeight = 20.f;
+        notifNode->Style.Margin = Edges{ 10.f };
     }
+
+    // ---------------- SECONDARY CONTENT AREA ----------------
+    WidgetID secondaryContent = m_Scene.CreateWidget<RectWidget>( contentRow, Colors::Surface600, "SecondaryContentArea" );
+    auto* secondaryNode = m_Scene.Layouts.Get( m_Scene.GetWidget( secondaryContent )->GetLayoutID() );
+
+    secondaryNode->Style.WidthMode = ESizingMode::Flex;
+    secondaryNode->Style.HeightMode = ESizingMode::Flex;
+    secondaryNode->Style.PercentWidth = 0.5f;
+    secondaryNode->Style.FlexGrow = 1.f;
+
+    // ---------------- FOOTER BAR ----------------
+    WidgetID footerBar = m_Scene.CreateWidget<RectWidget>( root, Colors::Surface700, "FooterBar" );
+    auto* footerNode = m_Scene.Layouts.Get( m_Scene.GetWidget( footerBar )->GetLayoutID() );
+
+    footerNode->Style.FixedHeight = 120.f;
+    footerNode->Style.WidthMode = ESizingMode::Flex;
+    footerNode->Style.HeightMode = ESizingMode::Fixed;
+
+    // ---------------- ACCENT SWATCH ROW ----------------
+    WidgetID accentSwatchRow = m_Scene.CreateWidget<RectWidget>( root, Colors::Surface800, "AccentSwatchRow" );
+    auto* swatchRowNode = m_Scene.Layouts.Get( m_Scene.GetWidget( accentSwatchRow )->GetLayoutID() );
+    swatchRowNode->Style.LayoutType = ELayoutType::Horizontal;
+    swatchRowNode->Style.Spacing = 20.f;
+    swatchRowNode->Style.Padding = Edges{ 10.f };
+    swatchRowNode->Style.HeightMode = ESizingMode::Fixed;
+    swatchRowNode->Style.FixedHeight = 200.f;
+    swatchRowNode->Style.WidthMode = ESizingMode::Flex;
+    swatchRowNode->Style.IsFocusScope = true;
+
+    // Five accent swatches: blue, purple, violet, emerald, rose
+    constexpr Colorf accentSwatches[5] = {
+        Colors::AccentBlue,
+        Colors::AccentPurple,
+        Colors::AccentViolet,
+        Colors::AccentEmerald,
+        Colors::AccentRose,
+    };
+
+    for ( int i = 0; i < 5; ++i )
+    {
+        f32 radius = 30.f + i * 10.f;
+        WidgetID swatch = m_Scene.CreateWidget<CircleWidget>( accentSwatchRow, radius, accentSwatches[i] );
+        auto* swatchNode = m_Scene.Layouts.Get( m_Scene.GetWidget( swatch )->GetLayoutID() );
+        swatchNode->Style.WidthMode = ESizingMode::Fixed;
+        swatchNode->Style.FixedWidth = radius * 2.f;
+        swatchNode->Style.HeightMode = ESizingMode::Fixed;
+        swatchNode->Style.FixedHeight = radius * 2.f;
+    }
+
+    return true;
+}
 
     void OnUpdate() override
     {

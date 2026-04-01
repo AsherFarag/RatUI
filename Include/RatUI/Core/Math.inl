@@ -277,6 +277,29 @@ namespace RatUI
         inline constexpr Colorf PowderBlue= MakeColorF32( 0.69f, 0.88f, 0.9f, 1.f );
         inline constexpr Colorf LightPink = MakeColorF32( 1.f, 0.71f, 0.76f, 1.f );
 
+        // - UI Surface Colors (dark theme base)
+        inline constexpr Colorf Surface900   = MakeColorF32( 0.067f, 0.067f, 0.078f, 1.f ); // #111113 - deepest bg
+        inline constexpr Colorf Surface800   = MakeColorF32( 0.110f, 0.110f, 0.133f, 1.f ); // #1C1C22 - panel bg
+        inline constexpr Colorf Surface700   = MakeColorF32( 0.157f, 0.157f, 0.188f, 1.f ); // #282830 - card bg
+        inline constexpr Colorf Surface600   = MakeColorF32( 0.208f, 0.208f, 0.247f, 1.f ); // #35353F - elevated card
+        inline constexpr Colorf Surface500   = MakeColorF32( 0.275f, 0.275f, 0.322f, 1.f ); // #464652 - border/divider
+
+        // - UI Accent Colors
+        inline constexpr Colorf AccentBlue       = MakeColorF32( 0.239f, 0.510f, 1.000f, 1.f ); // #3D82FF - primary action
+        inline constexpr Colorf AccentBlueDim    = MakeColorF32( 0.149f, 0.337f, 0.714f, 1.f ); // #2656B6 - hover state
+        inline constexpr Colorf AccentPurple     = MakeColorF32( 0.498f, 0.357f, 1.000f, 1.f ); // #7F5BFF - secondary accent
+        inline constexpr Colorf AccentViolet     = MakeColorF32( 0.686f, 0.404f, 1.000f, 1.f ); // #AF67FF - highlight
+        inline constexpr Colorf AccentEmerald    = MakeColorF32( 0.098f, 0.780f, 0.522f, 1.f ); // #19C785 - success
+        inline constexpr Colorf AccentAmber      = MakeColorF32( 1.000f, 0.718f, 0.137f, 1.f ); // #FFB723 - warning
+        inline constexpr Colorf AccentRose       = MakeColorF32( 1.000f, 0.294f, 0.404f, 1.f ); // #FF4B67 - error/danger
+        inline constexpr Colorf AccentSky        = MakeColorF32( 0.220f, 0.780f, 1.000f, 1.f ); // #38C7FF - info
+
+        // - UI Text Colors
+        inline constexpr Colorf TextPrimary      = MakeColorF32( 0.929f, 0.929f, 0.961f, 1.f ); // #EDECF5 - primary text
+        inline constexpr Colorf TextSecondary    = MakeColorF32( 0.588f, 0.588f, 0.647f, 1.f ); // #9696A5 - muted text
+        inline constexpr Colorf TextDisabled     = MakeColorF32( 0.357f, 0.357f, 0.400f, 1.f ); // #5B5B66 - disabled text
+
+
     } // namespace Colors
 
 } // namespace RatUI

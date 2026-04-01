@@ -14,6 +14,16 @@ namespace RatUI
         static constexpr CornerRounding None() { return {}; }
         static constexpr CornerRounding Uniform( Degreesf a_Radius ) { return { a_Radius, a_Radius, a_Radius, a_Radius }; }
         static constexpr CornerRounding Symmetric( Degreesf a_Top, Degreesf a_Bottom ) { return { a_Top, a_Top, a_Bottom, a_Bottom }; }
+
+        constexpr CornerRounding operator+( Degreesf a_Amount ) const
+        {
+            return {
+                .TopLeft = TopLeft + a_Amount,
+                .TopRight = TopRight + a_Amount,
+                .BottomLeft = BottomLeft + a_Amount,
+                .BottomRight = BottomRight + a_Amount
+            };
+        }
     };
 
     /**
