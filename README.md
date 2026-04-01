@@ -3,6 +3,8 @@
 RatUI is a Retained-Mode Graphical User Interface library built for C++20.
 It's designed for games and aims to integrate into your codebase rather than the other way around.
 
+![RatUI_Sandbox_LeObF4pG9w](https://github.com/user-attachments/assets/c17694b1-c2f8-42b1-94c2-398375ee9c72)
+
 ## Features
 
 * Retained-mode UI architecture
