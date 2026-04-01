@@ -53,8 +53,21 @@ inline void SDL2Renderer::Execute( RatUI::Span<const RatUI::DrawCmd> a_Commands 
     if ( !m_Renderer )
         return;
 
+    // TODO: Capture the renderer state and restore it after rendering, to avoid interfering with the application's own rendering code
+
     for ( const DrawCmd& cmd : a_Commands )
     {
+    
+        SDL_Rect sdlClipRect{
+            static_cast<int>( cmd.ClipRect.Origin[0] ),
+            static_cast<int>( cmd.ClipRect.Origin[1] ),
+            static_cast<int>( cmd.ClipRect.Size[0] ),
+            static_cast<int>( cmd.ClipRect.Size[1] )
+        };
+
+        // TODO: Get the intersection of the user set clip rect and the current scissor rect
+        SDL_RenderSetClipRect( m_Renderer, &sdlClipRect );
+
         if ( Holds<DrawCmd::RectCmd>( cmd.Payload ) )
         {
             const auto& rectCmd = Get<DrawCmd::RectCmd>( cmd.Payload );
@@ -79,9 +92,7 @@ inline void SDL2Renderer::Execute( RatUI::Span<const RatUI::DrawCmd> a_Commands 
         {
             const auto& customCmd = Get<DrawCmd::CustomCmd>( cmd.Payload );
 			if ( customCmd.Func )
-            {
                 customCmd.Func( *this, cmd );
-            }
         }
     }
 }
