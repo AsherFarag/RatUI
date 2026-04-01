@@ -37,6 +37,11 @@
             static const CharType&    At(const Type& a_String, SizeType a_Index) { return a_String.at(a_Index); }
             static CharType*          Data(Type& a_String) { return a_String.data(); }
             static const CharType*    Data(const Type& a_String) { return a_String.data(); }
+            static void               PushBack(Type& a_String, const CharType& a_Char) { a_String.push_back(a_Char); }
+            static void               PushBack(Type& a_String, CharType&& a_Char) { a_String.push_back(std::move(a_Char)); }
+            static void               PushBack(Type& a_String, const Type& a_Other) { a_String.append(a_Other); }
+            static void               PushBack(Type& a_String, Type&& a_Other) { a_String.append(std::move(a_Other)); }
+            static void               PopBack(Type& a_String) { a_String.pop_back(); }
 
             // - Iterators
 
