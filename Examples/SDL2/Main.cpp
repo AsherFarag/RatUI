@@ -36,10 +36,12 @@ public:
 
 		a_DrawList.PushTransform( transform.ToMatrix( rect ) );
 
-		if ( a_Scene.GetFocusedWidget() == GetID() )
-			a_DrawList.AddRect( Colors::White, rect.Expanded( 4.f ) );
+		constexpr CornerRounding rounding = CornerRounding::Uniform( 30_deg );
 
-		a_DrawList.AddRect( Col, rect );
+		if ( a_Scene.GetFocusedWidget() == GetID() )
+			a_DrawList.AddRect( Colors::White, rect.Expanded( 4.f ), rounding );
+		using namespace RatUI::Literals;
+		a_DrawList.AddRect( Col, rect, rounding );
 
         a_Scene.ForEachChildWidget( GetID(), [&](IWidget& child)
         {

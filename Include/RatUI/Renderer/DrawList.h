@@ -40,7 +40,7 @@ namespace RatUI
             Colorf Color;
             Rectf Rect;
             CornerRounding Rounding;
-            f32 BorderThickness;
+            f32 Thickness;
         };
 
         struct CircleCmd 
@@ -55,7 +55,7 @@ namespace RatUI
             Colorf Color;
             Vec2f Center; 
             f32 Radius; 
-            f32 BorderThickness; 
+            f32 Thickness;
         };
 
         struct CustomCmd { CustomDrawFunc Func; void* UserData; };
@@ -147,7 +147,7 @@ namespace RatUI
             PushBack( Commands, DrawCmd{
                 .Transform = CurrentTransform(),
                 .ClipRect = CurrentClipRect(),
-                .Payload = DrawCmd::RectBorderCmd{ .Color = a_Color, .Rect = a_Rect, .Rounding = a_Rounding, .BorderThickness = a_Thickness }
+                .Payload = DrawCmd::RectBorderCmd{ .Color = a_Color, .Rect = a_Rect, .Rounding = a_Rounding, .Thickness = a_Thickness }
             } );
             return *this;
         }
@@ -167,18 +167,24 @@ namespace RatUI
             PushBack( Commands, DrawCmd{
                 .Transform = CurrentTransform(),
                 .ClipRect = CurrentClipRect(),
-                .Payload = DrawCmd::CircleBorderCmd{ .Color = a_Color, .Center = a_Center, .Radius = a_Radius, .BorderThickness = a_Thickness }
+                .Payload = DrawCmd::CircleBorderCmd{ .Color = a_Color, .Center = a_Center, .Radius = a_Radius, .Thickness = a_Thickness }
             } );
             return *this;
         }
 
 		DrawList& AddCustom( CustomDrawFunc a_Func, void* a_UserData = nullptr )
         {
-            PushBack( Commands, DrawCmd{
-                .Transform = CurrentTransform(),
-                .ClipRect = CurrentClipRect(),
-                .Payload = DrawCmd::CustomCmd{ .Func = a_Func, .UserData = a_UserData }
-            } );
+			RATUI_USER_ASSERT( a_Func, "Custom draw command requires a valid function pointer." );
+
+			if ( a_Func )
+            {
+                PushBack( Commands, DrawCmd{
+                    .Transform = CurrentTransform(),
+                    .ClipRect = CurrentClipRect(),
+                    .Payload = DrawCmd::CustomCmd{.Func = a_Func, .UserData = a_UserData }
+                } );
+            }
+
             return *this;
         }
     };
