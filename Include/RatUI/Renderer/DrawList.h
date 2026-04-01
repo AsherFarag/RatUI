@@ -1,10 +1,21 @@
 #pragma once
 #include "../Core.h"
-#include "Brush.h"
 #include "RenderTransform.h"
 
 namespace RatUI
 {
+    struct CornerRounding
+    {
+        Degreesf TopLeft{ 0.f };
+        Degreesf TopRight{ 0.f };
+        Degreesf BottomLeft{ 0.f };
+        Degreesf BottomRight{ 0.f };
+
+        static constexpr CornerRounding None() { return {}; }
+        static constexpr CornerRounding Uniform( Degreesf a_Radius ) { return { a_Radius, a_Radius, a_Radius, a_Radius }; }
+        static constexpr CornerRounding Symmetric( Degreesf a_Top, Degreesf a_Bottom ) { return { a_Top, a_Top, a_Bottom, a_Bottom }; }
+    };
+
     /**
      * @brief Used for custom rendering commands that don't fit into the predefined categories. 
      * @param a_Renderer The renderer to use for drawing.
@@ -17,29 +28,44 @@ namespace RatUI
      */
     struct DrawCmd
     {
-        struct RectCmd { Rectf Rect; };
+        struct RectCmd 
+        { 
+            Colorf Color;
+            Rectf Rect;
+            CornerRounding Rounding;
+        };
 
-        struct RectBorderCmd { Rectf Rect; f32 BorderThickness; };
+        struct RectBorderCmd 
+        { 
+            Colorf Color;
+            Rectf Rect;
+            CornerRounding Rounding;
+            f32 BorderThickness;
+        };
 
-        struct RoundedRectCmd { Rectf Rect; f32 CornerRadius; };
+        struct CircleCmd 
+        { 
+            Colorf Color;
+            Vec2f Center; 
+            f32 Radius; 
+        };
 
-        struct RoundedRectBorderCmd { Rectf Rect; f32 CornerRadius; f32 BorderThickness; };
-
-        struct CircleCmd { Vec2f Center; f32 Radius; };
-
-        struct CircleBorderCmd { Vec2f Center; f32 Radius; f32 BorderThickness; };
+        struct CircleBorderCmd 
+        { 
+            Colorf Color;
+            Vec2f Center; 
+            f32 Radius; 
+            f32 BorderThickness; 
+        };
 
         struct CustomCmd { CustomDrawFunc Func; void* UserData; };
 
-        Brush DrawBrush;
         Mat3f Transform{ c_Identity<Mat3f> };
         Rectf ClipRect;
 
         Variant<
             RectCmd,
             RectBorderCmd,
-            RoundedRectCmd,
-            RoundedRectBorderCmd,
             CircleCmd,
             CircleBorderCmd,
             CustomCmd
@@ -106,86 +132,54 @@ namespace RatUI
             return *this;
         }
 
-        DrawList& AddRect( Brush a_Brush, Rectf a_Rect )
+        DrawList& AddRect( Colorf a_Color, Rectf a_Rect, CornerRounding a_Rounding = {} )
         {
             PushBack( Commands, DrawCmd{
-                .DrawBrush = std::move( a_Brush ),
                 .Transform = CurrentTransform(),
                 .ClipRect = CurrentClipRect(),
-                .Payload = DrawCmd::RectCmd{ .Rect = a_Rect }
+                .Payload = DrawCmd::RectCmd{ .Color = a_Color, .Rect = a_Rect, .Rounding = a_Rounding }
 			} );
             return *this;
         }
 
-        DrawList& AddRoundedRect( Brush a_Brush, Rectf a_Rect, f32 a_CornerRadius )
+        DrawList& AddRectBorder( Colorf a_Color, Rectf a_Rect, CornerRounding a_Rounding = {}, f32 a_Thickness = 1.f )
         {
             PushBack( Commands, DrawCmd{
-                .DrawBrush = std::move( a_Brush ),
                 .Transform = CurrentTransform(),
                 .ClipRect = CurrentClipRect(),
-                .Payload = DrawCmd::RoundedRectCmd{ .Rect = a_Rect, .CornerRadius = a_CornerRadius }
-			} );
-            return *this;
-        }
-
-        DrawList& AddRectBorder( Brush a_Brush, Rectf a_Rect, f32 a_Thickness = 1.f )
-        {
-            PushBack( Commands, DrawCmd{
-                .DrawBrush = std::move( a_Brush ),
-                .Transform = CurrentTransform(),
-                .ClipRect = CurrentClipRect(),
-                .Payload = DrawCmd::RectBorderCmd{ .Rect = a_Rect, .BorderThickness = a_Thickness }
+                .Payload = DrawCmd::RectBorderCmd{ .Color = a_Color, .Rect = a_Rect, .Rounding = a_Rounding, .BorderThickness = a_Thickness }
             } );
             return *this;
         }
 
-        DrawList& AddRoundedRectBorder( Brush a_Brush, Rectf a_Rect, f32 a_CornerRadius, f32 a_Thickness = 1.f )
+        DrawList& AddCircle( Colorf a_Color, Vec2f a_Center, f32 a_Radius )
         {
             PushBack( Commands, DrawCmd{
-                .DrawBrush = std::move( a_Brush ),
                 .Transform = CurrentTransform(),
                 .ClipRect = CurrentClipRect(),
-                .Payload = DrawCmd::RoundedRectBorderCmd{ .Rect = a_Rect, .CornerRadius = a_CornerRadius, .BorderThickness = a_Thickness }
+                .Payload = DrawCmd::CircleCmd{ .Color = a_Color, .Center = a_Center, .Radius = a_Radius }
             } );
             return *this;
         }
 
-        DrawList& AddCircle( Brush a_Brush, Vec2f a_Center, f32 a_Radius )
+        DrawList& AddCircleBorder( Colorf a_Color, Vec2f a_Center, f32 a_Radius, f32 a_Thickness = 1.f )
         {
             PushBack( Commands, DrawCmd{
-                .DrawBrush = std::move( a_Brush ),
                 .Transform = CurrentTransform(),
                 .ClipRect = CurrentClipRect(),
-                .Payload = DrawCmd::CircleCmd{ .Center = a_Center, .Radius = a_Radius }
+                .Payload = DrawCmd::CircleBorderCmd{ .Color = a_Color, .Center = a_Center, .Radius = a_Radius, .BorderThickness = a_Thickness }
             } );
             return *this;
         }
 
-        DrawList& AddCircleBorder( Brush a_Brush, Vec2f a_Center, f32 a_Radius, f32 a_Thickness = 1.f )
+		DrawList& AddCustom( CustomDrawFunc a_Func, void* a_UserData = nullptr )
         {
             PushBack( Commands, DrawCmd{
-                .DrawBrush = std::move( a_Brush ),
-                .Transform = CurrentTransform(),
-                .ClipRect = CurrentClipRect(),
-                .Payload = DrawCmd::CircleBorderCmd{ .Center = a_Center, .Radius = a_Radius, .BorderThickness = a_Thickness }
-            } );
-            return *this;
-        }
-
-		DrawList& AddCustom( Brush a_Brush, CustomDrawFunc a_Func, void* a_UserData = nullptr )
-        {
-            PushBack( Commands, DrawCmd{
-                .DrawBrush = std::move( a_Brush ),
                 .Transform = CurrentTransform(),
                 .ClipRect = CurrentClipRect(),
                 .Payload = DrawCmd::CustomCmd{ .Func = a_Func, .UserData = a_UserData }
             } );
             return *this;
-        }
-
-        DrawList& AddCustom( CustomDrawFunc a_Func, void* a_UserData = nullptr )
-        {
-            return AddCustom( SolidBrush{ .Color = Colors::White }, a_Func, a_UserData );
         }
     };
 
