@@ -36,7 +36,12 @@ public:
 
 		a_DrawList.PushTransform( transform.ToMatrix( rect ) );
 
-		constexpr CornerRounding rounding = CornerRounding::Uniform( 30_deg );
+		constexpr CornerRounding rounding = CornerRounding{
+            .TopLeft = Degreesf{ 10.f },
+            .TopRight = Degreesf{ 30.f },
+            .BottomLeft = Degreesf{ 50.f },
+            .BottomRight = Degreesf{ 70.f }
+        };
 
 		if ( a_Scene.GetFocusedWidget() == GetID() )
 			a_DrawList.AddRect( Colors::White, rect.Expanded( 4.f ), rounding );
@@ -55,6 +60,39 @@ public:
     {
         return true;
 	}
+};
+
+class CircleWidget : public IWidget
+{
+public:
+
+    f32 Radius;
+    Colorf Col;
+
+    CircleWidget( f32 a_Radius, const SDL_Color& a_Color )
+        : Radius( a_Radius )
+        , Col( MakeColorU8( a_Color.r, a_Color.g, a_Color.b, a_Color.a ) )
+    {}
+
+    void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
+    {
+        const LayoutNode* node = a_Scene.Layouts.Get( GetLayoutID() );
+        if ( !node )
+            return;
+
+        const Rectf& rect = node->Layout.FinalRect;
+        Vec2f center = rect.Center();
+
+        if ( a_Scene.GetFocusedWidget() == GetID() )
+			a_DrawList.AddCircle( Colors::LightYellow, center, Radius + 4.f );
+
+        a_DrawList.AddCircle( Col, center, Radius );
+    }
+
+    bool IsFocusable( Scene& a_Scene ) const override
+    {
+        return true;
+    }
 };
 
 /**
@@ -134,7 +172,7 @@ protected:
         yellowNode->Style.HeightMode = ESizingMode::Flex;
 		yellowNode->Style.PercentWidth = 0.5f; // This will be ignored since the parent is an HBox with Spacing, so it falls back to FlexGrow behavior.
         yellowNode->Style.FlexGrow = 1.f;
-
+        
         // ---------------- BLUE ----------------
         WidgetID blue = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 0, 0, 255, 255 }, "Blue" );
         auto* blueNode = m_Scene.Layouts.Get( m_Scene.GetWidget( blue )->GetLayoutID() );
@@ -142,6 +180,30 @@ protected:
         blueNode->Style.FixedHeight = 120.f;
         blueNode->Style.WidthMode = ESizingMode::Flex;
         blueNode->Style.HeightMode = ESizingMode::Fixed;
+
+        // ---------------- HBOX of CIRCLES ----------------
+        WidgetID circleHBox = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 50, 0, 50, 255 }, "CircleHBox" );
+        auto* circleHBoxNode = m_Scene.Layouts.Get( m_Scene.GetWidget( circleHBox )->GetLayoutID() );
+        circleHBoxNode->Style.LayoutType = ELayoutType::Horizontal;
+        circleHBoxNode->Style.Spacing = 20.f;
+        circleHBoxNode->Style.Padding = Edges{ 10.f };
+        circleHBoxNode->Style.HeightMode = ESizingMode::Fixed;
+        circleHBoxNode->Style.FixedHeight = 200.f;
+        circleHBoxNode->Style.WidthMode = ESizingMode::Flex;
+        circleHBoxNode->Style.IsFocusScope = true; // Make the HBox a focus scope to test navigation between its children
+
+        for ( int i = 0; i < 5; ++i )
+        {
+            f32 radius = 30.f + i * 10.f;
+            SDL_Color col = { (Uint8)( 255 - i * 40 ), (Uint8)( i * 40 ), 150, 255 };
+            WidgetID circle = m_Scene.CreateWidget<CircleWidget>( circleHBox, radius, col );
+            auto* circleNode = m_Scene.Layouts.Get( m_Scene.GetWidget( circle )->GetLayoutID() );
+            circleNode->Style.WidthMode = ESizingMode::Fixed;
+            circleNode->Style.FixedWidth = radius * 2.f;
+            circleNode->Style.HeightMode = ESizingMode::Fixed;
+            circleNode->Style.FixedHeight = radius * 2.f;
+        }
+
 
         return true;
     }

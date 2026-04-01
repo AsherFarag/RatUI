@@ -19,14 +19,14 @@ public:
     void Execute( RatUI::Span<const RatUI::DrawCmd> a_Commands ) override;
 
     // TODO: Currently only handles rounding the same for all corners
-    void RenderFillRoundedRect( RatUI::Rectf a_Rect, RatUI::f32 a_Radius, RatUI::Colorf a_Color, const RatUI::Mat3f& a_Transform );
+    void RenderFillRoundedRect( RatUI::Rectf a_Rect, RatUI::CornerRounding a_Rounding, RatUI::Colorf a_Color, const RatUI::Mat3f& a_Transform );
 
     // TODO: Currently only handles rounding the same for all corners
-    void RenderFillRoundedRectBorder( RatUI::Rectf a_Rect, RatUI::f32 a_Radius, RatUI::Colorf a_Color, RatUI::f32 a_Thickness, const RatUI::Mat3f& a_Transform ) {};
+    void RenderFillRoundedRectBorder( RatUI::Rectf a_Rect, RatUI::f32 a_Radius, RatUI::Colorf a_Color, RatUI::f32 a_Thickness, const RatUI::Mat3f& a_Transform );
 
-    void RenderFillCircle( RatUI::Vec2f a_Center, RatUI::f32 a_Radius, RatUI::Colorf a_Color, const RatUI::Mat3f& a_Transform ) {};
+    void RenderFillCircle( RatUI::Vec2f a_Center, RatUI::f32 a_Radius, RatUI::Colorf a_Color, const RatUI::Mat3f& a_Transform );
 
-    void RenderFillCircleBorder( RatUI::Vec2f a_Center, RatUI::f32 a_Radius, RatUI::Colorf a_Color, RatUI::f32 a_Thickness, const RatUI::Mat3f& a_Transform ) {};
+    void RenderFillCircleBorder( RatUI::Vec2f a_Center, RatUI::f32 a_Radius, RatUI::Colorf a_Color, RatUI::f32 a_Thickness, const RatUI::Mat3f& a_Transform );
 
     static SDL_Color ToSDLColor( RatUI::Colorf a_Color )
     {
@@ -58,7 +58,7 @@ inline void SDL2Renderer::Execute( RatUI::Span<const RatUI::DrawCmd> a_Commands 
         if ( Holds<DrawCmd::RectCmd>( cmd.Payload ) )
         {
             const auto& rectCmd = Get<DrawCmd::RectCmd>( cmd.Payload );
-            RenderFillRoundedRect( rectCmd.Rect, rectCmd.Rounding.TopLeft.Value, rectCmd.Color, cmd.Transform );
+            RenderFillRoundedRect( rectCmd.Rect, rectCmd.Rounding, rectCmd.Color, cmd.Transform );
         }
         else if ( Holds<DrawCmd::RectBorderCmd>( cmd.Payload ) )
         {
@@ -87,10 +87,10 @@ inline void SDL2Renderer::Execute( RatUI::Span<const RatUI::DrawCmd> a_Commands 
 }
 
 inline void SDL2Renderer::RenderFillRoundedRect(
-    RatUI::Rectf        a_Rect,
-    RatUI::f32          a_Radius,
-    RatUI::Colorf       a_Color,
-    const RatUI::Mat3f& a_Transform )
+    RatUI::Rectf          a_Rect,
+    RatUI::CornerRounding a_Rounding,
+    RatUI::Colorf         a_Color,
+    const RatUI::Mat3f&   a_Transform )
 {
     using namespace RatUI;
 
@@ -109,11 +109,30 @@ inline void SDL2Renderer::RenderFillRoundedRect(
     int        vertCount = 0;
     int        idxCount  = 0;
 
-    const float r = SDL_min( a_Radius, SDL_min( a_Rect.Size[0], a_Rect.Size[1] ) * 0.5f );
     const float x = a_Rect.Origin[0];
     const float y = a_Rect.Origin[1];
     const float w = a_Rect.Size[0];
     const float h = a_Rect.Size[1];
+
+    float tlRadius = a_Rounding.TopLeft.Value;
+    float trRadius = a_Rounding.TopRight.Value;
+    float brRadius = a_Rounding.BottomRight.Value;
+    float blRadius = a_Rounding.BottomLeft.Value;
+
+    // Clamp radius so opposite corners don't exceed the available width/height
+    {
+        float scaleX = w / std::max( 1.f, ( tlRadius + trRadius ) );   // top
+        float scaleY = h / std::max( 1.f, ( tlRadius + blRadius ) );   // left side
+        scaleX = std::min( scaleX, w / std::max( 1.f, ( blRadius + brRadius ) ) ); // bottom
+        scaleY = std::min( scaleY, h / std::max( 1.f, ( trRadius + brRadius ) ) ); // right side
+
+        float scale = std::min( 1.f, std::min( scaleX, scaleY ) );
+
+        tlRadius *= scale;
+        trRadius *= scale;
+        brRadius *= scale;
+        blRadius *= scale;
+    }
 
     auto pushVertex = [&]( float px, float py ) -> int
     {
@@ -131,51 +150,51 @@ inline void SDL2Renderer::RenderFillRoundedRect(
 
     // Center rect
     {
-        int a = pushVertex( x + r,     y + r     );
-        int b = pushVertex( x + w - r, y + r     );
-        int c = pushVertex( x + w - r, y + h - r );
-        int d = pushVertex( x + r,     y + h - r );
+        int a = pushVertex( x + tlRadius,     y + tlRadius     );
+        int b = pushVertex( x + w - trRadius, y + trRadius     );
+        int c = pushVertex( x + w - brRadius, y + h - brRadius );
+        int d = pushVertex( x + blRadius,     y + h - blRadius );
         pushQuad( a, b, c, d );
     }
 
     // Top strip
     {
-        int a = pushVertex( x + r,     y     );
-        int b = pushVertex( x + w - r, y     );
-        int c = pushVertex( x + w - r, y + r );
-        int d = pushVertex( x + r,     y + r );
+        int a = pushVertex( x + tlRadius,     y            );
+        int b = pushVertex( x + w - trRadius, y            );
+        int c = pushVertex( x + w - trRadius, y + trRadius );
+        int d = pushVertex( x + tlRadius,     y + tlRadius );
         pushQuad( a, b, c, d );
     }
 
     // Bottom strip
     {
-        int a = pushVertex( x + r,     y + h - r );
-        int b = pushVertex( x + w - r, y + h - r );
-        int c = pushVertex( x + w - r, y + h     );
-        int d = pushVertex( x + r,     y + h     );
+        int a = pushVertex( x + blRadius,     y + h - blRadius );
+        int b = pushVertex( x + w - brRadius, y + h - brRadius );
+        int c = pushVertex( x + w - brRadius, y + h            );
+        int d = pushVertex( x + blRadius,     y + h            );
         pushQuad( a, b, c, d );
     }
 
     // Left strip
     {
-        int a = pushVertex( x,     y + r     );
-        int b = pushVertex( x + r, y + r     );
-        int c = pushVertex( x + r, y + h - r );
-        int d = pushVertex( x,     y + h - r );
+        int a = pushVertex( x,            y + tlRadius     );
+        int b = pushVertex( x + tlRadius, y + tlRadius     );
+        int c = pushVertex( x + blRadius, y + h - blRadius );
+        int d = pushVertex( x,            y + h - blRadius );
         pushQuad( a, b, c, d );
     }
 
     // Right strip
     {
-        int a = pushVertex( x + w - r, y + r     );
-        int b = pushVertex( x + w,     y + r     );
-        int c = pushVertex( x + w,     y + h - r );
-        int d = pushVertex( x + w - r, y + h - r );
+        int a = pushVertex( x + w - trRadius, y + trRadius     );
+        int b = pushVertex( x + w,            y + trRadius     );
+        int c = pushVertex( x + w,            y + h - brRadius );
+        int d = pushVertex( x + w - brRadius, y + h - brRadius );
         pushQuad( a, b, c, d );
     }
 
     // Corner fans - Center is the inset corner point, arc goes from inner to outer edge in CCW direction
-    auto addCorner = [&]( float cx, float cy, float startAngle )
+    auto addCorner = [&]( float cx, float cy, float startAngle, float r )
     {
         int   center = pushVertex( cx, cy );
         float step   = c_PI_2 / c_Segments;
@@ -195,10 +214,129 @@ inline void SDL2Renderer::RenderFillRoundedRect(
         }
     };
 
-    addCorner( x + r,     y + r,     Pi<f32>        ); // Top-left
-    addCorner( x + w - r, y + r,     Pi<f32> * 1.5f ); // Top-right
-    addCorner( x + w - r, y + h - r, 0.f            ); // Bottom-right
-    addCorner( x + r,     y + h - r, c_PI_2         ); // Bottom-left
+    addCorner( x + tlRadius,     y + tlRadius,     Pi<f32>       , tlRadius ); // Top-left
+    addCorner( x + w - trRadius, y + trRadius,     Pi<f32> * 1.5f, trRadius ); // Top-right
+    addCorner( x + w - brRadius, y + h - brRadius, 0.f           , brRadius ); // Bottom-right
+    addCorner( x + blRadius,     y + h - blRadius, c_PI_2        , blRadius ); // Bottom-left
+
+    SDL_RenderGeometry( m_Renderer, nullptr, vertices, vertCount, indices, idxCount );
+}
+
+inline void SDL2Renderer::RenderFillRoundedRectBorder(
+    RatUI::Rectf        a_Rect,
+    RatUI::f32          a_Radius,
+    RatUI::Colorf       a_Color,
+    RatUI::f32          a_Thickness,
+    const RatUI::Mat3f& a_Transform )
+{
+    // Nope
+
+    // TODO: Would be good to add helper functions or something so used wont have to deal with it.
+    // Something like an imgui-style batch draw commands into vertex and index buffers so users can handle that instead
+}
+
+inline void SDL2Renderer::RenderFillCircle(
+    RatUI::Vec2f        a_Center,
+    RatUI::f32          a_Radius,
+    RatUI::Colorf       a_Color,
+    const RatUI::Mat3f& a_Transform )
+{
+    using namespace RatUI;
+    
+    // Create a triangle fan
+
+    constexpr int c_Segments   = 32;
+    constexpr int c_MaxVerts   = 1 + c_Segments; /// center + arc
+    constexpr int c_MaxIndices = c_Segments * 3;
+
+    const SDL_Color sdlColor = ToSDLColor( a_Color );
+
+    SDL_Vertex vertices[c_MaxVerts];
+    int        indices[c_MaxIndices];
+    int        vertCount = 0;
+    int        idxCount  = 0;
+
+    auto pushVertex = [&]( float x, float y ) -> int
+    {
+        Vec3f p = a_Transform * Vec3f{ x, y, 1.f };
+        vertices[vertCount] = { { p[0], p[1] }, sdlColor, { 0.f, 0.f } };
+        return vertCount++;
+    };
+
+    int center = pushVertex( a_Center[0], a_Center[1] );
+
+    float step = ( Pi<f32> * 2.f ) / c_Segments;
+    for ( int s = 0; s < c_Segments; ++s )
+    {
+        float angle = s * step;
+        pushVertex( a_Center[0] + cosf( angle ) * a_Radius,
+                    a_Center[1] + sinf( angle ) * a_Radius );
+    }
+
+    for ( int s = 0; s < c_Segments; ++s )
+    {
+        indices[idxCount++] = center;
+        indices[idxCount++] = 1 + s;
+        indices[idxCount++] = 1 + ( s + 1 ) % c_Segments;
+    }
+
+    SDL_RenderGeometry( m_Renderer, nullptr, vertices, vertCount, indices, idxCount );
+}
+
+inline void SDL2Renderer::RenderFillCircleBorder(
+    RatUI::Vec2f        a_Center,
+    RatUI::f32          a_Radius,
+    RatUI::Colorf       a_Color,
+    RatUI::f32          a_Thickness,
+    const RatUI::Mat3f& a_Transform )
+{
+    using namespace RatUI;
+
+    constexpr int c_Segments   = 32;
+    constexpr int c_MaxVerts   = c_Segments * 2;  // outer + inner ring
+    constexpr int c_MaxIndices = c_Segments * 6;  // 2 tris per segment
+
+    const SDL_Color sdlColor   = ToSDLColor( a_Color );
+    const float     rOuter     = a_Radius;
+    const float     rInner     = std::max( 0.f, a_Radius - a_Thickness );
+
+    SDL_Vertex vertices[c_MaxVerts];
+    int        indices[c_MaxIndices];
+    int        vertCount = 0;
+    int        idxCount  = 0;
+
+    auto pushVertex = [&]( float x, float y ) -> int
+    {
+        Vec3f p = a_Transform * Vec3f{ x, y, 1.f };
+        vertices[vertCount] = { { p[0], p[1] }, sdlColor, { 0.f, 0.f } };
+        return vertCount++;
+    };
+
+    float step = ( Pi<f32> * 2.f ) / c_Segments;
+    for ( int s = 0; s < c_Segments; ++s )
+    {
+        float angle = s * step;
+        float cosA  = cosf( angle );
+        float sinA  = sinf( angle );
+        pushVertex( a_Center[0] + cosA * rOuter, a_Center[1] + sinA * rOuter ); // outer
+        pushVertex( a_Center[0] + cosA * rInner, a_Center[1] + sinA * rInner ); // inner
+    }
+
+    for ( int s = 0; s < c_Segments; ++s )
+    {
+        int o0 = ( s * 2 );
+        int i0 = ( s * 2 ) + 1;
+        int o1 = ( ( s + 1 ) % c_Segments ) * 2;
+        int i1 = ( ( s + 1 ) % c_Segments ) * 2 + 1;
+
+        indices[idxCount++] = o0;
+        indices[idxCount++] = o1;
+        indices[idxCount++] = i1;
+
+        indices[idxCount++] = o0;
+        indices[idxCount++] = i1;
+        indices[idxCount++] = i0;
+    }
 
     SDL_RenderGeometry( m_Renderer, nullptr, vertices, vertCount, indices, idxCount );
 }
