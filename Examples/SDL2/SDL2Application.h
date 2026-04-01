@@ -43,6 +43,7 @@ public:
     struct Config
     {
         std::string Title  = "RatUI Application";
+        Colorf      ClearColor{ 0.f, 0.f, 0.f, 1.f };
         int         Width  = 1280;
         int         Height = 720;
     };
@@ -77,7 +78,7 @@ public:
 
                 if ( m_SDLRenderer )
                 {
-                    SDL_SetRenderDrawColor( m_SDLRenderer, 0, 0, 0, 255 );
+                    SDL_SetRenderDrawColor( m_SDLRenderer, m_Config.ClearColor[0] * 255, m_Config.ClearColor[1] * 255, m_Config.ClearColor[2] * 255, m_Config.ClearColor[3] * 255 );
                     SDL_RenderClear( m_SDLRenderer );
                     OnRender( m_Renderer );
                     SDL_RenderPresent( m_SDLRenderer );
@@ -228,7 +229,7 @@ private:
         return result;
     }
 
-private:
+protected:
     Config        m_Config;
     bool          m_Running{ true };
     SDL_Window*   m_Window{ nullptr };

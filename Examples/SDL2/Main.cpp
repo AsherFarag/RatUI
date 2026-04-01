@@ -64,10 +64,12 @@ public:
 
     f32 Radius;
     Colorf Color;
+    bool IsFilled;
 
-    CircleWidget( f32 a_Radius, Colorf a_Color )
+    CircleWidget( f32 a_Radius, Colorf a_Color, bool a_Filled = true )
         : Radius( a_Radius )
         , Color( a_Color )
+        , IsFilled( a_Filled )
     {}
 
     void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
@@ -79,10 +81,21 @@ public:
         const Rectf& rect = node->Layout.FinalRect;
         Vec2f center = rect.Center();
 
-        if ( a_Scene.GetFocusedWidget() == GetID() )
-			a_DrawList.AddCircle( Colors::LightYellow, center, Radius + 4.f );
+        if ( IsFilled )
+        {
+            if ( a_Scene.GetFocusedWidget() == GetID() )
+			    a_DrawList.AddCircle( Colors::LightYellow, center, Radius + 4.f );
 
-        a_DrawList.AddCircle( Color, center, Radius );
+            a_DrawList.AddCircle( Color, center, Radius );
+        }
+        else
+        {
+            const f32 borderThickness = 4.f;
+            if ( a_Scene.GetFocusedWidget() == GetID() )
+                a_DrawList.AddCircleBorder( Colors::LightYellow, center, Radius + 4.f, borderThickness + 2.f );
+
+            a_DrawList.AddCircleBorder( Color, center, Radius, borderThickness );
+        }
     }
 
     bool IsFocusable( Scene& a_Scene ) const override
@@ -101,7 +114,7 @@ class SandboxApp : public SDL2Application
 {
 public:
     SandboxApp()
-        : SDL2Application( { "RatUI Sandbox", 1280, 720 } )
+        : SDL2Application( { "RatUI Sandbox", Colors::Surface900, 1280, 720 } )
     {}
 
 protected:
@@ -233,10 +246,23 @@ bool OnInitialize() override
         Colors::AccentRose,
     };
 
+    // Draw colored circles with increasing radius for each accent color
     for ( int i = 0; i < 5; ++i )
     {
         f32 radius = 30.f + i * 10.f;
         WidgetID swatch = m_Scene.CreateWidget<CircleWidget>( accentSwatchRow, radius, accentSwatches[i] );
+        auto* swatchNode = m_Scene.Layouts.Get( m_Scene.GetWidget( swatch )->GetLayoutID() );
+        swatchNode->Style.WidthMode = ESizingMode::Fixed;
+        swatchNode->Style.FixedWidth = radius * 2.f;
+        swatchNode->Style.HeightMode = ESizingMode::Fixed;
+        swatchNode->Style.FixedHeight = radius * 2.f;
+    }
+
+    // Draw colored circle borders in reverse order on top of the swatches to create a layered effect
+    for ( int i = 3; i >= 0; --i )
+    {
+        f32 radius = 30.f + i * 10.f;
+        WidgetID swatch = m_Scene.CreateWidget<CircleWidget>( accentSwatchRow, radius, accentSwatches[i], false  );
         auto* swatchNode = m_Scene.Layouts.Get( m_Scene.GetWidget( swatch )->GetLayoutID() );
         swatchNode->Style.WidthMode = ESizingMode::Fixed;
         swatchNode->Style.FixedWidth = radius * 2.f;
