@@ -217,7 +217,19 @@ namespace RatUI
         // - Pass 2: re-sync any widget that needs to wrap at its now-known laid-out width,
         // then remeasure heights only (widths won't change on the second pass).
 
-		SyncSubtree( SyncSubtree, *rootNode, a_AvailableSize );
+        const auto SyncSubtree2 = [&]( auto& Self, LayoutNode& node, Vec2f parentSize ) -> void
+        {
+            IWidget* widget = GetWidget( node.WidgetID );
+            if ( widget )
+                widget->OnSyncLayout( *this, node, parentSize );
+
+            node.ForEachChild( [&]( LayoutNode& child )
+            {
+                Self( Self, child, node.Layout.FinalRect.Size );
+            } );
+        };
+
+		SyncSubtree2( SyncSubtree2, *rootNode, a_AvailableSize );
         MeasureLayoutNode( *rootNode, a_AvailableSize );
         ArrangeLayoutNode( *rootNode, Rectf{ Vec2f{ 0.f, 0.f }, a_AvailableSize } );
 
