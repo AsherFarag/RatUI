@@ -38,27 +38,12 @@ namespace RatUI
 
             f32 maxWidth = 0.f;
 
-            if ( a_Node.Style.WidthMode == ESizingMode::Fixed )
-            {
+            if ( a_Node.Style.WidthMode == ESizingMode::Fixed ) 
                 maxWidth = a_Node.Style.FixedWidth;
-            }
             else
-            {
-				maxWidth = a_AvailableSize[0] - a_Node.Style.Padding.Horizontal();
-                // TODO: fix me
-                //for ( LayoutNode* ancestor = a_Node.Parent; ancestor; ancestor = ancestor->Parent )
-                //{
-                //    f32 w = 0.f;
-                //    if ( ancestor->Style.WidthMode == ESizingMode::Fixed )
-                //        w = ancestor->Style.FixedWidth - ancestor->Style.Padding.Horizontal();
-                //    else if ( ancestor->Layout.FinalRect.Width() > 0.f )
-                //        w = ancestor->Layout.FinalRect.Width() - ancestor->Style.Padding.Horizontal();
-//
-                //    if ( w > 0.f ) { maxWidth = w; break; }
-                //}
-            }
+                maxWidth = a_AvailableSize[0] - a_Node.Style.Padding.Horizontal();
 
-			TextMeasurement t = metrics->Measure( m_Text, m_Style, maxWidth == 0.f ? Limits<f32>::max() : maxWidth );
+			TextMeasurement t = metrics->Measure( m_Text, m_Style, maxWidth <= 0.f ? Limits<f32>::max() : maxWidth );
             a_Node.Layout.IntrinsicSize = t.Size;
         }
 
@@ -71,15 +56,13 @@ namespace RatUI
             const Rectf& finalRect = node->Layout.FinalRect;
             Rectf textRect{ finalRect.Origin, node->Layout.IntrinsicSize };
 
-            a_DrawList.AddText( SolidBrush{ m_Color }, m_Text, m_Style, textRect, m_Align );
+            a_DrawList.AddText( SolidBrush{ {} }, m_Text, m_Style, textRect );
         }
 
     protected:
         Text       m_Text;       ///< The text content to be displayed by the widget.
         ShapedText m_ShapedText; ///< Cached shaped text.
         TextStyle  m_Style;      ///< The style to apply when rendering the text.
-        Colorf     m_Color{ Colors::White };    ///< The color of the text.
-        ETextAlign m_Align{ ETextAlign::Left }; ///< Text alignment within the widget's bounds.
 
         bool  m_Dirty{ true }; ///< Whether the shaped text needs to be updated due to changes in text content, style, or available width.
         f32   m_LastMaxWidth{ Limits<f32>::max() }; ///< The last maximum width used for shaping the text.

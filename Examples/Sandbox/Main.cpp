@@ -122,9 +122,9 @@ public:
 		f32 scale = !IsHovered ? 1.0f : 1.f + 0.05f * std::sin( time * 5.f ); // Scale oscillates between 1.0 and 1.1 when hovered
 
 		if ( a_Scene.GetFocusedWidget() == GetID() )
-			a_DrawList.AddRect( SolidBrush{ .Color = Colors::White }, rect.Expanded( 10.f * scale ) );
+			a_DrawList.AddRect( SolidBrush{ .Color = Colorsf::White }, rect.Expanded( 10.f * scale ) );
 
-		a_DrawList.AddRect( SolidBrush{ .Color = IsPressed ? Colors::White : Col }, rect.Expanded( 10 * 10 * ( scale - 1.f ) ) );
+		a_DrawList.AddRect( SolidBrush{ .Color = IsPressed ? Colorsf::White : Col }, rect.Expanded( 10 * 10 * ( scale - 1.f ) ) );
 
         a_Scene.ForEachChildWidget( GetID(), [&](IWidget& child)
         {
@@ -259,6 +259,7 @@ protected:
         blueNode->Style.FixedHeight = 120.f;
         blueNode->Style.WidthMode = ESizingMode::Flex;
         blueNode->Style.HeightMode = ESizingMode::Fixed;
+        blueNode->Style.Padding = Edges{ 10.f };
 
         // ---------------- TEXT ----------------
 		WidgetID text = m_Scene.CreateWidget<TextWidget>( blue, "Hello, RatUI!", TextStyle{ .Size = 32.f, .LetterSpacing = 2.f } );

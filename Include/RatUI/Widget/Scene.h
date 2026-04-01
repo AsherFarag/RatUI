@@ -195,43 +195,43 @@ namespace RatUI
         // TODO: This looks horrible but need to research if theres a faster way to handle wrapping text.
         // UI is hell
 
-        // - Pass 1: sync with no parent-width knowledge, measure, arrange.
-
-        // Sync intrinsics
-		const auto SyncSubtree = [&]( auto& Self, LayoutNode& node, Vec2f availableSize ) -> void
+		// Walks the layout tree, calling OnSyncLayout on each widget to allow them to update their layout properties based on their children and the available size.
+		// Returns true if any widget's intrinsic size changed, which indicates a need for a second pass to remeasure and rearrange.
+        const auto SyncSubtree = [&]( auto& Self, LayoutNode& node, Vec2f parentSize ) -> bool
         {
-            IWidget* widget = GetWidget( node.WidgetID );
-            if ( widget )
-                widget->OnSyncLayout( *this, node, availableSize );
+            bool anyChanged = false;
 
+            if ( IWidget* widget = GetWidget( node.WidgetID ) )
+            {
+                const Vec2f oldIntrinsics = node.Layout.IntrinsicSize;
+                widget->OnSyncLayout( *this, node, parentSize );
+                anyChanged |= ( node.Layout.IntrinsicSize != oldIntrinsics );
+            }
+
+            const Vec2f innerSize = node.Layout.FinalRect.Size - Vec2f{ node.Style.Padding.Horizontal(), node.Style.Padding.Vertical() };
             node.ForEachChild( [&]( LayoutNode& child )
             {
-				Self( Self, child, availableSize );
-            });
+                anyChanged |= Self( Self, child, innerSize );
+            } );
+
+            return anyChanged;
         };
+
+        // - Pass 1: Sync layout properties and measure
 
 		SyncSubtree( SyncSubtree, *rootNode, a_AvailableSize );
         MeasureLayoutNode( *rootNode, a_AvailableSize );
         ArrangeLayoutNode( *rootNode, Rectf{ Vec2f{ 0.f, 0.f }, a_AvailableSize } );
 
-        // - Pass 2: re-sync any widget that needs to wrap at its now-known laid-out width,
-        // then remeasure heights only (widths won't change on the second pass).
+        // - Pass 2: If any widget reported a change in intrinsic size during the first pass, 
+        // we need to re-run the layout to account for those changes. 
+        // This is necessary because changes in intrinsic size can affect the layout of parent and sibling widgets.
 
-        const auto SyncSubtree2 = [&]( auto& Self, LayoutNode& node, Vec2f parentSize ) -> void
+		if ( bool needsSecondPass = SyncSubtree( SyncSubtree, *rootNode, a_AvailableSize ) )
         {
-            IWidget* widget = GetWidget( node.WidgetID );
-            if ( widget )
-                widget->OnSyncLayout( *this, node, parentSize );
-
-            node.ForEachChild( [&]( LayoutNode& child )
-            {
-                Self( Self, child, node.Layout.FinalRect.Size );
-            } );
-        };
-
-		SyncSubtree2( SyncSubtree2, *rootNode, a_AvailableSize );
-        MeasureLayoutNode( *rootNode, a_AvailableSize );
-        ArrangeLayoutNode( *rootNode, Rectf{ Vec2f{ 0.f, 0.f }, a_AvailableSize } );
+            MeasureLayoutNode( *rootNode, a_AvailableSize );
+            ArrangeLayoutNode( *rootNode, Rectf{ Vec2f{ 0.f, 0.f }, a_AvailableSize } );
+        }
 
         // Re-run hit test to update hovered widget based on new layout
         // TODO: This is a bit unclean and potentially incorrect

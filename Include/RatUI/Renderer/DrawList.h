@@ -215,7 +215,7 @@ namespace RatUI
 
         DrawList& AddCustom( CustomDrawFunc a_Func, void* a_UserData = nullptr )
         {
-            return AddCustom( SolidBrush{ .Color = Colors::White }, a_Func, a_UserData );
+            return AddCustom( SolidBrush{ .Color = Colorsf::White }, a_Func, a_UserData );
         }
     };
 
