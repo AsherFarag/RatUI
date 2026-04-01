@@ -39,18 +39,18 @@ public:
 
 		//a_DrawList.PushTransform( transform.ToMatrix( rect ) );
 
-        a_DrawList.PushClipRect( rect );
 		if ( a_Scene.GetFocusedWidget() == GetID() )
 			a_DrawList.AddRect( Colors::White, rect.Expanded( 4.f ), Rounding + 4_deg );
 
 		a_DrawList.AddRect( Color, rect, Rounding );
 
+        a_DrawList.PushClipRect( rect );
         a_Scene.ForEachChildWidget( GetID(), [&](IWidget& child)
         {
             child.OnPaint( a_Scene, a_DrawList );
 		} );
-
         a_DrawList.PopClipRect();
+
         //a_DrawList.PopTransform();
     }
 
