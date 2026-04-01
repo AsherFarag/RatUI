@@ -68,6 +68,9 @@ namespace RatUI
         constexpr explicit Radians( T a_Value ) : Value( a_Value ) {}
         constexpr explicit Radians( Degrees<T> a_Degrees );
 
+        template<typename U>
+		constexpr Radians( Radians<U> a_Other ) : Value( static_cast<T>( a_Other.Value ) ) {}
+
         // === Conversion Operators ===
 
         constexpr explicit operator Degrees<T>() const;
@@ -105,6 +108,9 @@ namespace RatUI
         constexpr Degrees() : Value(static_cast<T>( 0 )) {}
         constexpr explicit Degrees( T a_Value ) : Value( a_Value ) {}
         constexpr explicit Degrees( Radians<T> a_Radians ) : Value( RadToDeg( a_Radians.Value ) ) {}
+
+		template<typename U>
+		constexpr Degrees( Degrees<U> a_Other ) : Value( static_cast<T>( a_Other.Value ) ) {}
 
         // === Conversion Operators ===
 
