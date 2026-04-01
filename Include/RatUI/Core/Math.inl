@@ -99,7 +99,7 @@ namespace RatUI
     // === Color ===
 
     using Colorf = /* TODO: RATUI_COLOR_IMPL */ Vec4f;
-    using Coloru8 = /* TODO: RATUI_COLOR_IMPL */ Vec4u;
+    using Coloru8 = /* TODO: RATUI_COLOR_IMPL */ Vec4<u8>;
 
     /** @brief Creates a color from f32 RGBA components in the range [0, 1]. */
     constexpr Colorf MakeColorF32( f32 a_Red, f32 a_Green, f32 a_Blue, f32 a_Alpha = 1.f );
