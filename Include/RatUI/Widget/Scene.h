@@ -198,40 +198,28 @@ namespace RatUI
         // - Pass 1: sync with no parent-width knowledge, measure, arrange.
 
         // Sync intrinsics
-        Widgets.ForEach( [&]( Unique<IWidget>& widgetPtr )
+		const auto SyncSubtree = [&]( auto& Self, LayoutNode& node, Vec2f availableSize ) -> void
         {
-            IWidget* widget = widgetPtr.get();
-            LayoutNode* node = Layouts.Get( widget->GetLayoutID() );
-            if ( !node ) return;
-        
-            widget->OnSyncLayout( *this, *node );
-        });
+            IWidget* widget = GetWidget( node.WidgetID );
+            if ( widget )
+                widget->OnSyncLayout( *this, node, availableSize );
 
+            node.ForEachChild( [&]( LayoutNode& child )
+            {
+				Self( Self, child, availableSize );
+            });
+        };
+
+		SyncSubtree( SyncSubtree, *rootNode, a_AvailableSize );
         MeasureLayoutNode( *rootNode, a_AvailableSize );
         ArrangeLayoutNode( *rootNode, Rectf{ Vec2f{ 0.f, 0.f }, a_AvailableSize } );
 
         // - Pass 2: re-sync any widget that needs to wrap at its now-known laid-out width,
         // then remeasure heights only (widths won't change on the second pass).
 
-        bool anyChanged = false;
-        Widgets.ForEach( [&]( Unique<IWidget>& widgetPtr )
-        {
-            IWidget* widget = widgetPtr.get();
-            LayoutNode* node = Layouts.Get( widget->GetLayoutID() );
-            if ( !node ) return;
-        
-            const f32 prev = node->Layout.IntrinsicSize[1];
-            widget->OnSyncLayout( *this, *node );
-            if ( node->Layout.IntrinsicSize[1] != prev )
-                anyChanged = true;
-        });
-
-        if ( anyChanged )
-        {
-            // If any intrinsic sizes changed during sync, we need to re-run layout to account for it.
-            MeasureLayoutNode( *rootNode, a_AvailableSize );
-            ArrangeLayoutNode( *rootNode, Rectf{ Vec2f{ 0.f, 0.f }, a_AvailableSize } );
-        }
+		SyncSubtree( SyncSubtree, *rootNode, a_AvailableSize );
+        MeasureLayoutNode( *rootNode, a_AvailableSize );
+        ArrangeLayoutNode( *rootNode, Rectf{ Vec2f{ 0.f, 0.f }, a_AvailableSize } );
 
         // Re-run hit test to update hovered widget based on new layout
         // TODO: This is a bit unclean and potentially incorrect

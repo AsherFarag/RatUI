@@ -256,7 +256,6 @@ protected:
         // ---------------- BLUE ----------------
         WidgetID blue = m_Scene.CreateWidget<RectWidget>( root, SDL_Color{ 0, 0, 255, 255 }, "Blue" );
         auto* blueNode = m_Scene.Layouts.Get( m_Scene.GetWidget( blue )->GetLayoutID() );
-
         blueNode->Style.FixedHeight = 120.f;
         blueNode->Style.WidthMode = ESizingMode::Flex;
         blueNode->Style.HeightMode = ESizingMode::Fixed;

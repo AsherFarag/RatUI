@@ -27,7 +27,7 @@ namespace RatUI
             m_ShapedText = {}; 
         }
 
-        void OnSyncLayout( Scene& a_Scene, LayoutNode& a_Node ) override
+		void OnSyncLayout( Scene& a_Scene, LayoutNode& a_Node, Vec2f a_AvailableSize ) override
         {
             ITextMetrics* metrics = a_Scene.TextMetrics;
             if ( !metrics || m_Text.empty() )
@@ -36,7 +36,7 @@ namespace RatUI
                 return;
             }
 
-            f32 maxWidth = Limits<f32>::max();
+            f32 maxWidth = 0.f;
 
             if ( a_Node.Style.WidthMode == ESizingMode::Fixed )
             {
@@ -44,20 +44,21 @@ namespace RatUI
             }
             else
             {
+				maxWidth = a_AvailableSize[0] - a_Node.Style.Padding.Horizontal();
                 // TODO: fix me
-                for ( LayoutNode* ancestor = a_Node.Parent; ancestor; ancestor = ancestor->Parent )
-                {
-                    f32 w = 0.f;
-                    if ( ancestor->Style.WidthMode == ESizingMode::Fixed )
-                        w = ancestor->Style.FixedWidth - ancestor->Style.Padding.Horizontal();
-                    else if ( ancestor->Layout.FinalRect.Width() > 0.f )
-                        w = ancestor->Layout.FinalRect.Width() - ancestor->Style.Padding.Horizontal();
-
-                    if ( w > 0.f ) { maxWidth = w; break; }
-                }
+                //for ( LayoutNode* ancestor = a_Node.Parent; ancestor; ancestor = ancestor->Parent )
+                //{
+                //    f32 w = 0.f;
+                //    if ( ancestor->Style.WidthMode == ESizingMode::Fixed )
+                //        w = ancestor->Style.FixedWidth - ancestor->Style.Padding.Horizontal();
+                //    else if ( ancestor->Layout.FinalRect.Width() > 0.f )
+                //        w = ancestor->Layout.FinalRect.Width() - ancestor->Style.Padding.Horizontal();
+//
+                //    if ( w > 0.f ) { maxWidth = w; break; }
+                //}
             }
 
-            TextMeasurement t = metrics->Measure( m_Text, m_Style, maxWidth );
+			TextMeasurement t = metrics->Measure( m_Text, m_Style, maxWidth == 0.f ? Limits<f32>::max() : maxWidth );
             a_Node.Layout.IntrinsicSize = t.Size;
         }
 

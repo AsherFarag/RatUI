@@ -116,8 +116,8 @@ namespace RatUI
         
             contentSize = contentSize + padding;
         
-            if ( s.WidthMode  == ESizingMode::Content ) desired[0] = contentSize[0];
-            if ( s.HeightMode == ESizingMode::Content ) desired[1] = contentSize[1];
+            if ( s.WidthMode  == ESizingMode::Content ) desired[0] += contentSize[0];
+            if ( s.HeightMode == ESizingMode::Content ) desired[1] += contentSize[1];
         }
     
         // Clamp to constraints
