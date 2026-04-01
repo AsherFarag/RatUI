@@ -53,10 +53,13 @@ namespace RatUI
             if ( !node || !node->Layout.Visibility.IsRendered() ) return;
             if ( m_Text.empty() ) return;
 
+            // Add padding
+
             const Rectf& finalRect = node->Layout.FinalRect;
             Rectf textRect{ finalRect.Origin, node->Layout.IntrinsicSize };
+            textRect = node->Style.Padding.Apply( textRect );
 
-            a_DrawList.AddText( SolidBrush{ {} }, m_Text, m_Style, textRect );
+            a_DrawList.AddText( m_Text, m_Style, textRect );
         }
 
     protected:

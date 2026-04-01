@@ -2,6 +2,8 @@
 #include <RatUI/RatUI.h>
 #include <RatUI/Backends/SDL2/SDL2Renderer.h>
 #include <SDL2/SDL.h>
+#include <SDL_ttf.h>
+#include <iostream>
 
 using namespace RatUI;
 
@@ -111,6 +113,13 @@ private:
     {
         if ( SDL_Init( SDL_INIT_VIDEO | SDL_INIT_EVENTS ) != 0 )
             return false;
+
+        if ( TTF_Init() != 0 )
+        {
+            std::cerr << "TTF_Init failed: " << TTF_GetError() << std::endl;
+            SDL_Quit();
+            return false;
+        }
 
         m_Window = SDL_CreateWindow(
             m_Config.Title.c_str(),
