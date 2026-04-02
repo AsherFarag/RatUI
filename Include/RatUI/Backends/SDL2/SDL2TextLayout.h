@@ -249,8 +249,8 @@ namespace RatUI::SDL2::TextLayoutUtils
                         c = static_cast<char>(std::tolower((unsigned char)c));
                         break;
                     case ETextTransform::Capitalize:
-                        // Simplified ASCII capitalize handling
                         c = static_cast<char>(std::toupper((unsigned char)c));
+                        // TODO:
                         break;
                     default:
                         break;
@@ -463,6 +463,54 @@ namespace RatUI::SDL2::TextLayoutUtils
             wrapSingleParagraph( TextView( Data( a_Text ) + paragraphStart, Size( a_Text ) - paragraphStart ) );
     }
 
+    inline String TruncateLineWithEllipsis(
+        TTF_Font*       a_Font,
+        StringView      a_Line,
+        const TextStyle& a_Style,
+        f32             a_MaxWidth,
+        bool            a_ForceEllipsis )
+    {
+        if ( !a_ForceEllipsis && MeasureLineWidth( a_Font, a_Line, a_Style ) <= a_MaxWidth )
+            return String( Begin( a_Line ), End( a_Line ) );
+
+        constexpr StringView c_Ellipsis = "...";
+        const f32 ellipsisWidth = MeasureLineWidth( a_Font, c_Ellipsis, a_Style );
+        if ( ellipsisWidth > a_MaxWidth )
+            return {};
+
+        size bestPrefixByteCount = 0;
+
+        UTF8Iterator it( a_Line );
+        UTF8Iterator end = UTF8Iterator::End( a_Line );
+        while ( it != end )
+        {
+            ++it;
+            const size currentPrefixBytes = it.ByteIndex();
+
+            String candidate;
+            Reserve( candidate, currentPrefixBytes + Size( c_Ellipsis ) );
+
+            for ( size i = 0; i < currentPrefixBytes; ++i )
+                PushBack( candidate, RawAt( a_Line, i ) );
+            for ( const char c : c_Ellipsis )
+                PushBack( candidate, c );
+
+            if ( MeasureLineWidth( a_Font, candidate, a_Style ) <= a_MaxWidth )
+                bestPrefixByteCount = currentPrefixBytes;
+            else
+                break;
+        }
+
+        String result;
+        Reserve( result, bestPrefixByteCount + Size( c_Ellipsis ) );
+        for ( size i = 0; i < bestPrefixByteCount; ++i )
+            PushBack( result, RawAt( a_Line, i ) );
+        for ( const char c : c_Ellipsis )
+            PushBack( result, c );
+
+        return result;
+    }
+
     /**
      * @brief Builds the array of text lines to be rendered based on the input text, text style, and layout constraints.
      * This function first applies text transformations, then splits the text into lines based on newline characters
@@ -477,8 +525,6 @@ namespace RatUI::SDL2::TextLayoutUtils
      */
     inline void BuildTextLines( TTF_Font* a_Font, const TextStyle& a_Style, TextView a_Text, Array<String>& o_Lines, f32 a_MaxWidth = Limits<f32>::max() )
     {
-        // TODO: I forgot to handle overflow behavior
-
         Clear( o_Lines );
 
         const bool needsTransform = ( a_Style.Transform != ETextTransform::None );
@@ -502,11 +548,42 @@ namespace RatUI::SDL2::TextLayoutUtils
             RatUI::SDL2::TextLayoutUtils::WrapText( a_Font, textToRender, a_Style, a_MaxWidth, o_Lines );
         } 
 
-        // Handle MaxLines
-        if (a_Style.MaxLines > 0 && Size(o_Lines) > a_Style.MaxLines )
-            Resize( o_Lines, a_Style.MaxLines );
+        const bool hasWidthConstraint = ( a_MaxWidth < Limits<f32>::max() );
+        const bool exceededMaxLines = ( a_Style.MaxLines > 0 && Size( o_Lines ) > a_Style.MaxLines );
 
-        // TODO: Handle ellipsis overflow one day
+        if ( a_Style.Overflow == ETextOverflow::Clip || a_Style.Overflow == ETextOverflow::Fade )
+        {
+            // Fade is currently handled by clipping semantics in text layout.
+            if ( exceededMaxLines )
+                Resize( o_Lines, a_Style.MaxLines );
+            return;
+        }
+
+        if ( a_Style.Overflow == ETextOverflow::Ellipsis )
+        {
+            if ( exceededMaxLines )
+                Resize( o_Lines, a_Style.MaxLines );
+
+            const bool requiresWidthEllipsis = hasWidthConstraint;
+            const bool requiresLastLineIndicator = exceededMaxLines;
+
+            if ( Empty( o_Lines ) || ( !requiresWidthEllipsis && !requiresLastLineIndicator ) )
+                return;
+
+            const size lastLineIndex = Size( o_Lines ) - 1;
+
+            for ( size i = 0; i < Size( o_Lines ); ++i )
+            {
+                const bool forceEllipsis = requiresLastLineIndicator && i == lastLineIndex;
+                const bool lineOverflowsWidth = requiresWidthEllipsis
+                    && MeasureLineWidth( a_Font, o_Lines[i], a_Style ) > a_MaxWidth;
+
+                if ( !forceEllipsis && !lineOverflowsWidth )
+                    continue;
+
+                o_Lines[i] = TruncateLineWithEllipsis( a_Font, o_Lines[i], a_Style, a_MaxWidth, forceEllipsis );
+            }
+        }
     }
 
 } // namespace RatUI::SDL2::TextLayoutUtils

@@ -189,6 +189,8 @@ namespace RatUI::SDL2
         {
             if ( !Empty( line ) )
             {
+                // TODO: Doesnt support custom letter spacing.
+                // TODO: Optimize
                 SDL_Surface* surface = TTF_RenderUTF8_Blended( font, CStr( line ), sdlColor );
                 if ( surface )
                 {

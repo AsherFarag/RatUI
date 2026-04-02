@@ -47,12 +47,12 @@ public:
 
 		a_DrawList.AddRect( Color, rect, Rounding );
 
-        a_DrawList.PushClipRect( { .Origin = { (u16)rect.Origin[0], (u16)rect.Origin[1] }, .Size = { (u16)rect.Size[0], (u16)rect.Size[1] } } );
+        //a_DrawList.PushClipRect( { .Origin = { (u16)rect.Origin[0], (u16)rect.Origin[1] }, .Size = { (u16)rect.Size[0], (u16)rect.Size[1] } } );
         a_Scene.ForEachChildWidget( GetID(), [&](IWidget& child)
         {
             child.OnPaint( a_Scene, a_DrawList );
 		} );
-        a_DrawList.PopClipRect();
+        //a_DrawList.PopClipRect();
 
         //a_DrawList.PopTransform();
     }
@@ -197,18 +197,20 @@ protected:
                 .Wrap = ETextWrap::NoWrap,
             };
 			textStyle.Overflow = ETextOverflow::Ellipsis;
+			textStyle.Color = Colorsu8::AccentRose;
 			//textStyle.Transform = ETextTransform::Uppercase;
             //textStyle.Underline = true;
 			//textStyle.Strikethrough = true;
 
             // Add some text to the footer bar
             WidgetID footerText = m_Scene.CreateWidget<TextWidget>( green, 
-                "This is the main content area. It can contain the primary information or controls for the application.", textStyle
+                "This is the main content area. It can contain the primary information or controls for the application.\n"
+                                                                    "Hello ifahjkfhaiofhoajfojaofjasojdioajodjaodjoas", textStyle
             );
             auto* footerTextNode = m_Scene.Layouts.Get( m_Scene.GetWidget( footerText )->GetLayoutID() );
 
-            footerTextNode->Style.WidthMode = ESizingMode::Fixed;
-			footerTextNode->Style.FixedWidth = 30.0f; // Intentionally small to demonstrate text overflow handling
+            footerTextNode->Style.WidthMode = ESizingMode::Flex;
+			footerTextNode->Style.FixedWidth = 100.0f; // Intentionally small to demonstrate text overflow handling
             footerTextNode->Style.HeightMode = ESizingMode::Content;
             footerTextNode->Style.Padding = Edges{ 10.f };
         }
@@ -339,7 +341,7 @@ protected:
 		// Animate green widget's width with a sine wave
         if ( auto* greenNode = m_Scene.Layouts.Get( m_Scene.GetWidget( green )->GetLayoutID() ) )
         {
-			greenNode->Style.FlexGrow = 0.5f + 0.5f * std::sin( time ); // FlexGrow oscillates between 0 and 1
+			greenNode->Style.FlexGrow = 0.51f + 0.5f * std::sin( time ); // FlexGrow oscillates between 0.01 and 1
             greenNode->Layout.IsDirty = true; // Mark layout dirty to trigger recalculation
 		}
 

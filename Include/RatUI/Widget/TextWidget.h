@@ -43,7 +43,7 @@ namespace RatUI
             else
                 maxWidth = a_AvailableSize[0] - a_Node.Style.Padding.Horizontal();
 
-			TextMeasurement t = metrics->Measure( m_Text, m_Style, maxWidth <= 0.f ? Limits<f32>::max() : maxWidth );
+			TextMeasurement t = metrics->Measure( m_Text, m_Style, std::max( maxWidth, 0.f ) );
             a_Node.Layout.IntrinsicSize = t.Size;
         }
 
@@ -52,8 +52,6 @@ namespace RatUI
             LayoutNode* node = a_Scene.Layouts.Get( GetLayoutID() );
             if ( !node || !node->Layout.Visibility.IsRendered() ) return;
             if ( m_Text.empty() ) return;
-
-            // Add padding
 
             const Rectf& finalRect = node->Layout.FinalRect;
             Rectf textRect{ finalRect.Origin, node->Layout.IntrinsicSize };
@@ -66,9 +64,6 @@ namespace RatUI
         Text       m_Text;       ///< The text content to be displayed by the widget.
         ShapedText m_ShapedText; ///< Cached shaped text.
         TextStyle  m_Style;      ///< The style to apply when rendering the text.
-
-        bool  m_Dirty{ true }; ///< Whether the shaped text needs to be updated due to changes in text content, style, or available width.
-        f32   m_LastMaxWidth{ Limits<f32>::max() }; ///< The last maximum width used for shaping the text.
     };
 
 } // namespace RatUI
