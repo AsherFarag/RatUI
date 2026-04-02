@@ -239,9 +239,9 @@ private:
     }
 
 protected:
-    Config        m_Config;
-    bool          m_Running{ true };
-    SDL_Window*   m_Window{ nullptr };
-    SDL_Renderer* m_SDLRenderer{ nullptr };
-    SDL2Renderer  m_Renderer{};
+    Config              m_Config;
+    bool                m_Running{ true };
+    SDL_Window*         m_Window{ nullptr };
+    SDL_Renderer*       m_SDLRenderer{ nullptr };
+    SDL2::SDL2Renderer  m_Renderer{};
 };

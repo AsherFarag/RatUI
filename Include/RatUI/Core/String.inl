@@ -110,6 +110,12 @@ namespace RatUI
      */
     using StringView = StringViewImpl;
 
+    /** 
+     * @brief CStr returns a pointer to the underlying character array of the string, suitable for interop with C-style APIs.
+     * @note The string must be null-terminated.
+     */
+    inline const char* CStr( const String& a_String ) { return CoreTraits<String>::CStr( a_String ); }
+
 } // namespace RatUI
 
 
