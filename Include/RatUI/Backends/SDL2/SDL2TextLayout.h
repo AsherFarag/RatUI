@@ -5,6 +5,96 @@
 
 namespace RatUI::SDL2::TextLayoutUtils
 {
+    // TODO: I forgot to treat the text as utf8 and just wrote it as ascii.
+    // Please fix.
+
+    // AI generated this code. clean it up or find a cleaner solution
+    class UTF8Iterator 
+    {
+    public:
+        using iterator_category = std::input_iterator_tag;
+        using value_type        = char32_t;
+        using difference_type   = std::ptrdiff_t;
+        using pointer           = const char32_t*;
+        using reference         = const char32_t&;
+
+        UTF8Iterator(StringView str, size_t pos = 0)
+            : data(str), index(pos) {
+            if (index < data.size()) {
+                current = decode();
+            }
+        }
+
+        char32_t operator*() const { return current; }
+
+        UTF8Iterator& operator++() {
+            if (index >= data.size()) return *this;
+            advance();
+            if (index < data.size()) {
+                current = decode();
+            }
+            return *this;
+        }
+
+        bool operator!=(const UTF8Iterator& other) const {
+            return index != other.index || &data != &other.data;
+        }
+
+        static UTF8Iterator end(StringView str) {
+            return UTF8Iterator(str, str.size());
+        }
+
+        operator bool() const {
+            return index < data.size();
+        }
+
+    private:
+        StringView data;
+        size_t index;
+        char32_t current = 0;
+
+        void advance() {
+            unsigned char lead = static_cast<unsigned char>(data[index]);
+            size_t length = utf8CharLength(lead);
+            index += length;
+        }
+
+        char32_t decode() const {
+            unsigned char lead = static_cast<unsigned char>(data[index]);
+            size_t length = utf8CharLength(lead);
+
+            if (index + length > data.size()) {
+                RATUI_ASSERT(false, "Invalid UTF-8 sequence: unexpected end of string");
+                return 0xFFFD; // Unicode replacement character
+            }
+
+            char32_t codepoint = 0;
+            if (length == 1) {
+                codepoint = lead;
+            } else {
+                codepoint = lead & ((1 << (8 - length - 1)) - 1);
+                for (size_t i = 1; i < length; ++i) {
+                    unsigned char ch = static_cast<unsigned char>(data[index + i]);
+                    if ((ch & 0xC0) != 0x80) {
+                        RATUI_ASSERT(false, "Invalid UTF-8 sequence: expected continuation byte");
+                        return 0xFFFD; // Unicode replacement character
+                    }
+                    codepoint = (codepoint << 6) | (ch & 0x3F);
+                }
+            }
+            return codepoint;
+        }
+
+        static size_t utf8CharLength(unsigned char lead) {
+            if (lead < 0x80) return 1;
+            else if ((lead >> 5) == 0x6) return 2;
+            else if ((lead >> 4) == 0xE) return 3;
+            else if ((lead >> 3) == 0x1E) return 4;
+            else { RATUI_ASSERT(false,  "Invalid UTF-8 lead byte"); return 1; }
+        }
+    };
+
+
     /**
      * @brief Measures the width of a single line of text using SDL_ttf, taking into account letter spacing from the TextStyle.
      * @param a_Font The TTF_Font* to use for measurement.
@@ -12,20 +102,38 @@ namespace RatUI::SDL2::TextLayoutUtils
      * @param a_Style The TextStyle containing letter spacing information.
      * @return The width of the line in pixels, including letter spacing.
      */
-    inline f32 MeasureLineWidth( TTF_Font* a_Font, const String& a_Line, const TextStyle& a_Style )
+    inline f32 MeasureLineWidth(TTF_Font* font, StringView line, const TextStyle& style)
     {
-        if ( !a_Font || Empty( a_Line ) )
-            return 0.0f;
+        if (!font || line.empty())
+            return 0.f;
 
-        int width = 0;
-        int height = 0;
-        if ( TTF_SizeUTF8( a_Font, Data( a_Line ), &width, &height ) != 0 )
-            return 0.0f;
+        f32 width = 0.f;
 
-        if ( Size( a_Line ) > 1 )
-            width += static_cast<int>( static_cast<float>( Size( a_Line ) - 1 ) * a_Style.LetterSpacing );
+        u32 prevGlyph = 0;
+        bool hasPrev = false;
 
-        return static_cast<f32>( width );
+        UTF8Iterator it(line);
+        while (it)
+        {
+            u32 glyph = *it;
+
+            int advance = 0;
+            TTF_GlyphMetrics32(font, glyph, nullptr, nullptr, nullptr, nullptr, &advance);
+
+            if (hasPrev)
+            {
+                width += TTF_GetFontKerningSizeGlyphs32(font, prevGlyph, glyph);
+                width += style.LetterSpacing;
+            }
+
+            width += advance;
+
+            prevGlyph = glyph;
+            hasPrev = true;
+            ++it;
+        }
+
+        return width;
     }
 
     /**

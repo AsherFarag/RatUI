@@ -273,13 +273,16 @@ protected:
 
             // Add some text to the footer bar
             WidgetID footerText = m_Scene.CreateWidget<TextWidget>( footerBar, 
-                "This is the footer bar. It can contain status messages, controls, or other information.", textStyle
+                "This is the footer bar. It can contain status messages, controls, or other information.\n"
+                "VAVAVAVA\n"
+                "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\n"
+                "0123456789\n", textStyle
             );
             auto* footerTextNode = m_Scene.Layouts.Get( m_Scene.GetWidget( footerText )->GetLayoutID() );
 
             footerTextNode->Style.WidthMode = ESizingMode::Content;
             footerTextNode->Style.HeightMode = ESizingMode::Content;
-            footerTextNode->Style.Margin = Edges{ 10.f };
+            footerTextNode->Style.Padding = Edges{ 10.f };
         }
     
         // ---------------- ACCENT SWATCH ROW ----------------
