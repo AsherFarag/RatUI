@@ -47,7 +47,7 @@ public:
 
 		a_DrawList.AddRect( Color, rect, Rounding );
 
-        a_DrawList.PushClipRect( rect );
+        a_DrawList.PushClipRect( { .Origin = { (u16)rect.Origin[0], (u16)rect.Origin[1] }, .Size = { (u16)rect.Size[0], (u16)rect.Size[1] } } );
         a_Scene.ForEachChildWidget( GetID(), [&](IWidget& child)
         {
             child.OnPaint( a_Scene, a_DrawList );

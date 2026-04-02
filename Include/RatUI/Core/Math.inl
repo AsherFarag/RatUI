@@ -178,12 +178,12 @@ namespace RatUI
             if ( !Intersects( a_Other ) )
                 return Rect<T>{};
 
-            Vec2f newMin{
+            Vec2<T> newMin{
                 std::max( Left(), a_Other.Left() ),
                 std::max( Top(), a_Other.Top() )
 			};
 
-            Vec2f newMax{
+            Vec2<T> newMax{
                 std::min( Right(), a_Other.Right() ),
                 std::min( Bottom(), a_Other.Bottom() )
             };
@@ -220,6 +220,7 @@ namespace RatUI
     using Rectf = Rect<f32>;
     using Recti = Rect<i32>;
     using Rectu = Rect<u32>;
+    using Rectu16 = Rect<u16>;
 
 	template<typename ColorType>
     struct Colors

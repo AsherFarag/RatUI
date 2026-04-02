@@ -79,8 +79,8 @@ namespace RatUI
 
         struct CustomCmd { CustomDrawFunc Func; void* UserData; };
 
-        Mat3f Transform{ c_Identity<Mat3f> };
-        Rectf ClipRect;
+        Mat3f   Transform{ c_Identity<Mat3f> };
+        Rectu16 ClipRect{ Rectu16::Infinite() };
 
         Variant<
             RectCmd,
@@ -99,9 +99,9 @@ namespace RatUI
      */
     struct DrawList
     {
-        Array<DrawCmd> Commands;     ///< Buffered draw commands to be executed by the renderer.
-        Array<Rectf> ClipStack;      ///< Stack of clipping rectangles. The current clipping rectangle is the intersection of all rectangles in the stack.
-        Array<Mat3f> TransformStack; ///< Stack of transformation matrices. The current transformation is the product of all matrices in the stack.
+        Array<DrawCmd> Commands;       ///< Buffered draw commands to be executed by the renderer.
+        Array<Rectu16> ClipStack;      ///< Stack of clipping rectangles. The current clipping rectangle is the intersection of all rectangles in the stack.
+        Array<Mat3f>   TransformStack; ///< Stack of transformation matrices. The current transformation is the product of all matrices in the stack.
 
         void Clear()
         {
@@ -128,15 +128,15 @@ namespace RatUI
             return *this;
         }
 
-        Rectf CurrentClipRect() const
+        Rectu16 CurrentClipRect() const
         {
             if ( Empty( ClipStack ) )
-                return Rectf::Infinite();
+                return Rectu16::Infinite();
 
             return Back( ClipStack );
         }
 
-        DrawList& PushClipRect( Rectf a_Rect )
+        DrawList& PushClipRect( Rectu16 a_Rect )
         {
             // Intersect with current clip rect if one exists
             if ( !Empty( ClipStack ) )
