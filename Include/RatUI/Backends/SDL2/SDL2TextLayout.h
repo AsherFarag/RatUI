@@ -8,7 +8,7 @@ namespace RatUI::SDL2::TextLayoutUtils
     // TODO: I forgot to treat the text as utf8 and just wrote it as ascii.
     // Please fix.
 
-    // AI generated this code. clean it up or find a cleaner solution
+    // TODO: AI generated this code. clean it up or find a cleaner solution
     class UTF8Iterator 
     {
     public:
