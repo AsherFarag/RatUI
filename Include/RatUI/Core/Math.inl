@@ -165,6 +165,16 @@ namespace RatUI
                    Top() < a_Other.Bottom() && Bottom() > a_Other.Top();
         }
 
+        constexpr bool operator==( const Rect<T>& a_Other ) const
+        {
+            return Origin == a_Other.Origin && Size == a_Other.Size;
+		}
+
+        constexpr bool IsInfinite() const
+        {
+            return Size[ 0 ] >= Limits<T>::max() && Size[ 1 ] >= Limits<T>::max();
+		}
+
         constexpr Rect<T> Expanded( T a_Amount ) const
         {
             return {

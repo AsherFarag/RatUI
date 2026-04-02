@@ -8,92 +8,167 @@ namespace RatUI::SDL2::TextLayoutUtils
     // TODO: I forgot to treat the text as utf8 and just wrote it as ascii.
     // Please fix.
 
-    // TODO: AI generated this code. clean it up or find a cleaner solution
-    class UTF8Iterator 
+    // TODO: Probably shouldve gotten a library for this
+    // TODO: make this a universal utility instead of SDL2 specific since it doesn't actually use any SDL2 features
+    /** @brief An iterator for traversing UTF-8 encoded strings. */
+    class UTF8Iterator
     {
     public:
-        using iterator_category = std::input_iterator_tag;
-        using value_type        = char32_t;
-        using difference_type   = std::ptrdiff_t;
-        using pointer           = const char32_t*;
-        using reference         = const char32_t&;
+        using value_type = char32_t;
 
-        UTF8Iterator(StringView str, size_t pos = 0)
-            : data(str), index(pos) {
-            if (index < data.size()) {
-                current = decode();
-            }
+        UTF8Iterator(StringView a_Str, size_t a_ByteIndex = 0)
+            : m_Data(a_Str), m_Index(a_ByteIndex)
+        {
+            if (m_Index < m_Data.size())
+                m_Current = Decode();
         }
 
-        char32_t operator*() const { return current; }
+        static UTF8Iterator End(StringView a_Str)
+        {
+            return UTF8Iterator(a_Str, Size(a_Str));
+        }
 
-        UTF8Iterator& operator++() {
-            if (index >= data.size()) return *this;
-            advance();
-            if (index < data.size()) {
-                current = decode();
-            }
+        char32_t operator*() const { return m_Current; }
+
+        UTF8Iterator& operator++()
+        {
+            if (m_Index >= Size(m_Data))
+                return *this;
+
+            Advance();
+            if (m_Index < Size(m_Data))
+                m_Current = Decode();
+
             return *this;
         }
 
-        bool operator!=(const UTF8Iterator& other) const {
-            return index != other.index || &data != &other.data;
+        bool operator==(const UTF8Iterator& a_Other) const
+        {
+            return Data( m_Data ) == Data( a_Other.m_Data ) && m_Index == a_Other.m_Index;
         }
 
-        static UTF8Iterator end(StringView str) {
-            return UTF8Iterator(str, str.size());
+        explicit operator bool() const
+        {
+            return m_Index < m_Data.size();
         }
 
-        operator bool() const {
-            return index < data.size();
-        }
+        size_t ByteIndex() const { return m_Index; }
 
     private:
-        StringView data;
-        size_t index;
-        char32_t current = 0;
+        StringView m_Data;
+        size_t     m_Index   = 0;
+        char32_t   m_Current = 0;
 
-        void advance() {
-            unsigned char lead = static_cast<unsigned char>(data[index]);
-            size_t length = utf8CharLength(lead);
-            index += length;
+        static constexpr char32_t c_ReplacementCodepoint = 0xFFFD;
+
+        // - UTF-8 structural constants
+
+        // Byte patterns
+        static constexpr u8 c_AsciiMax              = 0x7F;
+        static constexpr u8 c_ContinuationMask      = 0xC0;
+        static constexpr u8 c_ContinuationPattern   = 0x80;
+
+        // Leading byte prefix patterns (after shifting)
+        static constexpr u8 c_2ByteLeadPrefix = 0b110;   // 0x6
+        static constexpr u8 c_3ByteLeadPrefix = 0b1110;  // 0xE
+        static constexpr u8 c_4ByteLeadPrefix = 0b11110; // 0x1E
+
+        // Bit masks for extracting payload bits
+        static constexpr u8 c_2ByteMask = 0x1F;
+        static constexpr u8 c_3ByteMask = 0x0F;
+        static constexpr u8 c_4ByteMask = 0x07;
+        static constexpr u8 c_ContMask  = 0x3F;
+
+        // Shift amounts
+        static constexpr i32 c_Shift6  = 6;
+        static constexpr i32 c_Shift12 = 12;
+        static constexpr i32 c_Shift18 = 18;
+
+        // Byte counts
+        static constexpr size c_1ByteLength = 1;
+        static constexpr size c_2ByteLength = 2;
+        static constexpr size c_3ByteLength = 3;
+        static constexpr size c_4ByteLength = 4;
+
+        /** @brief Advances the iterator to the next UTF-8 character. */
+        void Advance()
+        {
+            u8 lead = (u8)m_Data[m_Index];
+            m_Index += CharLength(lead);
         }
 
-        char32_t decode() const {
-            unsigned char lead = static_cast<unsigned char>(data[index]);
-            size_t length = utf8CharLength(lead);
+        /** @brief Decodes the UTF-8 character at the current position. */
+        char32_t Decode() const
+        {
+            const u8* s = (const u8*)m_Data.data() + m_Index;
 
-            if (index + length > data.size()) {
-                RATUI_ASSERT(false, "Invalid UTF-8 sequence: unexpected end of string");
-                return 0xFFFD; // Unicode replacement character
+            size_t remaining = m_Data.size() - m_Index;
+            u8 b0 = s[0];
+
+            // ASCII (single byte)
+            if (b0 <= c_AsciiMax)
+                return b0;
+
+            // 2-byte sequence
+            if ((b0 >> 5) == c_2ByteLeadPrefix &&
+                remaining >= c_2ByteLength &&
+                IsCont(s[1]))
+            {
+                return ((b0 & c_2ByteMask) << c_Shift6) |
+                       (s[1] & c_ContMask);
             }
 
-            char32_t codepoint = 0;
-            if (length == 1) {
-                codepoint = lead;
-            } else {
-                codepoint = lead & ((1 << (8 - length - 1)) - 1);
-                for (size_t i = 1; i < length; ++i) {
-                    unsigned char ch = static_cast<unsigned char>(data[index + i]);
-                    if ((ch & 0xC0) != 0x80) {
-                        RATUI_ASSERT(false, "Invalid UTF-8 sequence: expected continuation byte");
-                        return 0xFFFD; // Unicode replacement character
-                    }
-                    codepoint = (codepoint << 6) | (ch & 0x3F);
-                }
+            // 3-byte sequence
+            if ((b0 >> 4) == c_3ByteLeadPrefix &&
+                remaining >= c_3ByteLength &&
+                IsCont(s[1]) &&
+                IsCont(s[2]))
+            {
+                return ((b0 & c_3ByteMask) << c_Shift12) |
+                       ((s[1] & c_ContMask) << c_Shift6) |
+                       (s[2] & c_ContMask);
             }
-            return codepoint;
+
+            // 4-byte sequence
+            if ((b0 >> 3) == c_4ByteLeadPrefix &&
+                remaining >= c_4ByteLength &&
+                IsCont(s[1]) &&
+                IsCont(s[2]) &&
+                IsCont(s[3]))
+            {
+                return ((b0 & c_4ByteMask) << c_Shift18) |
+                       ((s[1] & c_ContMask) << c_Shift12) |
+                       ((s[2] & c_ContMask) << c_Shift6) |
+                       (s[3] & c_ContMask);
+            }
+
+            return c_ReplacementCodepoint;
         }
 
-        static size_t utf8CharLength(unsigned char lead) {
-            if (lead < 0x80) return 1;
-            else if ((lead >> 5) == 0x6) return 2;
-            else if ((lead >> 4) == 0xE) return 3;
-            else if ((lead >> 3) == 0x1E) return 4;
-            else { RATUI_ASSERT(false,  "Invalid UTF-8 lead byte"); return 1; }
+        /** @brief Checks if a byte is a UTF-8 continuation byte. */
+        static bool IsCont(u8 a_Byte)
+        {
+            return (a_Byte & c_ContinuationMask) == c_ContinuationPattern;
+        }
+
+        /** @brief Determines the length of a UTF-8 character based on its leading byte. */
+        static size_t CharLength(u8 a_Lead)
+        {
+            if ( a_Lead       <= c_AsciiMax)        return c_1ByteLength;
+            if ((a_Lead >> 5) == c_2ByteLeadPrefix) return c_2ByteLength;
+            if ((a_Lead >> 4) == c_3ByteLeadPrefix) return c_3ByteLength;
+            if ((a_Lead >> 3) == c_4ByteLeadPrefix) return c_4ByteLength;
+            return c_1ByteLength;
         }
     };
 
+    inline bool IsAsciiWhitespace( char32_t a_CP )
+    {
+        return a_CP == U' '  ||
+               a_CP == U'\t' ||
+               a_CP == U'\n' ||
+               a_CP == U'\r';
+    }
 
     /**
      * @brief Measures the width of a single line of text using SDL_ttf, taking into account letter spacing from the TextStyle.
@@ -143,51 +218,55 @@ namespace RatUI::SDL2::TextLayoutUtils
      * @param a_Transform The type of text transformation to apply (e.g., uppercase, lowercase, capitalize).
      * @return A new String containing the transformed text.
      */
-    inline String ApplyTextTransform( TextView a_Text, ETextTransform a_Transform )
+    inline String ApplyTextTransform(TextView a_Text, ETextTransform a_Transform)
     {
-        String text( Begin( a_Text ), End( a_Text ) );
-
-        switch ( a_Transform )
+        if (a_Transform == ETextTransform::None)
+            return String(Begin(a_Text), End(a_Text));
+    
+        String result;
+        Reserve(result, Size(a_Text));
+    
+        UTF8Iterator it(a_Text);
+        UTF8Iterator end = UTF8Iterator::End(a_Text);
+    
+        while (it != end)
         {
-            case ETextTransform::Uppercase:
-                for ( size i = 0; i < Size( a_Text ); ++i )
-                {
-                    RawAt( text, i ) = static_cast<char>( std::toupper( static_cast<unsigned char>( RawAt( a_Text, i ) ) ) );
-                }
-                break;
-            case ETextTransform::Lowercase:
-                for ( size i = 0; i < Size( a_Text ); ++i )
-                {
-                    RawAt( text, i ) = static_cast<char>( std::tolower( static_cast<unsigned char>( RawAt( a_Text, i ) ) ) );
-                }
-                break;
-            case ETextTransform::Capitalize:
+            size_t start = it.ByteIndex();
+            char32_t cp  = *it;
+            ++it;
+            size_t endByte = it.ByteIndex();
+        
+            if (cp <= 0x7F) // ASCII only
             {
-                bool capitalizeNext = true;
-                for ( size i = 0; i < Size( a_Text ); ++i )
+                char c = static_cast<char>(cp);
+            
+                switch (a_Transform)
                 {
-                    const unsigned char uc = static_cast<unsigned char>( RawAt( a_Text, i ) );
-                    if ( std::isalpha( uc ) )
-                    {
-                        RawAt( text, i ) = capitalizeNext 
-                            ? static_cast<char>( std::toupper( uc ) ) 
-                            : static_cast<char>( std::tolower( uc ) );
-
-                        capitalizeNext = false;
-                    }
-                    else if ( std::isspace( uc ) )
-                    {
-                        capitalizeNext = true;
-                    }
+                    case ETextTransform::Uppercase:
+                        c = static_cast<char>(std::toupper((unsigned char)c));
+                        break;
+                    case ETextTransform::Lowercase:
+                        c = static_cast<char>(std::tolower((unsigned char)c));
+                        break;
+                    case ETextTransform::Capitalize:
+                        // Simplified ASCII capitalize handling
+                        c = static_cast<char>(std::toupper((unsigned char)c));
+                        break;
+                    default:
+                        break;
                 }
-                break;
+            
+                PushBack(result, c);
             }
-            case ETextTransform::None:
-            default: 
-                break;
+            else
+            {
+                // Copy full UTF-8 byte sequence unchanged
+                for (size i = start; i < endByte; ++i)
+                    PushBack(result, RawAt(a_Text, i));
+            }
         }
-
-        return text;
+    
+        return result;
     }
 
     /**
@@ -253,6 +332,22 @@ namespace RatUI::SDL2::TextLayoutUtils
                 return MeasureLineWidth( a_Font, current, a_Style ) <= a_MaxWidth;
             };
 
+            auto appendCodepoint = [&](UTF8Iterator& it)
+            {
+                size_t start = it.ByteIndex();
+                char32_t cp = *it;
+                ++it;
+                size_t end = it.ByteIndex();
+            
+                size_t count = end - start;
+            
+                size_t oldSize = Size(current);
+                Resize(current, oldSize + count);
+            
+                for (size_t i = 0; i < count; ++i)
+                    RawAt(current, oldSize + i) = RawAt(a_Paragraph, start + i);
+            };
+
             auto appendRange = [&]( size_t a_Start, size_t a_End )
             {
                 const size oldSize = Size( current );
@@ -271,63 +366,74 @@ namespace RatUI::SDL2::TextLayoutUtils
                 return isFit;
             };
 
-            auto appendTokenSplitByChar = [&]( size_t a_Start, size_t a_End )
+            auto appendTokenSplitByChar = [&](UTF8Iterator begin, UTF8Iterator end)
             {
-                for ( size i = a_Start; i < a_End; ++i )
+                while (begin != end)
                 {
-                    const size oldSize = Size( current );
-                    Resize( current, oldSize + 1 );
-                    RawAt( current, oldSize ) = RawAt( a_Paragraph, i );
-
-                    if ( Size( current ) > 1 && !fitsCurrent() )
+                    size_t cpStart = begin.ByteIndex();
+                    ++begin;
+                    size_t cpEnd = begin.ByteIndex();
+                
+                    const size byteCount = cpEnd - cpStart;
+                    const size oldSize   = Size(current);
+                
+                    Resize(current, oldSize + byteCount);
+                
+                    for (size i = 0; i < byteCount; ++i)
+                        RawAt(current, oldSize + i) =
+                            RawAt(a_Paragraph, cpStart + i);
+                
+                    if (!fitsCurrent())
                     {
-                        Resize( current, oldSize );
+                        Resize(current, oldSize);
                         flushCurrent();
-                        Resize( current, 1 );
-                        RawAt( current, 0 ) = RawAt( a_Paragraph, i );
+                    
+                        Resize(current, byteCount);
+                        for (size i = 0; i < byteCount; ++i)
+                            RawAt(current, i) =
+                                RawAt(a_Paragraph, cpStart + i);
                     }
                 }
             };
 
             if ( a_Style.Wrap == ETextWrap::WrapChar )
             {
-                appendTokenSplitByChar( 0, Size( a_Paragraph ) );
+                appendTokenSplitByChar( UTF8Iterator( a_Paragraph ), UTF8Iterator::End( a_Paragraph ) );
                 flushCurrent();
                 return;
             }
 
-            size i = 0;
-            while ( i < Size( a_Paragraph ) )
+            UTF8Iterator it(a_Paragraph);
+            UTF8Iterator end = UTF8Iterator::End(a_Paragraph);
+
+            while (it != end)
             {
-                size tokenEnd = i;
-                const bool isSpace = std::isspace( static_cast<unsigned char>( RawAt( a_Paragraph, i ) ) ) != 0;
-
-                // Keep consuming characters until we hit a change in whitespace vs non-whitespace or we reach the end of the paragraph.
-                while ( tokenEnd < Size( a_Paragraph ) &&
-                        ( std::isspace( static_cast<unsigned char>( RawAt( a_Paragraph, tokenEnd ) ) ) != 0 ) == isSpace )
+                UTF8Iterator tokenStart = it;
+                bool isSpace = IsAsciiWhitespace(*it);
+            
+                // Consume contiguous whitespace or non-whitespace
+                while (it != end && IsAsciiWhitespace(*it) == isSpace)
+                    ++it;
+            
+                size_t byteStart = tokenStart.ByteIndex();
+                size_t byteEnd   = it.ByteIndex();
+            
+                if (Empty(current) || fitsAfterAppendRange(byteStart, byteEnd))
                 {
-                    ++tokenEnd;
-                }
-
-                if ( Empty( current ) || fitsAfterAppendRange( i, tokenEnd ) )
-                {
-                    appendRange( i, tokenEnd );
-                    i = tokenEnd;
+                    appendRange(byteStart, byteEnd);
                     continue;
                 }
-
+            
                 flushCurrent();
-
-                if ( fitsAfterAppendRange( i, tokenEnd ) )
+            
+                if (fitsAfterAppendRange(byteStart, byteEnd))
                 {
-                    appendRange( i, tokenEnd );
+                    appendRange(byteStart, byteEnd);
                 }
                 else
                 {
-                    appendTokenSplitByChar( i, tokenEnd );
+                    appendTokenSplitByChar(tokenStart, it);
                 }
-
-                i = tokenEnd;
             }
 
             flushCurrent();
@@ -396,9 +502,11 @@ namespace RatUI::SDL2::TextLayoutUtils
             RatUI::SDL2::TextLayoutUtils::WrapText( a_Font, textToRender, a_Style, a_MaxWidth, o_Lines );
         } 
 
-        // Truncate to MaxLines if needed
-        if ( a_Style.MaxLines > 0 && Size( o_Lines ) > a_Style.MaxLines )
+        // Handle MaxLines
+        if (a_Style.MaxLines > 0 && Size(o_Lines) > a_Style.MaxLines )
             Resize( o_Lines, a_Style.MaxLines );
+
+        // TODO: Handle ellipsis overflow one day
     }
 
 } // namespace RatUI::SDL2::TextLayoutUtils

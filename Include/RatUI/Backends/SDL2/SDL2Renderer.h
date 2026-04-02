@@ -101,14 +101,24 @@ namespace RatUI::SDL2
         for ( const DrawCmd& cmd : a_Commands )
         {
             // TODO: This should probably be the intersection of the prevClip and the new clip rect
-            SDL_Rect sdlClip{
-                .x = static_cast<int>( cmd.ClipRect.Origin[0] ),
-                .y = static_cast<int>( cmd.ClipRect.Origin[1] ),
-                .w = static_cast<int>( cmd.ClipRect.Size[0] ),
-                .h = static_cast<int>( cmd.ClipRect.Size[1] )
-            };
+            
+            if ( cmd.ClipRect.IsInfinite() )
+            {
+                // Disable clipping by passing nullptr to SDL_RenderSetClipRect
+                SDL_RenderSetClipRect( m_Renderer, nullptr );
+            }
+            else
+            {
+                SDL_Rect sdlClip{
+                    .x = static_cast<int>( cmd.ClipRect.Origin[0] ),
+                    .y = static_cast<int>( cmd.ClipRect.Origin[1] ),
+                    .w = static_cast<int>( cmd.ClipRect.Size[0] ),
+                    .h = static_cast<int>( cmd.ClipRect.Size[1] )
+                };
 
-            SDL_RenderSetClipRect( m_Renderer, &sdlClip );
+                SDL_RenderSetClipRect( m_Renderer, &sdlClip );
+            }
+            
 
             if ( Holds<DrawCmd::RectCmd>( cmd.Payload ) )
             {

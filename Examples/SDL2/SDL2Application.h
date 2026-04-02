@@ -220,7 +220,9 @@ private:
     {
         bool result = OnShutdown();
 
-        m_Renderer.SetSDLRenderer( nullptr ); // Detach SDL_Renderer from our wrapper before destroying it
+        m_Renderer = {};
+
+        TTF_Quit();
 
         if ( m_SDLRenderer )
         {
