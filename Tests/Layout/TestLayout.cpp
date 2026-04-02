@@ -360,9 +360,37 @@ TEST_CASE( "LayoutResult defaults to Visible visibility", "[layout][result]" )
     REQUIRE( r.Visibility.Value == Visibility::Visible );
 }
 
-TEST_CASE( "LayoutResult IsDirty can be cleared", "[layout][result]" )
+// =============================================================================
+// Edges – arithmetic operators
+// =============================================================================
+
+TEST_CASE( "Edges operator+ combines two edges element-wise", "[layout][edges]" )
 {
-    LayoutResult r{};
-    r.IsDirty = false;
-    REQUIRE_FALSE( r.IsDirty );
+    Edges a = Edges::Asymmetric( 1.0f, 2.0f, 3.0f, 4.0f );
+    Edges b = Edges::Asymmetric( 10.0f, 20.0f, 30.0f, 40.0f );
+    Edges result = a + b;
+    REQUIRE( result.Top    == Catch::Approx( 11.0f ) );
+    REQUIRE( result.Right  == Catch::Approx( 22.0f ) );
+    REQUIRE( result.Bottom == Catch::Approx( 33.0f ) );
+    REQUIRE( result.Left   == Catch::Approx( 44.0f ) );
+}
+
+TEST_CASE( "Edges operator* scales each edge by a scalar factor", "[layout][edges]" )
+{
+    Edges e = Edges::Asymmetric( 2.0f, 4.0f, 6.0f, 8.0f );
+    Edges result = e * 2.5f;
+    REQUIRE( result.Top    == Catch::Approx( 5.0f  ) );
+    REQUIRE( result.Right  == Catch::Approx( 10.0f ) );
+    REQUIRE( result.Bottom == Catch::Approx( 15.0f ) );
+    REQUIRE( result.Left   == Catch::Approx( 20.0f ) );
+}
+
+TEST_CASE( "Edges operator/ divides each edge by a scalar factor", "[layout][edges]" )
+{
+    Edges e = Edges::Uniform( 10.0f );
+    Edges result = e / 4.0f;
+    REQUIRE( result.Top    == Catch::Approx( 2.5f ) );
+    REQUIRE( result.Right  == Catch::Approx( 2.5f ) );
+    REQUIRE( result.Bottom == Catch::Approx( 2.5f ) );
+    REQUIRE( result.Left   == Catch::Approx( 2.5f ) );
 }

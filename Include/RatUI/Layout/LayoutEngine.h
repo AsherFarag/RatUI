@@ -98,7 +98,7 @@ namespace RatUI
             } );
         
             // Remove trailing spacing added after last child
-            if ( numFlow > 1 )
+            if ( numFlow > 0 )
             {
                 if ( s.LayoutType == ELayoutType::Horizontal ) contentSize[0] -= s.Spacing;
                 if ( s.LayoutType == ELayoutType::Vertical )   contentSize[1] -= s.Spacing;
