@@ -1,5 +1,6 @@
 #pragma once
 #include "../Core.h"
+#include "Texture.h"
 
 namespace RatUI
 {
@@ -13,5 +14,13 @@ namespace RatUI
 
         /** @brief Executes the given draw commands, rendering all the operations contained within them. */
         virtual void Execute( Span<const struct DrawCmd> a_Commands ) = 0;
+
+        // TODO:
+
+        virtual Optional<TextureID> CreateTexture( u32 a_Width, u32 a_Height, ETextureFormat a_Format, const void* a_Data ) = 0;
+        virtual bool UpdateTexture( TextureID a_Texture, u32 a_MipLevel, Rectu a_Region, const void* a_Data, size a_DataSizeBytes ) = 0;
+        virtual void DestroyTexture( TextureID a_Texture ) = 0;
+        virtual bool IsValidTexture( TextureID a_Texture ) const = 0;
     };
-}
+    
+} // namespace RatUI

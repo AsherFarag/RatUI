@@ -61,17 +61,7 @@ TEST_CASE( "MeasureLayoutNode Content mode with no children but padding returns 
 // MeasureLayoutNode – DesiredSize is stored on the LayoutNode
 // =============================================================================
 
-TEST_CASE( "MeasureLayoutNode stores the result in LayoutNode::Layout::DesiredSize", "[LayoutNode][measure]" )
-{
-    LayoutNode w{};
-    w.Style.WidthMode   = ESizingMode::Fixed;
-    w.Style.HeightMode  = ESizingMode::Fixed;
-    w.Style.FixedWidth  = 64.0f;
-    w.Style.FixedHeight = 32.0f;
-
-    MeasureLayoutNode( w, Vec2f( 1000.0f, 1000.0f ) );
-    RequireApproxEqual( w.Layout.DesiredSize, Vec2f( 64.0f, 32.0f ) );
-}
+// (covered by every sizing-mode test above; no separate redundant test needed)
 
 // =============================================================================
 // MeasureLayoutNode – SizeConstraints clamping
@@ -105,6 +95,7 @@ TEST_CASE( "MeasureLayoutNode clamps Fixed size to SizeConstraints max", "[Layou
 
 TEST_CASE( "MeasureLayoutNode Fixed constraints keep size unchanged when within bounds", "[LayoutNode][measure]" )
 {
+    // (clamp(x,x,x)==x; validates Constraints::Fixed round-trips cleanly)
     LayoutNode w{};
     w.Style.WidthMode   = ESizingMode::Fixed;
     w.Style.HeightMode  = ESizingMode::Fixed;
@@ -114,6 +105,35 @@ TEST_CASE( "MeasureLayoutNode Fixed constraints keep size unchanged when within 
 
     Vec2f result = MeasureLayoutNode( w, Vec2f( 1000.0f, 1000.0f ) );
     RequireApproxEqual( result, Vec2f( 80.0f, 60.0f ) );
+}
+
+// =============================================================================
+// MeasureLayoutNode – Percent sizing mode
+// =============================================================================
+
+TEST_CASE( "MeasureLayoutNode Percent width and height scales with available size", "[LayoutNode][measure][percent]" )
+{
+    LayoutNode w{};
+    w.Style.WidthMode     = ESizingMode::Percent;
+    w.Style.HeightMode    = ESizingMode::Percent;
+    w.Style.PercentWidth  = 0.5f;
+    w.Style.PercentHeight = 0.25f;
+
+    Vec2f result = MeasureLayoutNode( w, Vec2f( 400.0f, 200.0f ) );
+    RequireApproxEqual( result, Vec2f( 200.0f, 50.0f ) );
+    RequireApproxEqual( w.Layout.DesiredSize, Vec2f( 200.0f, 50.0f ) );
+}
+
+TEST_CASE( "MeasureLayoutNode mixed sizing modes: Fixed width, Percent height", "[LayoutNode][measure][percent]" )
+{
+    LayoutNode w{};
+    w.Style.WidthMode     = ESizingMode::Fixed;
+    w.Style.HeightMode    = ESizingMode::Percent;
+    w.Style.FixedWidth    = 80.0f;
+    w.Style.PercentHeight = 0.5f;
+
+    Vec2f result = MeasureLayoutNode( w, Vec2f( 200.0f, 100.0f ) );
+    RequireApproxEqual( result, Vec2f( 80.0f, 50.0f ) );
 }
 
 // =============================================================================
@@ -399,3 +419,125 @@ TEST_CASE( "MeasureLayoutNode child DesiredSize is populated during parent measu
 //    RequireApproxEqual( child.Layout.FinalRect.Size, Vec2f( 400.f, 200.f ) );
 //    RequireApproxEqual( child.Layout.FinalRect.Origin, Vec2f( 0.f, 0.f ) );
 //}
+
+// =============================================================================
+// MeasureLayoutNode – single child with spacing (trailing spacing bug regression)
+// =============================================================================
+
+TEST_CASE( "MeasureLayoutNode Horizontal single child with spacing has no trailing spacing added", "[LayoutNode][measure][horizontal]" )
+{
+    LayoutNode parent{};
+    parent.Style.LayoutType = ELayoutType::Horizontal;
+    parent.Style.WidthMode  = ESizingMode::Content;
+    parent.Style.HeightMode = ESizingMode::Content;
+    parent.Style.Spacing    = 10.0f;
+
+    LayoutNode child{}; child.Style.WidthMode = ESizingMode::Fixed; child.Style.HeightMode = ESizingMode::Fixed;
+    child.Style.FixedWidth = 50.0f; child.Style.FixedHeight = 20.0f;
+
+    parent.PushBackChild( child );
+
+    Vec2f result = MeasureLayoutNode( parent, Vec2f( 1000.0f, 1000.0f ) );
+    // Only 1 child → no spacing gap; spacing should NOT be added
+    RequireApproxEqual( result, Vec2f( 50.0f, 20.0f ) );
+}
+
+TEST_CASE( "MeasureLayoutNode Vertical single child with spacing has no trailing spacing added", "[LayoutNode][measure][vertical]" )
+{
+    LayoutNode parent{};
+    parent.Style.LayoutType = ELayoutType::Vertical;
+    parent.Style.WidthMode  = ESizingMode::Content;
+    parent.Style.HeightMode = ESizingMode::Content;
+    parent.Style.Spacing    = 15.0f;
+
+    LayoutNode child{}; child.Style.WidthMode = ESizingMode::Fixed; child.Style.HeightMode = ESizingMode::Fixed;
+    child.Style.FixedWidth = 40.0f; child.Style.FixedHeight = 30.0f;
+
+    parent.PushBackChild( child );
+
+    Vec2f result = MeasureLayoutNode( parent, Vec2f( 1000.0f, 1000.0f ) );
+    RequireApproxEqual( result, Vec2f( 40.0f, 30.0f ) );
+}
+
+// =============================================================================
+// MeasureLayoutNode – Collapsed children
+// =============================================================================
+
+TEST_CASE( "MeasureLayoutNode Collapsed child contributes nothing to Content parent size", "[LayoutNode][measure][visibility]" )
+{
+    LayoutNode parent{};
+    parent.Style.LayoutType = ELayoutType::Horizontal;
+    parent.Style.WidthMode  = ESizingMode::Content;
+    parent.Style.HeightMode = ESizingMode::Content;
+
+    LayoutNode visible{}; visible.Style.WidthMode = ESizingMode::Fixed; visible.Style.HeightMode = ESizingMode::Fixed;
+    visible.Style.FixedWidth = 60.0f; visible.Style.FixedHeight = 40.0f;
+
+    LayoutNode collapsed{}; collapsed.Style.WidthMode = ESizingMode::Fixed; collapsed.Style.HeightMode = ESizingMode::Fixed;
+    collapsed.Style.FixedWidth = 200.0f; collapsed.Style.FixedHeight = 200.0f;
+    collapsed.Layout.Visibility = { Visibility::Collapsed };
+
+    parent.PushBackChild( visible );
+    parent.PushBackChild( collapsed );
+
+    Vec2f result = MeasureLayoutNode( parent, Vec2f( 1000.0f, 1000.0f ) );
+    // Only the visible child contributes; collapsed child is ignored
+    RequireApproxEqual( result, Vec2f( 60.0f, 40.0f ) );
+}
+
+TEST_CASE( "MeasureLayoutNode all children Collapsed gives Content parent zero desired size", "[LayoutNode][measure][visibility]" )
+{
+    LayoutNode parent{};
+    parent.Style.LayoutType = ELayoutType::Horizontal;
+    parent.Style.WidthMode  = ESizingMode::Content;
+    parent.Style.HeightMode = ESizingMode::Content;
+
+    LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
+    c1.Style.FixedWidth = 100.0f; c1.Style.FixedHeight = 50.0f;
+    c1.Layout.Visibility = { Visibility::Collapsed };
+
+    LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
+    c2.Style.FixedWidth = 80.0f; c2.Style.FixedHeight = 60.0f;
+    c2.Layout.Visibility = { Visibility::Collapsed };
+
+    parent.PushBackChild( c1 );
+    parent.PushBackChild( c2 );
+
+    Vec2f result = MeasureLayoutNode( parent, Vec2f( 1000.0f, 1000.0f ) );
+    RequireApproxEqual( result, Vec2f( 0.0f, 0.0f ) );
+}
+
+// =============================================================================
+// MeasureLayoutNode – SizeConstraints clamping on Content-mode node
+// =============================================================================
+
+TEST_CASE( "MeasureLayoutNode SizeConstraints clamps Content-mode desired size to max", "[LayoutNode][measure][constraints]" )
+{
+    LayoutNode parent{};
+    parent.Style.LayoutType     = ELayoutType::Horizontal;
+    parent.Style.WidthMode      = ESizingMode::Content;
+    parent.Style.HeightMode     = ESizingMode::Content;
+    parent.Style.SizeConstraints = Constraints::AtMost( Vec2f( 50.0f, 30.0f ) );
+
+    LayoutNode child{}; child.Style.WidthMode = ESizingMode::Fixed; child.Style.HeightMode = ESizingMode::Fixed;
+    child.Style.FixedWidth = 200.0f; child.Style.FixedHeight = 100.0f;
+
+    parent.PushBackChild( child );
+
+    Vec2f result = MeasureLayoutNode( parent, Vec2f( 1000.0f, 1000.0f ) );
+    // Content would be 200×100 but max clamps it
+    RequireApproxEqual( result, Vec2f( 50.0f, 30.0f ) );
+}
+
+TEST_CASE( "MeasureLayoutNode SizeConstraints clamps Content-mode desired size to min", "[LayoutNode][measure][constraints]" )
+{
+    LayoutNode parent{};
+    parent.Style.LayoutType     = ELayoutType::Overlay;
+    parent.Style.WidthMode      = ESizingMode::Content;
+    parent.Style.HeightMode     = ESizingMode::Content;
+    parent.Style.SizeConstraints = Constraints::AtLeast( Vec2f( 100.0f, 80.0f ) );
+
+    // No children → content = 0×0, but min constraint forces 100×80
+    Vec2f result = MeasureLayoutNode( parent, Vec2f( 1000.0f, 1000.0f ) );
+    RequireApproxEqual( result, Vec2f( 100.0f, 80.0f ) );
+}

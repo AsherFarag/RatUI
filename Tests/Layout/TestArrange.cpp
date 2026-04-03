@@ -169,15 +169,6 @@ TEST_CASE( "ResolveAlign returns child SelfAlign when it is not Inherit", "[arra
     REQUIRE( result == EAlignment::BottomRight );
 }
 
-TEST_CASE( "ResolveAlign TopLeft parent: child Inherit resolves to TopLeft", "[arrange][resolve]" )
-{
-    LayoutNode parent{};
-    parent.Style.ChildAlign = EAlignment::TopLeft;
-    LayoutNode child{};
-    child.Style.SelfAlign = EAlignment::Inherit;
-    REQUIRE( ResolveAlign( child, parent ) == EAlignment::TopLeft );
-}
-
 // =============================================================================
 // ArrangeLayoutNode – FinalRect is set to allocated rect
 // =============================================================================
@@ -188,15 +179,6 @@ TEST_CASE( "ArrangeLayoutNode stores the allocated rect as FinalRect", "[arrange
     Rectf rect{ .Origin = { 10.0f, 20.0f }, .Size = { 150.0f, 80.0f } };
     ArrangeLayoutNode( w, rect );
     RequireRect( w.Layout.FinalRect, { 10.0f, 20.0f }, { 150.0f, 80.0f } );
-}
-
-TEST_CASE( "ArrangeLayoutNode with no children sets FinalRect and returns", "[arrange][LayoutNode]" )
-{
-    LayoutNode w{};
-    w.Style.LayoutType = ELayoutType::Horizontal;
-    Rectf rect{ .Origin = { 5.0f, 5.0f }, .Size = { 200.0f, 100.0f } };
-    ArrangeLayoutNode( w, rect );
-    RequireRect( w.Layout.FinalRect, { 5.0f, 5.0f }, { 200.0f, 100.0f } );
 }
 
 // =============================================================================
@@ -1141,4 +1123,394 @@ TEST_CASE( "Content-sized parent resizes correctly after full Measure+Arrange ro
     // c1 at (0,0), c2 at (100+5, 0) = (105, 0) — but they are laid out inside a rect of 1000x1000
     REQUIRE( c1.Layout.FinalRect.Origin[0] == Catch::Approx( 0.0f   ) );
     REQUIRE( c2.Layout.FinalRect.Origin[0] == Catch::Approx( 105.0f ) );
+}
+
+// =============================================================================
+// ArrangeAnchored – remaining preset anchors and edge cases
+// =============================================================================
+
+TEST_CASE( "ArrangeAnchored StretchBottom stretches across bottom edge with zero height", "[arrange][anchored]" )
+{
+    LayoutNode parent{};
+    parent.Style.LayoutType = ELayoutType::Overlay;
+    parent.Style.WidthMode  = ESizingMode::Fixed;
+    parent.Style.HeightMode = ESizingMode::Fixed;
+    parent.Style.FixedWidth  = 200.0f;
+    parent.Style.FixedHeight = 100.0f;
+
+    LayoutNode child{};
+    child.Style.WidthMode    = ESizingMode::Fixed;
+    child.Style.HeightMode   = ESizingMode::Fixed;
+    child.Style.FixedWidth   = 0.0f;
+    child.Style.FixedHeight  = 0.0f;
+    child.Style.PositionMode = EPositioningMode::Anchored;
+    child.Style.Anchor       = Anchor::StretchBottom(); // Min=(0,1), Max=(1,1)
+
+    parent.PushBackChild( child );
+
+    DoLayout( parent, { 200.0f, 100.0f } );
+
+    // Stretch bottom edge: finalMin=(0,100), finalMax=(200,100) → size=(200,0)
+    REQUIRE( child.Layout.FinalRect.Size[0]   == Catch::Approx( 200.0f ) );
+    REQUIRE( child.Layout.FinalRect.Size[1]   == Catch::Approx( 0.0f   ) );
+    REQUIRE( child.Layout.FinalRect.Origin[1] == Catch::Approx( 100.0f ) );
+}
+
+TEST_CASE( "ArrangeAnchored StretchLeft stretches along left edge", "[arrange][anchored]" )
+{
+    LayoutNode parent{};
+    parent.Style.LayoutType = ELayoutType::Overlay;
+    parent.Style.WidthMode  = ESizingMode::Fixed;
+    parent.Style.HeightMode = ESizingMode::Fixed;
+    parent.Style.FixedWidth  = 200.0f;
+    parent.Style.FixedHeight = 100.0f;
+
+    LayoutNode child{};
+    child.Style.WidthMode    = ESizingMode::Fixed;
+    child.Style.HeightMode   = ESizingMode::Fixed;
+    child.Style.FixedWidth   = 0.0f;
+    child.Style.FixedHeight  = 0.0f;
+    child.Style.PositionMode = EPositioningMode::Anchored;
+    child.Style.Anchor       = Anchor::StretchLeft(); // Min=(0,0), Max=(0,1)
+
+    parent.PushBackChild( child );
+
+    DoLayout( parent, { 200.0f, 100.0f } );
+
+    // Stretch left edge: x is a point anchor (stretchX=false), y stretches full height
+    REQUIRE( child.Layout.FinalRect.Size[1]   == Catch::Approx( 100.0f ) );
+    REQUIRE( child.Layout.FinalRect.Size[0]   == Catch::Approx( 0.0f   ) );
+    REQUIRE( child.Layout.FinalRect.Origin[0] == Catch::Approx( 0.0f   ) );
+}
+
+TEST_CASE( "ArrangeAnchored StretchRight stretches along right edge", "[arrange][anchored]" )
+{
+    LayoutNode parent{};
+    parent.Style.LayoutType = ELayoutType::Overlay;
+    parent.Style.WidthMode  = ESizingMode::Fixed;
+    parent.Style.HeightMode = ESizingMode::Fixed;
+    parent.Style.FixedWidth  = 200.0f;
+    parent.Style.FixedHeight = 100.0f;
+
+    LayoutNode child{};
+    child.Style.WidthMode    = ESizingMode::Fixed;
+    child.Style.HeightMode   = ESizingMode::Fixed;
+    child.Style.FixedWidth   = 0.0f;
+    child.Style.FixedHeight  = 0.0f;
+    child.Style.PositionMode = EPositioningMode::Anchored;
+    child.Style.Anchor       = Anchor::StretchRight(); // Min=(1,0), Max=(1,1)
+
+    parent.PushBackChild( child );
+
+    DoLayout( parent, { 200.0f, 100.0f } );
+
+    // Stretch right edge: x is a point anchor at 1.0, y stretches full height
+    REQUIRE( child.Layout.FinalRect.Size[1]   == Catch::Approx( 100.0f ) );
+    REQUIRE( child.Layout.FinalRect.Size[0]   == Catch::Approx( 0.0f   ) );
+    REQUIRE( child.Layout.FinalRect.Origin[0] == Catch::Approx( 200.0f ) );
+}
+
+TEST_CASE( "ArrangeAnchored StretchAll with inward offset shrinks the stretch rect symmetrically", "[arrange][anchored]" )
+{
+    LayoutNode parent{};
+    parent.Style.LayoutType = ELayoutType::Overlay;
+    parent.Style.WidthMode  = ESizingMode::Fixed;
+    parent.Style.HeightMode = ESizingMode::Fixed;
+    parent.Style.FixedWidth  = 200.0f;
+    parent.Style.FixedHeight = 100.0f;
+
+    LayoutNode child{};
+    child.Style.WidthMode    = ESizingMode::Fixed;
+    child.Style.HeightMode   = ESizingMode::Fixed;
+    child.Style.FixedWidth   = 0.0f;
+    child.Style.FixedHeight  = 0.0f;
+    child.Style.PositionMode = EPositioningMode::Anchored;
+    // StretchAll with offset=(10,5) pushes each edge inward by the offset value
+    child.Style.Anchor = { .Min = { 0.0f, 0.0f }, .Max = { 1.0f, 1.0f }, .Pivot = { 0.5f, 0.5f }, .Offset = { 10.0f, 5.0f } };
+
+    parent.PushBackChild( child );
+
+    DoLayout( parent, { 200.0f, 100.0f } );
+
+    // X: origin = 0 + 200*0 + 10 = 10; right = 0 + 200*1 - 10 = 190; w = 180
+    // Y: origin = 0 + 100*0 +  5 =  5; bottom = 0 + 100*1 -  5 =  95; h =  90
+    RequireRect( child.Layout.FinalRect, { 10.0f, 5.0f }, { 180.0f, 90.0f } );
+}
+
+TEST_CASE( "ArrangeAnchored with non-zero parent container origin positions child correctly", "[arrange][anchored]" )
+{
+    // Parent rect starts at (50, 30), not at (0,0)
+    LayoutNode parent{};
+    parent.Style.LayoutType = ELayoutType::Overlay;
+    parent.Style.WidthMode  = ESizingMode::Fixed;
+    parent.Style.HeightMode = ESizingMode::Fixed;
+    parent.Style.FixedWidth  = 200.0f;
+    parent.Style.FixedHeight = 100.0f;
+
+    LayoutNode child{};
+    child.Style.WidthMode    = ESizingMode::Fixed;
+    child.Style.HeightMode   = ESizingMode::Fixed;
+    child.Style.FixedWidth   = 40.0f;
+    child.Style.FixedHeight  = 20.0f;
+    child.Style.PositionMode = EPositioningMode::Anchored;
+    child.Style.Anchor       = Anchor::Center(); // Min=Max=(0.5,0.5), Pivot=(0.5,0.5)
+
+    parent.PushBackChild( child );
+
+    // Arrange the parent rect starting at (50,30)
+    MeasureLayoutNode( parent, { 200.0f, 100.0f } );
+    ArrangeLayoutNode( parent, { .Origin = { 50.0f, 30.0f }, .Size = { 200.0f, 100.0f } } );
+
+    // anchorX = 50 + 200*0.5 = 150; originX = 150 - 40*0.5 = 130
+    // anchorY = 30 + 100*0.5 =  80; originY =  80 - 20*0.5 =  70
+    RequireRect( child.Layout.FinalRect, { 130.0f, 70.0f }, { 40.0f, 20.0f } );
+}
+
+// =============================================================================
+// ArrangeLinear – mixed anchored + flow children
+// =============================================================================
+
+TEST_CASE( "ArrangeLinear Horizontal anchored children do not advance the flow cursor", "[arrange][linear][anchored]" )
+{
+    LayoutNode parent{};
+    parent.Style.LayoutType = ELayoutType::Horizontal;
+    parent.Style.ChildAlign = EAlignment::TopLeft;
+    parent.Style.WidthMode  = ESizingMode::Fixed;
+    parent.Style.HeightMode = ESizingMode::Fixed;
+    parent.Style.FixedWidth  = 400.0f;
+    parent.Style.FixedHeight = 100.0f;
+
+    LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
+    c1.Style.FixedWidth = 50.0f; c1.Style.FixedHeight = 30.0f;
+
+    // Anchored child – should NOT advance the horizontal cursor
+    LayoutNode anchored{};
+    anchored.Style.WidthMode    = ESizingMode::Fixed;
+    anchored.Style.HeightMode   = ESizingMode::Fixed;
+    anchored.Style.FixedWidth   = 200.0f;
+    anchored.Style.FixedHeight  = 200.0f;
+    anchored.Style.PositionMode = EPositioningMode::Anchored;
+    anchored.Style.Anchor       = Anchor::TopLeft();
+
+    LayoutNode c3{}; c3.Style.WidthMode = ESizingMode::Fixed; c3.Style.HeightMode = ESizingMode::Fixed;
+    c3.Style.FixedWidth = 40.0f; c3.Style.FixedHeight = 30.0f;
+
+    parent.PushBackChild( c1 );
+    parent.PushBackChild( anchored );
+    parent.PushBackChild( c3 );
+
+    DoLayout( parent, { 400.0f, 100.0f } );
+
+    // c1 at x=0, c3 immediately after c1 at x=50 (anchored child has no effect on flow)
+    REQUIRE( c1.Layout.FinalRect.Origin[0] == Catch::Approx( 0.0f  ) );
+    REQUIRE( c3.Layout.FinalRect.Origin[0] == Catch::Approx( 50.0f ) );
+}
+
+// =============================================================================
+// ArrangeLinear – FlexGrow accounts for spacing in available space
+// =============================================================================
+
+TEST_CASE( "ArrangeLinear FlexGrow with spacing: spacing reduces available flex space", "[arrange][flex][spacing]" )
+{
+    LayoutNode parent{};
+    parent.Style.LayoutType = ELayoutType::Horizontal;
+    parent.Style.WidthMode  = ESizingMode::Fixed;
+    parent.Style.HeightMode = ESizingMode::Fixed;
+    parent.Style.FixedWidth  = 300.0f;
+    parent.Style.FixedHeight = 50.0f;
+    parent.Style.Spacing     = 10.0f;
+
+    LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
+    c1.Style.FixedWidth = 50.0f; c1.Style.FixedHeight = 50.0f;
+
+    LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
+    c2.Style.FixedWidth = 0.0f; c2.Style.FixedHeight = 50.0f;
+    c2.Style.FlexGrow = 1.0f;
+
+    parent.PushBackChild( c1 );
+    parent.PushBackChild( c2 );
+
+    DoLayout( parent, { 300.0f, 50.0f } );
+
+    // available = 300 - spacing*(numFlow-1) = 300 - 10*1 = 290
+    // totalFixed = 50 (c1)
+    // leftover = 290 - 50 = 240 → c2 gets 240
+    REQUIRE( c2.Layout.FinalRect.Size[0]   == Catch::Approx( 240.0f ) );
+    REQUIRE( c2.Layout.FinalRect.Origin[0] == Catch::Approx( 60.0f  ) ); // 0 + spacing(10) + c1(50) = 60
+}
+
+// =============================================================================
+// ArrangeLinear Vertical – margin on child
+// =============================================================================
+
+TEST_CASE( "ArrangeLinear Vertical single-child margin shifts position and shrinks size", "[arrange][linear][vertical]" )
+{
+    LayoutNode parent{};
+    parent.Style.LayoutType = ELayoutType::Vertical;
+    parent.Style.ChildAlign = EAlignment::TopLeft;
+
+    LayoutNode child{};
+    child.Style.WidthMode   = ESizingMode::Fixed;
+    child.Style.HeightMode  = ESizingMode::Fixed;
+    child.Style.FixedWidth  = 80.0f;
+    child.Style.FixedHeight = 60.0f;
+    child.Style.Margin      = Edges::Asymmetric( 8.0f, 0.0f, 12.0f, 0.0f ); // top=8, bottom=12
+
+    parent.PushBackChild( child );
+
+    DoLayout( parent, { 200.0f, 300.0f } );
+
+    // origin y += margin.top=8; size.h -= margin.vertical=20 → h=40
+    RequireRect( child.Layout.FinalRect, { 0.0f, 8.0f }, { 80.0f, 40.0f } );
+}
+
+// =============================================================================
+// ArrangeOverlay – collapsed child
+// =============================================================================
+
+TEST_CASE( "ArrangeOverlay Collapsed child gets zero-size FinalRect and non-collapsed sibling is placed correctly", "[arrange][overlay][visibility]" )
+{
+    LayoutNode parent{};
+    parent.Style.LayoutType = ELayoutType::Overlay;
+    parent.Style.WidthMode  = ESizingMode::Fixed;
+    parent.Style.HeightMode = ESizingMode::Fixed;
+    parent.Style.FixedWidth  = 200.0f;
+    parent.Style.FixedHeight = 100.0f;
+
+    LayoutNode collapsed{};
+    collapsed.Style.WidthMode   = ESizingMode::Fixed;
+    collapsed.Style.HeightMode  = ESizingMode::Fixed;
+    collapsed.Style.FixedWidth  = 100.0f;
+    collapsed.Style.FixedHeight = 50.0f;
+    collapsed.Layout.Visibility = { Visibility::Collapsed };
+
+    LayoutNode visible{};
+    visible.Style.WidthMode   = ESizingMode::Fixed;
+    visible.Style.HeightMode  = ESizingMode::Fixed;
+    visible.Style.FixedWidth  = 40.0f;
+    visible.Style.FixedHeight = 20.0f;
+    visible.Style.SelfAlign   = EAlignment::BottomRight;
+
+    parent.PushBackChild( collapsed );
+    parent.PushBackChild( visible );
+
+    DoLayout( parent, { 200.0f, 100.0f } );
+
+    // Collapsed child has DesiredSize=0×0 and gets a 0×0 FinalRect
+    REQUIRE( collapsed.Layout.DesiredSize[0] == Catch::Approx( 0.0f ) );
+    REQUIRE( collapsed.Layout.DesiredSize[1] == Catch::Approx( 0.0f ) );
+    REQUIRE( collapsed.Layout.FinalRect.Size[0] == Catch::Approx( 0.0f ) );
+    REQUIRE( collapsed.Layout.FinalRect.Size[1] == Catch::Approx( 0.0f ) );
+
+    // Visible child at BottomRight: (160, 80)
+    RequireRect( visible.Layout.FinalRect, { 160.0f, 80.0f }, { 40.0f, 20.0f } );
+}
+
+// =============================================================================
+// Nested Horizontal inside Vertical – full round-trip
+// =============================================================================
+
+TEST_CASE( "ArrangeLayoutNode nested Horizontal inside Vertical positions grandchildren correctly", "[arrange][nested]" )
+{
+    // root: Vertical, Fixed 200×200
+    LayoutNode root{};
+    root.Style.LayoutType = ELayoutType::Vertical;
+    root.Style.ChildAlign = EAlignment::TopLeft;
+    root.Style.WidthMode  = ESizingMode::Fixed;
+    root.Style.HeightMode = ESizingMode::Fixed;
+    root.Style.FixedWidth  = 200.0f;
+    root.Style.FixedHeight = 200.0f;
+
+    // row: Horizontal, Fixed width=200, Fixed height=50
+    LayoutNode row{};
+    row.Style.LayoutType = ELayoutType::Horizontal;
+    row.Style.ChildAlign = EAlignment::TopLeft;
+    row.Style.WidthMode  = ESizingMode::Fixed;
+    row.Style.HeightMode = ESizingMode::Fixed;
+    row.Style.FixedWidth  = 200.0f;
+    row.Style.FixedHeight = 50.0f;
+
+    LayoutNode gc1{}; gc1.Style.WidthMode = ESizingMode::Fixed; gc1.Style.HeightMode = ESizingMode::Fixed;
+    gc1.Style.FixedWidth = 60.0f; gc1.Style.FixedHeight = 50.0f;
+
+    LayoutNode gc2{}; gc2.Style.WidthMode = ESizingMode::Fixed; gc2.Style.HeightMode = ESizingMode::Fixed;
+    gc2.Style.FixedWidth = 80.0f; gc2.Style.FixedHeight = 50.0f;
+
+    row.PushBackChild( gc1 );
+    row.PushBackChild( gc2 );
+
+    // Node below the row
+    LayoutNode below{};
+    below.Style.WidthMode   = ESizingMode::Fixed;
+    below.Style.HeightMode  = ESizingMode::Fixed;
+    below.Style.FixedWidth  = 100.0f;
+    below.Style.FixedHeight = 30.0f;
+
+    root.PushBackChild( row );
+    root.PushBackChild( below );
+
+    DoLayout( root, { 200.0f, 200.0f } );
+
+    // row at y=0 height=50, below at y=50
+    REQUIRE( row.Layout.FinalRect.Origin[1]   == Catch::Approx( 0.0f  ) );
+    REQUIRE( below.Layout.FinalRect.Origin[1] == Catch::Approx( 50.0f ) );
+
+    // gc1 and gc2 inside row (world y=0)
+    REQUIRE( gc1.Layout.FinalRect.Origin[0] == Catch::Approx( 0.0f  ) );
+    REQUIRE( gc1.Layout.FinalRect.Origin[1] == Catch::Approx( 0.0f  ) );
+    REQUIRE( gc2.Layout.FinalRect.Origin[0] == Catch::Approx( 60.0f ) );
+    REQUIRE( gc2.Layout.FinalRect.Origin[1] == Catch::Approx( 0.0f  ) );
+}
+
+// =============================================================================
+// ESizingMode::Flex – height fills parent in horizontal layout (fallback)
+// =============================================================================
+
+TEST_CASE( "ArrangeLinear Horizontal child with Flex HeightMode fills parent height automatically", "[arrange][linear][flex]" )
+{
+    LayoutNode parent{};
+    parent.Style.LayoutType = ELayoutType::Horizontal;
+    parent.Style.WidthMode  = ESizingMode::Fixed;
+    parent.Style.HeightMode = ESizingMode::Fixed;
+    parent.Style.FixedWidth  = 200.0f;
+    parent.Style.FixedHeight = 100.0f;
+
+    LayoutNode child{};
+    child.Style.WidthMode  = ESizingMode::Fixed;
+    child.Style.HeightMode = ESizingMode::Flex; // fills parent height in horizontal layout
+    child.Style.FixedWidth = 50.0f;
+
+    parent.PushBackChild( child );
+
+    DoLayout( parent, { 200.0f, 100.0f } );
+
+    REQUIRE( child.Layout.FinalRect.Size[1] == Catch::Approx( 100.0f ) );
+}
+
+// =============================================================================
+// Percent sizing – measure and arrange round-trip
+// =============================================================================
+
+TEST_CASE( "ArrangeOverlay child with Percent sizing is positioned using fraction of available size", "[arrange][overlay][percent]" )
+{
+    LayoutNode parent{};
+    parent.Style.LayoutType = ELayoutType::Overlay;
+    parent.Style.ChildAlign = EAlignment::TopLeft;
+    parent.Style.WidthMode  = ESizingMode::Fixed;
+    parent.Style.HeightMode = ESizingMode::Fixed;
+    parent.Style.FixedWidth  = 400.0f;
+    parent.Style.FixedHeight = 200.0f;
+
+    LayoutNode child{};
+    child.Style.WidthMode     = ESizingMode::Percent;
+    child.Style.HeightMode    = ESizingMode::Percent;
+    child.Style.PercentWidth  = 0.5f;
+    child.Style.PercentHeight = 0.5f;
+
+    parent.PushBackChild( child );
+
+    DoLayout( parent, { 400.0f, 200.0f } );
+
+    // Child measured as 50% of available: 200×100, placed at TopLeft (0,0)
+    RequireRect( child.Layout.FinalRect, { 0.0f, 0.0f }, { 200.0f, 100.0f } );
 }
