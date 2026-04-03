@@ -466,6 +466,128 @@
 
 #endif // Default to std::optional if no custom optional implementation is provided.
 
+#ifndef RATUI_OVERRIDE_HASHMAP_IMPL
+    #include <unordered_map>
+
+    namespace RatUI
+    {
+        template<typename Key, typename Value, typename Hash = std::hash<Key>, typename KeyEqual = std::equal_to<Key>>
+        using HashMapImpl = std::unordered_map<Key, Value, Hash, KeyEqual>;
+
+        template<typename Key, typename Value, typename Hash, typename KeyEqual>
+        struct CoreTraits<HashMapImpl<Key, Value, Hash, KeyEqual>>
+        {
+            using Type        = HashMapImpl<Key, Value, Hash, KeyEqual>;
+            using KeyType     = typename Type::key_type;
+            using MappedType  = typename Type::mapped_type;
+            using ValueType   = typename Type::value_type;
+            using SizeType    = typename Type::size_type;
+        
+            using Iter        = typename Type::iterator;
+            using ConstIter   = typename Type::const_iterator;
+            using RevIter     = typename Type::reverse_iterator;
+            using ConstRevIter= typename Type::const_reverse_iterator;
+        
+            // === Iteration ===
+        
+            static constexpr Iter Begin(Type& a_Container) { return a_Container.begin(); }
+            static constexpr ConstIter Begin(const Type& a_Container) { return a_Container.begin(); }
+        
+            static constexpr Iter End(Type& a_Container) { return a_Container.end(); }
+            static constexpr ConstIter End(const Type& a_Container) { return a_Container.end(); }
+        
+            static constexpr RevIter RBegin(Type& a_Container) { return a_Container.rbegin(); }
+            static constexpr ConstRevIter RBegin(const Type& a_Container) { return a_Container.rbegin(); }
+        
+            static constexpr RevIter REnd(Type& a_Container) { return a_Container.rend(); }
+            static constexpr ConstRevIter REnd(const Type& a_Container) { return a_Container.rend(); }
+        
+            // === Capacity ===
+        
+            static constexpr SizeType Size(const Type& a_Container)
+            {
+                return a_Container.size();
+            }
+        
+            static constexpr bool Empty(const Type& a_Container)
+            {
+                return a_Container.empty();
+            }
+        
+            static constexpr void Reserve(Type& a_Container, SizeType a_Capacity)
+            {
+                a_Container.reserve(a_Capacity);
+            }
+        
+            // === Modifiers ===
+        
+            template<typename... Args>
+            static constexpr decltype(auto) Emplace(Type& a_Container, Args&&... a_Args)
+            {
+                return a_Container.emplace(std::forward<Args>(a_Args)...);
+            }
+        
+            template<typename... Args>
+            static constexpr decltype(auto) TryEmplace(Type& a_Container, Args&&... a_Args)
+            {
+                return a_Container.try_emplace(std::forward<Args>(a_Args)...);
+            }
+        
+            template<typename... Args>
+            static constexpr decltype(auto) Insert(Type& a_Container, Args&&... a_Args)
+            {
+                return a_Container.insert(std::forward<Args>(a_Args)...);
+            }
+        
+            template<typename... Args>
+            static constexpr decltype(auto) Erase(Type& a_Container, Args&&... a_Args)
+            {
+                return a_Container.erase(std::forward<Args>(a_Args)...);
+            }
+        
+            static constexpr void Clear(Type& a_Container)
+            {
+                a_Container.clear();
+            }
+        
+            // === Lookup ===
+        
+            static constexpr Iter Find(Type& a_Container, const KeyType& a_Key)
+            {
+                return a_Container.find(a_Key);
+            }
+        
+            static constexpr ConstIter Find(const Type& a_Container, const KeyType& a_Key)
+            {
+                return a_Container.find(a_Key);
+            }
+        
+            static constexpr bool Contains(const Type& a_Container, const KeyType& a_Key)
+            {
+                return a_Container.find(a_Key) != a_Container.end();
+            }
+        
+            // === Element Access (Key-based) ===
+        
+            static constexpr decltype(auto) At(Type& a_Container, const KeyType& a_Key)
+            {
+                return a_Container.at(a_Key);
+            }
+        
+            static constexpr decltype(auto) At(const Type& a_Container, const KeyType& a_Key)
+            {
+                return a_Container.at(a_Key);
+            }
+
+            static constexpr decltype(auto) RawAt(Type& a_Container, const KeyType& a_Key)
+            {
+                return a_Container[a_Key];
+            }
+        };
+    }
+
+#endif // Default to std::unordered_map if no custom hashmap implementation is provided.
+
 namespace RatUI
 {
     // === Containers ===
@@ -504,6 +626,17 @@ namespace RatUI
 
     /** @brief Monostate is a type used to represent an empty state in a Variant, similar to std::monostate. */
     using Monostate = MonostateImpl;
+
+    /**
+     * @brief HashMap is a hash table based associative container that contains key-value pairs with unique keys.
+     * It is implemented using std::unordered_map by default, but can be customized by defining RATUI_HASHMAP_IMPL before including this header.
+     * @tparam Key The type of the keys in the map.
+     * @tparam Value The type of the values in the map.
+     * @tparam Hash The type of the hash function used to hash the keys. Defaults to std::hash<Key>.
+     * @tparam KeyEqual The type of the equality function used to compare keys. Defaults to std::equal_to<Key>.
+     */
+    template<typename Key, typename Value, typename Hash = HashMapImpl<Key, Value>::hasher, typename KeyEqual = HashMapImpl<Key, Value>::key_equal>
+    using HashMap = HashMapImpl<Key, Value, Hash, KeyEqual>;
 
     /** 
      * @brief Optional is a type that may contain a value of type T or be empty, similar to std::optional.
@@ -658,7 +791,7 @@ namespace RatUI
 	}
 
     template<typename Container>
-    constexpr decltype( auto ) RawAt( const Container& a_Container, const size a_Index )
+    constexpr decltype(auto) RawAt( const Container& a_Container, const size a_Index )
     {
         return CoreTraits<Container>::RawAt( a_Container, a_Index );
     }
@@ -687,10 +820,22 @@ namespace RatUI
         return CoreTraits<Container>::Data(a_Container);
     }
 
+    template<typename Container, typename... Args>
+    constexpr decltype(auto) Find(Container& a_Container, Args&&... a_Args)
+    {
+        return CoreTraits<Container>::Find(a_Container, std::forward<decltype(a_Args)>(a_Args)...);
+    }
+
+    template<typename Container, typename... Args>
+    constexpr decltype(auto) Find(const Container& a_Container, Args&&... a_Args)
+    {
+        return CoreTraits<Container>::Find(a_Container, std::forward<decltype(a_Args)>(a_Args)...);
+    }
+
     // === Variant Access ===
 
 	template<typename Container>
-    constexpr decltype( auto ) Index( const Container& a_Container )
+    constexpr decltype(auto) Index( const Container& a_Container )
     {
         return CoreTraits<Container>::Index( a_Container );
 	}
@@ -708,13 +853,13 @@ namespace RatUI
     }
 
     template<typename T, typename Container>
-    constexpr decltype( auto ) Get( Container&& a_Container )
+    constexpr decltype(auto) Get( Container&& a_Container )
     {
         return CoreTraits<std::remove_cvref_t<Container>>::template Get<T>( std::forward<Container>( a_Container ) );
     }
 
 	template<auto I, typename Container>
-    constexpr decltype( auto ) Get( Container&& a_Container )
+    constexpr decltype(auto) Get( Container&& a_Container )
     {
         return CoreTraits<std::remove_cvref_t<Container>>::template Get<I>( std::forward<Container>( a_Container ) );
 	}
