@@ -1,6 +1,7 @@
 #pragma once
 #include "../../RatUI.h"
-#include <SDL_ttf.h>
+#include <ft2build.h>
+#include FT_FREETYPE_H
 #include <cctype>
 
 namespace RatUI::SDL2::TextLayoutUtils
@@ -171,40 +172,46 @@ namespace RatUI::SDL2::TextLayoutUtils
     }
 
     /**
-     * @brief Measures the width of a single line of text using SDL_ttf, taking into account letter spacing from the TextStyle.
-     * @param a_Font The TTF_Font* to use for measurement.
+     * @brief Measures the width of a single line of text using FreeType, taking into account letter spacing from the TextStyle.
+     * @param a_Face The FT_Face to use for measurement.
      * @param a_Line The line of text to measure.
      * @param a_Style The TextStyle containing letter spacing information.
      * @return The width of the line in pixels, including letter spacing.
      */
-    inline f32 MeasureLineWidth(TTF_Font* font, StringView line, const TextStyle& style)
+    inline f32 MeasureLineWidth( FT_Face a_Face, StringView a_Line, const TextStyle& a_Style )
     {
-        if (!font || line.empty())
+        if ( !a_Face || a_Line.empty() )
             return 0.f;
 
         f32 width = 0.f;
 
-        u32 prevGlyph = 0;
+        u32 prevGlyphIdx = 0;
         bool hasPrev = false;
 
-        UTF8Iterator it(line);
-        while (it)
+        UTF8Iterator it( a_Line );
+        while ( it )
         {
-            u32 glyph = *it;
+            u32 cp = *it;
+            u32 glyphIdx = FT_Get_Char_Index( a_Face, cp );
 
-            int advance = 0;
-            TTF_GlyphMetrics32(font, glyph, nullptr, nullptr, nullptr, nullptr, &advance);
-
-            if (hasPrev)
+            if ( FT_Load_Glyph( a_Face, glyphIdx, FT_LOAD_DEFAULT ) == 0 )
             {
-                width += TTF_GetFontKerningSizeGlyphs32(font, prevGlyph, glyph);
-                width += style.LetterSpacing;
+                if ( hasPrev )
+                {
+                    if ( FT_HAS_KERNING( a_Face ) )
+                    {
+                        FT_Vector kerning;
+                        if ( FT_Get_Kerning( a_Face, prevGlyphIdx, glyphIdx, FT_KERNING_DEFAULT, &kerning ) == 0 )
+                            width += kerning.x / 64.f;
+                    }
+                    width += a_Style.LetterSpacing;
+                }
+
+                width += a_Face->glyph->advance.x / 64.f;
+                prevGlyphIdx = glyphIdx;
+                hasPrev = true;
             }
 
-            width += advance;
-
-            prevGlyph = glyph;
-            hasPrev = true;
             ++it;
         }
 
@@ -297,7 +304,7 @@ namespace RatUI::SDL2::TextLayoutUtils
      * @brief Wraps the input text into multiple lines based on the specified maximum width and populates the output array with the resulting lines.
      * This function takes into account word boundaries and letter spacing from the TextStyle to ensure that lines do not exceed the maximum width.
      * For example, if the input text is "This is a long line of text" and the maximum width only allows for "This is a long", "line of", and "text", then those three lines would be output.
-     * @param a_Font The TTF_Font* to use for measuring text width during wrapping.
+     * @param a_Face The FT_Face to use for measuring text width during wrapping.
      * @param a_Text The input text to wrap into lines.
      * @param a_Style The TextStyle containing letter spacing information that affects line width calculations.
      * @param a_MaxWidth The maximum width in pixels that each line of text should not exceed. Lines will be wrapped accordingly.
@@ -305,7 +312,7 @@ namespace RatUI::SDL2::TextLayoutUtils
      * The caller is responsible for ensuring that this array is properly initialized before calling this function.
      */
     inline void WrapText(
-        TTF_Font* a_Font,
+        FT_Face a_Face,
         TextView a_Text,
         const TextStyle& a_Style,
         f32 a_MaxWidth,
@@ -329,7 +336,7 @@ namespace RatUI::SDL2::TextLayoutUtils
 
             auto fitsCurrent = [&]() -> bool
             {
-                return MeasureLineWidth( a_Font, current, a_Style ) <= a_MaxWidth;
+                return MeasureLineWidth( a_Face, current, a_Style ) <= a_MaxWidth;
             };
 
             auto appendCodepoint = [&](UTF8Iterator& it)
@@ -464,17 +471,17 @@ namespace RatUI::SDL2::TextLayoutUtils
     }
 
     inline String TruncateLineWithEllipsis(
-        TTF_Font*       a_Font,
+        FT_Face         a_Face,
         StringView      a_Line,
         const TextStyle& a_Style,
         f32             a_MaxWidth,
         bool            a_ForceEllipsis )
     {
-        if ( !a_ForceEllipsis && MeasureLineWidth( a_Font, a_Line, a_Style ) <= a_MaxWidth )
+        if ( !a_ForceEllipsis && MeasureLineWidth( a_Face, a_Line, a_Style ) <= a_MaxWidth )
             return String( Begin( a_Line ), End( a_Line ) );
 
         constexpr StringView c_Ellipsis = "...";
-        const f32 ellipsisWidth = MeasureLineWidth( a_Font, c_Ellipsis, a_Style );
+        const f32 ellipsisWidth = MeasureLineWidth( a_Face, c_Ellipsis, a_Style );
         if ( ellipsisWidth > a_MaxWidth )
             return {};
 
@@ -495,7 +502,7 @@ namespace RatUI::SDL2::TextLayoutUtils
             for ( const char c : c_Ellipsis )
                 PushBack( candidate, c );
 
-            if ( MeasureLineWidth( a_Font, candidate, a_Style ) <= a_MaxWidth )
+            if ( MeasureLineWidth( a_Face, candidate, a_Style ) <= a_MaxWidth )
                 bestPrefixByteCount = currentPrefixBytes;
             else
                 break;
@@ -516,14 +523,14 @@ namespace RatUI::SDL2::TextLayoutUtils
      * This function first applies text transformations, then splits the text into lines based on newline characters
      * and finally wraps lines that exceed the maximum width. The resulting lines are stored in the output array.
      * For example, if the input text is "Hello World\nThis is a test" with a maximum width that only allows "Hello World" and "This is a", then the output lines would be "Hello World", "This is a", and "test".
-     * @param a_Font The TTF_Font* to use for measuring text width during layout.
+     * @param a_Face The FT_Face to use for measuring text width during layout.
      * @param a_Style The TextStyle containing font, size, letter spacing, and transformation information that affects text layout.
      * @param a_Text The input text to layout into lines.
      * @param o_Lines An array to be populated with the resulting lines of text after layout.
      * The caller is responsible for ensuring that this array is properly initialized before calling this function.
      * @param a_MaxWidth The maximum width in pixels that each line of text should not exceed. Lines will be wrapped accordingly.
      */
-    inline void BuildTextLines( TTF_Font* a_Font, const TextStyle& a_Style, TextView a_Text, Array<String>& o_Lines, f32 a_MaxWidth = Limits<f32>::max() )
+    inline void BuildTextLines( FT_Face a_Face, const TextStyle& a_Style, TextView a_Text, Array<String>& o_Lines, f32 a_MaxWidth = Limits<f32>::max() )
     {
         Clear( o_Lines );
 
@@ -545,7 +552,7 @@ namespace RatUI::SDL2::TextLayoutUtils
         } 
         else
         {
-            RatUI::SDL2::TextLayoutUtils::WrapText( a_Font, textToRender, a_Style, a_MaxWidth, o_Lines );
+            RatUI::SDL2::TextLayoutUtils::WrapText( a_Face, textToRender, a_Style, a_MaxWidth, o_Lines );
         } 
 
         const bool hasWidthConstraint = ( a_MaxWidth < Limits<f32>::max() );
@@ -576,12 +583,12 @@ namespace RatUI::SDL2::TextLayoutUtils
             {
                 const bool forceEllipsis = requiresLastLineIndicator && i == lastLineIndex;
                 const bool lineOverflowsWidth = requiresWidthEllipsis
-                    && MeasureLineWidth( a_Font, o_Lines[i], a_Style ) > a_MaxWidth;
+                    && MeasureLineWidth( a_Face, o_Lines[i], a_Style ) > a_MaxWidth;
 
                 if ( !forceEllipsis && !lineOverflowsWidth )
                     continue;
 
-                o_Lines[i] = TruncateLineWithEllipsis( a_Font, o_Lines[i], a_Style, a_MaxWidth, forceEllipsis );
+                o_Lines[i] = TruncateLineWithEllipsis( a_Face, o_Lines[i], a_Style, a_MaxWidth, forceEllipsis );
             }
         }
     }

@@ -1,9 +1,9 @@
 #pragma once
 #include "../../RatUI.h"
-#include "SDL2FontCache.h"
+#include "../FreeType/GlyphAtlas.h"
+#include "../FreeType/FontCache.h"
 #include "SDL2TextLayout.h"
 #include <SDL.h>
-#include <SDL_ttf.h>
 
 namespace RatUI::SDL2
 {
@@ -15,18 +15,30 @@ namespace RatUI::SDL2
     {
     public:
         SDL2Renderer() = default;
-        SDL2Renderer( SDL_Renderer* a_Renderer, SDL2FontCache* a_FontCache )
+        SDL2Renderer( SDL_Renderer* a_Renderer, FreeType::FontCache* a_FontCache, FreeType::GlyphAtlas* a_GlyphAtlas = nullptr )
             : m_Renderer( a_Renderer )
             , m_FontCache( a_FontCache )
+            , m_GlyphAtlas( a_GlyphAtlas )
         {}
 
-        SDL_Renderer* GetSDLRenderer() const { return m_Renderer; }
-        SDL2FontCache* GetFontCache() const { return m_FontCache; }
+        SDL_Renderer*         GetSDLRenderer() const { return m_Renderer; }
+        FreeType::FontCache*  GetFontCache()   const { return m_FontCache; }
+        FreeType::GlyphAtlas* GetGlyphAtlas()  const { return m_GlyphAtlas; }
 
-        void SetSDLRenderer( SDL_Renderer* a_Renderer ) { m_Renderer = a_Renderer; }
-        void SetFontCache( SDL2FontCache* a_Cache ) { m_FontCache = a_Cache;  }
+        void SetSDLRenderer( SDL_Renderer* a_Renderer )       { m_Renderer   = a_Renderer; }
+        void SetFontCache( FreeType::FontCache* a_Cache )     { m_FontCache  = a_Cache;    }
+        void SetGlyphAtlas( FreeType::GlyphAtlas* a_Atlas )   { m_GlyphAtlas = a_Atlas;    }
 
         void Execute( Span<const DrawCmd> a_Commands ) override;
+
+        // = IRenderer texture management
+
+        Optional<TextureID> CreateTexture( u32 a_Width, u32 a_Height, ETextureFormat a_Format, const void* a_Data ) override;
+        bool UpdateTexture( TextureID a_Texture, u32 a_MipLevel, Rectu a_Region, const void* a_Data, size a_DataSizeBytes ) override;
+        void DestroyTexture( TextureID a_Texture ) override;
+        bool IsValidTexture( TextureID a_Texture ) const override;
+
+        // = Geometry rendering
 
         void RenderFillRoundedRect(
             Rectf          a_Rect,
@@ -81,8 +93,9 @@ namespace RatUI::SDL2
         }
 
     protected:
-        SDL_Renderer* m_Renderer  { nullptr };
-        SDL2FontCache* m_FontCache{ nullptr };
+        SDL_Renderer*         m_Renderer  { nullptr };
+        FreeType::FontCache*  m_FontCache { nullptr };
+        FreeType::GlyphAtlas* m_GlyphAtlas{ nullptr };
     };
 
     // = Inline Implementations
@@ -155,33 +168,148 @@ namespace RatUI::SDL2
         SDL_RenderSetClipRect( m_Renderer, &prevClip );
     }
 
+    inline Optional<TextureID> SDL2Renderer::CreateTexture(
+        u32            a_Width,
+        u32            a_Height,
+        ETextureFormat a_Format,
+        const void*    a_Data )
+    {
+        if ( !m_Renderer )
+            return NullOpt;
+
+        // SDL2 does not support a native single-channel (R8) texture format for use with
+        // SDL_RenderGeometry. We always create an RGBA texture and expand R8 data to RGBA
+        // (white RGB, alpha = R) in UpdateTexture.
+        SDL_Texture* tex = SDL_CreateTexture(
+            m_Renderer,
+            SDL_PIXELFORMAT_RGBA32,
+            SDL_TEXTUREACCESS_STREAMING,
+            static_cast<int>( a_Width ),
+            static_cast<int>( a_Height ) );
+
+        if ( !tex )
+            return NullOpt;
+
+        SDL_SetTextureBlendMode( tex, SDL_BLENDMODE_BLEND );
+
+        if ( a_Data )
+        {
+            const Rectu fullRegion{ Vec2u{ 0u, 0u }, Vec2u{ a_Width, a_Height } };
+            const size  dataSize = static_cast<size>( a_Width ) * a_Height
+                                   * ( a_Format == ETextureFormat::RGBA8 ? 4u : 1u );
+            UpdateTexture( TextureID{ .Ptr = tex }, 0, fullRegion, a_Data, dataSize );
+        }
+
+        TextureID id;
+        id.Ptr = tex;
+        return id;
+    }
+
+    inline bool SDL2Renderer::UpdateTexture(
+        TextureID   a_Texture,
+        u32         /*a_MipLevel*/,
+        Rectu       a_Region,
+        const void* a_Data,
+        size        a_DataSizeBytes )
+    {
+        SDL_Texture* tex = static_cast<SDL_Texture*>( a_Texture.Ptr );
+        if ( !tex || !a_Data )
+            return false;
+
+        const u32 w = a_Region.Width();
+        const u32 h = a_Region.Height();
+        if ( w == 0 || h == 0 )
+            return true; // Nothing to upload — not an error.
+
+        // All SDL2 textures created by CreateTexture use SDL_PIXELFORMAT_RGBA32 internally.
+        // ETextureFormat::R8 data (single byte per pixel) is expanded to RGBA here:
+        //   R=255, G=255, B=255, A=source_byte
+        // This lets vertex colours tint the glyph while the bitmap acts as an alpha mask.
+        // ETextureFormat::RGBA8 is uploaded directly if a_DataSizeBytes == w * h * 4.
+        // Note: only R8 and RGBA8 formats are supported.
+        RATUI_USER_ASSERT( a_DataSizeBytes == static_cast<size>( w ) * h ||
+                           a_DataSizeBytes == static_cast<size>( w ) * h * 4u,
+                           "UpdateTexture: a_DataSizeBytes must match either R8 (w*h) or RGBA8 (w*h*4) format." );
+
+        const bool isR8 = ( a_DataSizeBytes == static_cast<size>( w ) * h );
+
+        if ( isR8 )
+        {
+            Array<u8> rgba;
+            Resize( rgba, static_cast<size>( w ) * h * 4u );
+
+            const u8* src = static_cast<const u8*>( a_Data );
+            for ( u32 i = 0; i < w * h; ++i )
+            {
+                rgba[ i * 4 + 0 ] = 255u;
+                rgba[ i * 4 + 1 ] = 255u;
+                rgba[ i * 4 + 2 ] = 255u;
+                rgba[ i * 4 + 3 ] = src[i];
+            }
+
+            SDL_Rect rect{
+                static_cast<int>( a_Region.Origin[0] ),
+                static_cast<int>( a_Region.Origin[1] ),
+                static_cast<int>( w ),
+                static_cast<int>( h )
+            };
+
+            return SDL_UpdateTexture( tex, &rect, Data( rgba ), static_cast<int>( w ) * 4 ) == 0;
+        }
+        else
+        {
+            // RGBA8: upload directly.
+            SDL_Rect rect{
+                static_cast<int>( a_Region.Origin[0] ),
+                static_cast<int>( a_Region.Origin[1] ),
+                static_cast<int>( w ),
+                static_cast<int>( h )
+            };
+
+            return SDL_UpdateTexture( tex, &rect, a_Data, static_cast<int>( w ) * 4 ) == 0;
+        }
+    }
+
+    inline void SDL2Renderer::DestroyTexture( TextureID a_Texture )
+    {
+        if ( SDL_Texture* tex = static_cast<SDL_Texture*>( a_Texture.Ptr ) )
+            SDL_DestroyTexture( tex );
+    }
+
+    inline bool SDL2Renderer::IsValidTexture( TextureID a_Texture ) const
+    {
+        return a_Texture.Ptr != nullptr;
+    }
+
     inline void SDL2Renderer::RenderText(
         TextView         a_Text,
         const TextStyle& a_Style,
         Rectf            a_Rect,
         const Mat3f&     a_Transform )
     {
-        if ( !m_Renderer || !m_FontCache )
-            return; // Early out if we don't have a valid SDL_Renderer or FontCache to work with.
+        if ( !m_Renderer || !m_FontCache || !m_GlyphAtlas )
+            return; // Early out if we don't have a valid SDL_Renderer, FontCache, or GlyphAtlas.
 
         if ( a_Text.empty() || !a_Style.Font.IsValid() )
             return; // Early out if there's no text to render or the font handle is invalid.
 
-        TTF_Font* font = m_FontCache->GetFont( a_Style );
+        FreeType::Font* font = m_FontCache->GetOrLoadFont( a_Style.Font, static_cast<u32>( a_Style.Size ) );
         if ( !font )
-            return; // Early out if we couldn't get a TTF_Font* for the given TextStyle (e.g. font failed to load).
+            return; // Early out if we couldn't get a font for the given TextStyle.
 
-        // - Build the line array
+        FT_Face face = font->FTFace;
+        const u32 pixelSize = static_cast<u32>( a_Style.Size );
+
+        // Build the wrapped line array using FreeType metrics.
         Array<String> lines;
-        RatUI::SDL2::TextLayoutUtils::BuildTextLines( font, a_Style, a_Text, lines, a_Rect.Size[0] );
+        RatUI::SDL2::TextLayoutUtils::BuildTextLines( face, a_Style, a_Text, lines, a_Rect.Size[0] );
 
         const SDL_Color sdlColor = ToSDLColor( a_Style.Color );
-        const f32 lineHeight = SDL2FontCache::GetLineHeight( font, a_Style );
+        const f32 lineHeight     = FreeType::GetLineHeight( face, a_Style );
+        const f32 ascender       = face->size->metrics.ascender / 64.f;
 
-        // - Render each line
-        // SDL_ttf blended rendering produces an ARGB surface which we blit into
-        // a texture, position at the correct line origin, then render as a quad
-        // using SDL_RenderGeometry so the transform matrix is respected.
+        // Obtain the SDL_Texture* backing the glyph atlas.
+        SDL_Texture* atlasTexture = static_cast<SDL_Texture*>( m_GlyphAtlas->GetTexture().Ptr );
 
         f32 lineY = a_Rect.Origin[1];
 
@@ -189,52 +317,41 @@ namespace RatUI::SDL2
         {
             if ( !Empty( line ) )
             {
-                // TODO: Doesnt support custom letter spacing.
-                // TODO: Optimize
-                SDL_Surface* surface = TTF_RenderUTF8_Blended( font, CStr( line ), sdlColor );
-                if ( surface )
+                // Shape the line using HarfBuzz for correct glyph ordering and advances.
+                Array<FreeType::ShapedGlyph> glyphs = FreeType::ShapeLine( font->HBFont, line, pixelSize );
+
+                // Calculate the total advance width for horizontal alignment.
+                f32 lineWidth = 0.f;
+                for ( const FreeType::ShapedGlyph& g : glyphs )
+                    lineWidth += g.XAdvance;
+
+                f32 lineX = a_Rect.Origin[0];
+                if ( a_Style.Align == ETextAlign::Center )
+                    lineX += ( a_Rect.Size[0] - lineWidth ) * 0.5f;
+                else if ( a_Style.Align == ETextAlign::Right )
+                    lineX += a_Rect.Size[0] - lineWidth;
+
+                // The baseline sits ascender pixels below the top of the line.
+                const Vec2f origin{ lineX, lineY + ascender };
+
+                auto transformPoint = [&]( float px, float py ) -> SDL_FPoint
                 {
-                    SDL_Texture* texture = SDL_CreateTextureFromSurface( m_Renderer, surface );
-                    SDL_FreeSurface( surface );
+                    Vec3f p = a_Transform * Vec3f{ px, py, 1.f };
+                    return SDL_FPoint{ p[0], p[1] };
+                };
 
-                    if ( texture )
+                FreeType::RenderShapedLine( *m_GlyphAtlas, face, glyphs, origin,
+                    [&]( const FreeType::GlyphQuad& q )
                     {
-                        int texW = 0, texH = 0;
-                        SDL_QueryTexture( texture, nullptr, nullptr, &texW, &texH );
-
-                        // Resolve text alignment within the rect.
-                        f32 lineX = a_Rect.Origin[0];
-                        if ( a_Style.Align == ETextAlign::Center )
-                            lineX += ( a_Rect.Size[0] - static_cast<f32>( texW ) ) * 0.5f;
-                        else if ( a_Style.Align == ETextAlign::Right )
-                            lineX += a_Rect.Size[0] - static_cast<f32>( texW );
-
-                        // Build a quad and transform its vertices.
-                        const float x0 = lineX;
-                        const float y0 = lineY;
-                        const float x1 = lineX + static_cast<float>( texW );
-                        const float y1 = lineY + static_cast<float>( texH );
-
-                        SDL_Color white{ 255, 255, 255, 255 };
-
-                        auto transformPoint = [&]( float px, float py ) -> SDL_FPoint
-                        {
-                            Vec3f p = a_Transform * Vec3f{ px, py, 1.f };
-                            return SDL_FPoint{ p[0], p[1] };
-                        };
-
                         SDL_Vertex verts[4];
-                        verts[0] = { transformPoint( x0, y0 ), white, { 0.f, 0.f } };
-                        verts[1] = { transformPoint( x1, y0 ), white, { 1.f, 0.f } };
-                        verts[2] = { transformPoint( x1, y1 ), white, { 1.f, 1.f } };
-                        verts[3] = { transformPoint( x0, y1 ), white, { 0.f, 1.f } };
+                        verts[0] = { transformPoint( q.PosMin[0], q.PosMin[1] ), sdlColor, { q.UVMin[0], q.UVMin[1] } };
+                        verts[1] = { transformPoint( q.PosMax[0], q.PosMin[1] ), sdlColor, { q.UVMax[0], q.UVMin[1] } };
+                        verts[2] = { transformPoint( q.PosMax[0], q.PosMax[1] ), sdlColor, { q.UVMax[0], q.UVMax[1] } };
+                        verts[3] = { transformPoint( q.PosMin[0], q.PosMax[1] ), sdlColor, { q.UVMin[0], q.UVMax[1] } };
 
                         const int indices[6] = { 0, 1, 2, 0, 2, 3 };
-
-                        SDL_RenderGeometry( m_Renderer, texture, verts, 4, indices, 6 );
-                        SDL_DestroyTexture( texture );
-                    }
-                }
+                        SDL_RenderGeometry( m_Renderer, atlasTexture, verts, 4, indices, 6 );
+                    } );
             }
 
             lineY += lineHeight;

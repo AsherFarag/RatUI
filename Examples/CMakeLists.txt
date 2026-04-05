@@ -1,5 +1,6 @@
 find_package(SDL2 QUIET)
-find_package(SDL2_ttf QUIET)
+find_package(Freetype QUIET)
+find_package(harfbuzz QUIET)
 
 include(FetchContent)
 
@@ -16,16 +17,28 @@ if(NOT SDL2_FOUND)
     endif()
 endif()
 
-if(NOT SDL2_ttf_FOUND)
+if(NOT Freetype_FOUND)
     FetchContent_Declare(
-        SDL2_ttf
-        GIT_REPOSITORY https://github.com/libsdl-org/SDL_ttf.git
-        GIT_TAG        release-2.22.0
+        freetype
+        GIT_REPOSITORY https://gitlab.freedesktop.org/freetype/freetype.git
+        GIT_TAG        VER-2-13-2
     )
-    FetchContent_MakeAvailable(SDL2_ttf)
-    # Provide the SDL2_ttf::SDL2_ttf target alias expected by the rest of this file
-    if(NOT TARGET SDL2_ttf::SDL2_ttf)
-        add_library(SDL2_ttf::SDL2_ttf ALIAS SDL2_ttf)
+    FetchContent_MakeAvailable(freetype)
+    if(NOT TARGET Freetype::Freetype)
+        add_library(Freetype::Freetype ALIAS freetype)
+    endif()
+endif()
+
+if(NOT harfbuzz_FOUND)
+    FetchContent_Declare(
+        harfbuzz
+        GIT_REPOSITORY https://github.com/harfbuzz/harfbuzz.git
+        GIT_TAG        8.3.0
+    )
+    set(HB_BUILD_SUBSET OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(harfbuzz)
+    if(NOT TARGET harfbuzz::harfbuzz)
+        add_library(harfbuzz::harfbuzz ALIAS harfbuzz)
     endif()
 endif()
 
@@ -41,7 +54,8 @@ target_link_libraries(RatUI_Examples_Common
     INTERFACE
         RatUI
         SDL2::SDL2
-        SDL2_ttf::SDL2_ttf
+        Freetype::Freetype
+        harfbuzz::harfbuzz
 )
 
 # ─── Examples ────────────────────────────────────────────────────────────────
