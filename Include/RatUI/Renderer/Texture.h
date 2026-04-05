@@ -5,6 +5,12 @@ namespace RatUI
 {
     enum class ETextureFormat : u8
     {
+        Unknown = 0,
+
+        R8,
+        RG8,
+        RGB8,
+        RGBA8,
     };
 
     /**
@@ -19,7 +25,7 @@ namespace RatUI
             uptr  ID{ 0 };
         };
 
-        constexpr bool operator==( const TextureID& ) const { return ID == ID; } 
+        constexpr bool operator==( const TextureID& a_Other ) const { return ID == a_Other.ID; } 
         constexpr bool IsValid() const { return *this != Null(); }
         static constexpr TextureID Null() { return TextureID{}; }
     };

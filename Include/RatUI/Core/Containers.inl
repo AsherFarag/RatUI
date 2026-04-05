@@ -482,11 +482,8 @@
             using MappedType  = typename Type::mapped_type;
             using ValueType   = typename Type::value_type;
             using SizeType    = typename Type::size_type;
-        
             using Iter        = typename Type::iterator;
             using ConstIter   = typename Type::const_iterator;
-            using RevIter     = typename Type::reverse_iterator;
-            using ConstRevIter= typename Type::const_reverse_iterator;
         
             // === Iteration ===
         
@@ -495,12 +492,6 @@
         
             static constexpr Iter End(Type& a_Container) { return a_Container.end(); }
             static constexpr ConstIter End(const Type& a_Container) { return a_Container.end(); }
-        
-            static constexpr RevIter RBegin(Type& a_Container) { return a_Container.rbegin(); }
-            static constexpr ConstRevIter RBegin(const Type& a_Container) { return a_Container.rbegin(); }
-        
-            static constexpr RevIter REnd(Type& a_Container) { return a_Container.rend(); }
-            static constexpr ConstRevIter REnd(const Type& a_Container) { return a_Container.rend(); }
         
             // === Capacity ===
         
