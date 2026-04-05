@@ -2,7 +2,7 @@
 #include "../../RatUI.h"
 #include "../../Text/ITextMetrics.h"
 #include "../FreeType/FontCache.h"
-#include "SDL2TextLayout.h"
+#include "../FreeType/TextUtil.h"
 
 namespace RatUI::SDL2
 {
@@ -56,12 +56,12 @@ namespace RatUI::SDL2
 
         // - Build the line array
         Array<String> lines;
-        RatUI::SDL2::TextLayoutUtils::BuildTextLines( face, a_Style, a_Text, lines, a_MaxWidth );
+        FreeType::TextUtil::BuildTextLines( face, a_Style, a_Text, lines, a_MaxWidth );
 
         // - Measure each line and compute overall metrics
         f32 maxWidth = 0.f;
         for ( const String& line : lines )
-            maxWidth = std::max( maxWidth, TextLayoutUtils::MeasureLineWidth( face, line, a_Style ) );
+            maxWidth = std::max( maxWidth, FreeType::TextUtil::MeasureLineWidth( face, line, a_Style ) );
 
         const f32 lineHeight = FreeType::GetLineHeight( face, a_Style );
         const f32 baseline   = face->size->metrics.ascender / 64.f;

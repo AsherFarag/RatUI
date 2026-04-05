@@ -2,7 +2,7 @@
 #include "../../RatUI.h"
 #include "../FreeType/GlyphAtlas.h"
 #include "../FreeType/FontCache.h"
-#include "SDL2TextLayout.h"
+#include "../FreeType/TextUtil.h"
 #include <SDL.h>
 
 namespace RatUI::SDL2
@@ -302,7 +302,7 @@ namespace RatUI::SDL2
 
         // Build the wrapped line array using FreeType metrics.
         Array<String> lines;
-        RatUI::SDL2::TextLayoutUtils::BuildTextLines( face, a_Style, a_Text, lines, a_Rect.Size[0] );
+        FreeType::TextUtil::BuildTextLines( face, a_Style, a_Text, lines, a_Rect.Size[0] );
 
         const SDL_Color sdlColor = ToSDLColor( a_Style.Color );
         const f32 lineHeight     = FreeType::GetLineHeight( face, a_Style );

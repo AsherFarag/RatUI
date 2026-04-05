@@ -4,7 +4,7 @@
 #include FT_FREETYPE_H
 #include <cctype>
 
-namespace RatUI::SDL2::TextLayoutUtils
+namespace RatUI::FreeType::TextUtil
 {
     // TODO: I forgot to treat the text as utf8 and just wrote it as ascii.
     // Please fix.
@@ -539,7 +539,7 @@ namespace RatUI::SDL2::TextLayoutUtils
         // Only allocate a transformed string if we actually need to apply a transform - otherwise we can just work with the original TextView directly. 
         String transformedText;
         if ( needsTransform )
-            transformedText = RatUI::SDL2::TextLayoutUtils::ApplyTextTransform( a_Text, a_Style.Transform );
+            transformedText = ApplyTextTransform( a_Text, a_Style.Transform );
 
         const StringView textToRender = needsTransform ? StringView{ transformedText } : a_Text;
 
@@ -548,11 +548,11 @@ namespace RatUI::SDL2::TextLayoutUtils
 
         if ( noWrap )
         {
-            RatUI::SDL2::TextLayoutUtils::SplitTextLines( textToRender, o_Lines );
+            SplitTextLines( textToRender, o_Lines );
         } 
         else
         {
-            RatUI::SDL2::TextLayoutUtils::WrapText( a_Face, textToRender, a_Style, a_MaxWidth, o_Lines );
+            WrapText( a_Face, textToRender, a_Style, a_MaxWidth, o_Lines );
         } 
 
         const bool hasWidthConstraint = ( a_MaxWidth < Limits<f32>::max() );
@@ -593,4 +593,4 @@ namespace RatUI::SDL2::TextLayoutUtils
         }
     }
 
-} // namespace RatUI::SDL2::TextLayoutUtils
+} // namespace RatUI::FreeType::TextUtil
