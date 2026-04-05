@@ -708,6 +708,12 @@ namespace RatUI
     }
 
     template<typename Container, typename... Args>
+    constexpr decltype(auto) Emplace(Container& a_Container, Args&&... a_Args)
+    {
+        return CoreTraits<Container>::Emplace(a_Container, std::forward<Args>(a_Args)...);
+    }
+
+    template<typename Container, typename... Args>
     constexpr decltype(auto) EmplaceBack(Container& a_Container, Args&&... a_Args)
     {
         return CoreTraits<Container>::EmplaceBack(a_Container, std::forward<Args>(a_Args)...);
