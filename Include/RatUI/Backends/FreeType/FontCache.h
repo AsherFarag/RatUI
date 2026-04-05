@@ -252,42 +252,41 @@ namespace RatUI::FreeType
         f32 XOffset{0.f}, YOffset{0.f};
     };
 
-    inline Array<ShapedGlyph> ShapeLine( hb_font_t* a_Font, StringView a_TextUTF8, u32 a_PixelSize )
+    inline void ShapeLine( hb_font_t* a_Font, StringView a_TextUTF8, u32 a_PixelSize, Array<ShapedGlyph>& o_Glyphs )
     {
         hb_buffer_t* buf = hb_buffer_create();
 
         // Set up the buffer with the text and properties
-        hb_buffer_add_utf8(buf, Data( a_TextUTF8 ), static_cast<int>( Size( a_TextUTF8 ) ), 0, -1 );
+        hb_buffer_add_utf8( buf, Data( a_TextUTF8 ), static_cast<int>( Size( a_TextUTF8 ) ), 0, -1 );
 
         // TODO: we're hardcoding direction, script, and language here.
-        hb_buffer_set_direction(buf, HB_DIRECTION_LTR);
-        hb_buffer_set_script(buf, HB_SCRIPT_LATIN);
-        hb_buffer_set_language(buf, hb_language_from_string("en", -1));
+        hb_buffer_set_direction( buf, HB_DIRECTION_LTR );
+        hb_buffer_set_script( buf, HB_SCRIPT_LATIN );
+        hb_buffer_set_language( buf, hb_language_from_string( "en", -1 ) );
 
-        hb_shape(a_Font, buf, nullptr, 0);
+        hb_shape( a_Font, buf, nullptr, 0 );
 
         unsigned int glyphCount = 0;
-        hb_glyph_info_t*     infos     = hb_buffer_get_glyph_infos(buf, &glyphCount);
-        hb_glyph_position_t* positions = hb_buffer_get_glyph_positions(buf, &glyphCount);
+        hb_glyph_info_t* infos = hb_buffer_get_glyph_infos( buf, &glyphCount );
+        hb_glyph_position_t* positions = hb_buffer_get_glyph_positions( buf, &glyphCount );
 
-        Array<ShapedGlyph> result;
-        Reserve( result, glyphCount );
+        Clear( o_Glyphs );
+        Reserve( o_Glyphs, glyphCount );
 
         // HarfBuzz positions are in 26.6 fixed-point (1/64 pixel), divide by 64
-        for (unsigned i = 0; i < glyphCount; ++i)
+        for ( unsigned i = 0; i < glyphCount; ++i )
         {
-            EmplaceBack( result,
+            EmplaceBack( o_Glyphs,
                 /*.GlyphID  */ infos[i].codepoint, // after shaping, codepoint is the glyph ID
                 /*.PixelSize*/ a_PixelSize, // TODO: Do we need this here? In the render func we could just pass in a pixel size instead of per-glyph, since all glyphs in a line will be the same size?
                 /*.XAdvance */ positions[i].x_advance / 64.f,
                 /*.YAdvance */ positions[i].y_advance / 64.f,
-                /*.XOffset  */ positions[i].x_offset  / 64.f,
-                /*.YOffset  */ positions[i].y_offset  / 64.f
+                /*.XOffset  */ positions[i].x_offset / 64.f,
+                /*.YOffset  */ positions[i].y_offset / 64.f
             );
         }
 
-        hb_buffer_destroy(buf);
-        return result;
+        hb_buffer_destroy( buf );
     }
 
 } // namespace RatUI::FreeType

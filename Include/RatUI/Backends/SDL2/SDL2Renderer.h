@@ -301,8 +301,9 @@ namespace RatUI::SDL2
         const u32 pixelSize = static_cast<u32>( a_Style.Size );
 
         // Build the wrapped line array using FreeType metrics.
-        Array<String> lines;
-        FreeType::TextUtil::BuildTextLines( face, a_Style, a_Text, lines, a_Rect.Size[0] );
+        Array<StringView> lines;
+        Array<String> linesStorage;
+        FreeType::TextUtil::BuildTextLines( face, a_Style, a_Text, lines, linesStorage, a_Rect.Size[0] );
 
         const SDL_Color sdlColor = ToSDLColor( a_Style.Color );
         const f32 lineHeight     = FreeType::GetLineHeight( face, a_Style );
@@ -313,12 +314,13 @@ namespace RatUI::SDL2
 
         f32 lineY = a_Rect.Origin[1];
 
-        for ( const String& line : lines )
+        Array<FreeType::ShapedGlyph> glyphs;
+        for ( const StringView line : lines )
         {
             if ( !Empty( line ) )
             {
                 // Shape the line using HarfBuzz for correct glyph ordering and advances.
-                Array<FreeType::ShapedGlyph> glyphs = FreeType::ShapeLine( font->HBFont, line, pixelSize );
+                FreeType::ShapeLine( font->HBFont, line, pixelSize, glyphs );
 
                 // Calculate the total advance width for horizontal alignment.
                 f32 lineWidth = 0.f;

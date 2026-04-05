@@ -253,13 +253,31 @@ protected:
         }
     
         // ---------------- SECONDARY CONTENT AREA ----------------
-        WidgetID secondaryContent = m_Scene.CreateWidget<RectWidget>( contentRow, Colorsf::Surface600, "SecondaryContentArea" );
-        auto* secondaryNode = m_Scene.Layouts.Get( m_Scene.GetWidget( secondaryContent )->GetLayoutID() );
-    
-        secondaryNode->Style.WidthMode = ESizingMode::Flex;
-        secondaryNode->Style.HeightMode = ESizingMode::Flex;
-        secondaryNode->Style.PercentWidth = 0.5f;
-        secondaryNode->Style.FlexGrow = 1.f;
+        {
+            WidgetID secondaryContent = m_Scene.CreateWidget<RectWidget>( contentRow, Colorsf::Surface600, "SecondaryContentArea" );
+            auto* secondaryNode = m_Scene.Layouts.Get( m_Scene.GetWidget( secondaryContent )->GetLayoutID() );
+            
+            secondaryNode->Style.WidthMode = ESizingMode::Flex;
+            secondaryNode->Style.HeightMode = ESizingMode::Flex;
+            secondaryNode->Style.PercentWidth = 0.5f;
+            secondaryNode->Style.FlexGrow = 1.f;
+
+            // Long wrapping Text
+            TextStyle textStyle{ 
+                .Font = fontHandle,
+                .Size = 16,
+                .Wrap = ETextWrap::WrapWord,
+            };
+            WidgetID longText = m_Scene.CreateWidget<TextWidget>( secondaryContent, 
+                "This is the secondary content area. It can contain supplementary information or controls that support the main content.\n"
+                "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.", textStyle
+            );
+            auto* longTextNode = m_Scene.Layouts.Get( m_Scene.GetWidget( longText )->GetLayoutID() );
+            longTextNode->Style.WidthMode = ESizingMode::Flex;
+            longTextNode->Style.HeightMode = ESizingMode::Content;
+            longTextNode->Style.Padding = Edges{ 10.f };
+        }
+        
     
         // ---------------- FOOTER BAR ----------------
         {

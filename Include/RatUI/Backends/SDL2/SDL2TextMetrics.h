@@ -55,12 +55,13 @@ namespace RatUI::SDL2
         FT_Face face = font->FTFace;
 
         // - Build the line array
-        Array<String> lines;
-        FreeType::TextUtil::BuildTextLines( face, a_Style, a_Text, lines, a_MaxWidth );
+        Array<StringView> lines;
+		Array<String> linesStorage;
+        FreeType::TextUtil::BuildTextLines( face, a_Style, a_Text, lines, linesStorage, a_MaxWidth );
 
         // - Measure each line and compute overall metrics
         f32 maxWidth = 0.f;
-        for ( const String& line : lines )
+        for ( const StringView line : lines )
             maxWidth = std::max( maxWidth, FreeType::TextUtil::MeasureLineWidth( face, line, a_Style ) );
 
         const f32 lineHeight = FreeType::GetLineHeight( face, a_Style );
