@@ -69,15 +69,23 @@ namespace RatUI::FreeType
         }
 
         Font() = default;
-        Font( FT_Face a_FTFace, hb_font_t* a_HBFont ) : FTFace( a_FTFace ), HBFont( a_HBFont ) {}
         ~Font() { Destroy(); }
+
+        Font( FT_Face a_FTFace, hb_font_t* a_HBFont ) 
+            : FTFace( a_FTFace )
+            , HBFont( a_HBFont ) 
+        {}
 
         // Non-copyable
         Font( const Font& ) = delete;
         Font& operator=( const Font& ) = delete;
 
         // Movable
-        Font( Font&& a_Other ) noexcept = default;
+        Font( Font&& a_Other ) noexcept
+            : FTFace( std::exchange( a_Other.FTFace, nullptr ) )
+            , HBFont( std::exchange( a_Other.HBFont, nullptr ) )
+        {}
+
         Font& operator=( Font&& a_Other ) noexcept
         {
             if ( this == &a_Other ) return *this;
