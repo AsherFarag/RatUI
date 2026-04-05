@@ -99,7 +99,111 @@ namespace RatUI::FreeType
     class FontCache
     {
     public:
+        FontCache()
+        {
+            if ( FT_Init_FreeType( &m_Library ) != 0 )
+                m_Library = nullptr;
+        }
 
+        ~FontCache()
+        {
+            // Destroy all Font objects before releasing the FT_Library they reference.
+            m_Cache.clear();
+            if ( m_Library )
+                FT_Done_FreeType( m_Library );
+        }
+
+        // Non-copyable because it owns the FT_Library and Font handles.
+        FontCache( const FontCache& ) = delete;
+        FontCache& operator=( const FontCache& ) = delete;
+
+        FontCache( FontCache&& a_Other ) noexcept
+            : m_Library( std::exchange( a_Other.m_Library, nullptr ) )
+            , m_Cache( std::move( a_Other.m_Cache ) )
+        {}
+
+        FontCache& operator=( FontCache&& a_Other ) noexcept
+        {
+            if ( this != &a_Other )
+            {
+                this->~FontCache(); // Clean up current resources
+                m_Library = std::exchange( a_Other.m_Library, nullptr );
+                m_Cache   = std::move( a_Other.m_Cache );
+            }
+            return *this;
+        }
+
+        /** @brief Returns true if the FreeType library was initialised successfully. */
+        bool IsValid() const { return m_Library != nullptr; }
+
+        /** @brief Returns the underlying FT_Library handle. */
+        FT_Library GetLibrary() const { return m_Library; }
+
+        /**
+         * @brief Returns a pointer to a cached Font for the given file path and pixel size,
+         *        loading and caching it on first use.
+         * @return A valid Font* on success, or nullptr if the library is uninitialised or loading fails.
+         */
+        Font* GetOrLoad( const char* a_FilePath, u32 a_PixelSize )
+        {
+            if ( !m_Library || !a_FilePath )
+                return nullptr;
+
+            FontKey key{ a_FilePath, a_PixelSize };
+            auto it = Find( m_Cache, key );
+            if ( it != End( m_Cache ) )
+                return &it->second; // Found in cache, return it.
+
+            Optional<Font> loaded = Font::LoadFromFile( m_Library, a_FilePath, a_PixelSize );
+            if ( !loaded )
+                return nullptr; // Failed to load font, return nullptr.
+
+            auto result = Emplace( m_Cache, std::move( key ), std::move( *loaded ) );
+            return &result.first->second;
+        }
+
+        /** @brief Removes the cached Font for the given file path and pixel size, if present. */
+        void Evict( const char* a_FilePath, u32 a_PixelSize )
+        {
+            // TODO: Not a fan of requiring String alloc here
+            if ( a_FilePath ) Erase( m_Cache, FontKey{ String( a_FilePath ), a_PixelSize } );
+        }
+
+        /** @brief Destroys all cached Font objects. */
+        void Clear() { ::RatUI::Clear( m_Cache ); }
+
+        /** @brief Returns the number of currently cached Font variants. */
+        size CachedCount() const { return Size( m_Cache ); }
+
+    private:
+        struct FontKey
+        {
+            String Path;
+            u32    PixelSize;
+
+            bool operator==( const FontKey& ) const = default;
+        };
+
+        struct FontKeyHasher
+        {
+            size_t operator()( const FontKey& a_Key ) const noexcept
+            {
+                // FNV-1a hash with platform-appropriate constants (32-bit or 64-bit size_t).
+                static constexpr size_t Basis = sizeof(size_t) == 8
+                    ? size_t( 14695981039346656037ULL ) : size_t( 2166136261u );
+                static constexpr size_t Prime = sizeof(size_t) == 8
+                    ? size_t( 1099511628211ULL ) : size_t( 16777619u );
+
+                size_t h = Basis;
+                for ( unsigned char c : a_Key.Path )
+                    h = ( h ^ static_cast<size_t>( c ) ) * Prime;
+                h = ( h ^ std::hash<u32>{}( a_Key.PixelSize ) ) * Prime;
+                return h;
+            }
+        };
+
+        FT_Library m_Library{ nullptr };
+        HashMap<FontKey, Font, FontKeyHasher> m_Cache;
     };
 
     /**

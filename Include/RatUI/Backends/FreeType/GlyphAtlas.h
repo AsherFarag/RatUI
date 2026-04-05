@@ -4,27 +4,40 @@
 
 namespace RatUI::FreeType
 {
+    /**
+     * @brief A key for identifying a specific glyph in the atlas.
+     */
     struct GlyphKey
     {
-        u32 GlyphID;
-        u32 PixelSize;
+        u32 GlyphID;   ///< The FreeType glyph index (not Unicode codepoint).
+        u32 PixelSize; ///< The pixel size at which the glyph is rasterized.
 
         constexpr bool operator==( const GlyphKey& ) const = default;
     };
 
+    /**
+     * @brief Describes the rectangle and bearing of a rasterized glyph within the atlas texture.
+     */
     struct GlyphRect
     {
-        Rectu Rect;
-        Vec2i Bearing;
+        Rectu Rect;    ///< The rectangle within the atlas texture where the glyph bitmap is stored, in pixel coordinates.
+        Vec2i Bearing; ///< The horizontal and vertical bearing of the glyph, i.e. the offset from the baseline to the top-left of the glyph bitmap.
     };
 
+    /**
+     * @brief Describes the position and UV coordinates of a glyph quad for rendering.
+     */
     struct GlyphQuad
     {
         Vec2f PosMin{ 0.f, 0.f }, PosMax{ 0.f, 0.f }; ///< The position of the glyph quad in screen space (or whatever coordinate space the caller is using).
         Vec2f UVMin{ 0.f, 0.f }, UVMax{ 0.f, 0.f };   ///< The UV coordinates of the glyph quad in the atlas texture, normalized to [0, 1].
     };
 
-
+    /** 
+     * @brief A texture atlas for storing rasterized glyphs.
+     * This class manages a single texture and a mapping of glyph keys to their locations within that texture. 
+     * It handles rasterizing glyphs on demand and uploading them to the GPU.
+     */
     class GlyphAtlas
     {
     public:
@@ -33,9 +46,8 @@ namespace RatUI::FreeType
             , m_AtlasWidth( a_AtlasWidth )
             , m_AtlasHeight( a_AtlasHeight )
         {
-            // Create an empty texture for the atlas.
-            // TODO
-            //m_Texture = m_Renderer.CreateTexture( a_AtlasWidth, a_AtlasHeight, ETextureFormat::RGBA8, nullptr ).value_or( TextureID::Null() );
+            m_Texture = m_Renderer.CreateTexture( a_AtlasWidth, a_AtlasHeight, ETextureFormat::R8, nullptr )
+                        .value_or( TextureID::Null() );
         }
 
         ~GlyphAtlas()
@@ -44,32 +56,44 @@ namespace RatUI::FreeType
                 m_Renderer.DestroyTexture( m_Texture );
         }
 
-        /** @brief Gets the texture ID of the glyph atlas. */
+        /** @brief Returns the GPU texture containing all rasterized glyphs. */
         TextureID GetTexture() const { return m_Texture; }
 
-        /** @brief Gets the dimensions of the glyph atlas. */
+        /** @brief Gets the width of the glyph atlas texture. */
         u32 GetWidth() const { return m_AtlasWidth; }
+
+        /** @brief Gets the height of the glyph atlas texture. */
         u32 GetHeight() const { return m_AtlasHeight; }
 
+        /**
+         * @brief Looks up a glyph in the atlas, rasterizing and uploading it if not already cached.
+         * @return The GlyphRect describing the glyph's location and bearing in the atlas, or NullOpt
+         *         if the texture is invalid, the glyph could not be rasterized, or the atlas is full.
+         */
         Optional<GlyphRect> GetOrRasterizeGlyph( FT_Face a_Face, GlyphKey a_Key )
         {
-            auto it = Find( m_GlyphMap, a_Key );
-            if (it != End( m_GlyphMap )) 
-                return it->second; // Glyph already in atlas, return its rect. TODO: Add First() Second() helpers.
+            if ( !m_Texture.IsValid() )
+                return NullOpt;
 
-            FT_Load_Glyph(a_Face, a_Key.GlyphID, FT_LOAD_RENDER);
+            auto it = Find( m_GlyphMap, a_Key );
+            if ( it != End( m_GlyphMap ) )
+                return it->second;
+
+            if ( FT_Load_Glyph( a_Face, a_Key.GlyphID, FT_LOAD_RENDER ) != 0 )
+                return NullOpt;
+
             FT_Bitmap& bmp = a_Face->glyph->bitmap;
 
-            if (m_CursorX + (i32)bmp.width > m_AtlasWidth)
+            if ( m_CursorX + (i32)bmp.width > (i32)m_AtlasWidth )
             {
                 m_CursorX = 0;
                 m_CursorY = m_RowBottom;
             }
 
-            if (m_CursorY + (i32)bmp.rows > m_AtlasHeight)
+            if ( m_CursorY + (i32)bmp.rows > (i32)m_AtlasHeight )
                 return NullOpt; // atlas full — would need a second atlas page here
 
-            UploadBitmap(bmp, m_CursorX, m_CursorY);
+            UploadBitmap( bmp, m_CursorX, m_CursorY );
 
             GlyphRect rect{
                 .Rect = Rectu{ Vec2u{ (u32)m_CursorX, (u32)m_CursorY }, Vec2u{ (u32)bmp.width, (u32)bmp.rows } },
@@ -79,37 +103,63 @@ namespace RatUI::FreeType
             m_CursorX   += (i32)bmp.width + 1;  // 1px padding to avoid bleeding
             m_RowBottom  = std::max(m_RowBottom, m_CursorY + (i32)bmp.rows + 1);
 
-            m_GlyphMap[a_Key] = rect; // Cache the glyph rect for future lookups.
+            m_GlyphMap[a_Key] = rect;
             return rect;
         }
 
+        /** @brief Overload that takes separate glyph ID and pixel size parameters for convenience. */
         Optional<GlyphRect> GetOrRasterizeGlyph( FT_Face a_Face, u32 a_GlyphID, u32 a_PixelSize )
         {
             return GetOrRasterizeGlyph( a_Face, GlyphKey{ a_GlyphID, a_PixelSize } );
         }
 
     private:
+        struct GlyphKeyHasher
+        {
+            size_t operator()( const GlyphKey& a_Key ) const noexcept
+            {
+                // Simple hash combining GlyphID and PixelSize.
+                return std::hash<u32>{}( a_Key.GlyphID ) ^ ( std::hash<u32>{}( a_Key.PixelSize ) << 1 );
+            }
+        };
+
         void UploadBitmap(const FT_Bitmap& a_Bmp, i32 a_Dx, i32 a_Dy)
         {
-            //void* pixels; i32 pitch;
-            //u32* dst = static_cast<u32*>(pixels);
-            //for (u32 row = 0; row < a_Bmp.rows; ++row)
-            //{
-            //    for (u32 col = 0; col < a_Bmp.width; ++col)
-            //    {
-            //        u8 alpha = a_Bmp.buffer[row * a_Bmp.pitch + col];
-            //        dst[(a_Dy + row) * (pitch / 4) + (a_Dx + col)] = (alpha << 24) | 0x00FFFFFF;  // white + alpha
-            //    }
-            //}
+            if ( a_Bmp.rows == 0 || a_Bmp.width == 0 )
+                return;
 
-            // TODO: Use m_Renderer.UpdateTexture to upload the pixel data to the atlas texture.
+            const Rectu region{ Vec2u{ static_cast<u32>( a_Dx ), static_cast<u32>( a_Dy ) },
+                                 Vec2u{ a_Bmp.width, a_Bmp.rows } };
+
+            // FT_Bitmap::pitch is the byte stride per row and may be negative (bottom-up) or
+            // padded (positive but wider than width). Normalise to an unsigned stride.
+            const u32 stride = static_cast<u32>( std::abs( a_Bmp.pitch ) );
+
+            if ( stride == a_Bmp.width )
+            {
+                // Rows are already packed tightly — upload directly.
+                m_Renderer.UpdateTexture( m_Texture, 0, region, a_Bmp.buffer, static_cast<size>( a_Bmp.rows ) * a_Bmp.width );
+            }
+            else
+            {
+                // Rows have padding — pack into a contiguous buffer before uploading.
+                Array<u8> packed;
+                Resize( packed, static_cast<size>( a_Bmp.rows ) * a_Bmp.width );
+                for ( u32 row = 0; row < a_Bmp.rows; ++row )
+                {
+                    std::memcpy( Data( packed ) + row * a_Bmp.width,
+                                 a_Bmp.buffer  + row * stride,
+                                 a_Bmp.width );
+                }
+                m_Renderer.UpdateTexture( m_Texture, 0, region, Data( packed ), Size( packed ) );
+            }
         }
 
         IRenderer& m_Renderer;
         TextureID  m_Texture{ TextureID::Null() };
         u32        m_AtlasWidth{ 0 }, m_AtlasHeight{ 0 };
         i32        m_CursorX{ 0 }, m_CursorY{ 0 }, m_RowBottom{ 0 };
-        HashMap<GlyphKey, GlyphRect> m_GlyphMap;
+        HashMap<GlyphKey, GlyphRect, GlyphKeyHasher> m_GlyphMap;
     };
 
     /**
