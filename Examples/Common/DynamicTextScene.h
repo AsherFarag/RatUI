@@ -176,6 +176,7 @@ private:
         WidgetID lbl = m_Scene.CreateWidget<TextWidget>( row, rowLabel, RowLabelStyle() );
         {
             auto* n = Node( lbl );
+            n->Style.Padding    = Edges{ 4.f };
             n->Style.WidthMode  = ESizingMode::Fixed;
             n->Style.FixedWidth = 112.f;
             n->Style.HeightMode = ESizingMode::Content;
@@ -447,6 +448,7 @@ private:
         WidgetID lbl = m_Scene.CreateWidget<TextWidget>( row, "Ellipsis", RowLabelStyle() );
         {
             auto* n = Node( lbl );
+            n->Style.Padding = Edges{ 4.f };
             n->Style.WidthMode  = ESizingMode::Fixed;
             n->Style.FixedWidth = 112.f;
             n->Style.HeightMode = ESizingMode::Content;

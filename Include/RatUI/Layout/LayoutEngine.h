@@ -35,19 +35,19 @@ namespace RatUI
         // Resolve width
         switch (s.WidthMode)
         {
-            case ESizingMode::Content: desired[0] = a_Node.Layout.IntrinsicSize[0]; break;
             case ESizingMode::Fixed:   desired[0] = s.FixedWidth; break;
             case ESizingMode::Percent: desired[0] = s.PercentWidth * a_AvailableSize[0]; break;
-            case ESizingMode::Flex:    break; // Need to measure children to determine size
+            case ESizingMode::Flex:
+            case ESizingMode::Content: desired[0] = a_Node.Layout.IntrinsicSize[0]; break;
         }
     
         // Resolve height
         switch (s.HeightMode)
         {
-            case ESizingMode::Content: desired[1] = a_Node.Layout.IntrinsicSize[1]; break;
             case ESizingMode::Fixed:   desired[1] = s.FixedHeight; break;
             case ESizingMode::Percent: desired[1] = s.PercentHeight * a_AvailableSize[1]; break;
-            case ESizingMode::Flex:    break; // Need to measure children to determine size
+            case ESizingMode::Flex:
+            case ESizingMode::Content: desired[1] = a_Node.Layout.IntrinsicSize[1]; break;
         }
     
         // Accumulate children for content mode
