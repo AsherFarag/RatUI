@@ -53,10 +53,7 @@ namespace RatUI
             if ( !node || !node->Layout.Visibility.IsRendered() ) return;
             if ( m_Text.empty() ) return;
 
-            const Rectf& finalRect = node->Layout.FinalRect;
-            Rectf textRect{ finalRect.Origin, node->Layout.IntrinsicSize };
-            textRect = node->Style.Padding.Apply( textRect );
-
+            const Rectf textRect = node->Style.Padding.Apply( node->Layout.FinalRect );
             a_DrawList.AddText( m_Text, m_Style, textRect );
         }
 

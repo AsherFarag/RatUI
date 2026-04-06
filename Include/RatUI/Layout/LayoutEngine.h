@@ -53,7 +53,7 @@ namespace RatUI
         // Accumulate children for content mode
         {
             const Vec2f padding = s.Padding.Total();
-            Vec2f       contentSize{ 0.0f, 0.0f };
+            Vec2f       contentSize = a_Node.Layout.IntrinsicSize; // Start with intrinsic size, if any
             Vec2f       childAvailSize = a_AvailableSize - padding;
             u32         numFlow = 0;
         
