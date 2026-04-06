@@ -5,6 +5,8 @@
 #include <hb.h>
 #include <hb-ft.h>
 
+#include <map> // TODO: Remove me once we have Map<>
+
 namespace RatUI::FreeType
 {
     /**
@@ -17,76 +19,34 @@ namespace RatUI::FreeType
         if ( a_Style.LineHeight > 0.f )
             return a_Style.LineHeight;
 
-        return a_Face->size->metrics.height / 64.f;   
+        return a_Face->size->metrics.height / 64.f;
     }
 
     /**
-     * @brief Represents a loaded font, containing both the FreeType face and the HarfBuzz font.
+     * @brief Cached advance and kerning data for a single glyph at a specific pixel size.
+     * Populated lazily on first access and reused for all subsequent measurements.
+     * TODO: This isn't really needed yet, either remove it or expand it.
+     */
+    struct GlyphMetrics
+    {
+        f32 XAdvance{ 0.f };
+    };
+
+    /**
+     * @brief Represents a loaded font, containing the FreeType face, the HarfBuzz font,
+     *        a persistent HarfBuzz shaping buffer (reset between calls), and a per-size
+     *        glyph advance cache to avoid redundant FT_Load_Glyph calls during measurement.
      */
     class Font
     {
     public:
-        FT_Face FTFace = nullptr;    ///< The FreeType face object.
-        hb_font_t* HBFont = nullptr;
-
-        void Destroy()
-        {
-            if ( HBFont ) hb_font_destroy( HBFont );
-            if ( FTFace ) FT_Done_Face( FTFace );
-            HBFont = nullptr;
-            FTFace = nullptr;
-        }
-
-        static Optional<Font> LoadFromMemory( FT_Library a_FTLib, const void* a_Data, size a_Size, u32 a_PixelSize )
-        {
-            FT_Face face;
-            if ( FT_New_Memory_Face( a_FTLib, static_cast<const FT_Byte*>( a_Data ), static_cast<FT_Long>( a_Size ), 0, &face ) != 0 )
-                return NullOpt; // Failed to load font from memory.
-
-            if ( FT_Set_Pixel_Sizes( face, 0, static_cast<FT_UInt>( a_PixelSize ) ) != 0 )
-            {
-                FT_Done_Face( face );
-                return NullOpt; // Failed to set pixel size.
-            }
-
-            hb_font_t* hbFont = hb_ft_font_create( face, nullptr );
-            if ( !hbFont )
-            {
-                FT_Done_Face( face );
-                return NullOpt; // Failed to create HarfBuzz font.
-            }
-
-            return Font{ face, hbFont };
-        }
-
-        static Optional<Font> LoadFromFile( FT_Library a_FTLib, const char* a_FilePath, u32 a_PixelSize )
-        {
-            FT_Face face;
-            if ( FT_New_Face( a_FTLib, a_FilePath, 0, &face ) != 0 )
-                return NullOpt; // Failed to load font file.
-
-            if ( FT_Set_Pixel_Sizes( face, 0, static_cast<FT_UInt>( a_PixelSize ) ) != 0 )
-            {
-                FT_Done_Face( face );
-                return NullOpt; // Failed to set pixel size.
-            }
-
-            hb_font_t* hbFont = hb_ft_font_create( face, nullptr );
-            if ( !hbFont )
-            {
-                FT_Done_Face( face );
-                return NullOpt; // Failed to create HarfBuzz font.
-            }
-
-            return Font{ face, hbFont };
-        }
-
         Font() = default;
         ~Font() { Destroy(); }
 
-        Font( FT_Face a_FTFace, hb_font_t* a_HBFont ) 
-            : FTFace( a_FTFace )
-            , HBFont( a_HBFont ) 
+        Font( FT_Face a_Face, hb_font_t* a_Font, hb_buffer_t* a_Buffer )
+            : m_Face( a_Face )
+            , m_Font( a_Font )
+            , m_Buffer( a_Buffer )
         {}
 
         // Non-copyable
@@ -95,18 +55,128 @@ namespace RatUI::FreeType
 
         // Movable
         Font( Font&& a_Other ) noexcept
-            : FTFace( std::exchange( a_Other.FTFace, nullptr ) )
-            , HBFont( std::exchange( a_Other.HBFont, nullptr ) )
+            : m_Face   ( std::exchange( a_Other.m_Face,    nullptr ) )
+            , m_Font   ( std::exchange( a_Other.m_Font,    nullptr ) )
+            , m_Buffer ( std::exchange( a_Other.m_Buffer,  nullptr ) )
         {}
 
         Font& operator=( Font&& a_Other ) noexcept
         {
             if ( this == &a_Other ) return *this;
             Destroy();
-            FTFace = std::exchange( a_Other.FTFace, nullptr );
-            HBFont = std::exchange( a_Other.HBFont, nullptr );
+            m_Face        = std::exchange( a_Other.m_Face,   nullptr );
+            m_Font        = std::exchange( a_Other.m_Font,   nullptr );
+            m_Buffer      = std::exchange( a_Other.m_Buffer, nullptr );
             return *this;
         }
+
+        /** @brief Gets the FreeType face object. */
+        FT_Face GetFace() const { return m_Face; }
+
+        /** @brief Gets the HarfBuzz font object. */
+        hb_font_t* GetHBFont() const { return m_Font; }
+
+        /** @brief Gets the HarfBuzz buffer object. */
+        hb_buffer_t* GetHBBuffer() const { return m_Buffer; }
+
+        /**
+         * @brief Gets the horizontal advance for a given glyph ID, using the cache if available.
+         * If the advance is not in the cache, it loads the glyph with FT_LOAD_ADVANCE_ONLY 
+         * to query the advance without rasterizing, stores it in the cache, and returns it.
+         */
+        f32 GetAdvanceX( u32 a_GlyphID )
+        {
+			auto it = m_GlyphMetrics.find( a_GlyphID );
+			if ( it != m_GlyphMetrics.end() )
+                return it->second.XAdvance;
+
+            if ( FT_Load_Glyph( m_Face, a_GlyphID, FT_LOAD_ADVANCE_ONLY ) != 0 )
+                return 0.f;
+
+            GlyphMetrics metrics;
+            metrics.XAdvance = m_Face->glyph->advance.x / 64.f;
+            m_GlyphMetrics[a_GlyphID] = metrics;
+
+            return metrics.XAdvance;
+        }
+
+        /**
+         * @brief Loads a font from memory and prepares it for use, returning an optional Font object.
+         * @param a_FTLib The FreeType library instance to use for loading the font
+         * @param a_Data Pointer to the font data in memory
+         * @param a_Size Size of the font data in bytes
+         * @param a_PixelSize The desired pixel size for the font, which determines the
+         *                    resolution of the loaded glyphs and metrics. This is important for accurate measurement and rendering.
+         * @return An optional Font object containing the loaded font data and associated HarfBuzz objects, or NullOpt if loading failed.
+         * @note The caller is responsible for ensuring that the memory pointed to by a_Data remains valid for the lifetime of the returned Font, 
+         *       as FreeType may reference this memory directly without copying it.
+         */
+        static Optional<Font> LoadFromMemory( FT_Library a_FTLib, const void* a_Data, size a_Size, u32 a_PixelSize )
+        {
+            FT_Face face;
+            if ( FT_New_Memory_Face( a_FTLib, static_cast<const FT_Byte*>( a_Data ), static_cast<FT_Long>( a_Size ), 0, &face ) != 0 )
+                return NullOpt;
+
+            return LoadFromFace( face, a_PixelSize );
+        }
+
+        /**
+         * @brief Loads a font from a file path and prepares it for use, returning an optional Font object.
+         * @param a_FTLib The FreeType library instance to use for loading the font
+         * @param a_FilePath The file path to the font file on disk, which should be a valid font format supported by FreeType (e.g., TTF, OTF).
+         * @param a_PixelSize The desired pixel size for the font, which determines the resolution of the loaded glyphs and metrics. This is important for accurate measurement and rendering.
+         * @return An optional Font object containing the loaded font data and associated HarfBuzz objects, or NullOpt if loading failed.
+         */
+        static Optional<Font> LoadFromFile( FT_Library a_FTLib, const char* a_FilePath, u32 a_PixelSize )
+        {
+            FT_Face face;
+            if ( FT_New_Face( a_FTLib, a_FilePath, 0, &face ) != 0 )
+                return NullOpt;
+
+            return LoadFromFace( face, a_PixelSize );
+        }
+
+    private:
+        static Optional<Font> LoadFromFace( FT_Face a_Face, u32 a_PixelSize )
+        {
+            if ( FT_Set_Pixel_Sizes( a_Face, 0, static_cast<FT_UInt>( a_PixelSize ) ) != 0 )
+            {
+                FT_Done_Face( a_Face );
+                return NullOpt;
+            }
+
+            hb_font_t* hbFont = hb_ft_font_create( a_Face, nullptr );
+            if ( !hbFont )
+            {
+                FT_Done_Face( a_Face );
+                return NullOpt;
+            }
+
+            hb_buffer_t* hbBuf = hb_buffer_create();
+            if ( !hbBuf )
+            {
+                hb_font_destroy( hbFont );
+                FT_Done_Face( a_Face );
+                return NullOpt;
+            }
+
+            return Font{ a_Face, hbFont, hbBuf };
+        }
+
+        void Destroy()
+        {
+            if ( m_Buffer ) hb_buffer_destroy( m_Buffer );
+            if ( m_Font   ) hb_font_destroy( m_Font );
+            if ( m_Face   ) FT_Done_Face( m_Face );
+            m_Buffer = nullptr;
+            m_Font   = nullptr;
+            m_Face   = nullptr;
+        }
+
+        FT_Face      m_Face   = nullptr; ///< The FreeType face object representing the loaded font, used for rasterization and metric queries.
+        hb_font_t*   m_Font   = nullptr; ///< Persistent HarfBuzz font object associated with the FreeType face, used for shaping operations.
+        hb_buffer_t* m_Buffer = nullptr; ///< Persistent buffer that is reset and reused for each shaping operation to avoid repeated allocations.
+        std::map<u32, GlyphMetrics> m_GlyphMetrics; ///< TODO: Make a Map type
     };
 
     class FontCache
@@ -128,14 +198,13 @@ namespace RatUI::FreeType
             if ( m_Library ) FT_Done_FreeType( m_Library );
         }
 
-        // Non-copyable because it owns the FT_Library and Font handles.
         FontCache( const FontCache& ) = delete;
         FontCache& operator=( const FontCache& ) = delete;
 
         FontCache( FontCache&& a_Other ) noexcept
-            : m_Library( std::exchange( a_Other.m_Library, nullptr ) )
-            , m_Cache( std::move( a_Other.m_Cache ) )
-            , m_HandleToPath( std::move( a_Other.m_HandleToPath ) )
+            : m_Library      ( std::exchange( a_Other.m_Library, nullptr ) )
+            , m_Cache        ( std::move( a_Other.m_Cache ) )
+            , m_HandleToPath ( std::move( a_Other.m_HandleToPath ) )
         {}
 
         FontCache& operator=( FontCache&& a_Other ) noexcept
@@ -146,24 +215,15 @@ namespace RatUI::FreeType
             ::RatUI::Clear( m_HandleToPath );
             if ( m_Library ) FT_Done_FreeType( m_Library );
 
-            m_Library = std::exchange( a_Other.m_Library, nullptr );
-            m_Cache   = std::move( a_Other.m_Cache );
+            m_Library      = std::exchange( a_Other.m_Library, nullptr );
+            m_Cache        = std::move( a_Other.m_Cache );
             m_HandleToPath = std::move( a_Other.m_HandleToPath );
             return *this;
         }
 
-        /** @brief Returns true if the FreeType library was initialised successfully. */
         bool IsValid() const { return m_Library != nullptr; }
-
-        /** @brief Returns the underlying FT_Library handle. */
         FT_Library GetLibrary() const { return m_Library; }
 
-        /** 
-         * @brief Associates a FontHandle with a file path for later retrieval. 
-         *        This is necessary because the public API uses FontHandles, but the cache needs file paths to load fonts.
-         * @return True if the handle was valid and registration succeeded, false otherwise.
-         * @note Registering the same handle twice overwrites the previous path.
-         */
         bool RegisterFontHandle( FontHandle a_Handle, String a_FilePath )
         {
             if ( !a_Handle.IsValid() || Empty( a_FilePath ) )
@@ -173,10 +233,6 @@ namespace RatUI::FreeType
             return true;
         }
 
-        /**
-         * @brief Retrieves a Font from the cache based on the given handle and pixel size.
-         * @return A pointer to the Font if found, or nullptr if the handle is invalid or the font variant is not cached.
-         */
         Font* GetFont( FontHandle a_Handle, u32 a_PixelSize )
         {
             if ( !a_Handle.IsValid() )
@@ -186,37 +242,29 @@ namespace RatUI::FreeType
             return it != End( m_Cache ) ? &it->second : nullptr;
         }
 
-        /**
-         * @brief Retrieves a Font from the cache based on the given handle and pixel size.
-         * If the font is not already cached, it attempts to load it using the registered file path.
-         * @return A pointer to the Font if found or loaded successfully, or nullptr if the handle is invalid, no path is registered, or loading fails.
-         */
         Font* GetOrLoadFont( FontHandle a_Handle, u32 a_PixelSize )
         {
             if ( Font* cachedFont = GetFont( a_Handle, a_PixelSize ) )
-                return cachedFont; // Cache hit
+                return cachedFont;
 
-            // Cache miss - need to load the font
             auto pathIt = Find( m_HandleToPath, a_Handle );
             if ( pathIt == End( m_HandleToPath ) )
-                return nullptr; // No registered path for this handle
+                return nullptr;
 
             const String& filePath = pathIt->second;
             auto fontOpt = Font::LoadFromFile( m_Library, CStr( filePath ), a_PixelSize );
             if ( !fontOpt )
-                return nullptr; // Failed to load font
+                return nullptr;
 
             auto [insertIt, success] = Emplace( m_Cache, FontKey{ a_Handle, a_PixelSize }, std::move( *fontOpt ) );
             return success ? &insertIt->second : nullptr;
         }
 
-        /** @brief Evicts a specific font variant from the cache based on its handle and pixel size. */
         void Evict( FontHandle a_Handle, u32 a_PixelSize )
         {
             Erase( m_Cache, FontKey{ a_Handle, a_PixelSize } );
         }
 
-        /** @brief Returns the number of currently cached Font variants. */
         size CachedCount() const { return Size( m_Cache ); }
 
     private:
@@ -224,7 +272,6 @@ namespace RatUI::FreeType
         {
             FontHandle Handle;
             u32        PixelSize;
-
             bool operator==( const FontKey& ) const = default;
         };
 
@@ -238,55 +285,61 @@ namespace RatUI::FreeType
 
         FT_Library m_Library{ nullptr };
         HashMap<FontKey, Font, FontKeyHasher> m_Cache;
-        HashMap<FontHandle, String> m_HandleToPath;
+        HashMap<FontHandle, String>           m_HandleToPath;
     };
 
     /**
-     * @brief Represents a single shaped glyph, containing the glyph ID and its positioning information.
+     * @brief Represents a single shaped glyph with its ID and HarfBuzz positioning data.
      */
     struct ShapedGlyph
     {
         u32 GlyphID{0};
         u32 PixelSize{0};
         f32 XAdvance{0.f}, YAdvance{0.f};
-        f32 XOffset{0.f}, YOffset{0.f};
+        f32 XOffset{0.f},  YOffset{0.f};
     };
 
-    inline void ShapeLine( hb_font_t* a_Font, StringView a_TextUTF8, u32 a_PixelSize, Array<ShapedGlyph>& o_Glyphs )
+    struct Script
     {
-        hb_buffer_t* buf = hb_buffer_create();
+        hb_script_t Value;
+    };
 
-        // Set up the buffer with the text and properties
+    /**
+     * @brief Shapes a line of text using HarfBuzz.
+     * TODO: direction, script, and language are currently hardcoded to LTR/Latin/en.
+     *       These should be derived from the text content (e.g. via ICU or hb-unicode)
+     *       to support RTL scripts and non-Latin writing systems correctly.
+     */
+    inline void ShapeLine( Font& a_Font, StringView a_TextUTF8, u32 a_PixelSize, Array<ShapedGlyph>& o_Glyphs )
+    {
+        hb_buffer_t* buf = a_Font.GetHBBuffer();
+        hb_buffer_reset( buf );
+
         hb_buffer_add_utf8( buf, Data( a_TextUTF8 ), static_cast<int>( Size( a_TextUTF8 ) ), 0, -1 );
-
-        // TODO: we're hardcoding direction, script, and language here.
         hb_buffer_set_direction( buf, HB_DIRECTION_LTR );
-        hb_buffer_set_script( buf, HB_SCRIPT_LATIN );
-        hb_buffer_set_language( buf, hb_language_from_string( "en", -1 ) );
+        hb_buffer_set_script(    buf, HB_SCRIPT_LATIN );
+        hb_buffer_set_language(  buf, hb_language_from_string( "en", -1 ) );
 
-        hb_shape( a_Font, buf, nullptr, 0 );
+        hb_shape( a_Font.GetHBFont(), buf, nullptr, 0 );
 
-        unsigned int glyphCount = 0;
-        hb_glyph_info_t* infos = hb_buffer_get_glyph_infos( buf, &glyphCount );
-        hb_glyph_position_t* positions = hb_buffer_get_glyph_positions( buf, &glyphCount );
+        unsigned int           glyphCount = 0;
+        hb_glyph_info_t*       infos      = hb_buffer_get_glyph_infos( buf, &glyphCount );
+        hb_glyph_position_t*   positions  = hb_buffer_get_glyph_positions( buf, &glyphCount );
 
         Clear( o_Glyphs );
         Reserve( o_Glyphs, glyphCount );
 
-        // HarfBuzz positions are in 26.6 fixed-point (1/64 pixel), divide by 64
         for ( unsigned i = 0; i < glyphCount; ++i )
         {
             EmplaceBack( o_Glyphs,
-                /*.GlyphID  */ infos[i].codepoint, // after shaping, codepoint is the glyph ID
-                /*.PixelSize*/ a_PixelSize, // TODO: Do we need this here? In the render func we could just pass in a pixel size instead of per-glyph, since all glyphs in a line will be the same size?
+                /*.GlyphID  */ infos[i].codepoint,
+                /*.PixelSize*/ a_PixelSize,
                 /*.XAdvance */ positions[i].x_advance / 64.f,
                 /*.YAdvance */ positions[i].y_advance / 64.f,
-                /*.XOffset  */ positions[i].x_offset / 64.f,
-                /*.YOffset  */ positions[i].y_offset / 64.f
+                /*.XOffset  */ positions[i].x_offset  / 64.f,
+                /*.YOffset  */ positions[i].y_offset  / 64.f
             );
         }
-
-        hb_buffer_destroy( buf );
     }
 
 } // namespace RatUI::FreeType

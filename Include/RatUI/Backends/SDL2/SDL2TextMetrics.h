@@ -48,24 +48,25 @@ namespace RatUI::SDL2
         if ( !a_Style.Font.IsValid() || a_Text.empty() )
             return {}; // Early out for invalid font or empty text.
 
-		FreeType::Font* font = m_FontCache->GetFont( a_Style.Font, a_Style.Size );
+		FreeType::Font* font = m_FontCache->GetOrLoadFont( a_Style.Font, a_Style.Size );
         if ( !font )
+        {
+            // TODO: Should add a LOG api and use it here
             return {}; // Early out if the font failed to load for some reason.
-
-        FT_Face face = font->FTFace;
+        }
 
         // - Build the line array
         Array<StringView> lines;
 		Array<String> linesStorage;
-        FreeType::TextUtil::BuildTextLines( face, a_Style, a_Text, lines, linesStorage, a_MaxWidth );
+        FreeType::TextUtil::BuildTextLines( *font, a_Style, a_Text, lines, linesStorage, a_MaxWidth );
 
         // - Measure each line and compute overall metrics
         f32 maxWidth = 0.f;
         for ( const StringView line : lines )
-            maxWidth = std::max( maxWidth, FreeType::TextUtil::MeasureLineWidth( face, line, a_Style ) );
+            maxWidth = std::max( maxWidth, FreeType::TextUtil::MeasureLineWidth( *font, line, a_Style ) );
 
-        const f32 lineHeight = FreeType::GetLineHeight( face, a_Style );
-        const f32 baseline   = face->size->metrics.ascender / 64.f;
+        const f32 lineHeight = FreeType::GetLineHeight( font->GetFace(), a_Style);
+        const f32 baseline   = font->GetFace()->size->metrics.ascender / 64.f;
 
         TextMeasurement result;
         result.Size[0]   = std::clamp( maxWidth, 0.f, a_MaxWidth );

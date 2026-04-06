@@ -1,57 +1,50 @@
 #pragma once
 #include "../../RatUI.h"
+#include "FontCache.h"
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include <cctype>
 
 namespace RatUI::FreeType::TextUtil
 {
-    // TODO: I forgot to treat the text as utf8 and just wrote it as ascii.
-    // Please fix.
-
-    // TODO: Probably shouldve gotten a library for this
-    // TODO: make this a universal utility instead of SDL2 specific since it doesn't actually use any SDL2 features
-    /** @brief An iterator for traversing UTF-8 encoded strings. */
+    /** 
+     * @brief A forward iterator for UTF-8 encoded strings that decodes one Unicode codepoint at a time.
+     */
     class UTF8Iterator
     {
     public:
         using value_type = char32_t;
 
-        UTF8Iterator(StringView a_Str, size_t a_ByteIndex = 0)
-            : m_Data(a_Str), m_Index(a_ByteIndex)
+        UTF8Iterator( StringView a_Str, size_t a_ByteIndex = 0 )
+            : m_Data( a_Str ), m_Index( a_ByteIndex )
         {
-            if (m_Index < m_Data.size())
+            if ( m_Index < m_Data.size() )
                 m_Current = Decode();
         }
 
-        static UTF8Iterator End(StringView a_Str)
+        static UTF8Iterator End( StringView a_Str )
         {
-            return UTF8Iterator(a_Str, Size(a_Str));
+            return UTF8Iterator( a_Str, Size( a_Str ) );
         }
 
         char32_t operator*() const { return m_Current; }
 
         UTF8Iterator& operator++()
         {
-            if (m_Index >= Size(m_Data))
+            if ( m_Index >= Size( m_Data ) )
                 return *this;
-
             Advance();
-            if (m_Index < Size(m_Data))
+            if ( m_Index < Size( m_Data ) )
                 m_Current = Decode();
-
             return *this;
         }
 
-        bool operator==(const UTF8Iterator& a_Other) const
+        bool operator==( const UTF8Iterator& a_Other ) const
         {
             return Data( m_Data ) == Data( a_Other.m_Data ) && m_Index == a_Other.m_Index;
         }
 
-        explicit operator bool() const
-        {
-            return m_Index < m_Data.size();
-        }
+        explicit operator bool() const { return m_Index < m_Data.size(); }
 
         size_t ByteIndex() const { return m_Index; }
 
@@ -62,156 +55,113 @@ namespace RatUI::FreeType::TextUtil
 
         static constexpr char32_t c_ReplacementCodepoint = 0xFFFD;
 
-        // - UTF-8 structural constants
+        static constexpr u8 c_AsciiMax            = 0x7F;
+        static constexpr u8 c_ContinuationMask    = 0xC0;
+        static constexpr u8 c_ContinuationPattern = 0x80;
+        static constexpr u8 c_2ByteLeadPrefix     = 0b110;
+        static constexpr u8 c_3ByteLeadPrefix     = 0b1110;
+        static constexpr u8 c_4ByteLeadPrefix     = 0b11110;
+        static constexpr u8 c_2ByteMask           = 0x1F;
+        static constexpr u8 c_3ByteMask           = 0x0F;
+        static constexpr u8 c_4ByteMask           = 0x07;
+        static constexpr u8 c_ContMask            = 0x3F;
 
-        // Byte patterns
-        static constexpr u8 c_AsciiMax              = 0x7F;
-        static constexpr u8 c_ContinuationMask      = 0xC0;
-        static constexpr u8 c_ContinuationPattern   = 0x80;
-
-        // Leading byte prefix patterns (after shifting)
-        static constexpr u8 c_2ByteLeadPrefix = 0b110;   // 0x6
-        static constexpr u8 c_3ByteLeadPrefix = 0b1110;  // 0xE
-        static constexpr u8 c_4ByteLeadPrefix = 0b11110; // 0x1E
-
-        // Bit masks for extracting payload bits
-        static constexpr u8 c_2ByteMask = 0x1F;
-        static constexpr u8 c_3ByteMask = 0x0F;
-        static constexpr u8 c_4ByteMask = 0x07;
-        static constexpr u8 c_ContMask  = 0x3F;
-
-        // Shift amounts
-        static constexpr i32 c_Shift6  = 6;
-        static constexpr i32 c_Shift12 = 12;
-        static constexpr i32 c_Shift18 = 18;
-
-        // Byte counts
-        static constexpr size c_1ByteLength = 1;
-        static constexpr size c_2ByteLength = 2;
-        static constexpr size c_3ByteLength = 3;
-        static constexpr size c_4ByteLength = 4;
-
-        /** @brief Advances the iterator to the next UTF-8 character. */
         void Advance()
         {
-            u8 lead = (u8)m_Data[m_Index];
-            m_Index += CharLength(lead);
+            m_Index += CharLength( static_cast<u8>( m_Data[m_Index] ) );
         }
 
-        /** @brief Decodes the UTF-8 character at the current position. */
         char32_t Decode() const
         {
-            const u8* s = (const u8*)m_Data.data() + m_Index;
+            const u8*  s         = reinterpret_cast<const u8*>( m_Data.data() ) + m_Index;
+            size_t     remaining = m_Data.size() - m_Index;
+            const u8   b0        = s[0];
 
-            size_t remaining = m_Data.size() - m_Index;
-            u8 b0 = s[0];
-
-            // ASCII (single byte)
-            if (b0 <= c_AsciiMax)
+            if ( b0 <= c_AsciiMax )
                 return b0;
 
-            // 2-byte sequence
-            if ((b0 >> 5) == c_2ByteLeadPrefix &&
-                remaining >= c_2ByteLength &&
-                IsCont(s[1]))
-            {
-                return ((b0 & c_2ByteMask) << c_Shift6) |
-                       (s[1] & c_ContMask);
-            }
+            if ( (b0 >> 5) == c_2ByteLeadPrefix && remaining >= 2 && IsCont(s[1]) )
+                return ((b0 & c_2ByteMask) << 6) | (s[1] & c_ContMask);
 
-            // 3-byte sequence
-            if ((b0 >> 4) == c_3ByteLeadPrefix &&
-                remaining >= c_3ByteLength &&
-                IsCont(s[1]) &&
-                IsCont(s[2]))
-            {
-                return ((b0 & c_3ByteMask) << c_Shift12) |
-                       ((s[1] & c_ContMask) << c_Shift6) |
-                       (s[2] & c_ContMask);
-            }
+            if ( (b0 >> 4) == c_3ByteLeadPrefix && remaining >= 3 && IsCont(s[1]) && IsCont(s[2]) )
+                return ((b0 & c_3ByteMask) << 12) | ((s[1] & c_ContMask) << 6) | (s[2] & c_ContMask);
 
-            // 4-byte sequence
-            if ((b0 >> 3) == c_4ByteLeadPrefix &&
-                remaining >= c_4ByteLength &&
-                IsCont(s[1]) &&
-                IsCont(s[2]) &&
-                IsCont(s[3]))
-            {
-                return ((b0 & c_4ByteMask) << c_Shift18) |
-                       ((s[1] & c_ContMask) << c_Shift12) |
-                       ((s[2] & c_ContMask) << c_Shift6) |
-                       (s[3] & c_ContMask);
-            }
+            if ( (b0 >> 3) == c_4ByteLeadPrefix && remaining >= 4 && IsCont(s[1]) && IsCont(s[2]) && IsCont(s[3]) )
+                return ((b0 & c_4ByteMask) << 18) | ((s[1] & c_ContMask) << 12) | ((s[2] & c_ContMask) << 6) | (s[3] & c_ContMask);
 
             return c_ReplacementCodepoint;
         }
 
-        /** @brief Checks if a byte is a UTF-8 continuation byte. */
-        static bool IsCont(u8 a_Byte)
+        static bool IsCont(u8 a_Byte) 
         {
-            return (a_Byte & c_ContinuationMask) == c_ContinuationPattern;
+            return (a_Byte & c_ContinuationMask) == c_ContinuationPattern; 
         }
 
-        /** @brief Determines the length of a UTF-8 character based on its leading byte. */
-        static size_t CharLength(u8 a_Lead)
+        static size_t CharLength( u8 a_Lead )
         {
-            if ( a_Lead       <= c_AsciiMax)        return c_1ByteLength;
-            if ((a_Lead >> 5) == c_2ByteLeadPrefix) return c_2ByteLength;
-            if ((a_Lead >> 4) == c_3ByteLeadPrefix) return c_3ByteLength;
-            if ((a_Lead >> 3) == c_4ByteLeadPrefix) return c_4ByteLength;
-            return c_1ByteLength;
+            if  ( a_Lead       <= c_AsciiMax)        return 1;
+            if  ((a_Lead >> 5) == c_2ByteLeadPrefix) return 2;
+            if  ((a_Lead >> 4) == c_3ByteLeadPrefix) return 3;
+            if  ((a_Lead >> 3) == c_4ByteLeadPrefix) return 4;
+            return 1;
         }
     };
 
+    /**
+     * @brief Checks if a Unicode codepoint is an ASCII whitespace character (space, tab, newline, or carriage return).
+     */
     inline bool IsAsciiWhitespace( char32_t a_CP )
     {
-        return a_CP == U' '  ||
-               a_CP == U'\t' ||
-               a_CP == U'\n' ||
-               a_CP == U'\r';
+        return a_CP == U' ' || a_CP == U'\t' || a_CP == U'\n' || a_CP == U'\r';
     }
 
     /**
-     * @brief Measures the width of a single line of text using FreeType, taking into account letter spacing from the TextStyle.
-     * @param a_Face The FT_Face to use for measurement.
-     * @param a_Line The line of text to measure.
-     * @param a_Style The TextStyle containing letter spacing information.
-     * @return The width of the line in pixels, including letter spacing.
+     * @brief Measures the pixel width of a single (newline-free) line of text.
+     *
+     * Uses Font::GetAdvance - a glyph advance cache populated lazily by FreeType -
+     * so the common case (same glyphs measured multiple times per frame) never calls
+     * FT_Load_Glyph more than once per glyph per pixel size.
+     *
+     * Kerning is still fetched via FT_Get_Kerning on every pair because FreeType
+     * does not cache it.  If kerning queries prove expensive, consider building a
+     * pair cache in Font alongside the advance cache.
+     *
+     * @param a_Font  The loaded Font (provides FTFace + advance cache).
+     * @param a_Line  A newline-free string view to measure.
+     * @param a_Style TextStyle for letter spacing.
+     * @return The measured width in pixels.
      */
-    inline f32 MeasureLineWidth( FT_Face a_Face, StringView a_Line, const TextStyle& a_Style )
+    inline f32 MeasureLineWidth( Font& a_Font, StringView a_Line, const TextStyle& a_Style )
     {
-        if ( !a_Face || a_Line.empty() )
+        if ( a_Line.empty() )
             return 0.f;
 
-        f32 width = 0.f;
-
-        u32 prevGlyphIdx = 0;
-        bool hasPrev = false;
+        FT_Face face     = a_Font.GetFace();
+        f32     width    = 0.f;
+        u32     prevGlyph = 0;
+        bool    hasPrev  = false;
 
         UTF8Iterator it( a_Line );
         while ( it )
         {
-            u32 cp = *it;
-            u32 glyphIdx = FT_Get_Char_Index( a_Face, cp );
+            const u32 cp       = *it;
+            const u32 glyphIdx = FT_Get_Char_Index( face, cp );
+            const f32 advance = a_Font.GetAdvanceX( glyphIdx );
 
-            if ( FT_Load_Glyph( a_Face, glyphIdx, FT_LOAD_ADVANCE_ONLY  ) == 0 )
+            if ( hasPrev )
             {
-                if ( hasPrev )
+                if ( FT_HAS_KERNING( face ) )
                 {
-                    if ( FT_HAS_KERNING( a_Face ) )
-                    {
-                        FT_Vector kerning;
-                        if ( FT_Get_Kerning( a_Face, prevGlyphIdx, glyphIdx, FT_KERNING_DEFAULT, &kerning ) == 0 )
-                            width += kerning.x / 64.f;
-                    }
-                    width += a_Style.LetterSpacing;
+                    FT_Vector kerning;
+                    if ( FT_Get_Kerning( face, prevGlyph, glyphIdx, FT_KERNING_DEFAULT, &kerning ) == 0 )
+                        width += kerning.x / 64.f;
                 }
-
-                width += a_Face->glyph->advance.x / 64.f;
-                prevGlyphIdx = glyphIdx;
-                hasPrev = true;
+                width += a_Style.LetterSpacing;
             }
 
+            width    += advance;
+            prevGlyph = glyphIdx;
+            hasPrev   = true;
             ++it;
         }
 
@@ -219,76 +169,70 @@ namespace RatUI::FreeType::TextUtil
     }
 
     /**
-     * @brief Applies the specified text transformation to the input text and returns the transformed string.
-     * For example, if the transform is ETextTransform::Uppercase, all characters in the text will be converted to uppercase.
-     * @param a_Text The input text to transform.
-     * @param a_Transform The type of text transformation to apply (e.g., uppercase, lowercase, capitalize).
-     * @return A new String containing the transformed text.
+     * @brief Applies the specified text transformation (uppercase, lowercase, capitalize) to a UTF-8 encoded string.
+      * For ASCII characters, it uses std::toupper and std::tolower. For non-ASCII characters, it leaves them unchanged.
+      * The transformation is applied according to the ETextTransform mode:
+      * - Uppercase: All characters are transformed to uppercase.
+      * - Lowercase: All characters are transformed to lowercase.
+      * - Capitalize: The first character of each word is transformed to uppercase (currently implemented as all uppercase for simplicity).
+      *
+      * @param a_Text The input text to transform, provided as a StringView.
+      * @param a_Transform The type of transformation to apply, specified as an ETextTransform enum value.
+      * @return A new String containing the transformed text. The caller is responsible for managing the memory of the returned string.
+      * TODO: Support locale-aware transformations and proper word-boundary detection for capitalization.
      */
-    inline String ApplyTextTransform(TextView a_Text, ETextTransform a_Transform)
+    inline String ApplyTextTransform( TextView a_Text, ETextTransform a_Transform )
     {
-        if (a_Transform == ETextTransform::None)
-            return String(Begin(a_Text), End(a_Text));
-    
+        if ( a_Transform == ETextTransform::None )
+            return String( Begin( a_Text ), End( a_Text ) );
+
         String result;
-        Reserve(result, Size(a_Text));
-    
-        UTF8Iterator it(a_Text);
-        UTF8Iterator end = UTF8Iterator::End(a_Text);
-    
-        while (it != end)
+        Reserve( result, Size( a_Text ) );
+
+        UTF8Iterator it( a_Text );
+        UTF8Iterator end = UTF8Iterator::End( a_Text );
+
+        while ( it != end )
         {
-            size_t start = it.ByteIndex();
-            char32_t cp  = *it;
+            const size_t start   = it.ByteIndex();
+            const char32_t cp    = *it;
             ++it;
-            size_t endByte = it.ByteIndex();
-        
-            if (cp <= 0x7F) // ASCII only
+            const size_t endByte = it.ByteIndex();
+
+            if ( cp <= 0x7F )
             {
-                char c = static_cast<char>(cp);
-            
-                switch (a_Transform)
+                char c = static_cast<char>( cp );
+                switch ( a_Transform )
                 {
-                    case ETextTransform::Uppercase:
-                        c = static_cast<char>(std::toupper((unsigned char)c));
-                        break;
-                    case ETextTransform::Lowercase:
-                        c = static_cast<char>(std::tolower((unsigned char)c));
-                        break;
-                    case ETextTransform::Capitalize:
-                        c = static_cast<char>(std::toupper((unsigned char)c));
-                        // TODO:
-                        break;
-                    default:
-                        break;
+                    case ETextTransform::Uppercase:  c = static_cast<char>( std::toupper( static_cast<unsigned char>( c ) ) ); break;
+                    case ETextTransform::Lowercase:  c = static_cast<char>( std::tolower( static_cast<unsigned char>( c ) ) ); break;
+                    case ETextTransform::Capitalize: c = static_cast<char>( std::toupper( static_cast<unsigned char>( c ) ) ); break; // TODO: word-boundary awareness
+                    default: break;
                 }
-            
-                PushBack(result, c);
+                PushBack( result, c );
             }
             else
             {
-                // Copy full UTF-8 byte sequence unchanged
                 const size count   = endByte - start;
                 const size oldSize = Size( result );
                 Resize( result, oldSize + count );
                 std::memcpy( Data( result ) + oldSize, Data( a_Text ) + start, count );
             }
         }
-    
+
         return result;
     }
 
     /**
-     * @brief Splits the input text into lines based on newline characters ('\n') and populates the output array with the resulting lines.
-     * For example, the text "Hello\nWorld" would be split into two lines: "Hello" and "World".
-     * @param a_Text The input text to split into lines.
-     * @param o_Lines An array to be populated with the resulting lines of text after splitting. 
-     * The caller is responsible for ensuring that this array is properly initialized before calling this function.
+     * @brief Splits a UTF-8 encoded string into lines based on newline characters ('\n').
+     * Each line is represented as a StringView that references a portion of the original string, avoiding unnecessary copying.
+     * @param a_Text The input text to split, provided as a StringView.
+     * @param o_Lines An output array that will be populated with StringView slices corresponding to each line of text. 
+     *        The caller is responsible for ensuring that the lifetime of the original string exceeds
      */
     inline void SplitTextLines( TextView a_Text, Array<StringView>& o_Lines )
     {
         Clear( o_Lines );
-
         size lineStart = 0;
         for ( size i = 0; i < Size( a_Text ); ++i )
         {
@@ -298,44 +242,35 @@ namespace RatUI::FreeType::TextUtil
                 lineStart = i + 1;
             }
         }
-
         PushBack( o_Lines, StringView( Data( a_Text ) + lineStart, Size( a_Text ) - lineStart ) );
     }
 
     /**
-     * @brief Wraps the input text into multiple lines based on the specified maximum width and populates the output array with the resulting lines.
-     * This function takes into account word boundaries and letter spacing from the TextStyle to ensure that lines do not exceed the maximum width.
-     * For example, if the input text is "This is a long line of text" and the maximum width only allows for "This is a long", "line of", and "text", then those three lines would be output.
-     * @param a_Face The FT_Face to use for measuring text width during wrapping.
-     * @param a_Text The input text to wrap into lines.
-     * @param a_Style The TextStyle containing letter spacing information that affects line width calculations.
-     * @param a_MaxWidth The maximum width in pixels that each line of text should not exceed. Lines will be wrapped accordingly.
-     * @param o_Lines An array to be populated with the resulting lines of text after wrapping. 
-     * The caller is responsible for ensuring that this array is properly initialized before calling this function.
+     * @brief Wraps text into lines that fit within a_MaxWidth.
+     * @param a_Font     Font providing the FTFace and advance cache.
+     * @param a_Text     Text to wrap (may contain newlines - each newline starts a new paragraph).
+     * @param a_Style    Text style (letter spacing, wrap mode).
+     * @param a_MaxWidth Maximum line width in pixels.
+     * @param o_Lines    Output array of StringView slices into a_Text (or a_Text's backing storage).
      */
     inline void WrapText(
-        FT_Face a_Face,
-        TextView a_Text,
-        const TextStyle& a_Style,
-        f32 a_MaxWidth,
+        Font&              a_Font,
+        TextView           a_Text,
+        const TextStyle&   a_Style,
+        f32                a_MaxWidth,
         Array<StringView>& o_Lines )
     {
         Clear( o_Lines );
 
-        // Wraps a single newline-free paragraph into o_Lines.
-        // Instead of building a String accumulator, we track the start and end byte positions
-        // of the current line directly into a_Paragraph - every output StringView is a
-        // zero-copy slice of the original text.
+        FT_Face face = a_Font.GetFace();
+
         auto wrapSingleParagraph = [&]( TextView a_Paragraph )
         {
-            // [lineByteStart, lineByteEnd) is the byte range of the current line in a_Paragraph.
             size_t lineByteStart = 0;
             size_t lineByteEnd   = 0;
-
-            // Incremental width state for the current line being built.
-            f32  currentWidth = 0.f;
-            u32  lastGlyphIdx = 0;
-            bool hasLastGlyph = false;
+            f32    currentWidth  = 0.f;
+            u32    lastGlyphIdx  = 0;
+            bool   hasLastGlyph  = false;
 
             auto flushCurrent = [&]()
             {
@@ -346,10 +281,8 @@ namespace RatUI::FreeType::TextUtil
                 hasLastGlyph  = false;
             };
 
-            // Measures the width contribution of the byte range [a_ByteStart, a_ByteEnd) in
-            // a_Paragraph, accounting for leading kerning/spacing from the current line's last
-            // glyph state (lastGlyphIdx / hasLastGlyph). Does NOT modify shared state.
-            // On return, o_LastGlyph / o_HasLast hold the final glyph state of the token.
+            // Measures [a_ByteStart, a_ByteEnd) accounting for leading kerning from the current
+            // line's last glyph.  Uses the advance cache on every character.
             auto measureTokenWidth = [&]( size_t a_ByteStart, size_t a_ByteEnd,
                                           u32& o_LastGlyph, bool& o_HasLast ) -> f32
             {
@@ -363,74 +296,61 @@ namespace RatUI::FreeType::TextUtil
                 {
                     const u32 cp       = *it;
                     ++it;
-                    const u32 glyphIdx = FT_Get_Char_Index( a_Face, cp );
-                    if ( FT_Load_Glyph( a_Face, glyphIdx, FT_LOAD_ADVANCE_ONLY ) != 0 )
-                        continue;
+                    const u32 glyphIdx = FT_Get_Char_Index( face, cp );
 
                     if ( hasPrev )
                     {
-                        if ( FT_HAS_KERNING( a_Face ) )
+                        if ( FT_HAS_KERNING( face ) )
                         {
                             FT_Vector kerning;
-                            if ( FT_Get_Kerning( a_Face, prevGlyph, glyphIdx, FT_KERNING_DEFAULT, &kerning ) == 0 )
+                            if ( FT_Get_Kerning( face, prevGlyph, glyphIdx, FT_KERNING_DEFAULT, &kerning ) == 0 )
                                 w += kerning.x / 64.f;
                         }
                         w += a_Style.LetterSpacing;
                     }
-                    w        += a_Face->glyph->advance.x / 64.f;
+
+                    w += a_Font.GetAdvanceX( glyphIdx ); // cache hit after first encounter
                     prevGlyph = glyphIdx;
                     hasPrev   = true;
                 }
+
                 o_LastGlyph = prevGlyph;
                 o_HasLast   = hasPrev;
                 return w;
             };
 
-            // Appends characters one by one from [a_Begin, a_End), flushing to a new line
-            // whenever a character would exceed a_MaxWidth. Uses byte-position tracking so
-            // no String allocation is needed.
+            // Appends characters one-by-one, flushing to a new line on overflow.
             auto appendTokenSplitByChar = [&]( UTF8Iterator a_Begin, UTF8Iterator a_End )
             {
                 while ( a_Begin != a_End )
                 {
-                    const size_t cpStart   = a_Begin.ByteIndex();
-                    const u32    cp        = *a_Begin;
-                    ++a_Begin;
-                    const size_t cpEnd     = a_Begin.ByteIndex();
+                    const size_t cpStart  = a_Begin.ByteIndex();
+                    const u32    cp       = *a_Begin;
+                    const size_t cpEnd    = (++a_Begin).ByteIndex();
+                    const u32 glyphIdx    = FT_Get_Char_Index( face, cp );
+                    const f32 rawAdvance  = a_Font.GetAdvanceX( glyphIdx );
 
-                    const u32  glyphIdx = FT_Get_Char_Index( a_Face, cp );
-                    const bool glyphOk  = ( FT_Load_Glyph( a_Face, glyphIdx, FT_LOAD_ADVANCE_ONLY ) == 0 );
-
-                    f32 glyphContrib = 0.f;
-                    if ( glyphOk )
+                    f32 glyphContrib = rawAdvance;
+                    if ( hasLastGlyph )
                     {
-                        glyphContrib = a_Face->glyph->advance.x / 64.f;
-                        if ( hasLastGlyph )
+                        if ( FT_HAS_KERNING( face ) )
                         {
-                            if ( FT_HAS_KERNING( a_Face ) )
-                            {
-                                FT_Vector kerning;
-                                if ( FT_Get_Kerning( a_Face, lastGlyphIdx, glyphIdx, FT_KERNING_DEFAULT, &kerning ) == 0 )
-                                    glyphContrib += kerning.x / 64.f;
-                            }
-                            glyphContrib += a_Style.LetterSpacing;
+                            FT_Vector kerning;
+                            if ( FT_Get_Kerning( face, lastGlyphIdx, glyphIdx, FT_KERNING_DEFAULT, &kerning ) == 0 )
+                                glyphContrib += kerning.x / 64.f;
                         }
+                        glyphContrib += a_Style.LetterSpacing;
                     }
 
-                    // Flush if the character would overflow. A line with no content always accepts
-                    // the character (lineByteEnd > lineByteStart means content is present).
-                    // Characters are iterated sequentially, so at this point lineByteEnd equals
-                    // cpStart; flushCurrent() therefore correctly sets lineByteStart to cpStart.
                     if ( lineByteEnd > lineByteStart && currentWidth + glyphContrib > a_MaxWidth )
                     {
-                        flushCurrent(); // lineByteStart = lineByteEnd = cpStart (sequential iteration)
-                        // After flush, this is the first glyph of the new line — no leading contribution.
-                        glyphContrib = glyphOk ? ( a_Face->glyph->advance.x / 64.f ) : 0.f;
+                        flushCurrent();
+                        glyphContrib = rawAdvance; // no leading contribution on the new line
                     }
 
                     lineByteEnd   = cpEnd;
                     currentWidth += glyphContrib;
-                    if ( glyphOk )
+                    if ( rawAdvance > 0.f || glyphIdx != 0 )
                     {
                         lastGlyphIdx = glyphIdx;
                         hasLastGlyph = true;
@@ -451,37 +371,29 @@ namespace RatUI::FreeType::TextUtil
             while ( it != end )
             {
                 UTF8Iterator tokenStart = it;
-                bool isSpace = IsAsciiWhitespace( *it );
+                bool         isSpace    = IsAsciiWhitespace( *it );
 
-                // Consume a contiguous run of whitespace or non-whitespace.
                 while ( it != end && IsAsciiWhitespace( *it ) == isSpace )
                     ++it;
 
                 const size_t byteStart = tokenStart.ByteIndex();
                 const size_t byteEnd   = it.ByteIndex();
 
-                // Measure the token's width including leading kerning/spacing from the current
-                // line end. This is O(token_length) rather than O(current_line_length).
                 u32  tokenLastGlyph = 0;
                 bool tokenHasLast   = false;
                 const f32 tokenWidth = measureTokenWidth( byteStart, byteEnd, tokenLastGlyph, tokenHasLast );
 
                 if ( lineByteEnd == lineByteStart || currentWidth + tokenWidth <= a_MaxWidth )
                 {
-                    // Fast path: fits on the current line — just extend lineByteEnd.
-                    lineByteEnd   = byteEnd;
+                    lineByteEnd  = byteEnd;
                     currentWidth += tokenWidth;
-                    lastGlyphIdx  = tokenLastGlyph;
-                    hasLastGlyph  = tokenHasLast;
+                    lastGlyphIdx = tokenLastGlyph;
+                    hasLastGlyph = tokenHasLast;
                     continue;
                 }
 
-                // Token does not fit — flush the current line and try on a fresh one.
-                // Tokens cover the paragraph without gaps, so lineByteEnd == byteStart here;
-                // flushCurrent() therefore sets lineByteStart to byteStart of the new token.
                 flushCurrent();
 
-                // Re-measure without leading kerning (flushCurrent reset hasLastGlyph to false).
                 const f32 freshTokenWidth = measureTokenWidth( byteStart, byteEnd, tokenLastGlyph, tokenHasLast );
 
                 if ( freshTokenWidth <= a_MaxWidth )
@@ -493,7 +405,6 @@ namespace RatUI::FreeType::TextUtil
                 }
                 else
                 {
-                    // Token itself is wider than the max — split it character by character.
                     appendTokenSplitByChar( tokenStart, it );
                 }
             }
@@ -507,13 +418,9 @@ namespace RatUI::FreeType::TextUtil
             if ( RawAt( a_Text, i ) == '\n' )
             {
                 if ( i == paragraphStart )
-                {
                     PushBack( o_Lines, StringView() );
-                }
                 else
-                {
                     wrapSingleParagraph( TextView( Data( a_Text ) + paragraphStart, i - paragraphStart ) );
-                }
 
                 paragraphStart = i + 1;
             }
@@ -525,108 +432,118 @@ namespace RatUI::FreeType::TextUtil
             wrapSingleParagraph( TextView( Data( a_Text ) + paragraphStart, Size( a_Text ) - paragraphStart ) );
     }
 
+    /**
+     * @brief Truncates a line so that (prefix + "...") fits within a_MaxWidth.
+     * @param a_Font           Font providing FTFace and advance cache.
+     * @param a_Line           The line to truncate (must be newline-free).
+     * @param a_Style          Text style (letter spacing).
+     * @param a_MaxWidth       Maximum allowed width of the final string.
+     * @param a_ForceEllipsis  When true, always appends "..." even if the line fits.
+     * @return The truncated string, or an empty string if even "..." does not fit.
+     */
     inline String TruncateLineWithEllipsis(
-        FT_Face         a_Face,
-        StringView      a_Line,
+        Font&            a_Font,
+        StringView       a_Line,
         const TextStyle& a_Style,
-        f32             a_MaxWidth,
-        bool            a_ForceEllipsis )
+        f32              a_MaxWidth,
+        bool             a_ForceEllipsis )
     {
-        if ( !a_ForceEllipsis && MeasureLineWidth( a_Face, a_Line, a_Style ) <= a_MaxWidth )
+        FT_Face face = a_Font.GetFace();
+
+        if ( !a_ForceEllipsis && MeasureLineWidth( a_Font, a_Line, a_Style ) <= a_MaxWidth )
             return String( Begin( a_Line ), End( a_Line ) );
 
         constexpr StringView c_Ellipsis = "...";
-        const f32 ellipsisWidth = MeasureLineWidth( a_Face, c_Ellipsis, a_Style );
+        const f32 ellipsisWidth = MeasureLineWidth( a_Font, c_Ellipsis, a_Style );
         if ( ellipsisWidth > a_MaxWidth )
             return {};
 
-        // Find the longest prefix P of a_Line such that width(P + "...") <= a_MaxWidth.
-        // Accumulate the prefix width incrementally (O(n)) rather than re-measuring the full
-        // candidate string on every iteration (O(n^2)).
-        const u32 dotGlyphIdx = FT_Get_Char_Index( a_Face, U'.' );
+        const u32 dotGlyphIdx = FT_Get_Char_Index( face, U'.' );
 
-        size bestPrefixByteCount = 0;
-        f32  prefixWidth         = 0.f;
-        u32  prevGlyphIdx        = 0;
-        bool hasPrev             = false;
+        size_t bestPrefixByteCount = 0;
+        f32    prefixWidth         = 0.f;
+        u32    prevGlyphIdx        = 0;
+        bool   hasPrev             = false;
 
         UTF8Iterator it( a_Line );
         UTF8Iterator end = UTF8Iterator::End( a_Line );
+
         while ( it != end )
         {
-            const u32 cp = *it;
-            ++it;
-
-            const u32 glyphIdx = FT_Get_Char_Index( a_Face, cp );
-            if ( FT_Load_Glyph( a_Face, glyphIdx, FT_LOAD_ADVANCE_ONLY ) != 0 )
-                continue;
+            const u32 cp       = *it; ++it;
+            const u32 glyphIdx = FT_Get_Char_Index( face, cp );
+            const f32 advance = a_Font.GetAdvanceX( glyphIdx );
 
             if ( hasPrev )
             {
-                if ( FT_HAS_KERNING( a_Face ) )
+                if ( FT_HAS_KERNING( face ) )
                 {
                     FT_Vector kerning;
-                    if ( FT_Get_Kerning( a_Face, prevGlyphIdx, glyphIdx, FT_KERNING_DEFAULT, &kerning ) == 0 )
+                    if ( FT_Get_Kerning( face, prevGlyphIdx, glyphIdx, FT_KERNING_DEFAULT, &kerning ) == 0 )
                         prefixWidth += kerning.x / 64.f;
                 }
                 prefixWidth += a_Style.LetterSpacing;
             }
-            prefixWidth  += a_Face->glyph->advance.x / 64.f;
+
+            prefixWidth  += advance;
             prevGlyphIdx  = glyphIdx;
             hasPrev       = true;
 
-            // Compute width(currentPrefix + "...") accounting for the kerning/spacing
-            // between the last prefix glyph and the first '.' of the ellipsis.
+            // Candidate = prefix + LetterSpacing + crossKerning(last, '.') + "..."
             f32 crossKerning = 0.f;
-            if ( FT_HAS_KERNING( a_Face ) )
+            if ( FT_HAS_KERNING( face ) )
             {
                 FT_Vector kerning;
-                if ( FT_Get_Kerning( a_Face, prevGlyphIdx, dotGlyphIdx, FT_KERNING_DEFAULT, &kerning ) == 0 )
+                if ( FT_Get_Kerning( face, prevGlyphIdx, dotGlyphIdx, FT_KERNING_DEFAULT, &kerning ) == 0 )
                     crossKerning = kerning.x / 64.f;
             }
-            // hasPrev is always true here (we just added a glyph), so letter spacing applies.
             const f32 candidateWidth = prefixWidth + a_Style.LetterSpacing + crossKerning + ellipsisWidth;
 
-            if ( candidateWidth <= a_MaxWidth )
-                bestPrefixByteCount = it.ByteIndex();
-            else
-                break; // widths are non-decreasing, so no longer prefix can fit
+            if ( candidateWidth <= a_MaxWidth ) bestPrefixByteCount = it.ByteIndex();
+            else break; // Widths are non-decreasing - no longer prefix can fit.
         }
 
         String result;
-        Reserve( result, bestPrefixByteCount + Size( c_Ellipsis ) );
         Resize( result, bestPrefixByteCount );
+        Reserve( result, bestPrefixByteCount + Size( c_Ellipsis ) );
+
         if ( bestPrefixByteCount > 0 )
             std::memcpy( Data( result ), Data( a_Line ), bestPrefixByteCount );
+
         for ( const char c : c_Ellipsis )
             PushBack( result, c );
 
         return result;
     }
 
+    // -------------------------------------------------------------------------
+    // BuildTextLines
+    // -------------------------------------------------------------------------
+
     /**
-     * @brief Builds the array of text lines to be rendered based on the input text, text style, and layout constraints.
-     * This function first applies text transformations, then splits the text into lines based on newline characters
-     * and finally wraps lines that exceed the maximum width. The resulting lines are stored in the output array.
-     * For example, if the input text is "Hello World\nThis is a test" with a maximum width that only allows "Hello World" and "This is a", then the output lines would be "Hello World", "This is a", and "test".
-     * @param a_Face The FT_Face to use for measuring text width during layout.
-     * @param a_Style The TextStyle containing font, size, letter spacing, and transformation information that affects text layout.
-     * @param a_Text The input text to layout into lines.
-     * @param o_Lines An array to be populated with the resulting lines of text after layout.
-     * The caller is responsible for ensuring that this array is properly initialized before calling this function.
-     * @param a_MaxWidth The maximum width in pixels that each line of text should not exceed. Lines will be wrapped accordingly.
+     * @brief Builds the final array of lines to render from raw text, applying
+     *        transforms, wrapping, line limits, and overflow/ellipsis handling.
+     * @param a_Font       Font providing FTFace and advance cache.
+     * @param a_Style      Text style controlling wrapping, transform, overflow, etc.
+     * @param a_Text       Raw input text.
+     * @param o_Lines      Output: StringView slices into a_Text or o_Storage.
+     * @param o_Storage    Output: owns any String objects that o_Lines slices point into
+     *                     (transformed text, ellipsis-truncated lines).  Must outlive o_Lines.
+     * @param a_MaxWidth   Maximum line width for wrapping and overflow checks.
      */
-    inline void BuildTextLines( FT_Face a_Face, const TextStyle& a_Style, TextView a_Text,
-                                Array<StringView>& o_Lines, Array<String>& o_Storage,
-                                f32 a_MaxWidth = Limits<f32>::max() )
+    inline void BuildTextLines(
+        Font&              a_Font,
+        const TextStyle&   a_Style,
+        TextView           a_Text,
+        Array<StringView>& o_Lines,
+        Array<String>&     o_Storage,
+        f32                a_MaxWidth = Limits<f32>::max() )
     {
         Clear( o_Lines );
         Clear( o_Storage );
 
         const bool needsTransform = ( a_Style.Transform != ETextTransform::None );
 
-        // If a transform is required, store the owning String in o_Storage first, then take
-        // a StringView into it. Both steps are in the same branch so back() is always safe.
         StringView textToRender;
         if ( needsTransform )
         {
@@ -642,20 +559,15 @@ namespace RatUI::FreeType::TextUtil
                          || ( a_MaxWidth >= Limits<f32>::max() );
 
         if ( noWrap )
-        {
             SplitTextLines( textToRender, o_Lines );
-        }
         else
-        {
-            WrapText( a_Face, textToRender, a_Style, a_MaxWidth, o_Lines );
-        }
+            WrapText( a_Font, textToRender, a_Style, a_MaxWidth, o_Lines );
 
-        const bool hasWidthConstraint = ( a_MaxWidth < Limits<f32>::max() );
-        const bool exceededMaxLines = ( a_Style.MaxLines > 0 && Size( o_Lines ) > a_Style.MaxLines );
+        const bool hasWidthConstraint  = ( a_MaxWidth < Limits<f32>::max() );
+        const bool exceededMaxLines    = ( a_Style.MaxLines > 0 && Size( o_Lines ) > a_Style.MaxLines );
 
         if ( a_Style.Overflow == ETextOverflow::Clip || a_Style.Overflow == ETextOverflow::Fade )
         {
-            // Fade is currently handled by clipping semantics in text layout.
             if ( exceededMaxLines )
                 Resize( o_Lines, a_Style.MaxLines );
             return;
@@ -666,7 +578,7 @@ namespace RatUI::FreeType::TextUtil
             if ( exceededMaxLines )
                 Resize( o_Lines, a_Style.MaxLines );
 
-            const bool requiresWidthEllipsis = hasWidthConstraint;
+            const bool requiresWidthEllipsis    = hasWidthConstraint;
             const bool requiresLastLineIndicator = exceededMaxLines;
 
             if ( Empty( o_Lines ) || ( !requiresWidthEllipsis && !requiresLastLineIndicator ) )
@@ -674,22 +586,27 @@ namespace RatUI::FreeType::TextUtil
 
             const size lastLineIndex = Size( o_Lines ) - 1;
 
-            // Reserve enough capacity for every line to need an ellipsis string. This single
-            // reservation ensures that subsequent PushBack calls never reallocate o_Storage's
-            // internal buffer, keeping all previously captured StringViews valid.
+            // Reserve enough capacity so subsequent PushBack calls never reallocate
+            // o_Storage, keeping previously captured StringViews valid.
             Reserve( o_Storage, Size( o_Storage ) + Size( o_Lines ) );
 
             for ( size i = 0; i < Size( o_Lines ); ++i )
             {
-                const bool forceEllipsis = requiresLastLineIndicator && i == lastLineIndex;
-                const bool lineOverflowsWidth = requiresWidthEllipsis
-                    && MeasureLineWidth( a_Face, o_Lines[i], a_Style ) > a_MaxWidth;
+                const bool forceEllipsis = requiresLastLineIndicator && ( i == lastLineIndex );
 
-                if ( !forceEllipsis && !lineOverflowsWidth )
-                    continue;
+                // Fast path: skip lines that don't overflow and don't need the "more" indicator.
+                // MeasureLineWidth now uses the advance cache so even this fast-path check is cheap.
+                if ( !forceEllipsis )
+                {
+                    if ( !requiresWidthEllipsis )
+                        continue;
 
-                PushBack( o_Storage, TruncateLineWithEllipsis( a_Face, o_Lines[i], a_Style, a_MaxWidth, forceEllipsis ) );
-				o_Lines[i] = StringView{ Back( o_Storage ) };
+                    if ( MeasureLineWidth( a_Font, o_Lines[i], a_Style ) <= a_MaxWidth )
+                        continue;
+                }
+
+                PushBack( o_Storage, TruncateLineWithEllipsis( a_Font, o_Lines[i], a_Style, a_MaxWidth, forceEllipsis ) );
+                o_Lines[i] = StringView{ Back( o_Storage ) };
             }
         }
     }
