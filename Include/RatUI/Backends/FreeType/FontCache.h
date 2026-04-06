@@ -310,7 +310,7 @@ namespace RatUI::FreeType
      *       These should be derived from the text content (e.g. via ICU or hb-unicode)
      *       to support RTL scripts and non-Latin writing systems correctly.
      */
-    inline void ShapeLine( Font& a_Font, StringView a_TextUTF8, u32 a_PixelSize, Array<ShapedGlyph>& o_Glyphs )
+    inline f32 ShapeLine( Font& a_Font, StringView a_TextUTF8, u32 a_PixelSize, Array<ShapedGlyph>& o_Glyphs )
     {
         hb_buffer_t* buf = a_Font.GetHBBuffer();
         hb_buffer_reset( buf );
@@ -329,6 +329,7 @@ namespace RatUI::FreeType
         Clear( o_Glyphs );
         Reserve( o_Glyphs, glyphCount );
 
+        f32 lineWidth = 0.f;
         for ( unsigned i = 0; i < glyphCount; ++i )
         {
             EmplaceBack( o_Glyphs,
@@ -339,7 +340,9 @@ namespace RatUI::FreeType
                 /*.XOffset  */ positions[i].x_offset  / 64.f,
                 /*.YOffset  */ positions[i].y_offset  / 64.f
             );
+            lineWidth += Back( o_Glyphs ).XAdvance;
         }
+        return lineWidth;
     }
 
 } // namespace RatUI::FreeType

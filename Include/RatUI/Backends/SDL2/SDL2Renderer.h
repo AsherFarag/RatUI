@@ -247,12 +247,7 @@ namespace RatUI::SDL2
         {
             if ( !Empty( line ) )
             {
-                // ShapeLine reuses font->HBBuffer - no hb_buffer_t allocation per line.
-                FreeType::ShapeLine( *font, line, pixelSize, glyphs );
-
-                f32 lineWidth = 0.f;
-                for ( const FreeType::ShapedGlyph& g : glyphs )
-                    lineWidth += g.XAdvance;
+                const f32 lineWidth = FreeType::ShapeLine( *font, line, pixelSize, glyphs );
 
                 f32 lineX = a_Rect.Origin[0];
                 if ( a_Style.Align == ETextAlign::Center )
