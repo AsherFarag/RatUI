@@ -7,6 +7,7 @@
 #include <filesystem>
 
 #include "../Common/FeatureSandboxScene.h"
+#include "../Common/DynamicTextScene.h"
 #include "../Common/IDemoScene.h"
 
 using namespace RatUI;
@@ -45,7 +46,7 @@ protected:
 		m_TextMetrics.SetFontCache( &m_FontCache );
 		m_Renderer.SetFontCache( &m_FontCache );
 
-        m_Scene = std::make_unique<FeatureSandboxScene>( fontHandle, &m_TextMetrics );
+        m_Scene = std::make_unique<DynamicTextScene>( fontHandle, &m_TextMetrics );
         m_Scene->Init();
     
         return true;
