@@ -127,7 +127,7 @@ private:
     std::pair<WidgetID, WidgetID> MakeCols( WidgetID parent )
     {
         WidgetID row = m_Scene.CreateWidget<RectWidget>(
-            parent, Colorsf::Transparent, "ColRow"
+            parent, Colorsf::Surface900, "ColRow"
         );
         {
             auto* n = Node( row );
@@ -139,7 +139,7 @@ private:
 
         auto MakeCol = [&]() -> WidgetID
         {
-            WidgetID c = m_Scene.CreateWidget<RectWidget>( row, Colorsf::Transparent, "Col" );
+            WidgetID c = m_Scene.CreateWidget<RectWidget>( row, Colorsf::Surface900, "Col" );
             auto* n = Node( c );
             n->Style.LayoutType = ELayoutType::Vertical;
             n->Style.Spacing    = 12.f;
@@ -490,7 +490,7 @@ public:
     {
         // Root
         WidgetID root = m_Scene.CreateRootWidget<RectWidget>(
-            Colorsf::Surface900, "Root"
+            Colorsf::Surface900, "Root", CornerRounding::None()
         );
         {
             auto* n = Node( root );
@@ -504,7 +504,7 @@ public:
         // Title bar
         {
             WidgetID bar = m_Scene.CreateWidget<RectWidget>(
-                root, Colorsf::Surface800, "TitleBar"
+                root, Colorsf::Surface800, "TitleBar", CornerRounding::None()
             );
             auto* n = Node( bar );
             n->Style.LayoutType = ELayoutType::Vertical;
