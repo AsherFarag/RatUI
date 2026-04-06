@@ -247,7 +247,7 @@ namespace RatUI::SDL2
         {
             if ( !Empty( line ) )
             {
-                const f32 lineWidth = FreeType::ShapeLine( *font, line, pixelSize, glyphs );
+                const f32 lineWidth = FreeType::ShapeLine( *font, line, a_Style, glyphs );
 
                 f32 lineX = a_Rect.Origin[0];
                 if ( a_Style.Align == ETextAlign::Center )

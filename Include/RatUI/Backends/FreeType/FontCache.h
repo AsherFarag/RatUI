@@ -310,38 +310,96 @@ namespace RatUI::FreeType
      *       These should be derived from the text content (e.g. via ICU or hb-unicode)
      *       to support RTL scripts and non-Latin writing systems correctly.
      */
-    inline f32 ShapeLine( Font& a_Font, StringView a_TextUTF8, u32 a_PixelSize, Array<ShapedGlyph>& o_Glyphs )
+    inline f32 ShapeLine(
+        Font&                 a_Font,
+        StringView            a_TextUTF8,
+        const TextStyle&      a_Style,
+        Array<ShapedGlyph>&   o_Glyphs
+    )
     {
+        if ( Empty( a_TextUTF8 ) )
+            return 0.f;
+
         hb_buffer_t* buf = a_Font.GetHBBuffer();
         hb_buffer_reset( buf );
 
-        hb_buffer_add_utf8( buf, Data( a_TextUTF8 ), static_cast<int>( Size( a_TextUTF8 ) ), 0, -1 );
-        hb_buffer_set_direction( buf, HB_DIRECTION_LTR );
-        hb_buffer_set_script(    buf, HB_SCRIPT_LATIN );
-        hb_buffer_set_language(  buf, hb_language_from_string( "en", -1 ) );
+        hb_buffer_add_utf8(
+            buf,
+            Data( a_TextUTF8 ),
+            static_cast<int>( Size( a_TextUTF8 ) ),
+            0,
+            -1
+        );
 
-        hb_shape( a_Font.GetHBFont(), buf, nullptr, 0 );
+        // TODO: Should be user defined not auto guessed
+        hb_buffer_guess_segment_properties( buf ); // auto direction/script/lang
 
-        unsigned int           glyphCount = 0;
-        hb_glyph_info_t*       infos      = hb_buffer_get_glyph_infos( buf, &glyphCount );
-        hb_glyph_position_t*   positions  = hb_buffer_get_glyph_positions( buf, &glyphCount );
+        // - Options for shaping features (e.g., bold, italic) could be set here
+
+        hb_feature_t features[2];
+        unsigned int featureCount = 0;
+
+        if ( a_Style.Bold )
+        {
+            features[featureCount++] = {
+                HB_TAG('e','m','b','d'), 1, 0, (unsigned int)-1
+            };
+        }
+
+        if ( a_Style.Italic )
+        {
+            features[featureCount++] = {
+                HB_TAG('i','t','a','l'), 1, 0, (unsigned int)-1
+            };
+        }
+
+        hb_shape(
+            a_Font.GetHBFont(),
+            buf,
+            featureCount ? features : nullptr,
+            featureCount
+        );
+
+        // - Extract glyph info and positioning data from the HarfBuzz buffer and populate the output array of ShapedGlyphs.
+
+        unsigned int glyphCount = 0;
+
+        hb_glyph_info_t* infos =
+            hb_buffer_get_glyph_infos( buf, &glyphCount );
+
+        hb_glyph_position_t* positions =
+            hb_buffer_get_glyph_positions( buf, &glyphCount );
 
         Clear( o_Glyphs );
         Reserve( o_Glyphs, glyphCount );
 
+        const f32 scale = 1.0f / 64.0f;
+        const f32 letterSpacing = a_Style.LetterSpacing;
+
         f32 lineWidth = 0.f;
+
         for ( unsigned i = 0; i < glyphCount; ++i )
         {
-            EmplaceBack( o_Glyphs,
-                /*.GlyphID  */ infos[i].codepoint,
-                /*.PixelSize*/ a_PixelSize,
-                /*.XAdvance */ positions[i].x_advance / 64.f,
-                /*.YAdvance */ positions[i].y_advance / 64.f,
-                /*.XOffset  */ positions[i].x_offset  / 64.f,
-                /*.YOffset  */ positions[i].y_offset  / 64.f
+            f32 xAdvance = positions[i].x_advance * scale;
+            f32 yAdvance = positions[i].y_advance * scale;
+
+            // Apply letter spacing (horizontal text only)
+            if ( letterSpacing != 0.f && i + 1 < glyphCount )
+                xAdvance += letterSpacing;
+
+            EmplaceBack(
+                o_Glyphs,
+                /* GlyphID   */ infos[i].codepoint,
+                /* PixelSize */ static_cast<u32>( a_Style.Size ),
+                /* XAdvance  */ xAdvance,
+                /* YAdvance  */ yAdvance,
+                /* XOffset   */ positions[i].x_offset * scale,
+                /* YOffset   */ positions[i].y_offset * scale
             );
-            lineWidth += Back( o_Glyphs ).XAdvance;
+
+            lineWidth += xAdvance;
         }
+
         return lineWidth;
     }
 
