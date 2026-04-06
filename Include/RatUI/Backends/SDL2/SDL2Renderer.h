@@ -245,37 +245,104 @@ namespace RatUI::SDL2
 
         for ( const StringView line : lines )
         {
-            if ( !Empty( line ) )
+            if ( Empty( line ) )
             {
-                const f32 lineWidth = FreeType::ShapeLine( *font, line, a_Style, glyphs );
+                lineY += lineHeight;
+                continue;   
+            }
 
-                f32 lineX = a_Rect.Origin[0];
-                if ( a_Style.Align == ETextAlign::Center )
-                    lineX += ( a_Rect.Size[0] - lineWidth ) * 0.5f;
-                else if ( a_Style.Align == ETextAlign::Right )
-                    lineX += a_Rect.Size[0] - lineWidth;
+            const f32 lineWidth = FreeType::ShapeLine( *font, line, a_Style, glyphs );
+            f32 lineX = a_Rect.Origin[0];
 
-                const Vec2f origin{ lineX, lineY + ascender };
+            if ( a_Style.Align == ETextAlign::Center )
+                lineX += ( a_Rect.Size[0] - lineWidth ) * 0.5f;
+            else if ( a_Style.Align == ETextAlign::Right )
+                lineX += a_Rect.Size[0] - lineWidth;
 
-                auto transformPoint = [&]( f32 px, f32 py ) -> SDL_FPoint
+            const Vec2f origin{ lineX, lineY + ascender };
+            auto transformPoint = [&]( f32 px, f32 py ) -> SDL_FPoint
+            {
+                Vec3f p = a_Transform * Vec3f{ px, py, 1.f };
+                return SDL_FPoint{ p[0], p[1] };
+            };
+
+            // RenderShapedLine now takes Font& to stay consistent with the rest of the API.
+            FreeType::RenderShapedLine( *m_GlyphAtlas, *font, glyphs, origin,
+                [&]( const FreeType::GlyphQuad& q )
                 {
-                    Vec3f p = a_Transform * Vec3f{ px, py, 1.f };
-                    return SDL_FPoint{ p[0], p[1] };
+                    SDL_Vertex verts[4];
+                    verts[0] = { transformPoint( q.PosMin[0], q.PosMin[1] ), sdlColor, { q.UVMin[0], q.UVMin[1] } };
+                    verts[1] = { transformPoint( q.PosMax[0], q.PosMin[1] ), sdlColor, { q.UVMax[0], q.UVMin[1] } };
+                    verts[2] = { transformPoint( q.PosMax[0], q.PosMax[1] ), sdlColor, { q.UVMax[0], q.UVMax[1] } };
+                    verts[3] = { transformPoint( q.PosMin[0], q.PosMax[1] ), sdlColor, { q.UVMin[0], q.UVMax[1] } };
+                    const int indices[6] = { 0, 1, 2, 0, 2, 3 };
+                    SDL_RenderGeometry( m_Renderer, atlasTexture, verts, 4, indices, 6 );
+                } );
+
+            // Draw text decorations (underline/strikethrough) if needed.
+
+            {
+                // ------------------------------------------------------------
+                // Text decorations
+                // ------------------------------------------------------------
+
+                const FT_Face face = font->GetFace();
+
+                const f32 scale =
+                    static_cast<f32>( face->size->metrics.y_scale ) / 65536.f;
+
+                f32 underlineThickness = ( face->underline_thickness * scale ) / 64.f;
+                underlineThickness = std::max( 1.f, underlineThickness );
+
+                // Baseline Y (same used for glyph origin)
+                const f32 baselineY = origin[1];
+
+                // Helper to draw a filled quad line
+                auto DrawLineQuad = [&](f32 x0, f32 y0, f32 x1, f32 y1)
+                {
+                    SDL_FPoint p0 = transformPoint(x0, y0);
+                    SDL_FPoint p1 = transformPoint(x1, y0);
+                    SDL_FPoint p2 = transformPoint(x1, y1);
+                    SDL_FPoint p3 = transformPoint(x0, y1);
+                
+                    SDL_Vertex verts[4];
+                    verts[0] = { p0, sdlColor, {0.f, 0.f} };
+                    verts[1] = { p1, sdlColor, {0.f, 0.f} };
+                    verts[2] = { p2, sdlColor, {0.f, 0.f} };
+                    verts[3] = { p3, sdlColor, {0.f, 0.f} };
+                
+                    const int indices[6] = { 0, 1, 2, 0, 2, 3 };
+                
+                    SDL_RenderGeometry(m_Renderer, nullptr, verts, 4, indices, 6);
                 };
 
-                // RenderShapedLine now takes Font& to stay consistent with the rest of the API.
-                FreeType::RenderShapedLine( *m_GlyphAtlas, *font, glyphs, origin,
-                    [&]( const FreeType::GlyphQuad& q )
-                    {
-                        SDL_Vertex verts[4];
-                        verts[0] = { transformPoint( q.PosMin[0], q.PosMin[1] ), sdlColor, { q.UVMin[0], q.UVMin[1] } };
-                        verts[1] = { transformPoint( q.PosMax[0], q.PosMin[1] ), sdlColor, { q.UVMax[0], q.UVMin[1] } };
-                        verts[2] = { transformPoint( q.PosMax[0], q.PosMax[1] ), sdlColor, { q.UVMax[0], q.UVMax[1] } };
-                        verts[3] = { transformPoint( q.PosMin[0], q.PosMax[1] ), sdlColor, { q.UVMin[0], q.UVMax[1] } };
+                if ( a_Style.Underline )
+                {
+                    const f32 underlineOffset = ( face->underline_position * scale ) / 64.f;
+                    const f32 y = baselineY + underlineOffset;
 
-                        const int indices[6] = { 0, 1, 2, 0, 2, 3 };
-                        SDL_RenderGeometry( m_Renderer, atlasTexture, verts, 4, indices, 6 );
-                    } );
+                    DrawLineQuad(
+                        lineX,
+                        y,
+                        lineX + lineWidth,
+                        y + underlineThickness
+                    );
+                }
+                
+                if ( a_Style.Strikethrough )
+                {
+                    // Typical visual strike position ~35% of ascender
+                    const f32 strikeOffset = ascender * 0.35f;
+                
+                    const f32 y = baselineY - strikeOffset;
+                
+                    DrawLineQuad(
+                        lineX,
+                        y,
+                        lineX + lineWidth,
+                        y + underlineThickness
+                    );
+                }
             }
 
             lineY += lineHeight;
