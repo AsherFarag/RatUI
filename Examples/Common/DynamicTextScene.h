@@ -6,17 +6,17 @@
  *
  * Sections
  * --------
- *  1. Font Sizes          – 8 px … 40 px
- *  2. Text Colours        – full accent + semantic palette
- *  3. Text Alignment      – Left / Center / Right
- *  4. Text Wrapping       – NoWrap+Ellipsis, WrapWord, WrapChar
- *  5. Text Overflow       – Clip, Ellipsis, MaxLines
- *  6. Text Transform      – None / Uppercase / Lowercase / Capitalize
- *  7. Letter Spacing      – -1 px ... +5 px
- *  8. Line Height         – auto / tight / normal / loose
- *  9. Text Decoration     – Underline, Strikethrough, combined
- * 10. Combined Styles     – multiple properties at once
- * 11. Animated            – container width oscillates -> Ellipsis reflows live
+ *  1. Font Sizes          - 8 px … 40 px
+ *  2. Text Colours        - full accent + semantic palette
+ *  3. Text Alignment      - Left / Center / Right
+ *  4. Text Wrapping       - NoWrap+Ellipsis, WrapWord, WrapChar
+ *  5. Text Overflow       - Clip, Ellipsis, MaxLines
+ *  6. Text Transform      - None / Uppercase / Lowercase / Capitalize
+ *  7. Letter Spacing      - -1 px ... +5 px
+ *  8. Line Height         - auto / tight / normal / loose
+ *  9. Text Decoration     - Underline, Strikethrough, combined
+ * 10. Combined Styles     - multiple properties at once
+ * 11. Animated            - container width oscillates -> Ellipsis reflows live
  */
 class DynamicTextScene : public IDemoScene
 {
@@ -193,13 +193,13 @@ private:
         WidgetID card = BeginCard( parent, "Font Sizes" );
 
         constexpr struct { f32 sz; const char* label; } kSizes[] = {
-            {  8.f, "8 px – caption"  },
-            { 11.f, "11 px – small"   },
-            { 13.f, "13 px – ui"      },
-            { 16.f, "16 px – body"    },
-            { 20.f, "20 px – lead"    },
-            { 28.f, "28 px – h3"      },
-            { 40.f, "40 px – h1"      },
+            {  8.f, "8 px - caption"  },
+            { 11.f, "11 px - small"   },
+            { 13.f, "13 px - ui"      },
+            { 16.f, "16 px - body"    },
+            { 20.f, "20 px - lead"    },
+            { 28.f, "28 px - h3"      },
+            { 40.f, "40 px - h1"      },
         };
         for ( auto& e : kSizes )
             AddRow( card, e.label, "The quick brown fox", MakeStyle( e.sz ) );
