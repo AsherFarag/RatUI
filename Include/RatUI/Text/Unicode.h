@@ -17,6 +17,11 @@
 
 namespace RatUI::Unicode
 {
+    constexpr inline bool IsAsciiWhitespace( c32 a_CP )
+    {
+        return a_CP == 0x20 || ( a_CP >= 0x09 && a_CP <= 0x0D );
+    }
+
     /**
      * @brief Returns true if @p a_CP is a CJK (or CJK-adjacent) codepoint that
      *        allows a line-break opportunity between consecutive characters.
@@ -415,7 +420,7 @@ namespace RatUI::Unicode
          */
         constexpr void DecodeAt( size a_At, c32& a_CP, size& a_Len ) const
         {
-            const u8*  s   = reinterpret_cast<const u8*>( Data( m_Data ) ) + a_At;
+            const u8*  s   = static_cast<const u8*>( (const void*)Data( m_Data ) ) + a_At;
             const size rem = Size( m_Data ) - a_At;
             const u8   b0  = s[0];
 

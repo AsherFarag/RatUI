@@ -7,113 +7,8 @@
 
 namespace RatUI::FreeType::TextUtil
 {
-    /** 
-     * @brief A forward iterator for UTF-8 encoded strings that decodes one Unicode codepoint at a time.
-     */
-    class UTF8Iterator
-    {
-    public:
-        using value_type = char32_t;
-
-        UTF8Iterator( StringView a_Str, size_t a_ByteIndex = 0 )
-            : m_Data( a_Str ), m_Index( a_ByteIndex )
-        {
-            if ( m_Index < m_Data.size() )
-                m_Current = Decode();
-        }
-
-        static UTF8Iterator End( StringView a_Str )
-        {
-            return UTF8Iterator( a_Str, Size( a_Str ) );
-        }
-
-        char32_t operator*() const { return m_Current; }
-
-        UTF8Iterator& operator++()
-        {
-            if ( m_Index >= Size( m_Data ) )
-                return *this;
-            Advance();
-            if ( m_Index < Size( m_Data ) )
-                m_Current = Decode();
-            return *this;
-        }
-
-        bool operator==( const UTF8Iterator& a_Other ) const
-        {
-            return Data( m_Data ) == Data( a_Other.m_Data ) && m_Index == a_Other.m_Index;
-        }
-
-        explicit operator bool() const { return m_Index < m_Data.size(); }
-
-        size_t ByteIndex() const { return m_Index; }
-
-    private:
-        StringView m_Data;
-        size_t     m_Index   = 0;
-        char32_t   m_Current = 0;
-
-        static constexpr char32_t c_ReplacementCodepoint = 0xFFFD;
-
-        static constexpr u8 c_AsciiMax            = 0x7F;
-        static constexpr u8 c_ContinuationMask    = 0xC0;
-        static constexpr u8 c_ContinuationPattern = 0x80;
-        static constexpr u8 c_2ByteLeadPrefix     = 0b110;
-        static constexpr u8 c_3ByteLeadPrefix     = 0b1110;
-        static constexpr u8 c_4ByteLeadPrefix     = 0b11110;
-        static constexpr u8 c_2ByteMask           = 0x1F;
-        static constexpr u8 c_3ByteMask           = 0x0F;
-        static constexpr u8 c_4ByteMask           = 0x07;
-        static constexpr u8 c_ContMask            = 0x3F;
-
-        void Advance()
-        {
-            m_Index += CharLength( static_cast<u8>( m_Data[m_Index] ) );
-        }
-
-        char32_t Decode() const
-        {
-            const u8*  s         = reinterpret_cast<const u8*>( m_Data.data() ) + m_Index;
-            size_t     remaining = m_Data.size() - m_Index;
-            const u8   b0        = s[0];
-
-            if ( b0 <= c_AsciiMax )
-                return b0;
-
-            if ( (b0 >> 5) == c_2ByteLeadPrefix && remaining >= 2 && IsCont(s[1]) )
-                return ((b0 & c_2ByteMask) << 6) | (s[1] & c_ContMask);
-
-            if ( (b0 >> 4) == c_3ByteLeadPrefix && remaining >= 3 && IsCont(s[1]) && IsCont(s[2]) )
-                return ((b0 & c_3ByteMask) << 12) | ((s[1] & c_ContMask) << 6) | (s[2] & c_ContMask);
-
-            if ( (b0 >> 3) == c_4ByteLeadPrefix && remaining >= 4 && IsCont(s[1]) && IsCont(s[2]) && IsCont(s[3]) )
-                return ((b0 & c_4ByteMask) << 18) | ((s[1] & c_ContMask) << 12) | ((s[2] & c_ContMask) << 6) | (s[3] & c_ContMask);
-
-            return c_ReplacementCodepoint;
-        }
-
-        static bool IsCont(u8 a_Byte) 
-        {
-            return (a_Byte & c_ContinuationMask) == c_ContinuationPattern; 
-        }
-
-        static size_t CharLength( u8 a_Lead )
-        {
-            if  ( a_Lead       <= c_AsciiMax)        return 1;
-            if  ((a_Lead >> 5) == c_2ByteLeadPrefix) return 2;
-            if  ((a_Lead >> 4) == c_3ByteLeadPrefix) return 3;
-            if  ((a_Lead >> 3) == c_4ByteLeadPrefix) return 4;
-            return 1;
-        }
-    };
-
-    /**
-     * @brief Checks if a Unicode codepoint is an ASCII whitespace character (space, tab, newline, or carriage return).
-     */
-    inline bool IsAsciiWhitespace( char32_t a_CP )
-    {
-        return a_CP == U' ' || a_CP == U'\t' || a_CP == U'\n' || a_CP == U'\r';
-    }
+    using ::RatUI::Unicode::UTF8Iterator;
+    using ::RatUI::Unicode::UTF8Range;
 
     /**
      * @brief Measures the pixel width of a single (newline-free) line of text.
@@ -133,7 +28,7 @@ namespace RatUI::FreeType::TextUtil
      */
     inline f32 MeasureLineWidth( Font& a_Font, StringView a_Line, const TextStyle& a_Style )
     {
-        if ( a_Line.empty() )
+        if ( Empty( a_Line ) )
             return 0.f;
 
         FT_Face face     = a_Font.GetFace();
@@ -141,10 +36,8 @@ namespace RatUI::FreeType::TextUtil
         u32     prevGlyph = 0;
         bool    hasPrev  = false;
 
-        UTF8Iterator it( a_Line );
-        while ( it )
+        for ( const c32 cp : UTF8Range( a_Line ) )
         {
-            const u32 cp       = *it;
             const u32 glyphIdx = FT_Get_Char_Index( face, cp );
             const f32 advance = a_Font.GetAdvanceX( glyphIdx );
 
@@ -162,7 +55,6 @@ namespace RatUI::FreeType::TextUtil
             width    += advance;
             prevGlyph = glyphIdx;
             hasPrev   = true;
-            ++it;
         }
 
         return width;
@@ -189,15 +81,10 @@ namespace RatUI::FreeType::TextUtil
         String result;
         Reserve( result, Size( a_Text ) );
 
-        UTF8Iterator it( a_Text );
-        UTF8Iterator end = UTF8Iterator::End( a_Text );
-
-        while ( it != end )
+        UTF8Range range{ a_Text };
+        for ( auto it = range.begin(); it != range.end(); ++it )
         {
-            const size_t start   = it.ByteIndex();
-            const char32_t cp    = *it;
-            ++it;
-            const size_t endByte = it.ByteIndex();
+            const c32 cp = *it;
 
             if ( cp <= 0x7F )
             {
@@ -213,10 +100,10 @@ namespace RatUI::FreeType::TextUtil
             }
             else
             {
-                const size count   = endByte - start;
+                const size count   = it.SequenceByteLength();
                 const size oldSize = Size( result );
                 Resize( result, oldSize + count );
-                std::memcpy( Data( result ) + oldSize, Data( a_Text ) + start, count );
+                std::memcpy( Data( result ) + oldSize, Data( a_Text ) + it.ByteIndex(), count );
             }
         }
 
@@ -291,11 +178,8 @@ namespace RatUI::FreeType::TextUtil
                 bool hasPrev   = hasLastGlyph;
 
                 const StringView token( Data( a_Paragraph ) + a_ByteStart, a_ByteEnd - a_ByteStart );
-                UTF8Iterator it( token );
-                while ( it )
+                for ( c32 cp : Unicode::UTF8Range{ token } )
                 {
-                    const u32 cp       = *it;
-                    ++it;
                     const u32 glyphIdx = FT_Get_Char_Index( face, cp );
 
                     if ( hasPrev )
@@ -306,6 +190,7 @@ namespace RatUI::FreeType::TextUtil
                             if ( FT_Get_Kerning( face, prevGlyph, glyphIdx, FT_KERNING_DEFAULT, &kerning ) == 0 )
                                 w += kerning.x / 64.f;
                         }
+
                         w += a_Style.LetterSpacing;
                     }
 
@@ -371,9 +256,9 @@ namespace RatUI::FreeType::TextUtil
             while ( it != end )
             {
                 UTF8Iterator tokenStart = it;
-                bool         isSpace    = IsAsciiWhitespace( *it );
+                bool         isSpace    = Unicode::IsAsciiWhitespace( *it );
 
-                while ( it != end && IsAsciiWhitespace( *it ) == isSpace )
+                while ( it != end && Unicode::IsAsciiWhitespace( *it ) == isSpace )
                     ++it;
 
                 const size_t byteStart = tokenStart.ByteIndex();
@@ -465,12 +350,10 @@ namespace RatUI::FreeType::TextUtil
         u32    prevGlyphIdx        = 0;
         bool   hasPrev             = false;
 
-        UTF8Iterator it( a_Line );
-        UTF8Iterator end = UTF8Iterator::End( a_Line );
-
-        while ( it != end )
+        UTF8Range range{ a_Line };
+		for ( auto it = range.begin(); it != range.end(); ++it )
         {
-            const u32 cp       = *it; ++it;
+			const c32 cp = *it;
             const u32 glyphIdx = FT_Get_Char_Index( face, cp );
             const f32 advance = a_Font.GetAdvanceX( glyphIdx );
 
