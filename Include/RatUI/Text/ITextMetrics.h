@@ -10,26 +10,24 @@ namespace RatUI
         virtual ~ITextMetrics() = default;
 
         /**
-         * @brief Measures a string of text with the given style, optionally constrained to a maximum width for wrapping.
-         * @param a_Text The text to measure.
-         * @param a_Style The text style to use for measurement.
-         * @param a_MaxWidth Maximum width before wrapping. Use Limits<f32>::max() for no wrapping.
-         * @return The measured size and metadata of the text.
+         * @brief Normalises whitespace, segments the text into atomic units, and pre-measures
+         * each segment's pixel width.  The result should be cached and re-used across frames.
+         * Only call this again when the text content or style changes.
+         * @param a_Text  The text to prepare.
+         * @param a_Style The text style that controls font, size, wrapping mode, letter spacing, etc.
+         * @return A PreparedText value ready to pass to Measure() and to the renderer.
          */
-        virtual TextMeasurement Measure( TextView a_Text, const TextStyle& a_Style, f32 a_MaxWidth = Limits<f32>::max() ) = 0;
+        virtual PreparedText Prepare( TextView a_Text, const TextStyle& a_Style ) = 0;
 
         /**
-         * @brief Shapes a string of text into a backend-owned ShapedText object.
-         * The returned ShapedText is valid until DestroyShapedText is called.
-         * @param a_Text The text to shape.
-         * @param a_Style The text style to use.
-         * @param a_MaxWidth Maximum width for wrapping.
-         * @return A ShapedText handle.
+         * @brief Computes a TextMeasurement (total size, baseline, line count) for a block of
+         * previously prepared text, constrained to the given maximum line width.
+         * @param a_Prepared  A PreparedText produced by Prepare().
+         * @param a_Style     The same text style that was used when calling Prepare().
+         * @param a_MaxWidth  Maximum line width in pixels. Use Limits<f32>::max() for no wrapping.
+         * @return The measured size and metadata of the text block.
          */
-        virtual ShapedText Shape( TextView a_Text, const TextStyle& a_Style, f32 a_MaxWidth = Limits<f32>::max() ) = 0;
-
-        /** @brief Releases a previously created ShapedText object, freeing any associated resources. */
-        virtual void ReleaseShapedText( const ShapedText& a_ShapedText ) = 0;
+        virtual TextMeasurement Measure( const PreparedText& a_Prepared, const TextStyle& a_Style, f32 a_MaxWidth = Limits<f32>::max() ) = 0;
     };
 
 } // namespace RatUI

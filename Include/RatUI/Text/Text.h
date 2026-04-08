@@ -129,4 +129,45 @@ namespace RatUI
 		constexpr bool operator==( const ShapedText& other ) const { return Handle == other.Handle; }
     };
 
+    /**
+     * @brief The kind of a text segment.
+     */
+    enum class ESegmentKind : u8
+    {
+        Text,       ///< A word (Latin / script run) or a single CJK codepoint.
+        Space,      ///< Collapsible inter-word whitespace.
+        HardBreak,  ///< Explicit newline (only emitted in pre-wrap mode).
+    };
+
+    /**
+     * @brief A single pre-measured segment of text.
+     *
+     * Each segment corresponds to a contiguous byte range inside
+     * PreparedText::NormalizedText.
+     */
+    struct TextSegment
+    {
+        u32 StartByte{ 0 };    ///< Byte offset inside PreparedText::NormalizedText.
+        u32 ByteLength{ 0 };   ///< Length in bytes.
+        f32 Width{ 0.f };      ///< Pixel advance used for line-fit checks (includes any spacing).
+        f32 PaintWidth{ 0.f }; ///< Pixel width of visible rendered content.
+                               ///<   Text     : equals Width.
+                               ///<   Space    : 0 (trailing spaces hang past the edge).
+                               ///<   HardBreak: 0.
+
+        ESegmentKind Kind{ ESegmentKind::Text };
+        bool         IsCJKChar{ false }; ///< True when this is a single CJK codepoint.
+    };
+
+    /**
+     * @brief Result of the prepare phase, used as input to the layout phase.
+     * Treat this as an immutable value and only re-run Prepare() when the text content or style changes.
+     */
+    struct PreparedText
+    {
+        String             NormalizedText;     ///< Text after whitespace normalisation.
+        Array<TextSegment> Segments;           ///< Pre-measured segments in logical order.
+        f32                HyphenWidth{ 0.f }; ///< Width of "-" (reserved for soft-hyphen support).
+    };
+
 } // namespace RatUI

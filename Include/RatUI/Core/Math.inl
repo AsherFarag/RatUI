@@ -225,6 +225,15 @@ namespace RatUI
                 Vec2<T>{ Limits<T>::max(), Limits<T>::max() }
             };
         }
+
+        template<typename U> 
+        constexpr Rect<U> Cast() const
+        {
+            return {
+                Vec2<U>{ static_cast<U>( Origin[ 0 ] ), static_cast<U>( Origin[ 1 ] ) },
+                Vec2<U>{ static_cast<U>( Size[ 0 ] ), static_cast<U>( Size[ 1 ] ) }
+            };
+		}
     };
 
     using Rectf = Rect<f32>;

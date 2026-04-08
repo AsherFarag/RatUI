@@ -69,15 +69,18 @@ namespace RatUI
             f32 Thickness;
         };
 
-        // TODO: Would be safer to store the string but not too sure yet for perf
-        struct TextCmd 
+        struct PreparedTextCmd 
         { 
-            TextView Text; 
+            const PreparedText* Prepared;
             TextStyle Style;
-            Rectf Rect; 
+            Rectf Rect;
         };
 
-        struct CustomCmd { CustomDrawFunc Func; void* UserData; };
+        struct CustomCmd 
+        { 
+            CustomDrawFunc Func; 
+            void* UserData; 
+        };
 
         Mat3f   Transform{ c_Identity<Mat3f> };
         Rectu16 ClipRect{ Rectu16::Infinite() };
@@ -87,8 +90,7 @@ namespace RatUI
             RectBorderCmd,
             CircleCmd,
             CircleBorderCmd,
-            TextCmd,
-            //ShapedTextCmd,
+            PreparedTextCmd,
             CustomCmd
         > Payload;
     };
@@ -193,12 +195,12 @@ namespace RatUI
             return *this;
         }
 
-        DrawList& AddText( TextView a_Text, TextStyle a_Style, Rectf a_Rect )
+        DrawList& AddText( const PreparedText& a_Prepared, const TextStyle& a_Style, Rectf a_Rect )
         {
             PushBack( Commands, DrawCmd{
                 .Transform = CurrentTransform(),
                 .ClipRect = CurrentClipRect(),
-                .Payload = DrawCmd::TextCmd{ .Text = a_Text, .Style = a_Style, .Rect = a_Rect }
+                .Payload = DrawCmd::PreparedTextCmd{ .Prepared = &a_Prepared, .Style = a_Style, .Rect = a_Rect }
             } );
             return *this;
         }

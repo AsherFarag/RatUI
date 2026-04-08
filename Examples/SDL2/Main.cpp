@@ -1,5 +1,6 @@
 #include "SDL2Application.h"
-#include <RatUI/Backends/SDL2/SDL2TextMetrics.h>
+#include <RatUI/Backends/SDL2/SDL2Renderer.h>
+#include <RatUI/Backends/FreeType/TextMetrics.h>
 #include <RatUI/Backends/FreeType/GlyphAtlas.h>
 #include <RatUI/Widget/TextWidget.h>
 #include <iostream>
@@ -29,7 +30,7 @@ public:
 protected:
 
     FreeType::FontCache m_FontCache;
-    SDL2::SDL2TextMetrics m_TextMetrics{};
+    FreeType::TextMetrics m_TextMetrics{};
     std::unique_ptr<FreeType::GlyphAtlas> m_GlyphAtlas;
 
     std::unique_ptr<IDemoScene> m_Scene;

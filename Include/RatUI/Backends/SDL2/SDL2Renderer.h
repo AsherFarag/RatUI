@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "../../RatUI.h"
 #include "../FreeType/GlyphAtlas.h"
 #include "../FreeType/FontCache.h"
@@ -47,8 +47,8 @@ namespace RatUI::SDL2
         void RenderFillCircleBorder(
             Vec2f a_Center, f32 a_Radius, Colorf a_Color, f32 a_Thickness, const Mat3f& a_Transform );
 
-        void RenderText(
-            TextView a_Text, const TextStyle& a_Style, Rectf a_Rect, const Mat3f& a_Transform );
+        void RenderPreparedText(
+            const PreparedText& a_Prepared, const TextStyle& a_Style, Rectf a_Rect, const Mat3f& a_Transform );
 
         static SDL_Color ToSDLColor( Colorf a_Color )
         {
@@ -106,7 +106,7 @@ namespace RatUI::SDL2
             else if ( Holds<DrawCmd::RectBorderCmd>  ( cmd.Payload ) ) { const auto& c = Get<DrawCmd::RectBorderCmd>  ( cmd.Payload ); RenderFillRoundedRectBorder( c.Rect, c.Rounding, c.Color, c.Thickness, cmd.Transform ); }
             else if ( Holds<DrawCmd::CircleCmd>      ( cmd.Payload ) ) { const auto& c = Get<DrawCmd::CircleCmd>      ( cmd.Payload ); RenderFillCircle(     c.Center, c.Radius, c.Color,             cmd.Transform ); }
             else if ( Holds<DrawCmd::CircleBorderCmd>( cmd.Payload ) ) { const auto& c = Get<DrawCmd::CircleBorderCmd>( cmd.Payload ); RenderFillCircleBorder( c.Center, c.Radius, c.Color, c.Thickness, cmd.Transform ); }
-            else if ( Holds<DrawCmd::TextCmd>        ( cmd.Payload ) ) { const auto& c = Get<DrawCmd::TextCmd>        ( cmd.Payload ); RenderText( c.Text, c.Style, c.Rect, cmd.Transform ); }
+            else if ( Holds<DrawCmd::PreparedTextCmd>( cmd.Payload ) ) { const auto& c = Get<DrawCmd::PreparedTextCmd>( cmd.Payload ); if ( c.Prepared ) RenderPreparedText( *c.Prepared, c.Style, c.Rect, cmd.Transform ); }
             else if ( Holds<DrawCmd::CustomCmd>      ( cmd.Payload ) ) { const auto& c = Get<DrawCmd::CustomCmd>      ( cmd.Payload ); if ( c.Func ) c.Func( *this, cmd ); }
         }
 
@@ -206,66 +206,114 @@ namespace RatUI::SDL2
         return a_Texture.Ptr != nullptr;
     }
 
-    inline void SDL2Renderer::RenderText(
-        TextView         a_Text,
+    inline void SDL2Renderer::RenderPreparedText(
+        const PreparedText& a_Prepared,
         const TextStyle& a_Style,
-        Rectf            a_Rect,
-        const Mat3f&     a_Transform )
+        Rectf               a_Rect,
+        const Mat3f& a_Transform )
     {
+        // TODO: Could optimize this by batching it into one big mesh so it's one draw call instead of one per glyph.
+
         if ( !m_Renderer || !m_FontCache || !m_GlyphAtlas )
             return;
 
-        if ( a_Text.empty() || !a_Style.Font.IsValid() )
+        if ( Empty( a_Prepared.Segments ) || !a_Style.Font.IsValid() )
             return;
 
         FreeType::Font* font = m_FontCache->GetOrLoadFont( a_Style.Font, static_cast<u32>( a_Style.Size ) );
         if ( !font )
             return;
 
-        const u32 pixelSize = static_cast<u32>( a_Style.Size );
-
-        // Build wrapped lines.  BuildTextLines takes Font& and uses the advance
-        // cache internally, so repeated calls within a frame are cheap.
-        Array<StringView>   lines;
-        Array<String>       linesStorage;
-        FreeType::TextUtil::BuildTextLines( *font, a_Style, a_Text, lines, linesStorage, a_Rect.Size[0] );
-
-        const SDL_Color sdlColor   = ToSDLColor( a_Style.Color );
+        const SDL_Color sdlColor = ToSDLColor( a_Style.Color );
         const f32       lineHeight = FreeType::GetLineHeight( font->GetFace(), a_Style );
-        const f32       ascender   = font->GetFace()->size->metrics.ascender / 64.f;
+        const f32       ascender = font->GetFace()->size->metrics.ascender / 64.f;
 
         SDL_Texture* atlasTexture = static_cast<SDL_Texture*>( m_GlyphAtlas->GetTexture().Ptr );
-
         f32 lineY = a_Rect.Origin[1];
 
-        Array<FreeType::ShapedGlyph> glyphs;
+        // TODO: Probably dont want to store this as a static array here.
+        static thread_local Array<FreeType::ShapedGlyph> glyphs;
+		Clear( glyphs );
 
-        for ( const StringView line : lines )
+        // Pre-check whether MaxLines was exceeded so we can force an ellipsis on the
+        // last visible line as a "more content" indicator.
+        const bool applyEllipsis = ( a_Style.Overflow == ETextOverflow::Ellipsis );
+        bool       exceededMaxLines = false;
+        u32        totalVisibleLines = 0;
+
+        if ( applyEllipsis && a_Style.MaxLines > 0 )
         {
-            if ( Empty( line ) )
+            u32 totalLines = 0;
+            TextLayout::WalkLines( a_Prepared, a_Rect.Size[0], 0u,
+                [&]( u32, u32, f32 ) { ++totalLines; } );
+            exceededMaxLines = ( totalLines > a_Style.MaxLines );
+            if ( exceededMaxLines )
+                totalVisibleLines = a_Style.MaxLines; // WalkLines(maxLines) emits exactly maxLines lines
+        }
+
+        // Walk lines using pre-measured segments (pure arithmetic � no re-segmenting).
+        u32 lineIndex = 0;
+        TextLayout::WalkLines( a_Prepared, a_Rect.Size[0], a_Style.MaxLines,
+            [&]( u32 lineStartSeg, u32 lineEndSeg, f32 paintWidth )
             {
-                lineY += lineHeight;
-                continue;   
-            }
+                // Materialise the line's text from the normalised string.
+                const auto& segs = a_Prepared.Segments;
+                u32 end = lineEndSeg;
+                while ( end > lineStartSeg && segs[end - 1].Kind != ESegmentKind::Text )
+                    --end;
 
-            const f32 lineWidth = FreeType::ShapeLine( *font, line, a_Style, glyphs );
-            f32 lineX = a_Rect.Origin[0];
+                StringView line{};
+                if ( end > lineStartSeg )
+                {
+                    const u32 byteStart = segs[lineStartSeg].StartByte;
+                    const u32 byteEnd = segs[end - 1].StartByte + segs[end - 1].ByteLength;
+                    line = StringView{ Data( a_Prepared.NormalizedText ) + byteStart, byteEnd - byteStart };
+                }
 
-            if ( a_Style.Align == ETextAlign::Center )
-                lineX += ( a_Rect.Size[0] - lineWidth ) * 0.5f;
-            else if ( a_Style.Align == ETextAlign::Right )
-                lineX += a_Rect.Size[0] - lineWidth;
+                if ( Empty( line ) )
+                {
+                    lineY += lineHeight;
+                    ++lineIndex;
+                    return;
+                }
 
-            const Vec2f origin{ lineX, lineY + ascender };
-            auto transformPoint = [&]( f32 px, f32 py ) -> SDL_FPoint
-            {
-                Vec3f p = a_Transform * Vec3f{ px, py, 1.f };
-                return SDL_FPoint{ p[0], p[1] };
-            };
+                // Apply ellipsis truncation when the line overflows or when this is the
+                // last visible line and the text was cut short by MaxLines.
+                String truncatedStorage;
+                if ( applyEllipsis )
+                {
+                    const bool forceEllipsis = exceededMaxLines && ( lineIndex + 1 == totalVisibleLines );
+                    if ( forceEllipsis || paintWidth > a_Rect.Size[0] )
+                    {
+                        truncatedStorage = FreeType::TextUtil::TruncateLineWithEllipsis( *font, line, a_Style, a_Rect.Size[0], forceEllipsis );
+                        if ( Empty( truncatedStorage ) )
+                        {
+                            // Even "..." doesn't fit - skip this line entirely.
+                            lineY += lineHeight;
+                            ++lineIndex;
+                            return;
+                        }
+                        line = StringView{ truncatedStorage };
+                    }
+                }
 
-            // RenderShapedLine now takes Font& to stay consistent with the rest of the API.
-            FreeType::RenderShapedLine( *m_GlyphAtlas, *font, glyphs, origin,
-                [&]( const FreeType::GlyphQuad& q )
+                const f32 lineWidth = FreeType::ShapeLine( *font, line, a_Style, glyphs );
+                f32 lineX = a_Rect.Origin[0];
+
+                if ( a_Style.Align == ETextAlign::Center )
+                    lineX += ( a_Rect.Size[0] - lineWidth ) * 0.5f;
+                else if ( a_Style.Align == ETextAlign::Right )
+                    lineX += a_Rect.Size[0] - lineWidth;
+
+                const Vec2f origin{ lineX, lineY + ascender };
+                auto transformPoint = [&]( f32 px, f32 py ) -> SDL_FPoint
+                {
+                    Vec3f p = a_Transform * Vec3f{ px, py, 1.f };
+                    return SDL_FPoint{ p[0], p[1] };
+                };
+
+                FreeType::RenderShapedLine( *m_GlyphAtlas, *font, glyphs, origin,
+                    [&]( const FreeType::GlyphQuad& q )
                 {
                     SDL_Vertex verts[4];
                     verts[0] = { transformPoint( q.PosMin[0], q.PosMin[1] ), sdlColor, { q.UVMin[0], q.UVMin[1] } };
@@ -276,74 +324,46 @@ namespace RatUI::SDL2
                     SDL_RenderGeometry( m_Renderer, atlasTexture, verts, 4, indices, 6 );
                 } );
 
-            // Draw text decorations (underline/strikethrough) if needed.
-
-            {
-                // ------------------------------------------------------------
-                // Text decorations
-                // ------------------------------------------------------------
-
-                const FT_Face face = font->GetFace();
-
-                const f32 scale =
-                    static_cast<f32>( face->size->metrics.y_scale ) / 65536.f;
-
-                f32 underlineThickness = ( face->underline_thickness * scale ) / 64.f;
-                underlineThickness = std::max( 1.f, underlineThickness );
-
-                // Baseline Y (same used for glyph origin)
-                const f32 baselineY = origin[1];
-
-                // Helper to draw a filled quad line
-                auto DrawLineQuad = [&](f32 x0, f32 y0, f32 x1, f32 y1)
+                // Text decorations (underline / strikethrough).
+                if ( a_Style.Underline || a_Style.Strikethrough )
                 {
-                    SDL_FPoint p0 = transformPoint(x0, y0);
-                    SDL_FPoint p1 = transformPoint(x1, y0);
-                    SDL_FPoint p2 = transformPoint(x1, y1);
-                    SDL_FPoint p3 = transformPoint(x0, y1);
-                
-                    SDL_Vertex verts[4];
-                    verts[0] = { p0, sdlColor, {0.f, 0.f} };
-                    verts[1] = { p1, sdlColor, {0.f, 0.f} };
-                    verts[2] = { p2, sdlColor, {0.f, 0.f} };
-                    verts[3] = { p3, sdlColor, {0.f, 0.f} };
-                
-                    const int indices[6] = { 0, 1, 2, 0, 2, 3 };
-                
-                    SDL_RenderGeometry(m_Renderer, nullptr, verts, 4, indices, 6);
-                };
+                    const FT_Face face = font->GetFace();
+                    const f32     scale = static_cast<f32>( face->size->metrics.y_scale ) / 65536.f;
+                    const f32     baselineY = origin[1];
+                    f32           underlineThickness = ( face->underline_thickness * scale ) / 64.f;
+                    underlineThickness = std::max( 1.f, underlineThickness );
 
-                if ( a_Style.Underline )
-                {
-                    const f32 underlineOffset = ( face->underline_position * scale ) / 64.f;
-                    const f32 y = baselineY + underlineOffset;
+                    auto DrawLineQuad = [&]( f32 x0, f32 y0, f32 x1, f32 y1 )
+                    {
+                        SDL_Vertex verts[4];
+                        verts[0] = { transformPoint( x0, y0 ), sdlColor, { 0.f, 0.f } };
+                        verts[1] = { transformPoint( x1, y0 ), sdlColor, { 0.f, 0.f } };
+                        verts[2] = { transformPoint( x1, y1 ), sdlColor, { 0.f, 0.f } };
+                        verts[3] = { transformPoint( x0, y1 ), sdlColor, { 0.f, 0.f } };
+                        constexpr int indices[6] = { 0, 1, 2, 0, 2, 3 };
 
-                    DrawLineQuad(
-                        lineX,
-                        y,
-                        lineX + lineWidth,
-                        y + underlineThickness
-                    );
+                        SDL_RenderGeometry( m_Renderer, nullptr, verts, 4, indices, 6 );
+                    };
+
+                    if ( a_Style.Underline )
+                    {
+                        const f32 underlineOffset = ( face->underline_position * scale ) / 64.f;
+                        const f32 y = baselineY + underlineOffset;
+
+                        DrawLineQuad( lineX, y, lineX + lineWidth, y + underlineThickness );
+                    }
+
+                    if ( a_Style.Strikethrough )
+                    {
+                        const f32 y = baselineY - ascender * 0.35f;
+
+                        DrawLineQuad( lineX, y, lineX + lineWidth, y + underlineThickness );
+                    }
                 }
-                
-                if ( a_Style.Strikethrough )
-                {
-                    // Typical visual strike position ~35% of ascender
-                    const f32 strikeOffset = ascender * 0.35f;
-                
-                    const f32 y = baselineY - strikeOffset;
-                
-                    DrawLineQuad(
-                        lineX,
-                        y,
-                        lineX + lineWidth,
-                        y + underlineThickness
-                    );
-                }
-            }
 
-            lineY += lineHeight;
-        }
+                ++lineIndex;
+                lineY += lineHeight;
+            } );
     }
 
     inline void SDL2Renderer::RenderFillRoundedRect(

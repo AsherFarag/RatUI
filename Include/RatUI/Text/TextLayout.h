@@ -26,47 +26,6 @@ namespace RatUI::TextLayout
 
     constexpr f32 c_LineFitEpsilon = 0.01f; ///< Tolerance for floating-point line-fit checks
 
-    /**
-     * @brief The kind of a text segment.
-     */
-    enum class ESegmentKind : u8
-    {
-        Text,       ///< A word (Latin / script run) or a single CJK codepoint.
-        Space,      ///< Collapsible inter-word whitespace.
-        HardBreak,  ///< Explicit newline (only emitted in pre-wrap mode).
-    };
-
-    /**
-     * @brief A single pre-measured segment of text.
-     *
-     * Each segment corresponds to a contiguous byte range inside
-     * PreparedText::NormalizedText.
-     */
-    struct TextSegment
-    {
-        u32 StartByte{ 0 };    ///< Byte offset inside PreparedText::NormalizedText.
-        u32 ByteLength{ 0 };   ///< Length in bytes.
-        f32 Width{ 0.f };      ///< Pixel advance used for line-fit checks (includes any spacing).
-        f32 PaintWidth{ 0.f }; ///< Pixel width of visible rendered content.
-                               ///<   Text     : equals Width.
-                               ///<   Space    : 0 (trailing spaces hang past the edge).
-                               ///<   HardBreak: 0.
-
-        ESegmentKind Kind{ ESegmentKind::Text };
-        bool         IsCJKChar{ false }; ///< True when this is a single CJK codepoint.
-    };
-
-    /**
-     * @brief Result of the prepare phase, used as input to the layout phase.
-     * Treat this as an immutable value and only re-run Prepare() when the text content or style changes.
-     */
-    struct PreparedText
-    {
-        String             NormalizedText;     ///< Text after whitespace normalisation.
-        Array<TextSegment> Segments;           ///< Pre-measured segments in logical order.
-        f32                HyphenWidth{ 0.f }; ///< Width of "-" (reserved for soft-hyphen support).
-    };
-
     // =========================================================================
     // Prepare phase
     // =========================================================================
@@ -267,11 +226,46 @@ namespace RatUI::TextLayout
         return result;
     }
 
+    // =========================================================================
+    // Layout phase (WalkLines)
+    // =========================================================================
+
     /**
-     * @brief Walks the lines of a prepared text layout, invoking a callback for each line.
+     * @brief Decodes the first Unicode codepoint of segment @p a_SegIdx.
+     *
+     * Returns 0 for Space and HardBreak segments (they never need codepoint checks)
+     * or when the segment is empty.  Used internally by WalkLines() to evaluate
+     * line-break prohibition rules without storing codepoints in TextSegment.
+     */
+
+
+    /**
+     * @brief Walks the lines of a prepared text layout, invoking @p a_OnLine for each line.
+     *
+     * Features:
+     *  - Word-level and CJK character-level break opportunities.
+     *  - CJK line-break prohibition rules (JIS X 4051 / CSS Text Level 3):
+     *      - Characters in IsLineStartProhibited() or IsLineStartStickyPunctuation()
+     *        are kept off the start of a line whenever a prior break point exists.
+     *      - Characters in IsLineEndProhibited() do not record a break opportunity
+     *        after themselves (the following content stays on the same line).
+     *  - Optional hard maximum line count via @p a_MaxLines.
+     *  - Correct paint-width tracking: trailing Space segments are excluded.
+     *
+     * @tparam OnLineFn  Callable `void(u32 lineStartSeg, u32 lineEndSeg, f32 paintWidth)`.
+     *                   @p lineEndSeg is exclusive (one past the last segment of the line).
+     *                   @p paintWidth is the rendered pixel width, excluding trailing spaces.
+     *
+     * @param a_Prepared  Pre-measured text produced by Prepare().
+     * @param a_MaxWidth  Maximum pixel width of a line.  Pass Limits<f32>::max() for
+     *                    unlimited width (no wrapping).
+     * @param a_MaxLines  Maximum number of lines to emit.  0 means unlimited.
+     * @param a_OnLine    Callback invoked for each emitted line.
+     * @return            Total number of lines emitted.
      */
     template<std::invocable<u32/*lineStartSeg*/, u32/*lineEndSeg*/, f32/*paintWidth*/> OnLineFn>
-    inline u32 WalkLines( const PreparedText& a_Prepared, f32 a_MaxWidth, u32 a_MaxLines, OnLineFn&& a_OnLine )
+    inline u32 WalkLines( const PreparedText& a_Prepared, f32 a_MaxWidth, u32 a_MaxLines,
+                          OnLineFn&& a_OnLine )
     {
         const auto& segs = a_Prepared.Segments;
         if ( Empty( segs ) )
@@ -279,16 +273,231 @@ namespace RatUI::TextLayout
 
         constexpr u32 c_InvalidSeg = Limits<u32>::max();
         const u32 segCount = static_cast<u32>( Size( segs ) );
-         
 
         u32  lineCount          = 0;
-        f32  lineW              = 0.f;
-        bool hasContent         = false;
+        f32  lineW              = 0.f;   // total accumulated width (used for fit-checks)
+        f32  paintLineW         = 0.f;   // width of visible content (excludes trailing spaces)
+        bool hasContent         = false; // whether we've seen any non-space content on the current line (used to skip leading spaces and for paint width)
         u32  lineStartSeg       = 0;
-        u32  pendingBreakSeg    = c_InvalidSeg; // First seg of the NEXT line at break
-        f32  pendingBreakPaintW = 0.f;          // PaintLineW at the recorded break
+        u32  pendingBreakSeg    = c_InvalidSeg; // first seg of the NEXT line at break
+        f32  pendingBreakPaintW = 0.f;          // paintLineW at the recorded break
+
+        // Returns true when the caller should continue emitting lines.
+        auto emitLine = [&]( u32 endSeg, f32 paintW ) -> bool
+        {
+            a_OnLine( lineStartSeg, endSeg, paintW );
+            ++lineCount;
+            lineW = 0.f;
+            paintLineW = 0.f;
+            hasContent = false;
+            pendingBreakSeg = c_InvalidSeg;
+            pendingBreakPaintW = 0.f;
+
+            return a_MaxLines == 0u || lineCount < a_MaxLines;
+        };
+
+        // Helper to get the first codepoint of a segment, or 0 for non-Text segments.  Used for line-break prohibition checks.
+        auto segmentFirstCP = [&]( u32 segIndex ) -> c32
+        {
+            const TextSegment& seg = a_Prepared.Segments[segIndex];
+            if ( seg.ByteLength == 0 || seg.Kind != ESegmentKind::Text )
+                return 0;
+
+            StringView view{ Data( a_Prepared.NormalizedText ) + seg.StartByte, seg.ByteLength };
+            Unicode::UTF8Iterator it( view );
+            return it ? *it : 0;
+        };
+
+        // Returns true if segment @p idx starts with a character that must not begin a line.
+        auto isLineStartForbidden = [&]( u32 idx ) -> bool
+        {
+            const c32 cp = segmentFirstCP( idx );
+            return cp != 0 && ( Unicode::IsLineStartProhibited( cp ) ||
+                                Unicode::IsLineStartStickyPunctuation( cp ) );
+        };
+
+        u32 i = 0;
+        while ( i < segCount )
+        {
+            // At the start of a new line, consume (discard) leading Space segments.
+            if ( !hasContent )
+            {
+                while ( i < segCount && segs[i].Kind == ESegmentKind::Space )
+                    ++i;
+
+                if ( i >= segCount )
+                    break;
+
+                lineStartSeg = i;
+            }
+
+            const TextSegment& seg = segs[i];
+            const f32          w = seg.Width;
+            const ESegmentKind k = seg.Kind;
+
+            // - Hard break: force-emit the current line.
+            if ( k == ESegmentKind::HardBreak )
+            {
+                if ( !emitLine( i, hasContent ? paintLineW : 0.f ) )
+                    return lineCount;
+                lineStartSeg = i + 1;
+                ++i;
+                continue;
+            }
+
+            // - First content segment on this line: always fits.
+            if ( !hasContent )
+            {
+                hasContent = true;
+                lineW = w;
+                paintLineW = w; // first segment is always Text (spaces were skipped above)
+                ++i;
+                continue;
+            }
+
+            const f32 newW = lineW + w;
+
+            // - Space segment.
+            if ( k == ESegmentKind::Space )
+            {
+                if ( newW <= a_MaxWidth + c_LineFitEpsilon )
+                {
+                    // Space fits.  Record a break opportunity UNLESS the word
+                    // after this space is line-start-forbidden.
+                    lineW = newW;
+                    // paintLineW is unchanged (trailing space is not painted).
+                    const bool nextForbidden = ( i + 1 < segCount ) &&
+                        isLineStartForbidden( i + 1 );
+                    if ( !nextForbidden )
+                    {
+                        pendingBreakSeg = i + 1;
+                        pendingBreakPaintW = paintLineW; // width before this space
+                    }
+                }
+                else
+                {
+                    // Space itself overflows: emit the current line.
+                    if ( !emitLine( i, paintLineW ) )
+                        return lineCount;
+                    lineStartSeg = i + 1; // skip the overflowing space on the next line
+                }
+                ++i;
+                continue;
+            }
+
+            // - Text / CJK segment.
+
+            if ( newW <= a_MaxWidth + c_LineFitEpsilon )
+            {
+                // Fits on the current line.
+                lineW = newW;
+                paintLineW = newW; // Text is always painted.
+
+                // CJK-to-CJK (or CJK-to-end) boundaries are implicit break
+                // opportunities subject to line-break prohibition rules.
+                if ( seg.IsCJKChar )
+                {
+                    const c32  thisCp = segmentFirstCP( i );
+                    const bool endProhibited = Unicode::IsLineEndProhibited( thisCp );
+                    const bool nextForbidden = ( i + 1 < segCount ) &&
+                        isLineStartForbidden( i + 1 );
+
+                    if ( !endProhibited && !nextForbidden )
+                    {
+                        pendingBreakSeg = i + 1;
+                        pendingBreakPaintW = paintLineW; // after including this CJK char
+                    }
+                }
+
+                ++i;
+                continue;
+            }
+
+            // - Overflow: the current segment does not fit.
+
+            if ( pendingBreakSeg != static_cast<u32>( -1 ) )
+            {
+                // Break at the last recorded opportunity (word-space or CJK boundary).
+                if ( !emitLine( pendingBreakSeg, pendingBreakPaintW ) )
+                    return lineCount;
+                lineStartSeg = pendingBreakSeg;
+                // Do NOT advance i; re-process the current segment on the new line.
+                continue;
+            }
+
+            // No prior break opportunity: forced break before the current segment.
+            // If the current segment is line-start-forbidden (e.g. closing bracket),
+            // include it in the current line to avoid a prohibition violation even
+            // though it slightly overflows; then break after it.
+            if ( isLineStartForbidden( i ) )
+            {
+                lineW = newW;
+                paintLineW = newW;
+                ++i;
+                if ( !emitLine( i, paintLineW ) )
+                    return lineCount;
+                lineStartSeg = i;
+                continue;
+            }
+
+            if ( !emitLine( i, paintLineW ) )
+                return lineCount;
+            lineStartSeg = i;
+
+            // Do NOT advance i, re-process on the new line.
+        }
+
+        if ( hasContent && ( a_MaxLines == 0u || lineCount < a_MaxLines ) )
+            emitLine( segCount, paintLineW );
 
         return lineCount;
+    }
+
+    /**
+     * @brief Overload of WalkLines() with no maximum line count (unlimited).
+     *
+     * Convenience wrapper that passes 0 for @p a_MaxLines.
+     */
+    template<std::invocable<u32, u32, f32> OnLineFn>
+    inline u32 WalkLines( const PreparedText& a_Prepared, f32 a_MaxWidth,
+                          OnLineFn&& a_OnLine )
+    {
+        return WalkLines( a_Prepared, a_MaxWidth, 0u, std::forward<OnLineFn>( a_OnLine ) );
+    }
+
+    /**
+     * @brief Line count and maximum line paint-width returned by MeasureLineStats().
+     */
+    struct LineStats
+    {
+        u32 LineCount{ 0 };     ///< Number of lines emitted by WalkLines().
+        f32 MaxLineWidth{ 0.f }; ///< Widest line's paint width in pixels.
+    };
+
+    /**
+     * @brief Returns the line count and maximum line paint-width for a prepared text.
+     *
+     * Equivalent to calling WalkLines() and accumulating stats, expressed as a single
+     * convenient call.
+     *
+     * @param a_Prepared  Pre-measured text.
+     * @param a_MaxWidth  Maximum pixel width of a line.
+     * @param a_MaxLines  Maximum number of lines to count (0 = unlimited).
+     * @return            LineStats containing count and maximum paint-width.
+     */
+    [[nodiscard]] inline LineStats MeasureLineStats( const PreparedText& a_Prepared,
+                                                     f32 a_MaxWidth,
+                                                     u32 a_MaxLines = 0u )
+    {
+        LineStats stats;
+        WalkLines( a_Prepared, a_MaxWidth, a_MaxLines,
+                   [&]( u32, u32, f32 paintW )
+        {
+            ++stats.LineCount;
+            if ( paintW > stats.MaxLineWidth )
+                stats.MaxLineWidth = paintW;
+        } );
+        return stats;
     }
 
 } // namespace RatUI::TextLayout
