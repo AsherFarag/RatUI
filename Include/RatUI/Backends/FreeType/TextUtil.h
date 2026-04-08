@@ -41,6 +41,7 @@ namespace RatUI::FreeType::TextUtil
             const u32 glyphIdx = FT_Get_Char_Index( face, cp );
             const f32 advance = a_Font.GetAdvanceX( glyphIdx );
 
+            // Apply kerning and letter spacing between the previous glyph and this one.
             if ( hasPrev )
             {
                 if ( FT_HAS_KERNING( face ) )
@@ -380,6 +381,7 @@ namespace RatUI::FreeType::TextUtil
                 if ( FT_Get_Kerning( face, prevGlyphIdx, dotGlyphIdx, FT_KERNING_DEFAULT, &kerning ) == 0 )
                     crossKerning = kerning.x / 64.f;
             }
+            
             const f32 candidateWidth = prefixWidth + a_Style.LetterSpacing + crossKerning + ellipsisWidth;
 
             if ( candidateWidth <= a_MaxWidth ) bestPrefixByteCount = it.ByteIndex();

@@ -299,11 +299,6 @@ namespace RatUI::FreeType
         f32 XOffset{0.f},  YOffset{0.f};
     };
 
-    struct Script
-    {
-        hb_script_t Value;
-    };
-
     /**
      * @brief Shapes a line of text using HarfBuzz.
      * TODO: direction, script, and language are currently hardcoded to LTR/Latin/en.

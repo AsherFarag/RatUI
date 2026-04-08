@@ -17,9 +17,27 @@
 
 namespace RatUI::Unicode
 {
+    /** 
+     * @brief Returns true if @p a_CP is an ASCII whitespace codepoint (U+0020 SPACE, U+0009 TAB, U+000A LINE FEED, U+000D CARRIAGE RETURN, or U+000C FORM FEED). 
+     */
     constexpr inline bool IsAsciiWhitespace( c32 a_CP )
     {
         return a_CP == 0x20 || ( a_CP >= 0x09 && a_CP <= 0x0D );
+    }
+
+    /**
+     * @brief Returns true if @p a_CP is any Unicode whitespace codepoint, 
+     * including ASCII whitespace and the additional non-ASCII whitespace characters defined in Unicode.
+     * This includes U+0085 NEXT LINE, U+00A0 NO-BREAK SPACE, U+1680 OGHAM SPACE MARK,
+     *               U+2000–U+200A EN QUAD through HAIR SPACE, U+2028 LINE SEPARATOR,
+     *               U+2029 PARAGRAPH SEPARATOR, and U+202F NARROW NO-BREAK SPACE.
+     */
+    constexpr inline bool IsWhitespace( c32 a_CP )
+    {
+        return IsAsciiWhitespace( a_CP ) ||
+               a_CP == 0x85 ||   // NEXT LINE
+               a_CP == 0x2028 || // LINE SEPARATOR
+               a_CP == 0x2029;   // PARAGRAPH SEPARATOR
     }
 
     /**
