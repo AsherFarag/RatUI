@@ -73,6 +73,7 @@ namespace RatUI::FreeType::TextUtil
       * @param a_Transform The type of transformation to apply, specified as an ETextTransform enum value.
       * @return A new String containing the transformed text. The caller is responsible for managing the memory of the returned string.
       * TODO: Support locale-aware transformations and proper word-boundary detection for capitalization.
+      *       Probably need to use ICU. I miss ascii.
      */
     inline String ApplyTextTransform( TextView a_Text, ETextTransform a_Transform )
     {
