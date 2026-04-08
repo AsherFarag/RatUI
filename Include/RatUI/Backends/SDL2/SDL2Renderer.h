@@ -182,13 +182,10 @@ namespace RatUI::SDL2
 
             const u8* src = static_cast<const u8*>( a_Data );
             u8*       dst = Data( m_RGBAScratch );
-            for ( u32 i = 0; i < w * h; ++i )
-            {
-                dst[i * 4 + 0] = 255u;
-                dst[i * 4 + 1] = 255u;
-                dst[i * 4 + 2] = 255u;
-                dst[i * 4 + 3] = src[i];
-            }
+            
+            std::memset(dst, 0xFF, needed);  // set all bytes to 255
+            for (u32 i = 0; i < w * h; ++i)
+                dst[i * 4 + 3] = src[i];    // then overwrite alpha channel only
 
             return SDL_UpdateTexture( tex, &rect, dst, static_cast<int>( w ) * 4 ) == 0;
         }
