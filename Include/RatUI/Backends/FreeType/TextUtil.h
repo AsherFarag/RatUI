@@ -12,50 +12,64 @@ namespace RatUI::FreeType::TextUtil
 
     /**
      * @brief Measures the pixel width of a single (newline-free) line of text.
-     *
-     * Uses Font::GetAdvance - a glyph advance cache populated lazily by FreeType -
-     * so the common case (same glyphs measured multiple times per frame) never calls
-     * FT_Load_Glyph more than once per glyph per pixel size.
-     *
-     * Kerning is still fetched via FT_Get_Kerning on every pair because FreeType
-     * does not cache it.  If kerning queries prove expensive, consider building a
-     * pair cache in Font alongside the advance cache.
+     * 
+	 * TODO: This shapes the line every time its called. May need to add a separate MeasureLineWidth that takes already-shaped glyphs if this becomes a bottleneck?
      *
      * @param a_Font  The loaded Font (provides FTFace + advance cache).
      * @param a_Line  A newline-free string view to measure.
      * @param a_Style TextStyle for letter spacing.
      * @return The measured width in pixels.
      */
-    inline f32 MeasureLineWidth( Font& a_Font, StringView a_Line, const TextStyle& a_Style )
+    inline f32 MeasureLineWidth(
+        Font& a_Font,
+        StringView         a_Line,
+        const TextStyle& a_Style )
     {
         if ( Empty( a_Line ) )
             return 0.f;
 
-        FT_Face face     = a_Font.GetFace();
-        f32     width    = 0.f;
-        u32     prevGlyph = 0;
-        bool    hasPrev  = false;
+        hb_buffer_t* buffer = a_Font.GetHBBuffer();
 
-        for ( const c32 cp : UTF8Range( a_Line ) )
+        hb_buffer_clear_contents( buffer );
+        hb_buffer_add_utf8( buffer,
+                           Data( a_Line ),
+                           (int)Size( a_Line ),
+                           0,
+                           (int)Size( a_Line ) );
+
+        hb_buffer_guess_segment_properties( buffer );
+
+        hb_shape( a_Font.GetHBFont(), buffer, nullptr, 0 );
+
+        u32 glyphCount = 0;
+        hb_glyph_position_t* positions = hb_buffer_get_glyph_positions( buffer, &glyphCount );
+
+        hb_glyph_info_t* infos = hb_buffer_get_glyph_infos( buffer, &glyphCount );
+
+        if ( !positions || !infos || glyphCount == 0 )
+            return 0.f;
+
+        f32 width = 0.f;
+
+        u32 prevCluster = infos[0].cluster;
+        u32 clusterCount = 1;
+
+        width += positions[0].x_advance / 64.f;
+
+        for ( u32 i = 1; i < glyphCount; ++i )
         {
-            const u32 glyphIdx = FT_Get_Char_Index( face, cp );
-            const f32 advance = a_Font.GetAdvanceX( glyphIdx );
+            width += positions[i].x_advance / 64.f;
 
-            // Apply kerning and letter spacing between the previous glyph and this one.
-            if ( hasPrev )
+            if ( infos[i].cluster != prevCluster )
             {
-                if ( FT_HAS_KERNING( face ) )
-                {
-                    FT_Vector kerning;
-                    if ( FT_Get_Kerning( face, prevGlyph, glyphIdx, FT_KERNING_DEFAULT, &kerning ) == 0 )
-                        width += kerning.x / 64.f;
-                }
-                width += a_Style.LetterSpacing;
+                ++clusterCount;
+                prevCluster = infos[i].cluster;
             }
+        }
 
-            width    += advance;
-            prevGlyph = glyphIdx;
-            hasPrev   = true;
+        if ( a_Style.LetterSpacing != 0.f && clusterCount > 1 )
+        {
+            width += a_Style.LetterSpacing * ( clusterCount - 1 );
         }
 
         return width;
