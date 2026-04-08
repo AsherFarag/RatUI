@@ -68,7 +68,6 @@ namespace RatUI
             const Rectf textRect = node->Style.Padding.Apply( node->Layout.FinalRect );
 
 			a_DrawList.PushClipRect( textRect.Cast<u16>() );
-            a_DrawList.AddRect( Colorsf::Red, textRect, {} );
 			a_DrawList.AddText( m_PreparedText, m_Style, textRect );
 			a_DrawList.PopClipRect();
         }

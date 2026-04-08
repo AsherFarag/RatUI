@@ -236,6 +236,16 @@ namespace RatUI
         const LayoutStyle& s    = a_Node.Style;
         const bool         isHz = s.LayoutType == ELayoutType::Horizontal;
 
+        // returns true for children that fill the main axis without an explicit flex basis.
+        // These are excluded from totalFixed so their over-measured DesiredSize never prevents
+        // siblings from receiving their correct share of available space.
+        const auto isPureStretchMain = [&]( const LayoutNode& child ) -> bool
+        {
+            return ( child.Style.FlexGrow == 0.f ) &&
+                   ( ( isHz && child.Style.WidthMode  == ESizingMode::Flex ) ||
+                     ( !isHz && child.Style.HeightMode == ESizingMode::Flex ) );
+        };
+
         // Pass 1: sum fixed space and total grow weight
         f32 totalFixed = 0.f;
         f32 totalGrow  = 0.f;
@@ -246,8 +256,14 @@ namespace RatUI
             if ( child.Style.PositionMode == EPositioningMode::Anchored ) return;
             if ( !child.Layout.Visibility.AffectsLayout() )               return;
 
-            totalFixed += isHz ? child.Layout.DesiredSize[0] + child.Style.Margin.Horizontal()
-                               : child.Layout.DesiredSize[1] + child.Style.Margin.Vertical();
+            // Pure-stretch children are excluded from totalFixed, their size will be
+            // whatever space remains after all other children are allocated.
+            if ( !isPureStretchMain( child ) )
+            {
+                totalFixed += isHz ? child.Layout.DesiredSize[0] + child.Style.Margin.Horizontal()
+                                   : child.Layout.DesiredSize[1] + child.Style.Margin.Vertical();
+            }
+
             totalGrow  += child.Style.FlexGrow;
             numFlow++;
         } );
@@ -303,12 +319,15 @@ namespace RatUI
                 const Constraints& c     = child.Style.SizeConstraints;
                 f32                share = leftover * ( growWeight / totalGrow );
 
+                // Pure stretch flex children receive exactly their share of the remaining space
+                // (their DesiredSize is not used as a flex basis to avoid inflated measurements
+                // from a prior pass propagating into the final layout).
                 // TODO: Iterative clamped distribution - if a child hits MaxSize, remaining
                 // leftover should redistribute to uncapped siblings. Not worth doing until needed.
                 if ( isHz )
-                    childSize[0] = std::clamp( childSize[0] + share, c.MinSize[0], c.MaxSize[0] );
+                    childSize[0] = std::clamp( isPureStretchMain( child ) ? share : childSize[0] + share, c.MinSize[0], c.MaxSize[0] );
                 else
-                    childSize[1] = std::clamp( childSize[1] + share, c.MinSize[1], c.MaxSize[1] );
+                    childSize[1] = std::clamp( isPureStretchMain( child ) ? share : childSize[1] + share, c.MinSize[1], c.MaxSize[1] );
             }
 
             // Fill on the cross axis - always expand regardless of grow
