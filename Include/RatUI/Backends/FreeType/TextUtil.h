@@ -192,8 +192,15 @@ namespace RatUI::FreeType::TextUtil
             
             const f32 candidateWidth = prefixWidth + a_Style.LetterSpacing + crossKerning + ellipsisWidth;
 
-            if ( candidateWidth <= a_MaxWidth ) bestPrefixByteCount = it.ByteIndex();
-            else break; // Widths are non-decreasing - no longer prefix can fit.
+            if ( candidateWidth <= a_MaxWidth ) 
+            {
+                // This prefix fits with the ellipsis, so save it as the best candidate so far and keep trying to fit more.
+                bestPrefixByteCount = it.ByteIndex() + it.SequenceByteLength();
+            }
+            else
+            {
+                break; // Widths are non-decreasing - no longer prefix can fit.
+            }
         }
 
         String result;
@@ -330,9 +337,7 @@ namespace RatUI::FreeType::TextUtil
                         continue;
                 }
 
-                PushBack( o_Storage,
-                          TruncateLineWithEllipsis( a_Font, o_Lines[ i ], a_Style,
-                                                    a_MaxWidth, forceEllipsis ) );
+                PushBack( o_Storage, TruncateLineWithEllipsis( a_Font, o_Lines[ i ], a_Style, a_MaxWidth, forceEllipsis ) );
                 o_Lines[ i ] = StringView{ Back( o_Storage ) };
             }
         }
