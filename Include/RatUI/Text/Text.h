@@ -79,10 +79,16 @@ namespace RatUI
         f32            Size{ 16.0f };          ///< The size of the font in points, which determines the height of the characters. Default is 16.0f.          
         f32            LineHeight{ 0.0f };     ///< The height of each line of text, including spacing. If set to 0, it will be automatically calculated based on the font size and metrics.
         f32            LetterSpacing{ 0.0f };  ///< The spacing between characters in the text, specified in points. Default is 0.0f.
+		f32            WordSpacing{ 0.0f };    ///< The spacing between words in the text, specified in points. Default is 0.0f.
 
         Coloru8        Color{ Colorsu8::White };
 
         u16            MaxLines{ 0 };          ///< The maximum number of lines to render. If set to 0, there is no limit on the number of lines.
+
+        // TODO: Annoyingly, its not standardized for bitfields to use the underlying enum type, so a compiler could choose a signed type and cause truncation.
+        //       Either need to:
+        //       1) Remove the bitfield packing, which is innefficient but safe.
+        //       2) Use u8 for the bitfields, which makes the api cumbersome and error-prone since the caller has to cast the enum values to u8.
 
         ETextAlign     Align     : (u8)ETextAlign::_NumBits     { ETextAlign::Left };
         ETextWrap      Wrap      : (u8)ETextWrap::_NumBits      { ETextWrap::WrapWord }; 
@@ -100,7 +106,7 @@ namespace RatUI
 		constexpr bool operator==( const TextStyle& a_Other ) const = default;
     };
     static_assert( std::is_trivially_copyable_v<TextStyle> );
-	static_assert( sizeof( TextStyle ) == 24, "TextStyle should be 24 bytes in size - Reevaluate padding if this assertion fails." );
+	static_assert( sizeof( TextStyle ) == 28, "TextStyle should be 28 bytes in size - Reevaluate padding if this assertion fails." );
 
     /**
 	 * @brief Stores measurement results of a block of text created by ITextMetrics.

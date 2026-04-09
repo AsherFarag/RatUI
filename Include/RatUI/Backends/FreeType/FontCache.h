@@ -368,10 +368,16 @@ namespace RatUI::FreeType
         Clear( o_Glyphs );
         Reserve( o_Glyphs, glyphCount );
 
-        const f32 scale = 1.0f / 64.0f;
+        const f32 scale         = 1.0f / 64.0f;
         const f32 letterSpacing = a_Style.LetterSpacing;
+        const f32 wordSpacing   = a_Style.WordSpacing;
 
         f32 lineWidth = 0.f;
+
+        // Track the last cluster we checked for word-spacing so that multi-glyph
+        // clusters (e.g. ligature components) only receive the extra advance once.
+        constexpr u32 c_NoCluster = Limits<u32>::max();
+        u32 lastWordSpacingCluster = c_NoCluster;
 
         for ( unsigned i = 0; i < glyphCount; ++i )
         {
@@ -381,6 +387,14 @@ namespace RatUI::FreeType
             // Apply letter spacing (horizontal text only)
             if ( letterSpacing != 0.f && i + 1 < glyphCount )
                 xAdvance += letterSpacing;
+
+            // Apply word spacing for whitespace glyphs (once per unique whitespace cluster).
+            if ( wordSpacing != 0.f && infos[i].cluster != lastWordSpacingCluster )
+            {
+                lastWordSpacingCluster = infos[i].cluster;
+                if ( Unicode::IsWhitespaceCluster( a_TextUTF8, infos[i].cluster ) )
+                    xAdvance += wordSpacing;
+            }
 
             EmplaceBack(
                 o_Glyphs,

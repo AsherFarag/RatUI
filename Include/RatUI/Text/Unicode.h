@@ -41,6 +41,12 @@ namespace RatUI::Unicode
     }
 
     /**
+     * @brief Returns true if the UTF-8 codepoint starting at byte offset @p a_ClusterByte
+     *        within @p a_Text is a Unicode whitespace character.
+     */
+    constexpr bool IsWhitespaceCluster( StringView a_Text, u32 a_ClusterByte );
+
+    /**
      * @brief Returns true if @p a_CP is a CJK (or CJK-adjacent) codepoint that
      *        allows a line-break opportunity between consecutive characters.
      *
@@ -560,5 +566,18 @@ namespace RatUI::Unicode
     private:
         StringView m_String;
     };
+
+    // = Inline implementations =
+
+    constexpr inline bool IsWhitespaceCluster( StringView a_Text, u32 a_ClusterByte )
+    {
+        if ( a_ClusterByte >= static_cast<u32>( Size( a_Text ) ) )
+            return false;
+
+        UTF8Iterator it{ StringView{ Data( a_Text ) + a_ClusterByte,
+                                     Size( a_Text ) - a_ClusterByte } };
+                                     
+        return it && IsWhitespace( *it );
+    }
 
 } // namespace RatUI::Unicode

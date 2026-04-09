@@ -51,10 +51,14 @@ namespace RatUI::FreeType::TextUtil
 
         f32 width = 0.f;
 
-        u32 prevCluster = infos[0].cluster;
-        u32 clusterCount = 1;
+        u32 prevCluster       = infos[0].cluster;
+        u32 clusterCount      = 1;
+        u32 spaceClusterCount = 0;
 
         width += positions[0].x_advance / 64.f;
+
+        if ( a_Style.WordSpacing != 0.f && Unicode::IsWhitespaceCluster( a_Line, infos[0].cluster ) )
+            ++spaceClusterCount;
 
         for ( u32 i = 1; i < glyphCount; ++i )
         {
@@ -64,13 +68,17 @@ namespace RatUI::FreeType::TextUtil
             {
                 ++clusterCount;
                 prevCluster = infos[i].cluster;
+
+                if ( a_Style.WordSpacing != 0.f && Unicode::IsWhitespaceCluster( a_Line, infos[i].cluster ) )
+                    ++spaceClusterCount;
             }
         }
 
         if ( a_Style.LetterSpacing != 0.f && clusterCount > 1 )
-        {
             width += a_Style.LetterSpacing * ( clusterCount - 1 );
-        }
+
+        if ( a_Style.WordSpacing != 0.f && spaceClusterCount > 0 )
+            width += a_Style.WordSpacing * static_cast<f32>( spaceClusterCount );
 
         return width;
     }
