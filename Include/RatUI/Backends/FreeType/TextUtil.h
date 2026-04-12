@@ -17,13 +17,13 @@ namespace RatUI::FreeType::TextUtil
      *
      * @param a_Font  The loaded Font (provides FTFace + advance cache).
      * @param a_Line  A newline-free string view to measure.
-     * @param a_Style TextStyle for letter spacing.
+     * @param a_Style TextLayoutStyle for letter spacing.
      * @return The measured width in pixels.
      */
     inline f32 MeasureLineWidth(
         Font& a_Font,
-        StringView         a_Line,
-        const TextStyle& a_Style )
+        StringView a_Line,
+        const TextLayoutStyle& a_Style )
     {
         if ( Empty( a_Line ) )
             return 0.f;
@@ -144,11 +144,11 @@ namespace RatUI::FreeType::TextUtil
      * @return The truncated string, or an empty string if even "..." does not fit.
      */
     inline String TruncateLineWithEllipsis(
-        Font&            a_Font,
-        StringView       a_Line,
-        const TextStyle& a_Style,
-        f32              a_MaxWidth,
-        bool             a_ForceEllipsis )
+        Font&                  a_Font,
+        StringView             a_Line,
+        const TextLayoutStyle& a_Style,
+        f32                    a_MaxWidth,
+        bool                   a_ForceEllipsis )
     {
         FT_Face face = a_Font.GetFace();
 
@@ -242,12 +242,12 @@ namespace RatUI::FreeType::TextUtil
      * @param a_MaxWidth   Maximum line width for wrapping and overflow checks.
      */
     inline void BuildTextLines(
-        Font&              a_Font,
-        const TextStyle&   a_Style,
-        TextView           a_Text,
-        Array<StringView>& o_Lines,
-        Array<String>&     o_Storage,
-        f32                a_MaxWidth = Limits<f32>::max() )
+        Font&                  a_Font,
+        const TextLayoutStyle& a_Style,
+        TextView               a_Text,
+        Array<StringView>&     o_Lines,
+        Array<String>&         o_Storage,
+        f32                    a_MaxWidth = Limits<f32>::max() )
     {
         Clear( o_Lines );
         Clear( o_Storage );
@@ -265,9 +265,8 @@ namespace RatUI::FreeType::TextUtil
         }
 
         // 2. Prepare: segment + pre-measure (one-time cost per text/font/style change).
-        const bool preWrap = ( a_Style.Wrap != ETextWrap::NoWrap );
         PreparedText prepared = TextLayout::Prepare(
-            textToRender, a_Style.Wrap, preWrap,
+            textToRender, a_Style.Wrap, 
             [&]( StringView sv ) -> f32 { return MeasureLineWidth( a_Font, sv, a_Style ); } );
 
         // Determine whether MaxLines was exceeded by doing an unlimited pre-walk.
@@ -315,8 +314,8 @@ namespace RatUI::FreeType::TextUtil
             } );
 
         // 5. Overflow/ellipsis handling.
-        if ( a_Style.Overflow == ETextOverflow::Clip ||
-             a_Style.Overflow == ETextOverflow::Fade )
+        if ( a_Style.Overflow == ETextOverflow::Clip
+             /* TODO: || a_Style.Overflow == ETextOverflow::Fade*/ )
             return; // WalkLines already respected maxLines; nothing more to do.
 
         if ( a_Style.Overflow == ETextOverflow::Ellipsis )

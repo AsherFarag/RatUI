@@ -65,16 +65,15 @@ public:
             mainContentNode->Style.PercentWidth = 0.5f;
             mainContentNode->Style.Margin = Edges{ 10.f };
 
-            TextStyle textStyle{ 
-                .Font = DefaultFont,
-                .Size = 16,
-                .Wrap = ETextWrap::NoWrap,
-            };
-			textStyle.Overflow = ETextOverflow::Ellipsis;
-			textStyle.Color = Colorsu8::AccentRose;
-			//textStyle.Transform = ETextTransform::Uppercase;
-            //textStyle.Underline = true;
-			//textStyle.Strikethrough = true;
+            TextStyle textStyle;
+            textStyle.Layout.Font = DefaultFont;
+            textStyle.Layout.Size = 16;
+            textStyle.Layout.Wrap = TextWrap::NoWrap();
+            textStyle.Layout.Overflow = ETextOverflow::Ellipsis;
+            textStyle.Render.Color = Colorsu8::AccentRose;
+            //textStyle.Layout.Transform = ETextTransform::Uppercase;
+            //textStyle.Render.Underline = true;
+            //textStyle.Render.Strikethrough = true;
 
             // Add some text to the footer bar
             WidgetID footerText = m_Scene.CreateWidget<TextWidget>( MainContentArea, 
@@ -134,11 +133,10 @@ public:
             secondaryNode->Style.FlexGrow = 1.f;
 
             // Long wrapping Text
-            TextStyle textStyle{ 
-                .Font = DefaultFont,
-                .Size = 16,
-                .Wrap = ETextWrap::WrapWord,
-            };
+            TextStyle textStyle;
+            textStyle.Layout.Font = DefaultFont;
+            textStyle.Layout.Size = 16;
+            textStyle.Layout.Wrap = TextWrap::WrapWord();
             WidgetID longText = m_Scene.CreateWidget<TextWidget>( secondaryContent, 
                 "This is the secondary content area. It can contain supplementary information or controls that support the main content.\n"
                 "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.", textStyle
@@ -159,11 +157,10 @@ public:
             footerNode->Style.WidthMode = ESizingMode::Flex;
             footerNode->Style.HeightMode = ESizingMode::Fixed;
 
-			TextStyle textStyle{ 
-                .Font = DefaultFont,
-                .Size = 16,
-                .Wrap = ETextWrap::WrapWord,
-            };
+            TextStyle textStyle;
+            textStyle.Layout.Font = DefaultFont;
+            textStyle.Layout.Size = 16;
+            textStyle.Layout.Wrap = TextWrap::WrapWord();
 
             // Add some text to the footer bar
             WidgetID footerText = m_Scene.CreateWidget<TextWidget>( footerBar, 

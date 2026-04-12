@@ -49,26 +49,26 @@ private:
     TextStyle MakeStyle( f32 sz = 14.f ) const
     {
         TextStyle s;
-        s.Font     = m_Font;
-        s.Size     = sz;
-        s.Color    = Colorsu8::TextPrimary;
-        s.Wrap     = ETextWrap::NoWrap;
-        s.Overflow = ETextOverflow::Clip;
+        s.Layout.Font    = m_Font;
+        s.Layout.Size    = sz;
+        s.Render.Color   = Colorsu8::TextPrimary;
+        s.Layout.Wrap    = TextWrap::NoWrap();
+        s.Layout.Overflow = ETextOverflow::Clip;
         return s;
     }
 
     TextStyle SectionHeadingStyle() const
     {
         TextStyle s = MakeStyle( 9.f );
-        s.Color     = Colorsu8::TextSecondary;
-        s.Transform = ETextTransform::Uppercase;
+        s.Render.Color      = Colorsu8::TextSecondary;
+        s.Layout.Transform  = ETextTransform::Uppercase;
         return s;
     }
 
     TextStyle RowLabelStyle() const
     {
         TextStyle s = MakeStyle( 10.f );
-        s.Color = Colorsu8::TextDisabled;
+        s.Render.Color = Colorsu8::TextDisabled;
         return s;
     }
 
@@ -225,7 +225,7 @@ private:
         for ( auto& e : kCols )
         {
             TextStyle ts = MakeStyle( 14.f );
-            ts.Color = e.col;
+            ts.Render.Color = e.col;
             AddRow( card, e.label, "Aa  The quick brown fox", ts );
         }
     }
@@ -240,12 +240,30 @@ private:
             { ETextAlign::Center, "Center" },
             { ETextAlign::Right,  "Right"  },
         };
+
         for ( auto& e : kAligns )
         {
             TextStyle ts = MakeStyle( 14.f );
-            ts.Align = e.align;
-            ts.Wrap  = ETextWrap::WrapWord;
+            ts.Layout.Align = e.align;
+            ts.Layout.Wrap = TextWrap::WrapWord();
             AddRow( card, e.label, kSent, ts, ESizingMode::Flex );
+        }
+
+        // Now do ETextBaseline
+        static const char* kBase = "HYPHENATION\nBASELINE\nALIGNMENT";
+        constexpr struct { ETextBaseline base; const char* label; } kBases[] = {
+            { ETextBaseline::Top,        "Top"        },
+            { ETextBaseline::Middle,     "Middle"     },
+            { ETextBaseline::Bottom,     "Bottom"     },
+            { ETextBaseline::Alphabetic, "Alphabetic" },
+            { ETextBaseline::Hanging,    "Hanging"    },
+        };
+
+        for ( auto& e : kBases )
+        {
+            TextStyle ts = MakeStyle( 14.f );
+            ts.Layout.Baseline = e.base;
+            AddRow( card, e.label, kBase, ts, ESizingMode::Flex );
         }
     }
 
@@ -259,18 +277,18 @@ private:
 
         {
             TextStyle ts = MakeStyle( 13.f );
-            ts.Wrap    = ETextWrap::NoWrap;
-            ts.Overflow = ETextOverflow::Ellipsis;
+            ts.Layout.Wrap = TextWrap::NoWrap();
+            ts.Layout.Overflow = ETextOverflow::Ellipsis;
             AddRow( card, "NoWrap+Ellipsis", kLong, ts, ESizingMode::Flex );
         }
         {
             TextStyle ts = MakeStyle( 13.f );
-            ts.Wrap = ETextWrap::WrapWord;
+            ts.Layout.Wrap = TextWrap::WrapWord();
             AddRow( card, "WrapWord", kLong, ts, ESizingMode::Flex );
         }
         {
             TextStyle ts = MakeStyle( 13.f );
-            ts.Wrap = ETextWrap::WrapChar;
+            ts.Layout.Wrap = TextWrap::WrapChar();
             AddRow( card, "WrapChar", kLong, ts, ESizingMode::Flex );
         }
     }
@@ -282,19 +300,19 @@ private:
             "The five boxing wizards jump quickly over the lazy dog. "
             "Pack my box with five dozen liquor jugs.";
 
-        auto add = [&]( const char* label, ETextWrap wrap, ETextOverflow overflow, u16 maxLines )
+        auto add = [&]( const char* label, TextWrap wrap, ETextOverflow overflow, u16 maxLines )
         {
             TextStyle ts = MakeStyle( 13.f );
-            ts.Wrap     = wrap;
-            ts.Overflow = overflow;
-            ts.MaxLines = maxLines;
+            ts.Layout.Wrap = wrap;
+            ts.Layout.Overflow = overflow;
+            ts.Layout.MaxLines = maxLines;
             AddRow( card, label, kLong, ts, ESizingMode::Fixed, 260.f );
         };
 
-        add( "Clip",         ETextWrap::NoWrap,   ETextOverflow::Clip,     0 );
-        add( "Ellipsis",     ETextWrap::NoWrap,   ETextOverflow::Ellipsis, 0 );
-        add( "MaxLines = 2", ETextWrap::WrapWord, ETextOverflow::Ellipsis, 2 );
-        add( "MaxLines = 1", ETextWrap::WrapWord, ETextOverflow::Ellipsis, 1 );
+        add( "Clip",         TextWrap::NoWrap(),   ETextOverflow::Clip,     0 );
+        add( "Ellipsis",     TextWrap::NoWrap(),   ETextOverflow::Ellipsis, 0 );
+        add( "MaxLines = 2", TextWrap::WrapWord(), ETextOverflow::Ellipsis, 2 );
+        add( "MaxLines = 1", TextWrap::WrapWord(), ETextOverflow::Ellipsis, 1 );
     }
 
     void BuildTransform( WidgetID parent )
@@ -311,7 +329,7 @@ private:
         for ( auto& e : kXforms )
         {
             TextStyle ts = MakeStyle( 14.f );
-            ts.Transform = e.xf;
+            ts.Layout.Transform = e.xf;
             AddRow( card, e.label, kRaw, ts );
         }
     }
@@ -330,9 +348,9 @@ private:
         for ( auto& e : kSpacings )
         {
             TextStyle ts = MakeStyle( 14.f );
-            ts.LetterSpacing = e.sp;
-            ts.Wrap          = ETextWrap::NoWrap;
-            ts.Overflow      = ETextOverflow::Clip;
+            ts.Layout.LetterSpacing = e.sp;
+            ts.Layout.Wrap = TextWrap::NoWrap();
+            ts.Layout.Overflow      = ETextOverflow::Clip;
             AddRow( card, e.label, "LOREM IPSUM SIT AMET", ts );
         }
     }
@@ -354,8 +372,8 @@ private:
         for ( auto& e : kLH )
         {
             TextStyle ts = MakeStyle( 13.f );
-            ts.LineHeight = e.lh;
-            ts.Wrap       = ETextWrap::WrapWord;
+            ts.Layout.LineHeight = e.lh;
+            ts.Layout.Wrap = TextWrap::WrapWord();
             AddRow( card, e.label, kPara, ts, ESizingMode::Flex );
         }
     }
@@ -374,8 +392,8 @@ private:
         for ( auto& e : kDec )
         {
             TextStyle ts = MakeStyle( 14.f );
-            ts.Underline     = e.ul;
-            ts.Strikethrough = e.st;
+            ts.Render.Underline     = e.ul;
+            ts.Render.Strikethrough = e.st;
             AddRow( card, e.label, kSamp, ts );
         }
     }
@@ -387,42 +405,40 @@ private:
             "Amazingly few discotheques provide jukeboxes. "
             "How vexingly quick daft zebras jump!";
 
-        // Violet italic + underline + WrapWord
+        // Violet underline + WrapWord
         {
             TextStyle ts = MakeStyle( 14.f );
-            ts.Color     = Colorsu8::AccentViolet;
-            ts.Italic    = true;
-            ts.Underline = true;
-            ts.Wrap      = ETextWrap::WrapWord;
+            ts.Render.Color     = Colorsu8::AccentViolet;
+            ts.Render.Underline = true;
+            ts.Layout.Wrap = TextWrap::WrapWord();
             AddRow( card, "Italic+UL", kLong, ts, ESizingMode::Flex );
         }
-        // Rose bold + strikethrough + uppercase + WrapWord
+        // Rose strikethrough + uppercase + WrapWord
         {
             TextStyle ts = MakeStyle( 14.f );
-            ts.Color         = Colorsu8::AccentRose;
-            ts.Bold          = true;
-            ts.Strikethrough = true;
-            ts.Transform     = ETextTransform::Uppercase;
-            ts.Wrap          = ETextWrap::WrapWord;
+            ts.Render.Color         = Colorsu8::AccentRose;
+            ts.Render.Strikethrough = true;
+            ts.Layout.Transform     = ETextTransform::Uppercase;
+            ts.Layout.Wrap = TextWrap::WrapWord();
             AddRow( card, "Bold+ST+UC", kLong, ts, ESizingMode::Flex );
         }
         // Amber wide spacing + capitalize + ellipsis
         {
             TextStyle ts = MakeStyle( 13.f );
-            ts.Color         = Colorsu8::AccentAmber;
-            ts.LetterSpacing = 3.f;
-            ts.Transform     = ETextTransform::Capitalize;
-            ts.Wrap          = ETextWrap::NoWrap;
-            ts.Overflow      = ETextOverflow::Ellipsis;
+            ts.Render.Color         = Colorsu8::AccentAmber;
+            ts.Layout.LetterSpacing = 3.f;
+            ts.Layout.Transform     = ETextTransform::Capitalize;
+            ts.Layout.Wrap = TextWrap::NoWrap();
+            ts.Layout.Overflow      = ETextOverflow::Ellipsis;
             AddRow( card, "Wide+Cap", "the quick brown fox jumps over", ts, ESizingMode::Flex );
         }
         // Sky center-aligned large display
         {
             TextStyle ts = MakeStyle( 22.f );
-            ts.Color      = Colorsu8::AccentSky;
-            ts.Align      = ETextAlign::Center;
-            ts.Wrap       = ETextWrap::WrapWord;
-            ts.LineHeight = 30.f;
+            ts.Render.Color      = Colorsu8::AccentSky;
+            ts.Layout.Align      = ETextAlign::Center;
+            ts.Layout.Wrap = TextWrap::WrapWord();
+            ts.Layout.LineHeight = 30.f;
             AddRow( card, "Center 22px", "The beauty of typography lives in every detail.", ts, ESizingMode::Flex );
         }
     }
@@ -469,9 +485,9 @@ private:
         }
 
         TextStyle ts = MakeStyle( 13.f );
-        ts.Color    = Colorsu8::AccentBlue;
-        ts.Wrap     = ETextWrap::NoWrap;
-        ts.Overflow = ETextOverflow::Ellipsis;
+        ts.Render.Color    = Colorsu8::AccentBlue;
+        ts.Layout.Wrap = TextWrap::NoWrap();
+        ts.Layout.Overflow = ETextOverflow::Ellipsis;
 
         WidgetID txt = m_Scene.CreateWidget<TextWidget>(
             m_AnimContainer,
@@ -517,14 +533,14 @@ public:
 
             {
                 TextStyle ts = MakeStyle( 22.f );
-                ts.Color = Colorsu8::TextPrimary;
+                ts.Render.Color = Colorsu8::TextPrimary;
                 AddText( bar, "Text Feature Showcase", ts, ESizingMode::Flex );
             }
             {
                 TextStyle ts = MakeStyle( 11.f );
-                ts.Color   = Colorsu8::TextSecondary;
-                ts.Wrap    = ETextWrap::NoWrap;
-                ts.Overflow = ETextOverflow::Clip;
+                ts.Render.Color   = Colorsu8::TextSecondary;
+                ts.Layout.Wrap = TextWrap::NoWrap();
+                ts.Layout.Overflow = ETextOverflow::Clip;
                 AddText( bar,
                     "Sizes  |  Colours  |  Alignment  |  Wrapping  |  Overflow  |"
                     "  Transform  |  Spacing  |  LineHeight  |  Decoration  |  Animation",

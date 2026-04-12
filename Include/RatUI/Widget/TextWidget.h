@@ -40,7 +40,7 @@ namespace RatUI
             // Re-prepare only when text content or style changes (expensive – segments are pre-measured).
             if ( m_PreparedDirty )
             {
-                m_PreparedText = metrics->Prepare( m_Text, m_Style );
+                m_PreparedText = metrics->Prepare( m_Text, m_Style.Layout );
                 m_PreparedDirty = false;
             }
 
@@ -51,7 +51,7 @@ namespace RatUI
             else
                 maxWidth = a_AvailableSize[0] - a_Node.Style.Padding.Horizontal();
 
-            TextMeasurement t = metrics->Measure( m_PreparedText, m_Style, std::max( maxWidth, 0.f ) );
+            TextMeasurement t = metrics->Measure( m_PreparedText, m_Style.Layout, std::max( maxWidth, 0.f ) );
             a_Node.Layout.IntrinsicSize = t.Size;
         }
 
@@ -68,6 +68,7 @@ namespace RatUI
             const Rectf textRect = node->Style.Padding.Apply( node->Layout.FinalRect );
 
 			//a_DrawList.PushClipRect( textRect.Cast<u16>() );
+			//a_DrawList.AddRect( Colorsf::Red, textRect, {} );
 			a_DrawList.AddText( m_PreparedText, m_Style, textRect );
 			//a_DrawList.PopClipRect();
         }

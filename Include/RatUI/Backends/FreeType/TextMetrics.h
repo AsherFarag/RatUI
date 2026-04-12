@@ -18,7 +18,7 @@ namespace RatUI::FreeType
         /** @brief Sets the font cache. */
         void SetFontCache( FontCache* a_Cache ) { m_FontCache = a_Cache; }
 
-        PreparedText Prepare( TextView a_Text, const TextStyle& a_Style ) override
+        PreparedText Prepare( TextView a_Text, const TextLayoutStyle& a_Style ) override
         {
             if ( !m_FontCache || !a_Style.Font.IsValid() || Empty( a_Text ) )
                 return {};
@@ -27,22 +27,21 @@ namespace RatUI::FreeType
             if ( !font )
                 return {};
 
-            const bool preWrap = ( a_Style.Wrap != ETextWrap::NoWrap );
-            return TextLayout::Prepare( a_Text, a_Style.Wrap, preWrap,
+            return TextLayout::Prepare( a_Text, a_Style.Wrap,
                 [font, &a_Style]( StringView sv )
                 {
                     return TextUtil::MeasureLineWidth( *font, sv, a_Style );
                 } );
         }
 
-        TextMeasurement Measure( const PreparedText& a_Prepared, const TextStyle& a_Style, f32 a_MaxWidth = Limits<f32>::max() ) override
+        TextMeasurement Measure( const PreparedText& a_Prepared, const TextLayoutStyle& a_Style, f32 a_MaxWidth = Limits<f32>::max() ) override
         {
             if ( !m_FontCache || !a_Style.Font.IsValid() || Empty( a_Prepared.Segments ) )
-                return {};
+                return {}; // Return zero size if there are no segments to measure.
 
             Font* font = m_FontCache->GetOrLoadFont( a_Style.Font, static_cast<u32>( a_Style.Size ) );
             if ( !font )
-                return {};
+                return {}; // Return zero size if the font couldn't be loaded.
 
             f32 maxLineWidth = 0.f;
             u32 lineCount    = 0;

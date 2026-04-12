@@ -48,7 +48,7 @@ namespace RatUI::SDL2
             Vec2f a_Center, f32 a_Radius, Colorf a_Color, f32 a_Thickness, const Mat3f& a_Transform );
 
         void RenderPreparedText(
-            const PreparedText& a_Prepared, const TextStyle& a_Style, Rectf a_Rect, const Mat3f& a_Transform );
+            const PreparedText& a_Prepared, const TextLayoutStyle& a_Layout, const TextRenderStyle& a_Style, Rectf a_Rect, const Mat3f& a_Transform );
 
         static SDL_Color ToSDLColor( Colorf a_Color )
         {
@@ -102,11 +102,11 @@ namespace RatUI::SDL2
                 SDL_RenderSetClipRect( m_Renderer, &sdlClip );
             }
 
-            if      ( Holds<DrawCmd::RectCmd>        ( cmd.Payload ) ) { const auto& c = Get<DrawCmd::RectCmd>        ( cmd.Payload ); RenderFillRoundedRect(     c.Rect, c.Rounding, c.Color,             cmd.Transform ); }
+            if      ( Holds<DrawCmd::RectCmd>        ( cmd.Payload ) ) { const auto& c = Get<DrawCmd::RectCmd>        ( cmd.Payload ); RenderFillRoundedRect( c.Rect, c.Rounding, c.Color, cmd.Transform ); }
             else if ( Holds<DrawCmd::RectBorderCmd>  ( cmd.Payload ) ) { const auto& c = Get<DrawCmd::RectBorderCmd>  ( cmd.Payload ); RenderFillRoundedRectBorder( c.Rect, c.Rounding, c.Color, c.Thickness, cmd.Transform ); }
-            else if ( Holds<DrawCmd::CircleCmd>      ( cmd.Payload ) ) { const auto& c = Get<DrawCmd::CircleCmd>      ( cmd.Payload ); RenderFillCircle(     c.Center, c.Radius, c.Color,             cmd.Transform ); }
+            else if ( Holds<DrawCmd::CircleCmd>      ( cmd.Payload ) ) { const auto& c = Get<DrawCmd::CircleCmd>      ( cmd.Payload ); RenderFillCircle( c.Center, c.Radius, c.Color, cmd.Transform ); }
             else if ( Holds<DrawCmd::CircleBorderCmd>( cmd.Payload ) ) { const auto& c = Get<DrawCmd::CircleBorderCmd>( cmd.Payload ); RenderFillCircleBorder( c.Center, c.Radius, c.Color, c.Thickness, cmd.Transform ); }
-            else if ( Holds<DrawCmd::PreparedTextCmd>( cmd.Payload ) ) { const auto& c = Get<DrawCmd::PreparedTextCmd>( cmd.Payload ); if ( c.Prepared ) RenderPreparedText( *c.Prepared, c.Style, c.Rect, cmd.Transform ); }
+            else if ( Holds<DrawCmd::PreparedTextCmd>( cmd.Payload ) ) { const auto& c = Get<DrawCmd::PreparedTextCmd>( cmd.Payload ); if ( c.Prepared ) RenderPreparedText( *c.Prepared, c.Style.Layout, c.Style.Render, c.Rect, cmd.Transform ); }
             else if ( Holds<DrawCmd::CustomCmd>      ( cmd.Payload ) ) { const auto& c = Get<DrawCmd::CustomCmd>      ( cmd.Payload ); if ( c.Func ) c.Func( *this, cmd ); }
         }
 
@@ -207,25 +207,26 @@ namespace RatUI::SDL2
     }
 
     inline void SDL2Renderer::RenderPreparedText(
-        const PreparedText& a_Prepared,
-        const TextStyle& a_Style,
-        Rectf               a_Rect,
-        const Mat3f& a_Transform )
+        const PreparedText&    a_Prepared,
+        const TextLayoutStyle& a_Layout,
+		const TextRenderStyle& a_Style,
+        Rectf                  a_Rect,
+        const Mat3f&           a_Transform )
     {
         // TODO: Could optimize this by batching it into one big mesh so it's one draw call instead of one per glyph.
 
         if ( !m_Renderer || !m_FontCache || !m_GlyphAtlas )
             return;
 
-        if ( Empty( a_Prepared.Segments ) || !a_Style.Font.IsValid() )
+        if ( Empty( a_Prepared.Segments ) || !a_Layout.Font.IsValid() )
             return;
 
-        FreeType::Font* font = m_FontCache->GetOrLoadFont( a_Style.Font, static_cast<u32>( a_Style.Size ) );
+        FreeType::Font* font = m_FontCache->GetOrLoadFont( a_Layout.Font, static_cast<u32>( a_Layout.Size ) );
         if ( !font )
             return;
 
         const SDL_Color sdlColor = ToSDLColor( a_Style.Color );
-        const f32       lineHeight = FreeType::GetLineHeight( font->GetFace(), a_Style );
+        const f32       lineHeight = FreeType::GetLineHeight( font->GetFace(), a_Layout );
         const f32       ascender = font->GetFace()->size->metrics.ascender / 64.f;
 
         SDL_Texture* atlasTexture = static_cast<SDL_Texture*>( m_GlyphAtlas->GetTexture().Ptr );
@@ -237,23 +238,22 @@ namespace RatUI::SDL2
 
         // Pre-check whether MaxLines was exceeded so we can force an ellipsis on the
         // last visible line as a "more content" indicator.
-        const bool applyEllipsis = ( a_Style.Overflow == ETextOverflow::Ellipsis );
+        const bool applyEllipsis = ( a_Layout.Overflow == ETextOverflow::Ellipsis );
         bool       exceededMaxLines = false;
         u32        totalVisibleLines = 0;
 
-        if ( applyEllipsis && a_Style.MaxLines > 0 )
+        if ( applyEllipsis && a_Layout.MaxLines > 0 )
         {
             u32 totalLines = 0;
             TextLayout::WalkLines( a_Prepared, a_Rect.Size[0], 0u,
                 [&]( u32, u32, f32 ) { ++totalLines; } );
-            exceededMaxLines = ( totalLines > a_Style.MaxLines );
+            exceededMaxLines = ( totalLines > a_Layout.MaxLines );
             if ( exceededMaxLines )
-                totalVisibleLines = a_Style.MaxLines; // WalkLines(maxLines) emits exactly maxLines lines
+                totalVisibleLines = a_Layout.MaxLines; // WalkLines(maxLines) emits exactly maxLines lines
         }
 
-        // Walk lines using pre-measured segments (pure arithmetic � no re-segmenting).
         u32 lineIndex = 0;
-        TextLayout::WalkLines( a_Prepared, a_Rect.Size[0], a_Style.MaxLines,
+        TextLayout::WalkLines( a_Prepared, a_Rect.Size[0], a_Layout.MaxLines,
             [&]( u32 lineStartSeg, u32 lineEndSeg, f32 paintWidth )
             {
                 // Materialise the line's text from the normalised string.
@@ -285,7 +285,7 @@ namespace RatUI::SDL2
                     const bool forceEllipsis = exceededMaxLines && ( lineIndex + 1 == totalVisibleLines );
                     if ( forceEllipsis || paintWidth > a_Rect.Size[0] )
                     {
-                        truncatedStorage = FreeType::TextUtil::TruncateLineWithEllipsis( *font, line, a_Style, a_Rect.Size[0], forceEllipsis );
+                        truncatedStorage = FreeType::TextUtil::TruncateLineWithEllipsis( *font, line, a_Layout, a_Rect.Size[0], forceEllipsis );
                         if ( Empty( truncatedStorage ) )
                         {
                             // Even "..." doesn't fit - skip this line entirely.
@@ -297,12 +297,12 @@ namespace RatUI::SDL2
                     }
                 }
 
-                const f32 lineWidth = FreeType::ShapeLine( *font, line, a_Style, glyphs );
+                const f32 lineWidth = FreeType::ShapeLine( *font, line, a_Layout, glyphs );
                 f32 lineX = a_Rect.Origin[0];
 
-                if ( a_Style.Align == ETextAlign::Center )
+                if ( a_Layout.Align == ETextAlign::Center )
                     lineX += ( a_Rect.Size[0] - lineWidth ) * 0.5f;
-                else if ( a_Style.Align == ETextAlign::Right )
+                else if ( a_Layout.Align == ETextAlign::Right )
                     lineX += a_Rect.Size[0] - lineWidth;
 
                 const Vec2f origin{ lineX, lineY + ascender };

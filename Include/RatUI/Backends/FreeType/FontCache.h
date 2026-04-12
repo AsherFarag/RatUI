@@ -14,7 +14,7 @@ namespace RatUI::FreeType
      * If TextStyle::LineHeight is non-zero, that value is used directly.
      * Otherwise, the line height is derived from the face's size metrics.
      */
-    inline f32 GetLineHeight( FT_Face a_Face, const TextStyle& a_Style )
+    inline f32 GetLineHeight( FT_Face a_Face, const TextLayoutStyle& a_Style )
     {
         if ( a_Style.LineHeight > 0.f )
             return a_Style.LineHeight;
@@ -306,10 +306,10 @@ namespace RatUI::FreeType
      *       to support RTL scripts and non-Latin writing systems correctly.
      */
     inline f32 ShapeLine(
-        Font&                 a_Font,
-        StringView            a_TextUTF8,
-        const TextStyle&      a_Style,
-        Array<ShapedGlyph>&   o_Glyphs
+        Font&                  a_Font,
+        StringView             a_TextUTF8,
+        const TextLayoutStyle& a_Layout,
+        Array<ShapedGlyph>&    o_Glyphs
     )
     {
         if ( Empty( a_TextUTF8 ) )
@@ -329,30 +329,31 @@ namespace RatUI::FreeType
         // TODO: Should be user defined not auto guessed
         hb_buffer_guess_segment_properties( buf ); // auto direction/script/lang
 
+        // TODO: Should these be apart of the TextStyle or the Font?
+
         // - Options for shaping features (e.g., bold, italic) could be set here
 
-        hb_feature_t features[2];
-        unsigned int featureCount = 0;
+        // hb_feature_t features[2];
+        // unsigned int featureCount = 0;
 
-        if ( a_Style.Bold )
-        {
-            features[featureCount++] = {
-                HB_TAG('e','m','b','d'), 1, 0, (unsigned int)-1
-            };
-        }
+        //if ( a_Style.Bold )
+        //{
+        //    features[featureCount++] = {
+        //        HB_TAG('e','m','b','d'), 1, 0, (unsigned int)-1
+        //    };
+        //}
 
-        if ( a_Style.Italic )
-        {
-            features[featureCount++] = {
-                HB_TAG('i','t','a','l'), 1, 0, (unsigned int)-1
-            };
-        }
+        //if ( a_Style.Italic )
+        //{
+        //    features[featureCount++] = {
+        //        HB_TAG('i','t','a','l'), 1, 0, (unsigned int)-1
+        //    };
+        //}
 
         hb_shape(
             a_Font.GetHBFont(),
             buf,
-            featureCount ? features : nullptr,
-            featureCount
+            /*features=*/nullptr, /*num_features=*/0
         );
 
         // - Extract glyph info and positioning data from the HarfBuzz buffer and populate the output array of ShapedGlyphs.
@@ -369,8 +370,8 @@ namespace RatUI::FreeType
         Reserve( o_Glyphs, glyphCount );
 
         const f32 scale         = 1.0f / 64.0f;
-        const f32 letterSpacing = a_Style.LetterSpacing;
-        const f32 wordSpacing   = a_Style.WordSpacing;
+        const f32 letterSpacing = a_Layout.LetterSpacing;
+        const f32 wordSpacing   = a_Layout.WordSpacing;
 
         f32 lineWidth = 0.f;
 
@@ -399,7 +400,7 @@ namespace RatUI::FreeType
             EmplaceBack(
                 o_Glyphs,
                 /* GlyphID   */ infos[i].codepoint,
-                /* PixelSize */ static_cast<u32>( a_Style.Size ),
+                /* PixelSize */ static_cast<u32>( a_Layout.Size ),
                 /* XAdvance  */ xAdvance,
                 /* YAdvance  */ yAdvance,
                 /* XOffset   */ positions[i].x_offset * scale,

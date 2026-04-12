@@ -17,7 +17,7 @@ namespace RatUI
          * @param a_Style The text style that controls font, size, wrapping mode, letter spacing, etc.
          * @return A PreparedText value ready to pass to Measure() and to the renderer.
          */
-        virtual PreparedText Prepare( TextView a_Text, const TextStyle& a_Style ) = 0;
+        virtual PreparedText Prepare( TextView a_Text, const TextLayoutStyle& a_Style ) = 0;
 
         /**
          * @brief Computes a TextMeasurement (total size, baseline, line count) for a block of
@@ -27,7 +27,7 @@ namespace RatUI
          * @param a_MaxWidth  Maximum line width in pixels. Use Limits<f32>::max() for no wrapping.
          * @return The measured size and metadata of the text block.
          */
-        virtual TextMeasurement Measure( const PreparedText& a_Prepared, const TextStyle& a_Style, f32 a_MaxWidth = Limits<f32>::max() ) = 0;
+        virtual TextMeasurement Measure( const PreparedText& a_Prepared, const TextLayoutStyle& a_Style, f32 a_MaxWidth = Limits<f32>::max() ) = 0;
     };
 
 } // namespace RatUI

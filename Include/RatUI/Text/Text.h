@@ -10,6 +10,18 @@ namespace RatUI
     using TextView = StringView;
 
     /**
+     * @brief Specifies the base directionality of text for proper rendering of mixed-direction content.
+     */
+    enum class ETextDirection : u8
+    {
+        Auto, ///< Infer from the first strong character (Unicode Bidi Algorithm).
+        LTR,  ///< Left-to-right text direction, used for scripts like Latin and Cyrillic.
+        RTL,  ///< Right-to-left text direction, used for scripts like Arabic and Hebrew.
+
+        _NumBits = 2
+    };
+
+    /**
      * @brief Specifies the horizontal alignment of text within its layout box.
      */
     enum class ETextAlign : u8
@@ -43,23 +55,14 @@ namespace RatUI
     {
         Clip,     ///< Text that exceeds the available space is simply cut off, without any indication to the user.
         Ellipsis, ///< Text that exceeds the available space is truncated and an ellipsis ("...") is appended to indicate that there is more text that is not visible.
-        Fade,     ///< Text that exceeds the available space gradually fades out, providing a visual cue that there is more text that is not visible.
+        // TODO? Fade,     ///< Text that exceeds the available space gradually fades out, providing a visual cue that there is more text that is not visible.
 
         _NumBits = 2
     };
 
     /**
-     * @brief Specifies how to handle text wrapping within its layout box.
+     * @brief Specifies text transformation rules for layout and rendering.
      */
-    enum class ETextWrap : u8
-    {
-        NoWrap,    ///< Text is not wrapped and will continue on a single line, potentially overflowing the layout box.
-        WrapWord,  ///< Text is wrapped at word boundaries, ensuring that words are not split across lines.
-        WrapChar,  ///< Text is wrapped at character boundaries, allowing words to be split across lines.
-
-        _NumBits = 2
-    };
-
     enum class ETextTransform : u8
     {
         None,       ///< No transformation is applied to the text; it is rendered as-is.
@@ -71,42 +74,122 @@ namespace RatUI
     };
 
     /**
-     * @brief A struct that encapsulates the styling information for rendering text.
+     * @brief Specifies how text should wrap when it reaches the edge of its layout box.
      */
-    struct TextStyle
+    namespace EBreakMode
+    {
+        constexpr u8 None = 0; ///< No wrapping; text will continue on a single line and may overflow its container.
+        constexpr u8 Word = 1; ///< Text will wrap at word boundaries, ensuring that words are not split across lines. 
+                               ///< If a single word exceeds the container width, it will overflow.
+        constexpr u8 Char = 2; ///< Text will wrap at any character boundary, allowing words to be split if necessary to fit within the container width.
+
+        constexpr u8 _NumBits = 2;
+    };
+
+    /**
+     * @brief Specifies how whitespace characters are handled during text layout and rendering.
+     */
+    namespace EWhitespace
+    {
+        constexpr u8 Preserve = 0; ///< Whitespace is preserved as-is. Text will only wrap on line breaks.
+        constexpr u8 Collapse = 1; ///< Sequences of whitespace will collapse into a single whitespace. Text will wrap when necessary.
+
+        constexpr u8 _NumBits = 1;
+    };
+
+    /**
+     * @brief Specifies how newline characters are handled during text layout and rendering.
+     */
+    namespace ENewline
+    {
+        constexpr u8 Preserve = 0; ///< Sequences of newlines will collapse into a single newline. Text will wrap when necessary, and on line breaks.
+        constexpr u8 Collapse = 1; ///< Newlines are treated as whitespace and will collapse into a single whitespace. Text will wrap when necessary.
+
+        constexpr u8 _NumBits = 1;
+    };
+
+    /**
+     * @brief Defines text wrapping behavior, including line-breaking rules, whitespace handling, and newline handling.
+     */
+    struct TextWrap
+    {
+        u8 BreakMode  : EBreakMode::_NumBits  { EBreakMode::Word };
+        u8 Whitespace : EWhitespace::_NumBits { EWhitespace::Collapse };
+        u8 Newline    : ENewline::_NumBits    { ENewline::Preserve };
+
+        /** @brief Determines if the text should be pre-wrapped - i.e., whether Prepare() should do an initial layout pass treating newlines as hard breaks. */
+        constexpr bool Prewrap() const { return ( BreakMode != EBreakMode::None ) && ( Newline == ENewline::Preserve ); }
+
+        constexpr bool operator==( const TextWrap& ) const = default;
+
+        /** @brief Sequences of whitespace will collapse into a single whitespace. Text will never wrap to the next line. */
+        static constexpr TextWrap NoWrap()   { return { EBreakMode::None, EWhitespace::Collapse, ENewline::Preserve }; }
+
+        /** @brief Ordinary wrapping at word boundaries. Sequences of whitespace will collapse into a single whitespace. 
+         *  Text will wrap when necessary, and on line breaks. */
+        static constexpr TextWrap WrapWord() { return { EBreakMode::Word, EWhitespace::Collapse, ENewline::Preserve }; }
+
+        /** @brief Aggressive wrapping at any character boundary. Sequences of whitespace will collapse into a single whitespace. 
+         *  Text will wrap when necessary, and on line breaks. */
+        static constexpr TextWrap WrapChar() { return { EBreakMode::Char, EWhitespace::Collapse, ENewline::Preserve }; }
+
+        /** @brief Sequences of whitespace will be preserved as-is. Text will only wrap on line breaks. */
+        static constexpr TextWrap Pre()      { return { EBreakMode::None, EWhitespace::Preserve, ENewline::Preserve }; }
+
+        /** @brief Sequences of whitespace will collapse into a single whitespace. Text will only wrap on line breaks. */
+        static constexpr TextWrap PreLine()  { return { EBreakMode::Word, EWhitespace::Collapse, ENewline::Preserve }; }
+
+        /** @brief Sequences of whitespace will be preserved as-is. Text will wrap at word boundaries, and on line breaks. 
+         *  Newlines will be treated as whitespace and will collapse into a single whitespace. */
+        static constexpr TextWrap PreWrap()  { return { EBreakMode::Word, EWhitespace::Preserve, ENewline::Preserve }; }
+
+        /** @brief A default text wrap configuration that provides ordinary wrapping at word boundaries. */
+        static constexpr TextWrap Normal() { return WrapWord(); }
+    };
+    static_assert( TextWrap{} == TextWrap::WrapWord(), "Default TextWrap should be WrapWord" );
+    static_assert( TextWrap::Normal() == TextWrap::WrapWord(), "TextWrap::Normal() should be WrapWord" );
+
+    /**
+	 * @brief A struct that encapsulates the styling information for layout of text.
+     */
+    struct TextLayoutStyle
     {
         FontHandle     Font{};                 ///< The font to use for rendering the text, specified as a FontHandle. If not set, a default font will be used.
         f32            Size{ 16.0f };          ///< The size of the font in points, which determines the height of the characters. Default is 16.0f.          
         f32            LineHeight{ 0.0f };     ///< The height of each line of text, including spacing. If set to 0, it will be automatically calculated based on the font size and metrics.
         f32            LetterSpacing{ 0.0f };  ///< The spacing between characters in the text, specified in points. Default is 0.0f.
 		f32            WordSpacing{ 0.0f };    ///< The spacing between words in the text, specified in points. Default is 0.0f.
+		u16            MaxLines{ 0 };          ///< The maximum number of lines to display. If set to 0, there is no limit and all lines will be displayed.
 
-        Coloru8        Color{ Colorsu8::White };
+        ETextDirection Direction  { ETextDirection::Auto };
+        ETextAlign     Align      { ETextAlign::Left };
+        TextWrap       Wrap       { TextWrap::Normal() }; 
+        ETextOverflow  Overflow   { ETextOverflow::Clip };
+        ETextTransform Transform  { ETextTransform::None };
+        ETextBaseline  Baseline   { ETextBaseline::Alphabetic };
 
-        u16            MaxLines{ 0 };          ///< The maximum number of lines to render. If set to 0, there is no limit on the number of lines.
-
-        // TODO: Annoyingly, its not standardized for bitfields to use the underlying enum type, so a compiler could choose a signed type and cause truncation.
-        //       Either need to:
-        //       1) Remove the bitfield packing, which is innefficient but safe.
-        //       2) Use u8 for the bitfields, which makes the api cumbersome and error-prone since the caller has to cast the enum values to u8.
-
-        ETextAlign     Align     : (u8)ETextAlign::_NumBits     { ETextAlign::Left };
-        ETextWrap      Wrap      : (u8)ETextWrap::_NumBits      { ETextWrap::WrapWord }; 
-        ETextOverflow  Overflow  : (u8)ETextOverflow::_NumBits  { ETextOverflow::Clip };
-        ETextTransform Transform : (u8)ETextTransform::_NumBits { ETextTransform::None };
-        ETextBaseline  Baseline  : (u8)ETextBaseline::_NumBits  { ETextBaseline::Alphabetic };
-
-        // TODO: Should maybe remove some of these features and add it to a RichTextStyle or something instead.
-
-        bool Bold          : 1 = false;
-        bool Italic        : 1 = false;
-        bool Underline     : 1 = false;
-        bool Strikethrough : 1 = false;
-
-		constexpr bool operator==( const TextStyle& a_Other ) const = default;
+		constexpr bool operator==( const TextLayoutStyle& ) const = default;
     };
-    static_assert( std::is_trivially_copyable_v<TextStyle> );
-	static_assert( sizeof( TextStyle ) == 28, "TextStyle should be 28 bytes in size - Reevaluate padding if this assertion fails." );
+
+	/**
+	 * @brief A struct that encapsulates the styling information for rendering of text, such as color and decorations.
+     */
+    struct TextRenderStyle
+    {
+		Coloru8 Color{ Colorsu8::White };  ///< The default color of the text. Default is white.
+        bool    Underline     : 1 = false; ///< Whether the text should be rendered with an underline decoration. Default is false.
+        bool    Strikethrough : 1 = false; ///< Whether the text should be rendered with a strikethrough decoration. Default is false.
+
+		constexpr bool operator==( const TextRenderStyle& ) const = default;
+    };
+
+    struct TextStyle
+    {
+        TextLayoutStyle Layout{};
+        TextRenderStyle Render{};
+
+        constexpr FontHandle GetFont() const { return Layout.Font; }
+    };
 
     /**
 	 * @brief Stores measurement results of a block of text created by ITextMetrics.

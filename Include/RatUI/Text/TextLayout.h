@@ -34,12 +34,11 @@ namespace RatUI::TextLayout
      * @brief Normalises and prepares text for layout, returning a PreparedText with pre-measured segments.
      * @param a_Text The input text to prepare.
      * @param a_Wrap The text wrapping mode to use (NoWrap, WrapWord, or WrapChar).
-     * @param a_PreWrap Whether to apply pre-wrap normalisation rules (e.g. converting newlines to HardBreak segments).
      * @param a_Measure A callable that takes a StringView and returns its measured width in pixels.  This is used to pre-measure segments during preparation.
      * @return A PreparedText containing the normalised text and its pre-measured segments.
      */
     template<std::invocable<StringView> MeasureFn>
-    inline PreparedText Prepare( StringView a_Text, ETextWrap a_Wrap, bool a_PreWrap, MeasureFn&& a_Measure )
+    inline PreparedText Prepare( StringView a_Text, TextWrap a_Wrap, MeasureFn&& a_Measure )
     {
         // TODO: This doesnt handle 'graphemes' correctly, e.g. emoji sequences with skin-tone modifiers or ZWJ.  
         // The segmentation should ideally be based on extended grapheme clusters (e.g. via ICU) rather than just codepoints, 
@@ -47,7 +46,7 @@ namespace RatUI::TextLayout
         // But I need to research this more.
 
         PreparedText result;
-        result.NormalizedText = a_PreWrap
+        result.NormalizedText = a_Wrap.Prewrap()
             ? Unicode::NormalizeWhitespacePreWrap( a_Text )
             : Unicode::NormalizeWhitespace( a_Text );
 
@@ -61,7 +60,7 @@ namespace RatUI::TextLayout
         result.HyphenWidth = a_Measure( StringView{ "-" } );
 
         // For NoWrap mode, we can skip segmentation and just measure the whole text as a single line.
-        if ( a_Wrap == ETextWrap::NoWrap )
+        if ( a_Wrap.BreakMode == EBreakMode::None )
         {
             const f32 lineWidth = a_Measure( norm );
             PushBack( result.Segments,
@@ -105,7 +104,7 @@ namespace RatUI::TextLayout
             wordStartByteOffset = upTo;
         };
 
-        if ( a_Wrap == ETextWrap::WrapChar )
+        if ( a_Wrap.BreakMode == EBreakMode::Char )
         {
             // Reserve segments for each codepoint, since in WrapChar mode each codepoint is its own segment.
             // TODO: Calculate better heuristic for reserving segments in WrapWord mode, e.g. based on counting whitespace runs.
@@ -120,7 +119,7 @@ namespace RatUI::TextLayout
             const size len = it.SequenceByteLength();
 
             // Pre-wrap newline -> HardBreak segment
-            if ( a_PreWrap && cp == U'\n' )
+            if ( a_Wrap.Prewrap() && cp == U'\n' )
             {
                 flushWord( idx );
                 PushBack( result.Segments,
@@ -170,7 +169,7 @@ namespace RatUI::TextLayout
             }
 
             // WrapChar: each codepoint is its own Text segment
-            if ( a_Wrap == ETextWrap::WrapChar )
+            if ( a_Wrap.BreakMode == EBreakMode::Char )
             {
                 RATUI_ASSERT( wordStartByteOffset == idx, "In WrapChar mode, we should never have an outstanding word run." );
                 flushWord( idx );
