@@ -1,5 +1,6 @@
 #pragma once
 #include "../../RatUI.h"
+#include "Config.h"
 #include "FontCache.h"
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -85,64 +86,19 @@ namespace RatUI::FreeType::TextUtil
 
     /**
      * @brief Applies the specified text transformation (uppercase, lowercase, capitalize) to a UTF-8 encoded string.
-      * For ASCII characters, it uses std::toupper and std::tolower. For non-ASCII characters, it leaves them unchanged.
-      * The transformation is applied according to the ETextTransform mode:
-      * - Uppercase: All characters are transformed to uppercase.
-      * - Lowercase: All characters are transformed to lowercase.
-      * - Capitalize: The first character of each word is transformed to uppercase (currently implemented as all uppercase for simplicity).
-      *
-      * @param a_Text The input text to transform, provided as a StringView.
-      * @param a_Transform The type of transformation to apply, specified as an ETextTransform enum value.
-      * @return A new String containing the transformed text. The caller is responsible for managing the memory of the returned string.
+
       * TODO: Support locale-aware transformations and proper word-boundary detection for capitalization.
       *       Probably need to use ICU. I miss ascii.
      */
-    inline String ApplyTextTransform( TextView a_Text, ETextTransform a_Transform )
+    inline String ApplyTextTransform( StringView a_Text, ETextTransform a_Transform )
     {
-        if ( a_Transform == ETextTransform::None )
-            return String( Begin( a_Text ), End( a_Text ) );
-
-        String result;
-        Reserve( result, Size( a_Text ) );
-
-        bool newWord = true; // For ETextTransform::Capitalize
-
-        UTF8Range range{ a_Text };
-        for ( auto it = range.begin(); it != range.end(); ++it )
-        {
-            const c32 cp = *it;
-
-            if ( cp <= 0x7F )
-            {
-                char c = static_cast<char>( cp );
-                switch ( a_Transform )
-                {
-                    case ETextTransform::Uppercase:  c = static_cast<char>( std::toupper( static_cast<unsigned char>( c ) ) ); break;
-                    case ETextTransform::Lowercase:  c = static_cast<char>( std::tolower( static_cast<unsigned char>( c ) ) ); break;
-                    case ETextTransform::Capitalize: 
-                    {
-                        // For right now, just handle basic ASCII capitalization.
-                        c = newWord ? static_cast<char>( std::toupper( static_cast<unsigned char>( c ) ) ) : static_cast<char>( std::tolower( static_cast<unsigned char>( c ) ) );
-                        newWord = false;
-                        break;
-                    }
-                    default: break;
-                }
-                PushBack( result, c );
-            }
-            else
-            {
-                const size count   = it.SequenceByteLength();
-                const size oldSize = Size( result );
-                Resize( result, oldSize + count );
-                std::memcpy( Data( result ) + oldSize, Data( a_Text ) + it.ByteIndex(), count );
-            }
-
-            if ( Unicode::IsWhitespace( cp ) )
-                newWord = true;
-        }
-
-        return result;
+    #if RATUI_FREETYPE_WITH_ICU
+	#error "Text transformations are not yet implemented. ICU is included in the build, but ApplyTextTransform needs to be implemented to use it."
+    #else
+		String result;
+		Unicode::ApplyTextTransformASCII( a_Text, result, a_Transform );
+		return result;
+    #endif
     }
 
     /**

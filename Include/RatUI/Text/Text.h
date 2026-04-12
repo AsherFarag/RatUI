@@ -4,11 +4,6 @@
 
 namespace RatUI
 {
-
-    using Text = String;
-
-    using TextView = StringView;
-
     /**
      * @brief Specifies the base directionality of text for proper rendering of mixed-direction content.
      */

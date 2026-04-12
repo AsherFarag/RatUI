@@ -18,9 +18,17 @@
 namespace RatUI::Unicode
 {
     /** 
+     * @brief Returns true if @p a_CP is an ASCII codepoint (U+0000–U+007F).
+     */
+    constexpr inline bool IsASCII( c32 a_CP )
+    {
+        return a_CP <= 0x7F;
+    }
+
+    /** 
      * @brief Returns true if @p a_CP is an ASCII whitespace codepoint (U+0020 SPACE, U+0009 TAB, U+000A LINE FEED, U+000D CARRIAGE RETURN, or U+000C FORM FEED). 
      */
-    constexpr inline bool IsAsciiWhitespace( c32 a_CP )
+    constexpr inline bool IsASCIIWhitespace( c32 a_CP )
     {
         return a_CP == 0x20 || ( a_CP >= 0x09 && a_CP <= 0x0D );
     }
@@ -34,17 +42,11 @@ namespace RatUI::Unicode
      */
     constexpr inline bool IsWhitespace( c32 a_CP )
     {
-        return IsAsciiWhitespace( a_CP ) ||
+        return IsASCIIWhitespace( a_CP ) ||
                a_CP == 0x85 ||   // NEXT LINE
                a_CP == 0x2028 || // LINE SEPARATOR
                a_CP == 0x2029;   // PARAGRAPH SEPARATOR
     }
-
-    /**
-     * @brief Returns true if the UTF-8 codepoint starting at byte offset @p a_ClusterByte
-     *        within @p a_Text is a Unicode whitespace character.
-     */
-    constexpr bool IsWhitespaceCluster( StringView a_Text, u32 a_ClusterByte );
 
     /**
      * @brief Returns true if @p a_CP is a CJK (or CJK-adjacent) codepoint that
@@ -567,8 +569,10 @@ namespace RatUI::Unicode
         StringView m_String;
     };
 
-    // = Inline implementations =
-
+    /**
+     * @brief Returns true if the UTF-8 codepoint starting at byte offset @p a_ClusterByte
+     *        within @p a_Text is a Unicode whitespace character.
+     */
     constexpr inline bool IsWhitespaceCluster( StringView a_Text, u32 a_ClusterByte )
     {
         if ( a_ClusterByte >= static_cast<u32>( Size( a_Text ) ) )
@@ -578,6 +582,51 @@ namespace RatUI::Unicode
                                      Size( a_Text ) - a_ClusterByte } };
                                      
         return it && IsWhitespace( *it );
+    }
+
+    inline void ApplyTextTransformASCII( StringView a_Text, String& o_Out, ETextTransform a_Transform )
+    {
+        if ( a_Transform == ETextTransform::None )
+            return; // No transformation needed.
+
+		Resize( o_Out, Size( a_Text ) ); // Ensure o_Out has the same size as a_Text for in-place transformation.
+
+        bool newWord = true; // For ETextTransform::Capitalize
+
+        UTF8Range range{ a_Text };
+        for ( auto it = range.begin(); it != range.end(); ++it )
+        {
+            const c32 cp = *it;
+
+            if ( IsASCII( cp ) )
+            {
+                char c = static_cast<char>( cp );
+                switch ( a_Transform )
+                {
+                    case ETextTransform::Uppercase: c = static_cast<char>( std::toupper( static_cast<unsigned char>( c ) ) ); break;
+                    case ETextTransform::Lowercase: c = static_cast<char>( std::tolower( static_cast<unsigned char>( c ) ) ); break;
+                    case ETextTransform::Capitalize: 
+                    {
+                        c = newWord 
+                            ? static_cast<char>( std::toupper( static_cast<unsigned char>( c ) ) ) 
+                            : static_cast<char>( std::tolower( static_cast<unsigned char>( c ) ) );
+
+                        newWord = false;
+                        break;
+                    }
+                    default: break;
+                }
+
+                // Write the transformed character back to the string.
+                // Note: this assumes that the transformation does not change the byte length of the character,
+                // which is true for ASCII codepoints. For non-ASCII codepoints, no transformation is applied.
+                const size byteIndex = it.ByteIndex();
+                RawAt( o_Out, byteIndex ) = c;
+            }
+
+            if ( Unicode::IsWhitespace( cp ) )
+                newWord = true;
+        }
     }
 
 } // namespace RatUI::Unicode
