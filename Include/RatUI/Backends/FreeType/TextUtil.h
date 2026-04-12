@@ -105,6 +105,8 @@ namespace RatUI::FreeType::TextUtil
         String result;
         Reserve( result, Size( a_Text ) );
 
+        bool newWord = true; // For ETextTransform::Capitalize
+
         UTF8Range range{ a_Text };
         for ( auto it = range.begin(); it != range.end(); ++it )
         {
@@ -117,7 +119,13 @@ namespace RatUI::FreeType::TextUtil
                 {
                     case ETextTransform::Uppercase:  c = static_cast<char>( std::toupper( static_cast<unsigned char>( c ) ) ); break;
                     case ETextTransform::Lowercase:  c = static_cast<char>( std::tolower( static_cast<unsigned char>( c ) ) ); break;
-                    case ETextTransform::Capitalize: c = static_cast<char>( std::toupper( static_cast<unsigned char>( c ) ) ); break; // TODO: word-boundary awareness
+                    case ETextTransform::Capitalize: 
+                    {
+                        // For right now, just handle basic ASCII capitalization.
+                        c = newWord ? static_cast<char>( std::toupper( static_cast<unsigned char>( c ) ) ) : static_cast<char>( std::tolower( static_cast<unsigned char>( c ) ) );
+                        newWord = false;
+                        break;
+                    }
                     default: break;
                 }
                 PushBack( result, c );
@@ -129,6 +137,9 @@ namespace RatUI::FreeType::TextUtil
                 Resize( result, oldSize + count );
                 std::memcpy( Data( result ) + oldSize, Data( a_Text ) + it.ByteIndex(), count );
             }
+
+            if ( Unicode::IsWhitespace( cp ) )
+                newWord = true;
         }
 
         return result;

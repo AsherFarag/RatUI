@@ -27,7 +27,15 @@ namespace RatUI::FreeType
             if ( !font )
                 return {};
 
-            return TextLayout::Prepare( a_Text, a_Style.Wrap,
+            String buffer;
+			StringView text = a_Text;
+            if ( a_Style.Transform != ETextTransform::None )
+            {
+                buffer = TextUtil::ApplyTextTransform( a_Text, a_Style.Transform );
+                text = buffer;
+			}
+
+            return TextLayout::Prepare( text, a_Style.Wrap,
                 [font, &a_Style]( StringView sv )
                 {
                     return TextUtil::MeasureLineWidth( *font, sv, a_Style );
