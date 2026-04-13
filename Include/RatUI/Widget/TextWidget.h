@@ -9,14 +9,14 @@ namespace RatUI
     class TextWidget : public IWidget
     {
     public:
-        TextWidget( Text a_Text = {}, TextStyle a_Style = {} )
+        TextWidget( String a_Text = {}, TextStyle a_Style = {} )
             : m_Text( std::move( a_Text ) )
             , m_Style( std::move( a_Style ) )
         {}
 
         virtual ~TextWidget() override = default;
 
-        void SetText( Text a_Text )
+        void SetText( String a_Text )
         {
             m_Text = std::move( a_Text );
             m_PreparedDirty = true;
@@ -74,7 +74,7 @@ namespace RatUI
         }
 
     protected:
-        Text         m_Text;                  ///< The text content to be displayed by the widget.
+        String       m_Text;                  ///< The text content to be displayed by the widget.
         TextStyle    m_Style;                 ///< The style to apply when rendering the text.
         PreparedText m_PreparedText;          ///< Cached prepared text (segments + normalized string). Rebuilt when text or style changes.
         bool         m_PreparedDirty{ true }; ///< True when m_PreparedText needs to be rebuilt before the next layout/paint.

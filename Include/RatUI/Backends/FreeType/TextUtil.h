@@ -211,7 +211,7 @@ namespace RatUI::FreeType::TextUtil
     inline void BuildTextLines(
         Font&                  a_Font,
         const TextLayoutStyle& a_Style,
-        TextView               a_Text,
+        StringView             a_Text,
         Array<StringView>&     o_Lines,
         Array<String>&         o_Storage,
         f32                    a_MaxWidth = Limits<f32>::max() )

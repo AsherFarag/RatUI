@@ -17,7 +17,7 @@ namespace RatUI
          * @param a_Style The text style that controls font, size, wrapping mode, letter spacing, etc.
          * @return A PreparedText value ready to pass to Measure() and to the renderer.
          */
-        virtual PreparedText Prepare( TextView a_Text, const TextLayoutStyle& a_Style ) = 0;
+        virtual PreparedText Prepare( StringView a_Text, const TextLayoutStyle& a_Style ) = 0;
 
         /**
          * @brief Computes a TextMeasurement (total size, baseline, line count) for a block of

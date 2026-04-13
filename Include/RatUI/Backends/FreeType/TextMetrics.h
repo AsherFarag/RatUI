@@ -18,7 +18,7 @@ namespace RatUI::FreeType
         /** @brief Sets the font cache. */
         void SetFontCache( FontCache* a_Cache ) { m_FontCache = a_Cache; }
 
-        PreparedText Prepare( TextView a_Text, const TextLayoutStyle& a_Style ) override
+        PreparedText Prepare( StringView a_Text, const TextLayoutStyle& a_Style ) override
         {
             if ( !m_FontCache || !a_Style.Font.IsValid() || Empty( a_Text ) )
                 return {};
