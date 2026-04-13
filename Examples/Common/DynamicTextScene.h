@@ -29,6 +29,13 @@ public:
     ~DynamicTextScene() override = default;
 
 private:
+
+    struct TextStyle
+    {
+        TextLayoutStyle Layout{};
+        TextRenderStyle Render{};
+    };
+
     FontHandle m_Font;
     f32        m_Time{ 0.f };
     WidgetID   m_AnimContainer{};
@@ -84,7 +91,7 @@ private:
         ESizingMode wMode = ESizingMode::Flex,
         f32         fixedW = 0.f )
     {
-        WidgetID w = m_Scene.CreateWidget<TextWidget>( parent, text, style );
+        WidgetID w = m_Scene.CreateWidget<TextWidget>( parent, text, style.Layout, style.Render );
         auto* n = Node( w );
         n->Style.WidthMode  = wMode;
         n->Style.FixedWidth = fixedW;
@@ -173,7 +180,8 @@ private:
         }
 
         // Label column (fixed width)
-        WidgetID lbl = m_Scene.CreateWidget<TextWidget>( row, rowLabel, RowLabelStyle() );
+        TextStyle lblStyle = RowLabelStyle();
+        WidgetID lbl = m_Scene.CreateWidget<TextWidget>( row, rowLabel, lblStyle.Layout, lblStyle.Render );
         {
             auto* n = Node( lbl );
             n->Style.Padding    = Edges{ 4.f };
@@ -462,7 +470,8 @@ private:
         }
 
         // Label
-        WidgetID lbl = m_Scene.CreateWidget<TextWidget>( row, "Ellipsis", RowLabelStyle() );
+		const TextStyle lblStyle = RowLabelStyle();
+		WidgetID lbl = m_Scene.CreateWidget<TextWidget>( row, "Ellipsis", lblStyle.Layout, lblStyle.Render );
         {
             auto* n = Node( lbl );
             n->Style.Padding = Edges{ 4.f };
@@ -493,7 +502,7 @@ private:
         WidgetID txt = m_Scene.CreateWidget<TextWidget>(
             m_AnimContainer,
             "Pack my box with five dozen liquor jugs  —  sphinx of black quartz, judge my vow!",
-            ts
+			ts.Layout, ts.Render
         );
         {
             auto* n = Node( txt );

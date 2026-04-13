@@ -55,6 +55,31 @@ namespace RatUI
     template<typename T>
     constexpr T RadToDeg( T a_Radians ) { return a_Radians * ( static_cast<T>( 180 ) / Pi<T> ); }
 
+    /**
+     * @brief Checks if two floating-point numbers are approximately equal within a specified epsilon tolerance.
+     * This function accounts for the relative scale of the numbers and handles special cases like NaN and infinity.
+     * @tparam T A floating-point type (e.g., float, double).
+     * @param a_Left The first floating-point number to compare.
+     * @param a_Right The second floating-point number to compare.
+     * @param a_Epsilon The tolerance for comparison. Defaults to the machine epsilon for type T.
+     * @return true if the numbers are approximately equal within the specified tolerance, false otherwise.
+     */
+    template<std::floating_point T>
+    constexpr bool IsApproxEqual( T a_Left, T a_Right, T a_Epsilon = std::numeric_limits<T>::epsilon() )
+    {
+        // Handle NaN
+        if ( std::isnan( a_Left ) || std::isnan( a_Right ) ) 
+            return false;
+
+        // Handle infinities: only equal if both are infinite and have the same sign
+        if ( std::isinf( a_Left ) || std::isinf( a_Right ) )
+            return std::isinf( a_Left ) && 
+                   std::isinf( a_Right ) && 
+                   ( std::signbit( a_Left ) == std::signbit( a_Right ) );
+
+        return std::abs( a_Left - a_Right ) <= a_Epsilon * std::max( std::abs( a_Left ), std::abs( a_Right ) );
+    }
+
     // === Vector Types ===
 
     template<typename T, size Dim> requires std::is_arithmetic_v<T>

@@ -77,10 +77,14 @@ namespace RatUI::FreeType
          * @brief Evicts all glyphs and resets the cursor to the top-left corner.
          *        The underlying GPU texture is not recreated - it will be overwritten
          *        as new glyphs are rasterized.
+         *        @warning Both the glyph map and the indexed rect array are cleared.
+         *                 Any ShapedText objects shaped against this atlas will have stale
+         *                 GlyphIDs after a Reset() and must be re-shaped.
          */
         void Reset()
         {
             m_GlyphMap.clear();
+            Clear( m_GlyphRects );
             m_CursorX   = 0;
             m_CursorY   = 0;
             m_RowBottom = 0;
@@ -89,13 +93,15 @@ namespace RatUI::FreeType
 
         /**
          * @brief Looks up a glyph in the atlas, rasterizing and uploading it if not cached.
+         *        Returns the glyph's index in the internal array, which can be stored in
+         *        RatUI::ShapedGlyph::GlyphID for O(1) lookup at render time.
          *
-         * @return The GlyphRect, or NullOpt if:
+         * @return The atlas index, or NullOpt if:
          *  - the GPU texture is invalid,
          *  - FreeType failed to load/render the glyph, or
          *  - the atlas is full (IsAtlasFull() will return true).
          */
-        Optional<GlyphRect> GetOrRasterizeGlyph( FT_Face a_Face, GlyphKey a_Key )
+        Optional<u32> GetOrRasterizeGlyphIndex( FT_Face a_Face, GlyphKey a_Key )
         {
             if ( !m_Texture.IsValid() )
                 return NullOpt;
@@ -135,17 +141,54 @@ namespace RatUI::FreeType
                 .Bearing = Vec2i{ a_Face->glyph->bitmap_left, a_Face->glyph->bitmap_top }
             };
 
-            m_CursorX        += static_cast<i32>( bmp.width ) + 1; // 1 px padding to prevent bleeding
-            m_RowBottom       = std::max( m_RowBottom, m_CursorY + static_cast<i32>( bmp.rows ) + 1 );
-            m_GlyphMap[a_Key] = rect;
+            m_CursorX  += static_cast<i32>( bmp.width ) + 1; // 1 px padding to prevent bleeding
+            m_RowBottom = std::max( m_RowBottom, m_CursorY + static_cast<i32>( bmp.rows ) + 1 );
 
-            return rect;
+            const u32 index = static_cast<u32>( Size( m_GlyphRects ) );
+            PushBack( m_GlyphRects, rect );
+            m_GlyphMap[a_Key] = index;
+
+            return index;
+        }
+
+        /** @brief Convenience overload taking separate glyph ID and pixel size parameters. */
+        Optional<u32> GetOrRasterizeGlyphIndex( FT_Face a_Face, u32 a_GlyphID, u32 a_PixelSize )
+        {
+            return GetOrRasterizeGlyphIndex( a_Face, GlyphKey{ a_GlyphID, a_PixelSize } );
+        }
+
+        /**
+         * @brief Looks up a glyph in the atlas, rasterizing and uploading it if not cached.
+         *
+         * @return The GlyphRect, or NullOpt if:
+         *  - the GPU texture is invalid,
+         *  - FreeType failed to load/render the glyph, or
+         *  - the atlas is full (IsAtlasFull() will return true).
+         */
+        Optional<GlyphRect> GetOrRasterizeGlyph( FT_Face a_Face, GlyphKey a_Key )
+        {
+            Optional<u32> index = GetOrRasterizeGlyphIndex( a_Face, a_Key );
+            if ( !index )
+                return NullOpt;
+            return m_GlyphRects[*index];
         }
 
         /** @brief Convenience overload taking separate glyph ID and pixel size parameters. */
         Optional<GlyphRect> GetOrRasterizeGlyph( FT_Face a_Face, u32 a_GlyphID, u32 a_PixelSize )
         {
             return GetOrRasterizeGlyph( a_Face, GlyphKey{ a_GlyphID, a_PixelSize } );
+        }
+
+        /**
+         * @brief Returns a pointer to the GlyphRect for a glyph stored at @p a_Index,
+         *        as returned by GetOrRasterizeGlyphIndex().
+         * @return Pointer to the GlyphRect, or nullptr if the index is out of range.
+         */
+        const GlyphRect* GetGlyphRect( u32 a_Index ) const
+        {
+            if ( a_Index >= static_cast<u32>( Size( m_GlyphRects ) ) )
+                return nullptr;
+            return &m_GlyphRects[a_Index];
         }
 
     private:
@@ -215,35 +258,36 @@ namespace RatUI::FreeType
         // Sized to hold R8 data for the full atlas (w * h bytes).
         Array<u8> m_ScratchRGBA;
 
-        HashMap<GlyphKey, GlyphRect, GlyphKeyHasher> m_GlyphMap;
+        // Indexed glyph storage: the map stores an index into m_GlyphRects so that
+        // callers can cache the index (as RatUI::ShapedGlyph::GlyphID) and perform
+        // O(1) lookups at render time without hashing.
+        HashMap<GlyphKey, u32, GlyphKeyHasher> m_GlyphMap;
+        Array<GlyphRect>                       m_GlyphRects;
     };
 
     /**
-     * @brief Renders a shaped line of text using the provided glyph atlas and a caller-supplied render function.
+     * @brief Renders a line of text from a pre-shaped RatUI::ShapedText.
+     *        Glyphs are looked up by their atlas index (RatUI::ShapedGlyph::GlyphID),
+     *        so no font or rasterization is needed at render time.
      * @tparam RenderGlyphFunc  Callable matching `void(const GlyphQuad&)`.
-     * @param a_Atlas       The glyph atlas that caches rasterized glyphs.
-     * @param a_Font        The Font whose FTFace is used for rasterization.  Passing the
-     *                      full Font (rather than a bare FT_Face) keeps the API consistent
-     *                      with ShapeLine, which also takes a Font&.
-     * @param a_Glyphs      Shaped glyph span from ShapeLine.
+     * @param a_Atlas       The glyph atlas that was used during Shape().
+     * @param a_Glyphs      Glyph span for one line (a_Text.Glyphs[line.Start .. line.End]).
      * @param a_Position    Baseline origin (x = left edge, y = baseline) in screen space.
      * @param a_RenderGlyph Callback invoked once per visible glyph with its quad data.
      */
     template<std::invocable<const GlyphQuad&> RenderGlyphFunc>
-    void RenderShapedLine(
-        GlyphAtlas&             a_Atlas,
-        Font&                   a_Font,
+    void RenderShapedTextLine(
+        const GlyphAtlas&              a_Atlas,
         Span<const ShapedGlyph> a_Glyphs,
-        Vec2f                   a_Position,
-        RenderGlyphFunc&&       a_RenderGlyph )
+        Vec2f                          a_Position,
+        RenderGlyphFunc&&              a_RenderGlyph )
     {
-		FT_Face face = a_Font.GetFace();
         const f32 atlasW = static_cast<f32>( a_Atlas.GetWidth() );
         const f32 atlasH = static_cast<f32>( a_Atlas.GetHeight() );
 
-        for ( const ShapedGlyph& g : a_Glyphs )
+        for ( const RatUI::ShapedGlyph& g : a_Glyphs )
         {
-            Optional<GlyphRect> gr = a_Atlas.GetOrRasterizeGlyph( face, g.GlyphID, g.PixelSize);
+            const GlyphRect* gr = a_Atlas.GetGlyphRect( g.GlyphID );
             if ( !gr || gr->Rect.Width() == 0 )
             {
                 a_Position[0] += g.XAdvance;
@@ -255,8 +299,8 @@ namespace RatUI::FreeType
             f32 x1 = x0 + static_cast<f32>( gr->Rect.Width() );
             f32 y1 = y0 + static_cast<f32>( gr->Rect.Height() );
 
-            f32 u0 = static_cast<f32>( gr->Rect.Origin[0] )                     / atlasW;
-            f32 v0 = static_cast<f32>( gr->Rect.Origin[1] )                     / atlasH;
+            f32 u0 = static_cast<f32>( gr->Rect.Origin[0] )                    / atlasW;
+            f32 v0 = static_cast<f32>( gr->Rect.Origin[1] )                    / atlasH;
             f32 u1 = static_cast<f32>( gr->Rect.Origin[0] + gr->Rect.Width()  ) / atlasW;
             f32 v1 = static_cast<f32>( gr->Rect.Origin[1] + gr->Rect.Height() ) / atlasH;
 

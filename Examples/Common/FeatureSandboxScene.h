@@ -65,20 +65,20 @@ public:
             mainContentNode->Style.PercentWidth = 0.5f;
             mainContentNode->Style.Margin = Edges{ 10.f };
 
-            TextStyle textStyle;
-            textStyle.Layout.Font = DefaultFont;
-            textStyle.Layout.Size = 16;
-            textStyle.Layout.Wrap = TextWrap::NoWrap();
-            textStyle.Layout.Overflow = ETextOverflow::Ellipsis;
-            textStyle.Render.Color = Colorsu8::AccentRose;
-            //textStyle.Layout.Transform = ETextTransform::Uppercase;
-            //textStyle.Render.Underline = true;
-            //textStyle.Render.Strikethrough = true;
+            TextLayoutStyle layStyle;
+            layStyle.Font = DefaultFont;
+            layStyle.Size = 16;
+            layStyle.Wrap = TextWrap::NoWrap();
+            layStyle.Overflow = ETextOverflow::Ellipsis;
+
+            TextRenderStyle textStyle;
+            textStyle.Color = Colorsu8::AccentRose;
 
             // Add some text to the footer bar
             WidgetID footerText = m_Scene.CreateWidget<TextWidget>( MainContentArea, 
                 "This is the main content area. It can contain the primary information or controls for the application.\n"
-                                                                    "Hello ifahjkfhaiofhoajfojaofjasojdioajodjaodjoas", textStyle
+                "Hello ifahjkfhaiofhoajfojaofjasojdioajodjaodjoas", 
+                layStyle, textStyle
             );
             auto* footerTextNode = m_Scene.Layouts.Get( m_Scene.GetWidget( footerText )->GetLayoutID() );
 
@@ -133,13 +133,14 @@ public:
             secondaryNode->Style.FlexGrow = 1.f;
 
             // Long wrapping Text
-            TextStyle textStyle;
-            textStyle.Layout.Font = DefaultFont;
-            textStyle.Layout.Size = 16;
-            textStyle.Layout.Wrap = TextWrap::WrapWord();
+            TextLayoutStyle layStyle;
+            layStyle.Font = DefaultFont;
+            layStyle.Size = 16;
+            layStyle.Wrap = TextWrap::WrapWord();
             WidgetID longText = m_Scene.CreateWidget<TextWidget>( secondaryContent, 
                 "This is the secondary content area. It can contain supplementary information or controls that support the main content.\n"
-                "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.", textStyle
+                "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.", 
+                layStyle
             );
             auto* longTextNode = m_Scene.Layouts.Get( m_Scene.GetWidget( longText )->GetLayoutID() );
             longTextNode->Style.WidthMode = ESizingMode::Flex;
@@ -157,17 +158,17 @@ public:
             footerNode->Style.WidthMode = ESizingMode::Flex;
             footerNode->Style.HeightMode = ESizingMode::Fixed;
 
-            TextStyle textStyle;
-            textStyle.Layout.Font = DefaultFont;
-            textStyle.Layout.Size = 16;
-            textStyle.Layout.Wrap = TextWrap::WrapWord();
+            TextLayoutStyle layStyle;
+            layStyle.Font = DefaultFont;
+            layStyle.Size = 16;
+            layStyle.Wrap = TextWrap::WrapWord();
 
             // Add some text to the footer bar
             WidgetID footerText = m_Scene.CreateWidget<TextWidget>( footerBar, 
                 "This is the footer bar. It can contain status messages, controls, or other information.\n"
                 "VAVAVAVA\n"
                 "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\n"
-                "0123456789\n", textStyle
+                "0123456789\n", layStyle
             );
             auto* footerTextNode = m_Scene.Layouts.Get( m_Scene.GetWidget( footerText )->GetLayoutID() );
 

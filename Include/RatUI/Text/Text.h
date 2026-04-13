@@ -179,14 +179,6 @@ namespace RatUI
 		constexpr bool operator==( const TextRenderStyle& ) const = default;
     };
 
-    struct TextStyle
-    {
-        TextLayoutStyle Layout{};
-        TextRenderStyle Render{};
-
-        constexpr FontHandle GetFont() const { return Layout.Font; }
-    };
-
     /**
 	 * @brief Stores measurement results of a block of text created by ITextMetrics.
      */
@@ -195,23 +187,6 @@ namespace RatUI
         Vec2f Size{};         ///< The width and height of the measured text block.
         f32 Baseline{ 0.0f }; ///< The distance from the top of the text block to the baseline, which is important for aligning text vertically.
         u32 LineCount{ 0 };   ///< The number of lines in the measured text block, which can be used for multi-line text layout and spacing calculations.
-    };
-
-    /**
-     * @brief An opaque, backend-owned handle to a pre-rendered/shaped text object.
-     * Shaped text has already been measured and its glyph positions computed.
-     * Rendering it avoids per-frame re-shaping, which is expensive for long or complex strings.
-     *
-     * The backend creates and destroys ShapedText objects. RatUI holds handles and submits them
-     * in draw commands. The backend is responsible for resource lifetime.
-     */
-    struct ShapedText
-    {
-		u64             Handle{ 0 };   ///< Backend-specific identifier for the shaped text resource, used to reference the pre-rendered text in draw commands.
-		TextMeasurement Measurement{};
-
-        constexpr bool IsValid() const { return Handle != 0; }
-		constexpr bool operator==( const ShapedText& other ) const { return Handle == other.Handle; }
     };
 
     /**
@@ -253,6 +228,49 @@ namespace RatUI
         String             NormalizedText;     ///< Text after whitespace normalisation.
         Array<TextSegment> Segments;           ///< Pre-measured segments in logical order.
         f32                HyphenWidth{ 0.f }; ///< Width of "-" (reserved for soft-hyphen support).
+    };
+
+    /**
+     * @brief Represents a single shaped glyph used for rendering text, containing the glyph ID, pixel size, advance, and offset information.
+     */
+    struct ShapedGlyph
+    {
+        u32 GlyphID { 0 };                    ///< The backend-specific ID of the glyph, used for rendering. Usually the GlyphAtlas index.
+        f32 XAdvance{ 0.f }, YAdvance{ 0.f }; ///< The advance of the glyph in pixels, to move the pen position after rendering this glyph.
+        f32 XOffset { 0.f },  YOffset{ 0.f }; ///< The offset of the glyph in pixels, relative to the pen position when rendering.
+    };
+
+    /**
+     * @brief Represents a single line of shaped text.
+     */
+    struct ShapedLine
+    {
+        u32 Start  { 0 };
+        u32 End    { 0 };
+        f32 Width  { 0.f };
+        f32 XOffset{ 0.f }; ///< Pre-computed horizontal offset from the rect's left edge for text alignment (0 = left-aligned).
+    };
+
+    /**
+     * @brief Optimised data for rendering lines of text, produced by shaping the prepared text with ITextMetrics::Shape().
+     */
+    struct ShapedText
+    {
+        Array<ShapedGlyph> Glyphs; ///< The sequence of shaped glyphs that represent the rendered text.
+        Array<ShapedLine>  Lines;  ///< Metadata about the lines in the shaped text.
+
+        u32 PixelSize  { 0 };
+        f32 LineHeight { 0.f };
+        f32 Ascender   { 0.f };
+        f32 Descender  { 0.f };
+
+        f32 MaxWidth          { 0.f }; ///< The maximum line width, used for overflow checks when rendering.
+        f32 TotalHeight       { 0.f }; ///< The total height of the shaped text block, used for vertical alignment and spacing calculations.
+        f32 UnderlinePosition { 0.f }; ///< The vertical position of the underline relative to the baseline, used for rendering underlines.
+        f32 UnderlineThickness{ 0.f }; ///< The thickness of the underline, used for rendering underlines.
+
+		/** @brief Returns the number of lines in the shaped text, which can be used for layout and spacing calculations. */
+		u32 LineCount() const { return static_cast<u32>( Size( Lines ) ); }
     };
 
 } // namespace RatUI

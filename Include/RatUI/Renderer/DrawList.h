@@ -69,11 +69,11 @@ namespace RatUI
             f32 Thickness;
         };
 
-        struct PreparedTextCmd 
+        struct ShapedTextCmd 
         { 
-            const PreparedText* Prepared;
-            TextStyle Style;
-            Rectf Rect;
+            const ShapedText* Shaped;
+            TextRenderStyle   Style;
+            Rectf             Rect;
         };
 
         struct CustomCmd 
@@ -90,7 +90,7 @@ namespace RatUI
             RectBorderCmd,
             CircleCmd,
             CircleBorderCmd,
-            PreparedTextCmd,
+            ShapedTextCmd,
             CustomCmd
         > Payload;
     };
@@ -195,13 +195,16 @@ namespace RatUI
             return *this;
         }
 
-        DrawList& AddText( const PreparedText& a_Prepared, const TextStyle& a_Style, Rectf a_Rect )
+        DrawList& AddText( const ShapedText* a_Shaped, const TextRenderStyle& a_Style, Rectf a_Rect )
         {
+            RATUI_USER_ASSERT( a_Shaped, "AddText requires a valid ShapedText pointer." );
+            
             PushBack( Commands, DrawCmd{
                 .Transform = CurrentTransform(),
                 .ClipRect = CurrentClipRect(),
-                .Payload = DrawCmd::PreparedTextCmd{ .Prepared = &a_Prepared, .Style = a_Style, .Rect = a_Rect }
+                .Payload = DrawCmd::ShapedTextCmd{ .Shaped = a_Shaped, .Style = a_Style, .Rect = a_Rect }
             } );
+
             return *this;
         }
 
@@ -209,14 +212,11 @@ namespace RatUI
         {
 			RATUI_USER_ASSERT( a_Func, "Custom draw command requires a valid function pointer." );
 
-			if ( a_Func )
-            {
-                PushBack( Commands, DrawCmd{
+			PushBack( Commands, DrawCmd{
                     .Transform = CurrentTransform(),
                     .ClipRect = CurrentClipRect(),
                     .Payload = DrawCmd::CustomCmd{.Func = a_Func, .UserData = a_UserData }
-                } );
-            }
+            } );
 
             return *this;
         }

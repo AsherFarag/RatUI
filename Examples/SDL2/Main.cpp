@@ -41,6 +41,7 @@ protected:
         // Create the glyph atlas backed by this renderer (must be done after the SDL_Renderer is ready).
         m_GlyphAtlas = std::make_unique<FreeType::GlyphAtlas>( m_Renderer, 2048, 2048 );
         m_Renderer.SetGlyphAtlas( m_GlyphAtlas.get() );
+        m_TextMetrics.SetGlyphAtlas( m_GlyphAtlas.get() );
 
         const FontHandle fontHandle = { 1 };
         m_FontCache.RegisterFontHandle( fontHandle, "Resources/Fonts/Roboto-Medium.ttf" );

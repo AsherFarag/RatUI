@@ -1,5 +1,6 @@
 #pragma once
 #include "../Core.h"
+#include "../Layout/Layout.h"
 #include "Text.h"
 
 namespace RatUI
@@ -17,17 +18,12 @@ namespace RatUI
          * @param a_Style The text style that controls font, size, wrapping mode, letter spacing, etc.
          * @return A PreparedText value ready to pass to Measure() and to the renderer.
          */
-        virtual PreparedText Prepare( StringView a_Text, const TextLayoutStyle& a_Style ) = 0;
+        virtual Optional<PreparedText> Prepare( StringView a_Text, const TextLayoutStyle& a_Style ) = 0;
 
         /**
-         * @brief Computes a TextMeasurement (total size, baseline, line count) for a block of
-         * previously prepared text, constrained to the given maximum line width.
-         * @param a_Prepared  A PreparedText produced by Prepare().
-         * @param a_Style     The same text style that was used when calling Prepare().
-         * @param a_MaxWidth  Maximum line width in pixels. Use Limits<f32>::max() for no wrapping.
-         * @return The measured size and metadata of the text block.
+		 * @brief Builds optimised render data (glyph quads, line metadata, etc.) from the prepared text and style.
          */
-        virtual TextMeasurement Measure( const PreparedText& a_Prepared, const TextLayoutStyle& a_Style, f32 a_MaxWidth = Limits<f32>::max() ) = 0;
+		virtual Optional<ShapedText> Shape( const PreparedText& a_Prepared, const TextLayoutStyle& a_Style, Vec2f a_MaxSize = { Limits<f32>::max(), Limits<f32>::max() } ) = 0;
     };
 
 } // namespace RatUI

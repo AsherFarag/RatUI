@@ -173,6 +173,11 @@ namespace RatUI::FreeType
             m_Face   = nullptr;
         }
 
+		// TODO: m_Buffer is not thread-safe if we want to shape text from multiple threads. We could either:
+		//	   1. Add a mutex to protect access to m_Buffer, allowing it to be shared across threads at the cost of potential contention.
+		//	   2. Remove m_Buffer from the Font class and require callers to create and manage their own hb_buffer_t instances for shaping, 
+        //        which would allow for thread-local buffers without synchronization overhead.
+
         FT_Face      m_Face   = nullptr; ///< The FreeType face object representing the loaded font, used for rasterization and metric queries.
         hb_font_t*   m_Font   = nullptr; ///< Persistent HarfBuzz font object associated with the FreeType face, used for shaping operations.
         hb_buffer_t* m_Buffer = nullptr; ///< Persistent buffer that is reset and reused for each shaping operation to avoid repeated allocations.
@@ -289,17 +294,6 @@ namespace RatUI::FreeType
     };
 
     /**
-     * @brief Represents a single shaped glyph with its ID and HarfBuzz positioning data.
-     */
-    struct ShapedGlyph
-    {
-        u32 GlyphID{0};
-        u32 PixelSize{0};
-        f32 XAdvance{0.f}, YAdvance{0.f};
-        f32 XOffset{0.f},  YOffset{0.f};
-    };
-
-    /**
      * @brief Shapes a line of text using HarfBuzz.
      * TODO: direction, script, and language are currently hardcoded to LTR/Latin/en.
      *       These should be derived from the text content (e.g. via ICU or hb-unicode)
@@ -400,7 +394,6 @@ namespace RatUI::FreeType
             EmplaceBack(
                 o_Glyphs,
                 /* GlyphID   */ infos[i].codepoint,
-                /* PixelSize */ static_cast<u32>( a_Layout.Size ),
                 /* XAdvance  */ xAdvance,
                 /* YAdvance  */ yAdvance,
                 /* XOffset   */ positions[i].x_offset * scale,
