@@ -112,7 +112,7 @@ namespace RatUI
                 return; // Don't attempt to paint if we have no text or if the text isn't prepared or shaped.
 
             const Rectf textRect = node->Style.Padding.Apply( node->Layout.FinalRect );
-			a_DrawList.AddText( &(*m_ShapedText), m_RenderStyle, textRect );
+            a_DrawList.AddText( &( *m_ShapedText ), m_RenderStyle, textRect );
         }
 
     protected:

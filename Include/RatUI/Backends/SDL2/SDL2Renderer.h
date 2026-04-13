@@ -425,7 +425,7 @@ namespace RatUI::SDL2
     }
 
     inline void SDL2Renderer::RenderShapedText(
-        const ShapedText&    a_Shaped,
+        const ShapedText&      a_Shaped,
         const TextRenderStyle& a_Style,
         Rectf                  a_Rect,
         const Mat3f&           a_Transform )
@@ -436,6 +436,9 @@ namespace RatUI::SDL2
             return;
 
         if ( Empty( a_Shaped.Lines ) || Empty( a_Shaped.Glyphs ) )
+            return;
+
+		if ( a_Rect.Size[0] <= 0.f || a_Rect.Size[1] <= 0.f ) // No point rendering if the rect has no area - text won't be visible anyway.
             return;
 
         const SDL_Color sdlColor     = ToSDLColor( a_Style.Color );
@@ -452,14 +455,22 @@ namespace RatUI::SDL2
             SDL_RenderGeometry( m_Renderer, nullptr, verts, 4, indices, 6 );
         };
 
-        f32 lineY = a_Rect.Origin[1];
+        f32 lineY = a_Rect.Origin[1]; // TODO: Need baseline somehow
 
         for ( const ShapedLine& line : a_Shaped.Lines )
         {
-            const f32   lineX  = a_Rect.Origin[0] + line.XOffset;
+            f32 xOffset = 0.f;
+            switch ( a_Style.Align )
+            {
+                case ETextAlign::Center: xOffset = std::max( 0.f, ( a_Rect.Size[0] - line.Width ) * 0.5f ); break;
+                case ETextAlign::Right:  xOffset = std::max( 0.f,   a_Rect.Size[0] - line.Width );          break;
+                default: break;
+            }
+
+            const f32   lineX  = a_Rect.Origin[0] + xOffset;
             const Vec2f origin { lineX, lineY + a_Shaped.Ascender };
 
-            // Render glyphs using pre-baked atlas indices – no HarfBuzz or FreeType needed.
+            // Render glyphs using pre-baked atlas indices - no HarfBuzz or FreeType needed.
             FreeType::RenderShapedTextLine(
                 *m_GlyphAtlas,
                 Span<const ShapedGlyph>{ a_Shaped.Glyphs.data() + line.Start, line.End - line.Start },
@@ -475,7 +486,7 @@ namespace RatUI::SDL2
                     SDL_RenderGeometry( m_Renderer, atlasTexture, verts, 4, indices, 6 );
                 } );
 
-            // Text decorations (underline / strikethrough) – metrics are baked into ShapedText.
+            // Text decorations (underline / strikethrough) - metrics are baked into ShapedText.
             if ( a_Style.Underline || a_Style.Strikethrough )
             {
                 const f32 baselineY = origin[1];

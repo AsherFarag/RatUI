@@ -252,13 +252,13 @@ private:
         for ( auto& e : kAligns )
         {
             TextStyle ts = MakeStyle( 14.f );
-            ts.Layout.Align = e.align;
+            ts.Render.Align = e.align;
             ts.Layout.Wrap = TextWrap::WrapWord();
             AddRow( card, e.label, kSent, ts, ESizingMode::Flex );
         }
 
         // Now do ETextBaseline
-        static const char* kBase = "HYPHENATION\nBASELINE\nALIGNMENT";
+        static const char* kBase = "Lorem ipsum dolor sit amet, consectetur adipiscing elit.";
         constexpr struct { ETextBaseline base; const char* label; } kBases[] = {
             { ETextBaseline::Top,        "Top"        },
             { ETextBaseline::Middle,     "Middle"     },
@@ -445,7 +445,7 @@ private:
         {
             TextStyle ts = MakeStyle( 22.f );
             ts.Render.Color      = Colorsu8::AccentSky;
-            ts.Layout.Align      = ETextAlign::Center;
+            ts.Render.Align      = ETextAlign::Center;
             ts.Layout.Wrap = TextWrap::WrapWord();
             ts.Layout.LineHeight = 30.f;
             AddRow( card, "Center 22px", "The beauty of typography lives in every detail.", ts, ESizingMode::Flex );

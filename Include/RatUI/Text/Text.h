@@ -158,7 +158,6 @@ namespace RatUI
 		u16            MaxLines{ 0 };          ///< The maximum number of lines to display. If set to 0, there is no limit and all lines will be displayed.
 
         ETextDirection Direction  { ETextDirection::Auto };
-        ETextAlign     Align      { ETextAlign::Left };
         TextWrap       Wrap       { TextWrap::Normal() }; 
         ETextOverflow  Overflow   { ETextOverflow::Clip };
         ETextTransform Transform  { ETextTransform::None };
@@ -172,9 +171,10 @@ namespace RatUI
      */
     struct TextRenderStyle
     {
-		Coloru8 Color{ Colorsu8::White };  ///< The default color of the text. Default is white.
-        bool    Underline     : 1 = false; ///< Whether the text should be rendered with an underline decoration. Default is false.
-        bool    Strikethrough : 1 = false; ///< Whether the text should be rendered with a strikethrough decoration. Default is false.
+		Coloru8    Color{ Colorsu8::White };  ///< The default color of the text. Default is white.
+		ETextAlign Align{ ETextAlign::Left }; ///< The horizontal alignment of the text within its layout box. Default is left-aligned.
+        bool       Underline     : 1 = false; ///< Whether the text should be rendered with an underline decoration. Default is false.
+        bool       Strikethrough : 1 = false; ///< Whether the text should be rendered with a strikethrough decoration. Default is false.
 
 		constexpr bool operator==( const TextRenderStyle& ) const = default;
     };
@@ -248,7 +248,6 @@ namespace RatUI
         u32 Start  { 0 };
         u32 End    { 0 };
         f32 Width  { 0.f };
-        f32 XOffset{ 0.f }; ///< Pre-computed horizontal offset from the rect's left edge for text alignment (0 = left-aligned).
     };
 
     /**

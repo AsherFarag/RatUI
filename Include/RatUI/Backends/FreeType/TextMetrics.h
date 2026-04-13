@@ -51,6 +51,9 @@ namespace RatUI::FreeType
 
         Optional<ShapedText> Shape( const PreparedText& a_Prepared, const TextLayoutStyle& a_Style, Vec2f a_MaxSize = { Limits<f32>::max(), Limits<f32>::max() } ) override
         {
+            if ( a_MaxSize[0] <= 0.f || a_MaxSize[1] <= 0.f )
+                return NullOpt; // Return empty shaped text if the available space is zero or negative.
+
             if ( !m_FontCache || !a_Style.Font.IsValid() || Empty( a_Prepared.Segments ) )
                 return NullOpt; // Return empty shaped text if there are no segments to shape.
 
@@ -58,7 +61,7 @@ namespace RatUI::FreeType
             if ( !font )
                 return NullOpt; // Return empty shaped text if the font couldn't be loaded.
 
-             FT_Face   face      = font->GetFace();
+            FT_Face   face      = font->GetFace();
             const u32 pixelSize = static_cast<u32>( a_Style.Size );
 
             ShapedText result;
@@ -69,8 +72,8 @@ namespace RatUI::FreeType
             result.UnderlinePosition  = -( FT_MulFix( face->underline_position,  face->size->metrics.y_scale ) / 64.f );
             result.UnderlineThickness = std::max( 1.f, FT_MulFix( face->underline_thickness, face->size->metrics.y_scale ) / 64.f );
 
-            const f32  maxWidth = a_MaxSize[0];
-            const u32  maxLines = a_Style.MaxLines;
+            const f32 maxWidth = a_MaxSize[0];
+            const u32 maxLines = a_Style.MaxLines;
 
             // Pre-walk to detect whether the text would exceed the line limit (for forced ellipsis on the last line).
             bool exceededMaxLines = false;
@@ -81,9 +84,9 @@ namespace RatUI::FreeType
                 exceededMaxLines = ( totalLines > maxLines );
             }
 
-            const bool ellipsis         = ( a_Style.Overflow == ETextOverflow::Ellipsis );
+            const bool ellipsis           = ( a_Style.Overflow == ETextOverflow::Ellipsis );
             const bool hasWidthConstraint = ( maxWidth < Limits<f32>::max() );
-            const StringView norm = a_Prepared.NormalizedText;
+            const StringView norm         = a_Prepared.NormalizedText;
 
             Array<ShapedGlyph> lineGlyphs; // reused per line
 
@@ -120,12 +123,13 @@ namespace RatUI::FreeType
                     }
 
                     // Shape the line with HarfBuzz to get per-glyph positions.
-                    ShapeLine( *font, lineText, a_Style, lineGlyphs );
+                    paintWidth = ShapeLine( *font, lineText, a_Style, lineGlyphs );
 
                     // Rasterize each glyph into the atlas and replace the HarfBuzz glyph ID
                     // with the atlas index so the renderer can do O(1) lookups without FreeType.
                     if ( m_GlyphAtlas )
                     {
+                        // TODO: hacky but ill fix later
                         for ( ShapedGlyph& g : lineGlyphs )
                         {
                             Optional<u32> atlasIdx = m_GlyphAtlas->GetOrRasterizeGlyphIndex( face, g.GlyphID, pixelSize );
@@ -133,18 +137,6 @@ namespace RatUI::FreeType
                         }
                     }
 
-                    // Compute the horizontal alignment offset.
-                    f32 xOffset = 0.f;
-                    if ( hasWidthConstraint )
-                    {
-                        switch ( a_Style.Align )
-                        {
-                            case ETextAlign::Center: xOffset = ( maxWidth - paintWidth ) * 0.5f; break;
-                            case ETextAlign::Right:  xOffset =   maxWidth - paintWidth;           break;
-                            default: break;
-                        }
-                        xOffset = std::max( 0.f, xOffset );
-                    }
 
                     // Append glyphs to the output and record the line metadata.
                     const u32 glyphStart = static_cast<u32>( Size( result.Glyphs ) );
@@ -156,17 +148,20 @@ namespace RatUI::FreeType
                         .Start   = glyphStart,
                         .End     = glyphEnd,
                         .Width   = paintWidth,
-                        .XOffset = xOffset
                     } );
 
                     result.MaxWidth = std::max( result.MaxWidth, paintWidth );
                 }
             );
 
-            result.TotalHeight = result.LineHeight * static_cast<f32>( result.LineCount() );
-
             if ( Empty( result.Lines ) )
                 return NullOpt;
+
+			// Total height is the distance from the top of the first line to the bottom of the last line, including line spacing.
+			// TotalHeight = Ascender + (LineCount - 1) * LineHeight + abs(Descender)
+            result.TotalHeight = result.Ascender
+                + std::max( 0.f, static_cast<f32>( result.LineCount() ) - 1.f ) * result.LineHeight
+                + std::abs( result.Descender );
 
             return result;
         }
