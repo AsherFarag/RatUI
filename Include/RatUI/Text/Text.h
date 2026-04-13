@@ -34,10 +34,11 @@ namespace RatUI
      */
     enum class ETextBaseline : u8
     {
+		Alphabetic, ///< The baseline of the text is aligned with the alphabetic baseline of the layout box. 
+                    ///< This is the default and most common baseline for Latin and many other scripts.
         Top,        ///< The top of the text is aligned with the top of the layout box.
         Middle,     ///< The vertical center of the text is aligned with the vertical center of the layout box.
         Bottom,     ///< The bottom of the text is aligned with the bottom of the layout box.
-        Alphabetic, ///< The baseline of the text is aligned with the alphabetic baseline of the layout box.
         Hanging,    ///< The baseline of the text is aligned with the hanging baseline of the layout box.
 
         _NumBits = 3
@@ -161,7 +162,6 @@ namespace RatUI
         TextWrap       Wrap       { TextWrap::Normal() }; 
         ETextOverflow  Overflow   { ETextOverflow::Clip };
         ETextTransform Transform  { ETextTransform::None };
-        ETextBaseline  Baseline   { ETextBaseline::Alphabetic };
 
 		constexpr bool operator==( const TextLayoutStyle& ) const = default;
     };
@@ -171,10 +171,13 @@ namespace RatUI
      */
     struct TextRenderStyle
     {
-		Coloru8    Color{ Colorsu8::White };  ///< The default color of the text. Default is white.
-		ETextAlign Align{ ETextAlign::Left }; ///< The horizontal alignment of the text within its layout box. Default is left-aligned.
-        bool       Underline     : 1 = false; ///< Whether the text should be rendered with an underline decoration. Default is false.
-        bool       Strikethrough : 1 = false; ///< Whether the text should be rendered with a strikethrough decoration. Default is false.
+		Coloru8       Color{ Colorsu8::White };              ///< The default color of the text. Default is white.
+		ETextAlign    Align{ ETextAlign::Left };             ///< The horizontal alignment of the text within its layout box. Default is left-aligned.
+		ETextBaseline Baseline{ ETextBaseline::Alphabetic }; ///< The vertical alignment of the text relative to its layout box. Default is alphabetic baseline.
+                                                             ///< This only affects the text's position if the layout box isn't content sized.
+
+        bool          Underline     : 1 = false; ///< Whether the text should be rendered with an underline decoration. Default is false.
+        bool          Strikethrough : 1 = false; ///< Whether the text should be rendered with a strikethrough decoration. Default is false.
 
 		constexpr bool operator==( const TextRenderStyle& ) const = default;
     };

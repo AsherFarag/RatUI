@@ -455,7 +455,24 @@ namespace RatUI::SDL2
             SDL_RenderGeometry( m_Renderer, nullptr, verts, 4, indices, 6 );
         };
 
-        f32 lineY = a_Rect.Origin[1]; // TODO: Need baseline somehow
+        f32 lineY = a_Rect.Origin[1];
+        switch ( a_Style.Baseline )
+        {
+            case ETextBaseline::Middle:
+                // Vertically center the text block within the rect.
+                lineY += std::max( 0.f, ( a_Rect.Size[1] - a_Shaped.TotalHeight ) * 0.5f );
+                break;
+            case ETextBaseline::Bottom:
+                // Pin the bottom of the text block to the bottom of the rect.
+                lineY += std::max( 0.f, a_Rect.Size[1] - a_Shaped.TotalHeight );
+                break;
+            case ETextBaseline::Top:
+            case ETextBaseline::Alphabetic:
+            case ETextBaseline::Hanging:
+            default:
+                // Top of the text block at the top of the rect (default behaviour).
+                break;
+        }
 
         for ( const ShapedLine& line : a_Shaped.Lines )
         {

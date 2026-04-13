@@ -270,7 +270,7 @@ private:
         for ( auto& e : kBases )
         {
             TextStyle ts = MakeStyle( 14.f );
-            ts.Layout.Baseline = e.base;
+            ts.Render.Baseline = e.base;
             AddRow( card, e.label, kBase, ts, ESizingMode::Flex );
         }
     }
