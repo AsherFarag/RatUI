@@ -350,7 +350,7 @@ private:
             TextStyle ts = MakeStyle( 14.f );
             ts.Layout.LetterSpacing = e.sp;
             ts.Layout.Wrap = TextWrap::NoWrap();
-            ts.Layout.Overflow      = ETextOverflow::Clip;
+            ts.Layout.Overflow = ETextOverflow::Clip;
             AddRow( card, e.label, "LOREM IPSUM SIT AMET", ts );
         }
     }
@@ -369,6 +369,7 @@ private:
             { 20.f, "20 px  normal" },
             { 30.f, "30 px  loose"  },
         };
+
         for ( auto& e : kLH )
         {
             TextStyle ts = MakeStyle( 13.f );

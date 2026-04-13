@@ -362,7 +362,7 @@ namespace RatUI::SDL2
                 }
 
                 ++lineIndex;
-                lineY += lineHeight;
+				lineY += lineHeight + a_Layout.LineSpacing;
             } );
     }
 

@@ -154,6 +154,7 @@ namespace RatUI
         f32            LineHeight{ 0.0f };     ///< The height of each line of text, including spacing. If set to 0, it will be automatically calculated based on the font size and metrics.
         f32            LetterSpacing{ 0.0f };  ///< The spacing between characters in the text, specified in points. Default is 0.0f.
 		f32            WordSpacing{ 0.0f };    ///< The spacing between words in the text, specified in points. Default is 0.0f.
+		f32            LineSpacing{ 0.0f };    ///< The additional spacing between lines of text, specified in points. Default is 0.0f.
 		u16            MaxLines{ 0 };          ///< The maximum number of lines to display. If set to 0, there is no limit and all lines will be displayed.
 
         ETextDirection Direction  { ETextDirection::Auto };

@@ -61,14 +61,30 @@ namespace RatUI::FreeType
                     ++lineCount;
                 } );
 
-            const f32 lineHeight = GetLineHeight( font->GetFace(), a_Style );
-            const f32 baseline   = font->GetFace()->size->metrics.ascender / 64.f;
+            const f32 lineHeight  = GetLineHeight( font->GetFace(), a_Style );
+			const f32 lineSpacing = a_Style.LineSpacing;
+            const f32 baseline    = font->GetFace()->size->metrics.ascender / 64.f;
 
             TextMeasurement result;
             result.Size[0]   = lineCount > 0 ? std::clamp( maxLineWidth, 0.f, a_MaxWidth ) : 0.f;
-            result.Size[1]   = lineHeight * static_cast<f32>( lineCount );
             result.Baseline  = baseline;
             result.LineCount = lineCount;
+
+            if ( lineCount > 0 )
+            {
+                const f32 descender = std::abs( font->GetFace()->size->metrics.descender / 64.f );
+
+                result.Size[1] =
+                    baseline +
+                    ( static_cast<f32>( lineCount - 1 ) * lineHeight ) +
+					( lineCount - 1 ) * lineSpacing +
+                    descender;
+            }
+            else
+            {
+                result.Size[1] = 0.f;
+            }
+
             return result;
         }
 
