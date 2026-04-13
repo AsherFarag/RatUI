@@ -464,39 +464,4 @@ namespace RatUI::TextLayout
         return WalkLines( a_Prepared, a_MaxWidth, 0u, std::forward<OnLineFn>( a_OnLine ) );
     }
 
-    /**
-     * @brief Line count and maximum line paint-width returned by MeasureLineStats().
-     */
-    struct LineStats
-    {
-        u32 LineCount{ 0 };     ///< Number of lines emitted by WalkLines().
-        f32 MaxLineWidth{ 0.f }; ///< Widest line's paint width in pixels.
-    };
-
-    /**
-     * @brief Returns the line count and maximum line paint-width for a prepared text.
-     *
-     * Equivalent to calling WalkLines() and accumulating stats, expressed as a single
-     * convenient call.
-     *
-     * @param a_Prepared  Pre-measured text.
-     * @param a_MaxWidth  Maximum pixel width of a line.
-     * @param a_MaxLines  Maximum number of lines to count (0 = unlimited).
-     * @return            LineStats containing count and maximum paint-width.
-     */
-    [[nodiscard]] inline LineStats MeasureLineStats( const PreparedText& a_Prepared,
-                                                     f32 a_MaxWidth,
-                                                     u32 a_MaxLines = 0u )
-    {
-        LineStats stats;
-        WalkLines( a_Prepared, a_MaxWidth, a_MaxLines,
-                   [&]( u32, u32, f32 paintW )
-        {
-            ++stats.LineCount;
-            if ( paintW > stats.MaxLineWidth )
-                stats.MaxLineWidth = paintW;
-        } );
-        return stats;
-    }
-
 } // namespace RatUI::TextLayout

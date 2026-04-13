@@ -80,7 +80,7 @@ namespace RatUI::FreeType
             if ( maxLines > 0 )
             {
                 u32 totalLines = 0;
-                TextLayout::WalkLines( a_Prepared, maxWidth, 0u, [&]( u32, u32, f32 ) { ++totalLines; } );
+                TextLayout::WalkLines( a_Prepared, maxWidth, maxLines + 1u, [&]( u32, u32, f32 ) { ++totalLines; } );
                 exceededMaxLines = ( totalLines > maxLines );
             }
 
@@ -119,7 +119,6 @@ namespace RatUI::FreeType
                     {
                         truncated  = TextUtil::TruncateLineWithEllipsis( *font, lineText, a_Style, maxWidth, forceEllipsis );
                         lineText   = StringView{ truncated };
-                        paintWidth = TextUtil::MeasureLineWidth( *font, lineText, a_Style );
                     }
 
                     // Shape the line with HarfBuzz to get per-glyph positions.
@@ -140,8 +139,7 @@ namespace RatUI::FreeType
 
                     // Append glyphs to the output and record the line metadata.
                     const u32 glyphStart = static_cast<u32>( Size( result.Glyphs ) );
-                    for ( const ShapedGlyph& g : lineGlyphs )
-                        PushBack( result.Glyphs, g );
+                    Insert( result.Glyphs, End( result.Glyphs ), Begin( lineGlyphs ), End( lineGlyphs ) );
                     const u32 glyphEnd = static_cast<u32>( Size( result.Glyphs ) );
 
                     PushBack( result.Lines, ShapedLine{

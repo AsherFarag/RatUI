@@ -318,6 +318,7 @@ private:
         };
 
         add( "Clip",         TextWrap::NoWrap(),   ETextOverflow::Clip,     0 );
+        add( "Fade",         TextWrap::NoWrap(),   ETextOverflow::Fade,     0 );
         add( "Ellipsis",     TextWrap::NoWrap(),   ETextOverflow::Ellipsis, 0 );
         add( "MaxLines = 2", TextWrap::WrapWord(), ETextOverflow::Ellipsis, 2 );
         add( "MaxLines = 1", TextWrap::WrapWord(), ETextOverflow::Ellipsis, 1 );

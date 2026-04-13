@@ -18,7 +18,10 @@ namespace RatUI::SDL2
             : m_Renderer  ( a_Renderer )
             , m_FontCache ( a_FontCache )
             , m_GlyphAtlas( a_GlyphAtlas )
-        {}
+        {
+            Reserve( m_VertexScratch, 1024 ); // Avoid initial allocations for small draw calls.
+            Reserve( m_IndexScratch,  1024 );
+        }
 
         SDL_Renderer*         GetSDLRenderer() const { return m_Renderer; }
         FreeType::FontCache*  GetFontCache()   const { return m_FontCache; }
@@ -81,6 +84,9 @@ namespace RatUI::SDL2
         // Persistent scratch buffer for R8->RGBA expansion in UpdateTexture.
         // Grows as needed but never shrinks - avoids per-upload allocations.
         Array<u8> m_RGBAScratch;
+
+        Array<SDL_Vertex> m_VertexScratch; ///< Scratch buffer for vertex data, to avoid per-render allocations.
+        Array<int>        m_IndexScratch;  ///< Scratch buffer for index data, to avoid per-render allocations.
     };
 
     // =========================================================================
@@ -444,16 +450,26 @@ namespace RatUI::SDL2
         const SDL_Color sdlColor     = ToSDLColor( a_Style.Color );
         SDL_Texture*    atlasTexture = static_cast<SDL_Texture*>( m_GlyphAtlas->GetTexture().Ptr );
 
-        auto DrawLineQuad = [&]( f32 x0, f32 y0, f32 x1, f32 y1 )
+        auto pushQuad = [&]( const Vec2f a_PosMin, const Vec2f a_PosMax, const Vec2f a_UVMin, const Vec2f a_UVMax, f32 a_Alpha )
         {
-            SDL_Vertex verts[4];
-            verts[0] = { TransformPoint( x0, y0, a_Transform ), sdlColor, { 0.f, 0.f } };
-            verts[1] = { TransformPoint( x1, y0, a_Transform ), sdlColor, { 0.f, 0.f } };
-            verts[2] = { TransformPoint( x1, y1, a_Transform ), sdlColor, { 0.f, 0.f } };
-            verts[3] = { TransformPoint( x0, y1, a_Transform ), sdlColor, { 0.f, 0.f } };
-            constexpr int indices[6] = { 0, 1, 2, 0, 2, 3 };
-            SDL_RenderGeometry( m_Renderer, nullptr, verts, 4, indices, 6 );
+            SDL_Color col = sdlColor;
+            col.a = static_cast<Uint8>( a_Alpha * sdlColor.a );
+
+            EmplaceBack( m_VertexScratch, TransformPoint( a_PosMin[0], a_PosMin[1], a_Transform ), col, SDL_FPoint{ a_UVMin[0], a_UVMin[1] } );
+            EmplaceBack( m_VertexScratch, TransformPoint( a_PosMax[0], a_PosMin[1], a_Transform ), col, SDL_FPoint{ a_UVMax[0], a_UVMin[1] } );
+            EmplaceBack( m_VertexScratch, TransformPoint( a_PosMax[0], a_PosMax[1], a_Transform ), col, SDL_FPoint{ a_UVMax[0], a_UVMax[1] } );
+            EmplaceBack( m_VertexScratch, TransformPoint( a_PosMin[0], a_PosMax[1], a_Transform ), col, SDL_FPoint{ a_UVMin[0], a_UVMax[1] } );
+
+            int baseIndex = Size( m_VertexScratch ) - 4;
+            PushBack( m_IndexScratch, baseIndex );
+            PushBack( m_IndexScratch, baseIndex + 1 );
+            PushBack( m_IndexScratch, baseIndex + 2 );
+            PushBack( m_IndexScratch, baseIndex );
+            PushBack( m_IndexScratch, baseIndex + 2 );
+            PushBack( m_IndexScratch, baseIndex + 3 );                    
         };
+
+        // 1. Compute initial Y position based on baseline alignment.
 
         f32 lineY = a_Rect.Origin[1];
         switch ( a_Style.Baseline )
@@ -474,8 +490,11 @@ namespace RatUI::SDL2
                 break;
         }
 
+        // 2. Iterate lines and append quads for glyphs to vertex/index scratch buffers
+
         for ( const ShapedLine& line : a_Shaped.Lines )
         {
+            // Compute X offset for horizontal alignment.
             f32 xOffset = 0.f;
             switch ( a_Style.Align )
             {
@@ -484,26 +503,34 @@ namespace RatUI::SDL2
                 default: break;
             }
 
-            const f32   lineX  = a_Rect.Origin[0] + xOffset;
-            const Vec2f origin { lineX, lineY + a_Shaped.Ascender };
+            const f32   lineX     = a_Rect.Origin[0] + xOffset;
+            const Vec2f origin    = { lineX, lineY + a_Shaped.Ascender };
+            const f32   fadeWidth = a_Rect.Size[0] * a_Style.FadePercentage;
+            const f32   fadeStart = lineX + a_Rect.Size[0] - fadeWidth;
+            const f32   fadeEnd   = lineX + a_Rect.Size[0];
 
-            // Render glyphs using pre-baked atlas indices - no HarfBuzz or FreeType needed.
+            auto computeFade = [&](f32 x) -> f32
+            {
+                if (x <= fadeStart)
+                    return 1.0f;
+            
+                f32 t = (x - fadeStart) / fadeWidth;
+                t = std::clamp(t, 0.0f, 1.0f);
+                return 1.f - t;
+            };
+
+            // Add quads for each glyph in the line, applying fade-out if enabled and we're in the fade region.
             FreeType::RenderShapedTextLine(
                 *m_GlyphAtlas,
                 Span<const ShapedGlyph>{ a_Shaped.Glyphs.data() + line.Start, line.End - line.Start },
                 origin,
                 [&]( const FreeType::GlyphQuad& q )
                 {
-                    SDL_Vertex verts[4];
-                    verts[0] = { TransformPoint( q.PosMin[0], q.PosMin[1], a_Transform ), sdlColor, { q.UVMin[0], q.UVMin[1] } };
-                    verts[1] = { TransformPoint( q.PosMax[0], q.PosMin[1], a_Transform ), sdlColor, { q.UVMax[0], q.UVMin[1] } };
-                    verts[2] = { TransformPoint( q.PosMax[0], q.PosMax[1], a_Transform ), sdlColor, { q.UVMax[0], q.UVMax[1] } };
-                    verts[3] = { TransformPoint( q.PosMin[0], q.PosMax[1], a_Transform ), sdlColor, { q.UVMin[0], q.UVMax[1] } };
-                    const int indices[6] = { 0, 1, 2, 0, 2, 3 };
-                    SDL_RenderGeometry( m_Renderer, atlasTexture, verts, 4, indices, 6 );
+                    const f32 alpha = computeFade( q.PosMin[0] + ( q.PosMax[0] - q.PosMin[0] ) * 0.5f );
+                    pushQuad( q.PosMin, q.PosMax, q.UVMin, q.UVMax, alpha );
                 } );
 
-            // Text decorations (underline / strikethrough) - metrics are baked into ShapedText.
+            // Text decorations (underline / strikethrough)
             if ( a_Style.Underline || a_Style.Strikethrough )
             {
                 const f32 baselineY = origin[1];
@@ -512,18 +539,39 @@ namespace RatUI::SDL2
                 if ( a_Style.Underline )
                 {
                     const f32 y = baselineY + a_Shaped.UnderlinePosition;
-                    DrawLineQuad( lineX, y, lineX + line.Width, y + thickness );
+                    pushQuad( 
+                        Vec2f{ origin[0], y - thickness * 0.5f }, 
+                        Vec2f{ origin[0] + line.Width, y + thickness * 0.5f }, 
+                        Vec2f{ 0.f, 0.f }, 
+                        Vec2f{ 1.f, 1.f },
+                        sdlColor.a );
                 }
 
                 if ( a_Style.Strikethrough )
                 {
                     const f32 y = baselineY - a_Shaped.Ascender * 0.35f;
-                    DrawLineQuad( lineX, y, lineX + line.Width, y + thickness );
+                    pushQuad( 
+                        Vec2f{ origin[0], y - thickness * 0.5f }, 
+                        Vec2f{ origin[0] + line.Width, y + thickness * 0.5f }, 
+                        Vec2f{ 0.f, 0.f }, 
+                        Vec2f{ 1.f, 1.f },
+                        sdlColor.a );
                 }
             }
 
             lineY += a_Shaped.LineHeight;
         }
+
+        // 3. Flush the vertex/index buffers to the GPU in one draw call, then clear them for the next batch.
+        if ( !Empty( m_VertexScratch ) && !Empty( m_IndexScratch ) )
+        {
+            SDL_RenderGeometry( m_Renderer, atlasTexture, 
+                Data( m_VertexScratch ), static_cast<int>( Size( m_VertexScratch ) ), 
+                Data( m_IndexScratch ), static_cast<int>( Size( m_IndexScratch ) ) );
+        }
+
+        Clear( m_VertexScratch );
+        Clear( m_IndexScratch );
     }
 
 } // namespace RatUI::SDL2

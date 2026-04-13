@@ -112,7 +112,36 @@ namespace RatUI
                 return; // Don't attempt to paint if we have no text or if the text isn't prepared or shaped.
 
             const Rectf textRect = node->Style.Padding.Apply( node->Layout.FinalRect );
-            a_DrawList.AddText( &( *m_ShapedText ), m_RenderStyle, textRect );
+
+            // TODO: Pushing a clip rect doesnt work if this text is rotated or transformed in some other way. 
+            // Need to use stencil clipping instead of scissor
+
+            // TODO: Hack to disable fading when not using ETextOverflow::Fade, since the fade percentage is still applied in the shader even when overflow mode is Ellipsis or Clip. 
+            // We should ideally refactor this to avoid needing a hack like this.
+            TextRenderStyle effectiveRenderStyle = m_RenderStyle;
+            effectiveRenderStyle.FadePercentage = m_LayoutStyle.Overflow == ETextOverflow::Fade ? m_RenderStyle.FadePercentage : 0.f;
+
+            switch ( m_LayoutStyle.Overflow )
+            {
+                case ETextOverflow::Clip:
+                {
+                    a_DrawList.PushClipRect( textRect.Cast<u16>() );
+                    a_DrawList.AddText( &( *m_ShapedText ), effectiveRenderStyle, textRect );
+                    a_DrawList.PopClipRect();
+                    break;
+                }
+                case ETextOverflow::Fade:
+                {
+                    a_DrawList.PushClipRect( textRect.Cast<u16>() );
+                    a_DrawList.AddText( &( *m_ShapedText ), effectiveRenderStyle, textRect );
+                    a_DrawList.PopClipRect();
+                    break;
+                }
+                default:
+					a_DrawList.AddRect( Colorsf::DarkRed, textRect ); // Debug: Draw a red rect around the text bounds to visualize where the text is being drawn and how overflow is being handled.
+                    a_DrawList.AddText( &( *m_ShapedText ), effectiveRenderStyle, textRect );
+                    break;
+            }
         }
 
     protected:

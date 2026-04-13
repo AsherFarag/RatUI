@@ -254,6 +254,17 @@
             {
                 return a_Container.insert( a_Pos, std::forward<U>( a_Element ) );
             }
+
+            static constexpr Iter Insert( Type& a_Container, ConstIter a_Pos, size_t a_Count, const ElementType& a_Element )
+            {
+                return a_Container.insert( a_Pos, a_Count, a_Element );
+            }
+
+            template<typename InputIt>
+            static constexpr Iter Insert( Type& a_Container, ConstIter a_Pos, InputIt a_First, InputIt a_Last )
+            {
+                return a_Container.insert( a_Pos, a_First, a_Last );
+            }
         
             static constexpr Iter Erase(Type& a_Container, ConstIter a_Pos)
             {

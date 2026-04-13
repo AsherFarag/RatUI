@@ -54,7 +54,7 @@ namespace RatUI::FreeType
 
             // Pre-allocate the R8->RGBA scratch buffer to the full atlas size so
             // UpdateTexture never heap-allocates during a glyph upload.
-            Resize( m_ScratchRGBA, static_cast<size>( a_AtlasWidth ) * a_AtlasHeight * 4u );
+            Resize( m_ScratchR8, static_cast<size>( a_AtlasWidth ) * a_AtlasHeight );
         }
 
         ~GlyphAtlas()
@@ -72,24 +72,6 @@ namespace RatUI::FreeType
          *        Callers should allocate a new atlas page or rebuild when this is set.
          */
         bool IsAtlasFull() const { return m_AtlasFull; }
-
-        /**
-         * @brief Evicts all glyphs and resets the cursor to the top-left corner.
-         *        The underlying GPU texture is not recreated - it will be overwritten
-         *        as new glyphs are rasterized.
-         *        @warning Both the glyph map and the indexed rect array are cleared.
-         *                 Any ShapedText objects shaped against this atlas will have stale
-         *                 GlyphIDs after a Reset() and must be re-shaped.
-         */
-        void Reset()
-        {
-            m_GlyphMap.clear();
-            Clear( m_GlyphRects );
-            m_CursorX   = 0;
-            m_CursorY   = 0;
-            m_RowBottom = 0;
-            m_AtlasFull = false;
-        }
 
         /**
          * @brief Looks up a glyph in the atlas, rasterizing and uploading it if not cached.
@@ -237,13 +219,13 @@ namespace RatUI::FreeType
                 for ( u32 row = 0; row < a_Bmp.rows; ++row )
                 {
                     std::memcpy(
-                        Data( m_ScratchRGBA ) + row * a_Bmp.width,
-                        a_Bmp.buffer          + row * stride,
+                        Data( m_ScratchR8 ) + row * a_Bmp.width,
+                        a_Bmp.buffer        + row * stride,
                         static_cast<size>( a_Bmp.width )
                     );
                 }
 
-                m_Renderer.UpdateTexture( m_Texture, 0, region, Data( m_ScratchRGBA ), pixelCount );
+                m_Renderer.UpdateTexture( m_Texture, 0, region, Data( m_ScratchR8 ), pixelCount );
             }
         }
 
@@ -256,7 +238,7 @@ namespace RatUI::FreeType
         // Persistent scratch buffer for R8->packed conversion.
         // Reusing it avoids a heap allocation on every glyph upload.
         // Sized to hold R8 data for the full atlas (w * h bytes).
-        Array<u8> m_ScratchRGBA;
+        Array<u8> m_ScratchR8;
 
         // Indexed glyph storage: the map stores an index into m_GlyphRects so that
         // callers can cache the index (as RatUI::ShapedGlyph::GlyphID) and perform

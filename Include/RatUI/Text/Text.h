@@ -51,7 +51,7 @@ namespace RatUI
     {
         Clip,     ///< Text that exceeds the available space is simply cut off, without any indication to the user.
         Ellipsis, ///< Text that exceeds the available space is truncated and an ellipsis ("...") is appended to indicate that there is more text that is not visible.
-        // TODO? Fade,     ///< Text that exceeds the available space gradually fades out, providing a visual cue that there is more text that is not visible.
+        Fade,     ///< Text that exceeds the available space gradually fades out, providing a visual cue that there is more text that is not visible.
 
         _NumBits = 2
     };
@@ -172,6 +172,8 @@ namespace RatUI
     struct TextRenderStyle
     {
 		Coloru8       Color{ Colorsu8::White };              ///< The default color of the text. Default is white.
+        f32           FadePercentage{ 0.25f };               ///< The percentage of the text width to use for the fade-out zone when ETextOverflow::Fade is selected. 
+                                                             ///< Default is 0.25 (25% of the text width).
 		ETextAlign    Align{ ETextAlign::Left };             ///< The horizontal alignment of the text within its layout box. Default is left-aligned.
 		ETextBaseline Baseline{ ETextBaseline::Alphabetic }; ///< The vertical alignment of the text relative to its layout box. Default is alphabetic baseline.
                                                              ///< This only affects the text's position if the layout box isn't content sized.
