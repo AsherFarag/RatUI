@@ -28,6 +28,12 @@ public:
 
     void RenderFillCircleBorder( RatUI::Vec2f a_Center, RatUI::f32 a_Radius, RatUI::Colorf a_Color, RatUI::f32 a_Thickness, const RatUI::Mat3f& a_Transform );
 
+    // TODO: These are implemented in branch/text but not yet merged
+    RatUI::Optional<RatUI::TextureID> CreateTexture( RatUI::u32 a_Width, RatUI::u32 a_Height, RatUI::ETextureFormat a_Format, const void* a_Data ) { return RatUI::NullOpt; }
+    bool UpdateTexture( RatUI::TextureID a_Texture, RatUI::u32 a_MipLevel, RatUI::Rectu a_Region, const void* a_Data, RatUI::size a_DataSizeBytes ) { return false; }
+    void DestroyTexture( RatUI::TextureID a_Texture ) {}
+    bool IsValidTexture( RatUI::TextureID a_Texture ) const { return false; }
+
     static SDL_Color ToSDLColor( RatUI::Colorf a_Color )
     {
         return SDL_Color{
@@ -55,44 +61,53 @@ inline void SDL2Renderer::Execute( RatUI::Span<const RatUI::DrawCmd> a_Commands 
 
     // TODO: Capture the renderer state and restore it after rendering, to avoid interfering with the application's own rendering code
 
+    Mat3f currentTransform = Mat3f::identity();
     for ( const DrawCmd& cmd : a_Commands )
     {
-    
-        SDL_Rect sdlClipRect{
-            static_cast<int>( cmd.ClipRect.Origin[0] ),
-            static_cast<int>( cmd.ClipRect.Origin[1] ),
-            static_cast<int>( cmd.ClipRect.Size[0] ),
-            static_cast<int>( cmd.ClipRect.Size[1] )
-        };
-
-        // TODO: Get the intersection of the user set clip rect and the current scissor rect
-        SDL_RenderSetClipRect( m_Renderer, &sdlClipRect );
-
-        if ( Holds<DrawCmd::RectCmd>( cmd.Payload ) )
+        if ( Holds<DrawCmd::SetClipRectCmd>( cmd.Payload ) )
+        {
+            const auto& clipCmd = Get<DrawCmd::SetClipRectCmd>( cmd.Payload );
+            if ( clipCmd.Rect )
+            {
+                const Rectf& r = *clipCmd.Rect;
+                SDL_Rect sdlRect = { static_cast<int>( r.Origin[0] ), static_cast<int>( r.Origin[1] ), static_cast<int>( r.Size[0] ), static_cast<int>( r.Size[1] ) };
+                SDL_RenderSetClipRect( m_Renderer, &sdlRect );
+            }
+            else
+            {
+                SDL_RenderSetClipRect( m_Renderer, nullptr );
+            }
+        }
+        else if ( Holds<DrawCmd::SetTransformCmd>( cmd.Payload ) )
+        {
+            const auto& transformCmd = Get<DrawCmd::SetTransformCmd>( cmd.Payload );
+            currentTransform = transformCmd.Transform;
+        }
+        else if ( Holds<DrawCmd::RectCmd>( cmd.Payload ) )
         {
             const auto& rectCmd = Get<DrawCmd::RectCmd>( cmd.Payload );
-            RenderFillRoundedRect( rectCmd.Rect, rectCmd.Rounding, rectCmd.Color, cmd.Transform );
+            RenderFillRoundedRect( rectCmd.Rect, rectCmd.Rounding, rectCmd.Color, currentTransform );
         }
         else if ( Holds<DrawCmd::RectBorderCmd>( cmd.Payload ) )
         {
             const auto& borderCmd = Get<DrawCmd::RectBorderCmd>( cmd.Payload );
-            RenderFillRoundedRectBorder( borderCmd.Rect, borderCmd.Rounding.TopLeft.Value, borderCmd.Color, borderCmd.Thickness, cmd.Transform );
+            RenderFillRoundedRectBorder( borderCmd.Rect, borderCmd.Rounding.TopLeft.Value, borderCmd.Color, borderCmd.Thickness, currentTransform );
         }
         else if ( Holds<DrawCmd::CircleCmd>( cmd.Payload ) )
         {
             const auto& circleCmd = Get<DrawCmd::CircleCmd>( cmd.Payload );
-            RenderFillCircle( circleCmd.Center, circleCmd.Radius, circleCmd.Color, cmd.Transform );
+            RenderFillCircle( circleCmd.Center, circleCmd.Radius, circleCmd.Color, currentTransform );
         }
         else if ( Holds<DrawCmd::CircleBorderCmd>( cmd.Payload ) )
         {
             const auto& circleBorderCmd = Get<DrawCmd::CircleBorderCmd>( cmd.Payload );
-            RenderFillCircleBorder( circleBorderCmd.Center, circleBorderCmd.Radius, circleBorderCmd.Color, circleBorderCmd.Thickness, cmd.Transform );
+            RenderFillCircleBorder( circleBorderCmd.Center, circleBorderCmd.Radius, circleBorderCmd.Color, circleBorderCmd.Thickness, currentTransform );
         }
         else if ( Holds<DrawCmd::CustomCmd>( cmd.Payload ) )
         {
             const auto& customCmd = Get<DrawCmd::CustomCmd>( cmd.Payload );
 			if ( customCmd.Func )
-                customCmd.Func( *this, cmd );
+                customCmd.Func( *this, customCmd.UserData, currentTransform );
         }
     }
 }

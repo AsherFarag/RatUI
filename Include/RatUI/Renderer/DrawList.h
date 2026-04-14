@@ -31,13 +31,23 @@ namespace RatUI
      * @param a_Renderer The renderer to use for drawing.
      * @param a_Cmd The draw command containing the necessary information for rendering.
      */
-    using CustomDrawFunc = void(*)( class IRenderer& a_Renderer, const struct DrawCmd& a_Cmd );
+    using CustomDrawFunc = void(*)( class IRenderer& a_Renderer, void* a_UserData, const Mat3f& a_CurrentTransform );
 
     /**
      * @brief Represents a single drawing command, which are buffered in a DrawList and later executed by the renderer. 
      */
     struct DrawCmd
     {
+        struct SetClipRectCmd 
+        { 
+            Optional<Rectf> Rect; ///< If nullopt, indicates that clipping should be disabled. Otherwise, the specified rectangle should be used for clipping.
+        };
+
+        struct SetTransformCmd 
+        { 
+            Mat3f Transform;
+        };
+
         struct RectCmd 
         { 
             Colorf Color;
@@ -68,12 +78,15 @@ namespace RatUI
             f32 Thickness;
         };
 
-        struct CustomCmd { CustomDrawFunc Func; void* UserData; };
-
-        Mat3f Transform{ c_Identity<Mat3f> };
-        Rectf ClipRect;
+        struct CustomCmd 
+        { 
+            CustomDrawFunc Func; 
+            void* UserData; 
+        };
 
         Variant<
+            SetClipRectCmd,
+            SetTransformCmd,
             RectCmd,
             RectBorderCmd,
             CircleCmd,
@@ -99,6 +112,8 @@ namespace RatUI
             ::RatUI::Clear( TransformStack );
         }
 
+        // === Transform Stack Operations ===
+
         const Mat3f& CurrentTransform() const 
         {
             return Empty( TransformStack ) ? c_Identity<Mat3f> : Back( TransformStack );
@@ -107,6 +122,7 @@ namespace RatUI
         DrawList& PushTransform( const Mat3f& a_Transform )
         {
             PushBack( TransformStack, CurrentTransform() * a_Transform );
+            EmplaceBack( Commands, DrawCmd::SetTransformCmd{ .Transform = CurrentTransform() } );
             return *this;
         }
 
@@ -114,13 +130,16 @@ namespace RatUI
         {
             RATUI_USER_ASSERT( !Empty( TransformStack ), "Called PopTransform too many times: no transform to pop." );
             PopBack( TransformStack );      
+            EmplaceBack( Commands, DrawCmd::SetTransformCmd{ .Transform = CurrentTransform() } );
             return *this;
         }
 
-        Rectf CurrentClipRect() const
+        // === Clip Stack Operations ===
+
+        Optional<Rectf> CurrentClipRect() const
         {
             if ( Empty( ClipStack ) )
-                return Rectf::Infinite();
+                return NullOpt;
 
             return Back( ClipStack );
         }
@@ -131,54 +150,45 @@ namespace RatUI
             if ( !Empty( ClipStack ) )
                 a_Rect = a_Rect.Intersection( Back( ClipStack ) );
 
-            PushBack( ClipStack, a_Rect );
+            EmplaceBack( ClipStack, a_Rect );
+            EmplaceBack( Commands, DrawCmd::SetClipRectCmd{ .Rect = a_Rect } );
+
             return *this;
         }
 
         DrawList& PopClipRect()
         {
             RATUI_USER_ASSERT( !Empty( ClipStack ), "Called PopClipRect too many times: no clip rect to pop." );
+
             PopBack( ClipStack );
+            EmplaceBack( Commands, DrawCmd::SetClipRectCmd{ .Rect = CurrentClipRect() } );
+
             return *this;
         }
 
+        // === Draw Commands ===
+
         DrawList& AddRect( Colorf a_Color, Rectf a_Rect, CornerRounding a_Rounding = {} )
         {
-            PushBack( Commands, DrawCmd{
-                .Transform = CurrentTransform(),
-                .ClipRect = CurrentClipRect(),
-                .Payload = DrawCmd::RectCmd{ .Color = a_Color, .Rect = a_Rect, .Rounding = a_Rounding }
-			} );
+            EmplaceBack( Commands, DrawCmd::RectCmd{ .Color = a_Color, .Rect = a_Rect, .Rounding = a_Rounding } );
             return *this;
         }
 
         DrawList& AddRectBorder( Colorf a_Color, Rectf a_Rect, CornerRounding a_Rounding = {}, f32 a_Thickness = 1.f )
         {
-            PushBack( Commands, DrawCmd{
-                .Transform = CurrentTransform(),
-                .ClipRect = CurrentClipRect(),
-                .Payload = DrawCmd::RectBorderCmd{ .Color = a_Color, .Rect = a_Rect, .Rounding = a_Rounding, .Thickness = a_Thickness }
-            } );
+            EmplaceBack( Commands, DrawCmd::RectBorderCmd{ .Color = a_Color, .Rect = a_Rect, .Rounding = a_Rounding, .Thickness = a_Thickness } );
             return *this;
         }
 
         DrawList& AddCircle( Colorf a_Color, Vec2f a_Center, f32 a_Radius )
         {
-            PushBack( Commands, DrawCmd{
-                .Transform = CurrentTransform(),
-                .ClipRect = CurrentClipRect(),
-                .Payload = DrawCmd::CircleCmd{ .Color = a_Color, .Center = a_Center, .Radius = a_Radius }
-            } );
+            EmplaceBack( Commands, DrawCmd::CircleCmd{ .Color = a_Color, .Center = a_Center, .Radius = a_Radius } );
             return *this;
         }
 
         DrawList& AddCircleBorder( Colorf a_Color, Vec2f a_Center, f32 a_Radius, f32 a_Thickness = 1.f )
         {
-            PushBack( Commands, DrawCmd{
-                .Transform = CurrentTransform(),
-                .ClipRect = CurrentClipRect(),
-                .Payload = DrawCmd::CircleBorderCmd{ .Color = a_Color, .Center = a_Center, .Radius = a_Radius, .Thickness = a_Thickness }
-            } );
+            EmplaceBack( Commands, DrawCmd::CircleBorderCmd{ .Color = a_Color, .Center = a_Center, .Radius = a_Radius, .Thickness = a_Thickness } );
             return *this;
         }
 
@@ -188,11 +198,7 @@ namespace RatUI
 
 			if ( a_Func )
             {
-                PushBack( Commands, DrawCmd{
-                    .Transform = CurrentTransform(),
-                    .ClipRect = CurrentClipRect(),
-                    .Payload = DrawCmd::CustomCmd{.Func = a_Func, .UserData = a_UserData }
-                } );
+                EmplaceBack( Commands, DrawCmd::CustomCmd{ .Func = a_Func, .UserData = a_UserData } );
             }
 
             return *this;
