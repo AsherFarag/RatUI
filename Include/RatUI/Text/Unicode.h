@@ -584,12 +584,18 @@ namespace RatUI::Unicode
         return it && IsWhitespace( *it );
     }
 
-    inline void ApplyTextTransformASCII( StringView a_Text, String& o_Out, ETextTransform a_Transform )
+    /**
+     * @brief Applies the specified ASCII text transformation to @p a_Text.
+     *        Only ASCII codepoints (U+0000–U+007F) are transformed; non-ASCII
+     *        codepoints are left unchanged.
+     * @param a_Text      The text to transform (UTF-8 or ASCII).
+     * @param a_Transform The text transformation to apply.
+     * @return The transformed text. If @p a_Transform is None, @p a_Text is returned unmodified (moved).
+     */
+    inline String ApplyTextTransformASCII( String&& a_Text, ETextTransform a_Transform )
     {
         if ( a_Transform == ETextTransform::None )
-            return; // No transformation needed.
-
-		Resize( o_Out, Size( a_Text ) ); // Ensure o_Out has the same size as a_Text for in-place transformation.
+            return std::move( a_Text ); // No transformation needed.
 
         bool newWord = true; // For ETextTransform::Capitalize
 
@@ -617,16 +623,17 @@ namespace RatUI::Unicode
                     default: break;
                 }
 
-                // Write the transformed character back to the string.
-                // Note: this assumes that the transformation does not change the byte length of the character,
-                // which is true for ASCII codepoints. For non-ASCII codepoints, no transformation is applied.
+                // Replace the original character in the string with the transformed character.
                 const size byteIndex = it.ByteIndex();
-                RawAt( o_Out, byteIndex ) = c;
+                a_Text[ byteIndex ] = c;
             }
+
 
             if ( Unicode::IsWhitespace( cp ) )
                 newWord = true;
         }
+
+        return std::move( a_Text );
     }
 
 } // namespace RatUI::Unicode

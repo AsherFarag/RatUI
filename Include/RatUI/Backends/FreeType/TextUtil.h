@@ -90,14 +90,12 @@ namespace RatUI::FreeType::TextUtil
       * TODO: Support locale-aware transformations and proper word-boundary detection for capitalization.
       *       Probably need to use ICU. I miss ascii.
      */
-    inline String ApplyTextTransform( StringView a_Text, ETextTransform a_Transform )
+    inline String ApplyTextTransform( String&& a_Text, ETextTransform a_Transform )
     {
     #if RATUI_FREETYPE_WITH_ICU
 	#error "Text transformations are not yet implemented. ICU is included in the build, but ApplyTextTransform needs to be implemented to use it."
     #else
-		String result;
-		Unicode::ApplyTextTransformASCII( a_Text, result, a_Transform );
-		return result;
+		return Unicode::ApplyTextTransformASCII( std::move( a_Text ), a_Transform );
     #endif
     }
 

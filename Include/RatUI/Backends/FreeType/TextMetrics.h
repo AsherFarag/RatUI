@@ -38,7 +38,7 @@ namespace RatUI::FreeType
 			StringView text = a_Text;
             if ( a_Style.Transform != ETextTransform::None )
             {
-                buffer = TextUtil::ApplyTextTransform( a_Text, a_Style.Transform );
+                buffer = TextUtil::ApplyTextTransform( String{ a_Text }, a_Style.Transform );
                 text = buffer;
 			}
 

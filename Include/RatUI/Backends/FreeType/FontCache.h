@@ -379,8 +379,8 @@ namespace RatUI::FreeType
             f32 xAdvance = positions[i].x_advance * scale;
             f32 yAdvance = positions[i].y_advance * scale;
 
-            // Apply letter spacing (horizontal text only)
-            if ( letterSpacing != 0.f && i + 1 < glyphCount )
+            // Apply letter spacing between clusters, not inside a multi-glyph cluster.
+            if ( letterSpacing != 0.f && i + 1 < glyphCount && infos[i].cluster != infos[i + 1].cluster )
                 xAdvance += letterSpacing;
 
             // Apply word spacing for whitespace glyphs (once per unique whitespace cluster).

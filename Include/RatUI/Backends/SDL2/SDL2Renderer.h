@@ -19,8 +19,8 @@ namespace RatUI::SDL2
             , m_FontCache ( a_FontCache )
             , m_GlyphAtlas( a_GlyphAtlas )
         {
-            Reserve( m_VertexScratch, 1024 ); // Avoid initial allocations for small draw calls.
-            Reserve( m_IndexScratch,  1024 );
+            Reserve( m_VertexScratch, 1024 * 4 ); // Avoid initial allocations for small draw calls.
+            Reserve( m_IndexScratch,  1024 * 6 );
         }
 
         SDL_Renderer*         GetSDLRenderer() const { return m_Renderer; }

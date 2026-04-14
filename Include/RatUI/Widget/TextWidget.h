@@ -93,6 +93,12 @@ namespace RatUI
                 
             maxWidth = std::max( maxWidth, 0.f );
 
+            if ( !IsApproxEqual( maxWidth, m_LastAvailableWidth ) )
+            {
+                m_LastAvailableWidth = maxWidth;
+                InvalidateShaped();
+            }
+
             // Re-shape only when prepared text changes or when available width changes (Expensive).
             if ( !m_ShapedText || !IsApproxEqual( maxWidth, m_ShapedWidth ) )
             {
@@ -168,12 +174,13 @@ namespace RatUI
             m_ShapedText.reset(); // TODO: Add Reset() method
         }
 
-        String                 m_Text;                  ///< The text content to be displayed by the widget.
-        TextLayoutStyle        m_LayoutStyle;           ///< The layout style for the text, including font, size, alignment, wrapping, etc.
-        TextRenderStyle        m_RenderStyle;           ///< The render style for the text, including color and decorations like underline or strikethrough.
-        Optional<PreparedText> m_PreparedText;          ///< Cached prepared text (segments + normalized string). Rebuilt when text or style changes.
-        Optional<ShapedText>   m_ShapedText;            ///< Cached shaped text (glyph atlas indices + line metadata). Rebuilt when prepared text or width changes.
-        f32                    m_ShapedWidth  { -1.f }; ///< The maxWidth used for the last Shape() call; used to detect when re-shaping is needed.
+        String                 m_Text;         ///< The text content to be displayed by the widget.
+        TextLayoutStyle        m_LayoutStyle;  ///< The layout style for the text, including font, size, alignment, wrapping, etc.
+        TextRenderStyle        m_RenderStyle;  ///< The render style for the text, including color and decorations like underline or strikethrough.
+        Optional<PreparedText> m_PreparedText; ///< Cached prepared text (segments + normalized string). Rebuilt when text or style changes.
+        Optional<ShapedText>   m_ShapedText;   ///< Cached shaped text (glyph atlas indices + line metadata). Rebuilt when prepared text or width changes.
+        f32 m_ShapedWidth       { -1.f }; ///< The maxWidth used for the last Shape() call; used to detect when re-shaping is needed.
+        f32 m_LastAvailableWidth{ -1.f }; ///< The last effective width constraint used during layout; used to invalidate stale shaped text.
     };
 
 } // namespace RatUI
