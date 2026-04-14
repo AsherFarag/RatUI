@@ -1,5 +1,6 @@
 #pragma once
 #include "../Core.h"
+#include "DrawBatcher.h"
 #include "Texture.h"
 
 namespace RatUI
@@ -12,8 +13,8 @@ namespace RatUI
     public:
         virtual ~IRenderer() = default;
 
-        /** @brief Executes the given draw commands, rendering all the operations contained within them. */
-        virtual void Execute( Span<const struct DrawCmd> a_Commands ) = 0;
+		/** @brief Executes the given draw batches, each DrawBatch should equate to a single draw call on the backend. */
+		virtual void Execute( const DrawBatcher& a_Batcher ) = 0;
 
         // TODO:
 

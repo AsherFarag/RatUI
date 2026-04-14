@@ -1,224 +1,177 @@
 #pragma once
 #include "../Core.h"
-#include "../Text/Text.h"
+#include "DrawBatcher.h"
 #include "RenderTransform.h"
 
 namespace RatUI
 {
-    struct CornerRounding
-    {
-        Degreesf TopLeft{ 0.f };
-        Degreesf TopRight{ 0.f };
-        Degreesf BottomLeft{ 0.f };
-        Degreesf BottomRight{ 0.f };
-
-        static constexpr CornerRounding None() { return {}; }
-        static constexpr CornerRounding Uniform( Degreesf a_Radius ) { return { a_Radius, a_Radius, a_Radius, a_Radius }; }
-        static constexpr CornerRounding Symmetric( Degreesf a_Top, Degreesf a_Bottom ) { return { a_Top, a_Top, a_Bottom, a_Bottom }; }
-
-        constexpr CornerRounding operator+( Degreesf a_Amount ) const
-        {
-            return {
-                .TopLeft = TopLeft + a_Amount,
-                .TopRight = TopRight + a_Amount,
-                .BottomLeft = BottomLeft + a_Amount,
-                .BottomRight = BottomRight + a_Amount
-            };
-        }
-    };
-
-    /**
-     * @brief Used for custom rendering commands that don't fit into the predefined categories. 
-     * @param a_Renderer The renderer to use for drawing.
-     * @param a_Cmd The draw command containing the necessary information for rendering.
-     */
-    using CustomDrawFunc = void(*)( class IRenderer& a_Renderer, const struct DrawCmd& a_Cmd );
-
-    /**
-     * @brief Represents a single drawing command, which are buffered in a DrawList and later executed by the renderer. 
-     */
-    struct DrawCmd
-    {
-        struct RectCmd 
-        { 
-            Colorf Color;
-            Rectf Rect;
-            CornerRounding Rounding;
-        };
-
-        struct RectBorderCmd 
-        { 
-            Colorf Color;
-            Rectf Rect;
-            CornerRounding Rounding;
-            f32 Thickness;
-        };
-
-        struct CircleCmd 
-        { 
-            Colorf Color;
-            Vec2f Center; 
-            f32 Radius; 
-        };
-
-        struct CircleBorderCmd 
-        { 
-            Colorf Color;
-            Vec2f Center; 
-            f32 Radius; 
-            f32 Thickness;
-        };
-
-        struct ShapedTextCmd 
-        { 
-            const ShapedText* Shaped;
-            TextRenderStyle   Style;
-            Rectf             Rect;
-        };
-
-        struct CustomCmd 
-        { 
-            CustomDrawFunc Func; 
-            void* UserData; 
-        };
-
-        Mat3f   Transform{ c_Identity<Mat3f> };
-        Rectu16 ClipRect{ Rectu16::Infinite() };
-
-        Variant<
-            RectCmd,
-            RectBorderCmd,
-            CircleCmd,
-            CircleBorderCmd,
-            ShapedTextCmd,
-            CustomCmd
-        > Payload;
-    };
-
     /**
      * @brief A DrawList is a collection of draw commands that can be recorded and then executed by the renderer.
      * It also maintains a stack of clipping rectangles and transformation matrices, allowing for hierarchical transformations and clipping.
      */
     struct DrawList
     {
-        Array<DrawCmd> Commands;       ///< Buffered draw commands to be executed by the renderer.
-        Array<Rectu16> ClipStack;      ///< Stack of clipping rectangles. The current clipping rectangle is the intersection of all rectangles in the stack.
-        Array<Mat3f>   TransformStack; ///< Stack of transformation matrices. The current transformation is the product of all matrices in the stack.
+        DrawBatcher& Batcher;
+
+        Array<Rectf> ClipStack;
+        Array<Mat3f> TransformStack;
+
+        Optional<Rectf> CurrentClip;
+        Mat3f           CurrentTransform{ c_Identity<Mat3f> };
+        TextureID       CurrentTexture  { TextureID::Null() };
+        bool            HasActiveBatch  { false };
 
         void Clear()
         {
-            ::RatUI::Clear( Commands );
             ::RatUI::Clear( ClipStack );
             ::RatUI::Clear( TransformStack );
+
+            CurrentClip.reset();
+            CurrentTransform = c_Identity<Mat3f>;
+            CurrentTexture   = TextureID::Null();
+
+            HasActiveBatch = false;
         }
 
-        const Mat3f& CurrentTransform() const 
+    private:
+
+        void FlushBatch()
         {
-            return Empty( TransformStack ) ? c_Identity<Mat3f> : Back( TransformStack );
+            if ( HasActiveBatch )
+            {
+                Batcher.EndBatch();
+                HasActiveBatch = false;
+            }
+        }
+
+        void EnsureBatch()
+        {
+            if ( !HasActiveBatch )
+            {
+                Batcher.BeginBatch( CurrentClip, CurrentTransform, CurrentTexture );
+                HasActiveBatch = true;
+            }
+        }
+
+        void UpdateBatchState()
+        {
+            FlushBatch();
+            EnsureBatch();
+        }
+
+    public:
+
+        // ========================
+        // Transform Stack
+        // ========================
+
+        const Mat3f& GetCurrentTransform() const
+        {
+            return Empty( TransformStack )
+                ? c_Identity<Mat3f>
+                : Back( TransformStack );
         }
 
         DrawList& PushTransform( const Mat3f& a_Transform )
         {
-            PushBack( TransformStack, CurrentTransform() * a_Transform );
+            PushBack( TransformStack, Empty( TransformStack ) ? a_Transform : Back( TransformStack ) * a_Transform );
+            CurrentTransform = Back( TransformStack );
+
+            UpdateBatchState();
             return *this;
         }
 
         DrawList& PopTransform()
         {
-            RATUI_USER_ASSERT( !Empty( TransformStack ), "Called PopTransform too many times: no transform to pop." );
-            PopBack( TransformStack );      
+            RATUI_USER_ASSERT( !Empty( TransformStack ),
+                "PopTransform called too many times." );
+
+            PopBack( TransformStack );
+            CurrentTransform = GetCurrentTransform();
+
+            UpdateBatchState();
             return *this;
         }
 
-        Rectu16 CurrentClipRect() const
-        {
-            if ( Empty( ClipStack ) )
-                return Rectu16::Infinite();
+        // ========================
+        // Clip Stack
+        // ========================
 
-            return Back( ClipStack );
-        }
-
-        DrawList& PushClipRect( Rectu16 a_Rect )
+        DrawList& PushClipRect( Rectf rect )
         {
-            // Intersect with current clip rect if one exists
             if ( !Empty( ClipStack ) )
-                a_Rect = a_Rect.Intersection( Back( ClipStack ) );
+                rect = rect.Intersection( Back( ClipStack ) );
 
-            PushBack( ClipStack, a_Rect );
+            PushBack( ClipStack, rect );
+            CurrentClip = rect;
+
+            UpdateBatchState();
             return *this;
         }
 
         DrawList& PopClipRect()
         {
-            RATUI_USER_ASSERT( !Empty( ClipStack ), "Called PopClipRect too many times: no clip rect to pop." );
+            RATUI_USER_ASSERT( !Empty( ClipStack ),
+                "PopClipRect called too many times." );
+
             PopBack( ClipStack );
+
+            if ( Empty( ClipStack ) ) CurrentClip.reset();
+            else                      CurrentClip = Back( ClipStack );
+
+            UpdateBatchState();
             return *this;
         }
 
-        DrawList& AddRect( Colorf a_Color, Rectf a_Rect, CornerRounding a_Rounding = {} )
+        // ========================
+        // Drawing
+        // ========================
+
+        DrawList& AddRect( Coloru8 a_Color, Rectf a_Rect )
         {
-            PushBack( Commands, DrawCmd{
-                .Transform = CurrentTransform(),
-                .ClipRect = CurrentClipRect(),
-                .Payload = DrawCmd::RectCmd{ .Color = a_Color, .Rect = a_Rect, .Rounding = a_Rounding }
-			} );
+            EnsureBatch();
+            Batcher.EmitRect( a_Rect, a_Color );
             return *this;
         }
 
-        DrawList& AddRectBorder( Colorf a_Color, Rectf a_Rect, CornerRounding a_Rounding = {}, f32 a_Thickness = 1.f )
+        DrawList& AddRect( Coloru8 a_Color, Rectf a_Rect, CornerRounding a_Rounding )
         {
-            PushBack( Commands, DrawCmd{
-                .Transform = CurrentTransform(),
-                .ClipRect = CurrentClipRect(),
-                .Payload = DrawCmd::RectBorderCmd{ .Color = a_Color, .Rect = a_Rect, .Rounding = a_Rounding, .Thickness = a_Thickness }
-            } );
+            EnsureBatch();
+            Batcher.EmitRoundedRect( a_Rect, a_Rounding, a_Color );
             return *this;
         }
 
-        DrawList& AddCircle( Colorf a_Color, Vec2f a_Center, f32 a_Radius )
+        DrawList& AddRectBorder( Coloru8 a_Color, Rectf a_Rect, f32 a_Thickness = 1.f )
         {
-            PushBack( Commands, DrawCmd{
-                .Transform = CurrentTransform(),
-                .ClipRect = CurrentClipRect(),
-                .Payload = DrawCmd::CircleCmd{ .Color = a_Color, .Center = a_Center, .Radius = a_Radius }
-            } );
+            EnsureBatch();
+            Batcher.EmitRectBorder( a_Rect, 0.f, a_Color, a_Thickness );
             return *this;
         }
 
-        DrawList& AddCircleBorder( Colorf a_Color, Vec2f a_Center, f32 a_Radius, f32 a_Thickness = 1.f )
+        DrawList& AddRectBorder( Coloru8 a_Color, Rectf a_Rect, CornerRounding a_Rounding, f32 a_Thickness = 1.f )
         {
-            PushBack( Commands, DrawCmd{
-                .Transform = CurrentTransform(),
-                .ClipRect = CurrentClipRect(),
-                .Payload = DrawCmd::CircleBorderCmd{ .Color = a_Color, .Center = a_Center, .Radius = a_Radius, .Thickness = a_Thickness }
-            } );
+            EnsureBatch();
+            Batcher.EmitRoundedRectBorder( a_Rect, a_Rounding, a_Color, a_Thickness );
             return *this;
         }
 
-        DrawList& AddText( const ShapedText* a_Shaped, const TextRenderStyle& a_Style, Rectf a_Rect )
+        DrawList& AddCircle( Coloru8 a_Color, Vec2f a_Center, f32 a_Radius )
         {
-            RATUI_USER_ASSERT( a_Shaped, "AddText requires a valid ShapedText pointer." );
-            
-            PushBack( Commands, DrawCmd{
-                .Transform = CurrentTransform(),
-                .ClipRect = CurrentClipRect(),
-                .Payload = DrawCmd::ShapedTextCmd{ .Shaped = a_Shaped, .Style = a_Style, .Rect = a_Rect }
-            } );
-
+            EnsureBatch();
+            Batcher.EmitCircle( a_Center, a_Radius, a_Color );
             return *this;
         }
 
-		DrawList& AddCustom( CustomDrawFunc a_Func, void* a_UserData = nullptr )
+        DrawList& AddCircleBorder( Coloru8 a_Color, Vec2f a_Center, f32 a_Radius, f32 a_Thickness = 1.f )
         {
-			RATUI_USER_ASSERT( a_Func, "Custom draw command requires a valid function pointer." );
-
-			PushBack( Commands, DrawCmd{
-                    .Transform = CurrentTransform(),
-                    .ClipRect = CurrentClipRect(),
-                    .Payload = DrawCmd::CustomCmd{.Func = a_Func, .UserData = a_UserData }
-            } );
-
+            EnsureBatch();
+            Batcher.EmitCircleBorder( a_Center, a_Radius, a_Color, a_Thickness );
             return *this;
+        }
+
+        void Finish()
+        {
+            FlushBatch();
         }
     };
 
