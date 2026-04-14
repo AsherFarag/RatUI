@@ -609,7 +609,7 @@ namespace RatUI::SDL2
             lineY += a_Shaped.LineHeight;
         }
 
-        // 3. Flush the vertex/index buffers to the GPU in one draw call, then clear them for the next batch.
+        // 3: Flush the vertex/index buffers to the GPU in one draw call, then clear them for the next batch.
         if ( !Empty( m_VertexScratch ) && !Empty( m_IndexScratch ) )
         {
             SDL_RenderGeometry( m_Renderer, atlasTexture, 
