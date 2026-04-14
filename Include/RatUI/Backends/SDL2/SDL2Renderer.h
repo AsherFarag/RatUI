@@ -101,6 +101,10 @@ namespace RatUI::SDL2
         SDL_Rect prevClip;
         SDL_RenderGetClipRect( m_Renderer, &prevClip );
 
+		SDL_BlendMode prevBlendMode;
+		SDL_GetRenderDrawBlendMode( m_Renderer, &prevBlendMode );
+        SDL_SetRenderDrawBlendMode( m_Renderer, SDL_BLENDMODE_BLEND );
+
         for ( const DrawCmd& cmd : a_Commands )
         {
             if ( cmd.ClipRect.IsInfinite() )
@@ -124,6 +128,7 @@ namespace RatUI::SDL2
             else if ( Holds<DrawCmd::CustomCmd>      ( cmd.Payload ) ) { const auto& c = Get<DrawCmd::CustomCmd>      ( cmd.Payload ); if ( c.Func ) c.Func( *this, cmd ); }
         }
 
+		SDL_SetRenderDrawBlendMode( m_Renderer, prevBlendMode );
         SDL_RenderSetClipRect( m_Renderer, &prevClip );
     }
 
@@ -436,8 +441,6 @@ namespace RatUI::SDL2
         Rectf                  a_Rect,
         const Mat3f&           a_Transform )
     {
-        // TODO: Could optimize this by batching into one mesh (one draw call instead of one per glyph).
-
         if ( !m_Renderer || !m_GlyphAtlas )
             return;
 
@@ -469,7 +472,7 @@ namespace RatUI::SDL2
             PushBack( m_IndexScratch, baseIndex + 3 );                    
         };
 
-        // 1. Compute initial Y position based on baseline alignment.
+        // 1: Compute initial Y position based on baseline alignment.
 
         f32 lineY = a_Rect.Origin[1];
         switch ( a_Style.Baseline )
@@ -490,7 +493,7 @@ namespace RatUI::SDL2
                 break;
         }
 
-        // 2. Iterate lines and append quads for glyphs to vertex/index scratch buffers
+        // 2: Iterate lines and append quads for glyphs to vertex/index scratch buffers
 
         for ( const ShapedLine& line : a_Shaped.Lines )
         {
@@ -503,12 +506,14 @@ namespace RatUI::SDL2
                 default: break;
             }
 
-            const f32   lineX     = a_Rect.Origin[0] + xOffset;
-            const Vec2f origin    = { lineX, lineY + a_Shaped.Ascender };
-            const f32   fadeWidth = a_Rect.Size[0] * a_Style.FadePercentage;
-            const f32   fadeStart = lineX + a_Rect.Size[0] - fadeWidth;
-            const f32   fadeEnd   = lineX + a_Rect.Size[0];
+            const f32   lineX     = a_Rect.Origin[0] + xOffset;               // Left edge of the line's bounding box, in world space.
+            const Vec2f origin    = { lineX, lineY + a_Shaped.Ascender };     // Baseline origin for the line, in world space.
+            const f32   fadeWidth = a_Rect.Size[0] * a_Style.FadePercentage;  // Width of the fade-out region at the right end of the line, in world space.
+            const f32   fadeStart = lineX + a_Rect.Size[0] - fadeWidth;       // X position where fade-out starts, in world space.
+            const f32   fadeEnd   = lineX + a_Rect.Size[0];                   // X position where fade-out ends (fully transparent), in world space.
 
+            // Helper to compute alpha for a given X position based on fade-out settings.
+            // Returns 1.0f for fully opaque, 0.0f for fully transparent.
             auto computeFade = [&](f32 x) -> f32
             {
                 if (x <= fadeStart)
@@ -519,16 +524,19 @@ namespace RatUI::SDL2
                 return 1.f - t;
             };
 
+            // 2.1: Draw glyphs in the line as quads with texture coordinates from the glyph atlas, applying fade-out if enabled.
+
             // Add quads for each glyph in the line, applying fade-out if enabled and we're in the fade region.
+            Span<const ShapedGlyph> lineGlyphs{ a_Shaped.Glyphs.data() + line.Start, line.End - line.Start };
             FreeType::RenderShapedTextLine(
-                *m_GlyphAtlas,
-                Span<const ShapedGlyph>{ a_Shaped.Glyphs.data() + line.Start, line.End - line.Start },
-                origin,
+                *m_GlyphAtlas, lineGlyphs, origin,
                 [&]( const FreeType::GlyphQuad& q )
                 {
                     const f32 alpha = computeFade( q.PosMin[0] + ( q.PosMax[0] - q.PosMin[0] ) * 0.5f );
                     pushQuad( q.PosMin, q.PosMax, q.UVMin, q.UVMax, alpha );
                 } );
+
+            // 2.2: Add decorations (underline, strikethrough) as horizontal quads, applying the same fade-out logic.
 
             // Text decorations (underline / strikethrough)
             if ( a_Style.Underline || a_Style.Strikethrough )
@@ -536,27 +544,66 @@ namespace RatUI::SDL2
                 const f32 baselineY = origin[1];
                 const f32 thickness = a_Shaped.UnderlineThickness;
 
-                if ( a_Style.Underline )
+                // Helper to draw a horizontal line with optional fade-out at the right end, used for both underline and strikethrough.
+                const auto drawFadedLine = [&]( f32 y )
                 {
-                    const f32 y = baselineY + a_Shaped.UnderlinePosition;
-                    pushQuad( 
-                        Vec2f{ origin[0], y - thickness * 0.5f }, 
-                        Vec2f{ origin[0] + line.Width, y + thickness * 0.5f }, 
-                        Vec2f{ 0.f, 0.f }, 
-                        Vec2f{ 1.f, 1.f },
-                        sdlColor.a );
-                }
+                    const f32 lineStart = lineX;
+                    const f32 lineEnd   = lineX + line.Width;
+                
+                    if (lineEnd <= lineStart)
+                        return;
+                
+                    const f32 halfT = thickness * 0.5f;
+                
+                    const f32 solidEnd = std::min(fadeStart, lineEnd);
+                    const f32 fadeEndX = std::min(fadeEnd, lineEnd);
+                
+                    SDL_Color transparent = sdlColor;
+                    transparent.a = 0;
+                
+                    SDL_Vertex vertices[8];
+                    int indices[12];
+                    int v = 0;
+                    int i = 0;
+                
+                    // Solid part of the line (fully opaque)
+                    if ( solidEnd > lineStart )
+                    {
+                        vertices[v+0] = { TransformPoint( lineStart, y - halfT, a_Transform ), sdlColor, {0,0} };
+                        vertices[v+1] = { TransformPoint( solidEnd,  y - halfT, a_Transform ), sdlColor, {0,0} };
+                        vertices[v+2] = { TransformPoint( solidEnd,  y + halfT, a_Transform ), sdlColor, {0,0} };
+                        vertices[v+3] = { TransformPoint( lineStart, y + halfT, a_Transform ), sdlColor, {0,0} };
+                    
+                        indices[i+0] = v+0; indices[i+1] = v+1; indices[i+2] = v+2;
+                        indices[i+3] = v+0; indices[i+4] = v+2; indices[i+5] = v+3;
+                    
+                        v += 4;
+                        i += 6;
+                    }
+                
+                    // Fading part of the line (alpha interpolates to 0)
+                    if ( fadeEndX > solidEnd )
+                    {
+                        vertices[v+0] = { TransformPoint( solidEnd, y - halfT, a_Transform ), sdlColor,    {0,0} };
+                        vertices[v+1] = { TransformPoint( fadeEndX, y - halfT, a_Transform ), transparent, {0,0} };
+                        vertices[v+2] = { TransformPoint( fadeEndX, y + halfT, a_Transform ), transparent, {0,0} };
+                        vertices[v+3] = { TransformPoint( solidEnd, y + halfT, a_Transform ), sdlColor,    {0,0} };
+                    
+                        indices[i+0] = v+0; indices[i+1] = v+1; indices[i+2] = v+2;
+                        indices[i+3] = v+0; indices[i+4] = v+2; indices[i+5] = v+3;
+                    
+                        v += 4;
+                        i += 6;
+                    }
+                
+                    SDL_RenderGeometry(m_Renderer, nullptr, vertices, v, indices, i);
+                };
 
-                if ( a_Style.Strikethrough )
-                {
-                    const f32 y = baselineY - a_Shaped.Ascender * 0.35f;
-                    pushQuad( 
-                        Vec2f{ origin[0], y - thickness * 0.5f }, 
-                        Vec2f{ origin[0] + line.Width, y + thickness * 0.5f }, 
-                        Vec2f{ 0.f, 0.f }, 
-                        Vec2f{ 1.f, 1.f },
-                        sdlColor.a );
-                }
+                if (a_Style.Underline)
+                    drawFadedLine(baselineY + a_Shaped.UnderlinePosition);
+
+                if (a_Style.Strikethrough)
+                    drawFadedLine(baselineY - a_Shaped.Ascender * 0.35f);
             }
 
             lineY += a_Shaped.LineHeight;

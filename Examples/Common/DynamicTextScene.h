@@ -169,7 +169,7 @@ private:
         f32         textFixedW = 0.f )
     {
         WidgetID row = m_Scene.CreateWidget<RectWidget>(
-            card, Colorsf::Transparent, "Row"
+            card, Colorsf::Surface800, "Row"
         );
         {
             auto* n = Node( row );
@@ -255,23 +255,6 @@ private:
             ts.Render.Align = e.align;
             ts.Layout.Wrap = TextWrap::WrapWord();
             AddRow( card, e.label, kSent, ts, ESizingMode::Flex );
-        }
-
-        // Now do ETextBaseline
-        static const char* kBase = "Lorem ipsum dolor sit amet, consectetur adipiscing elit.";
-        constexpr struct { ETextBaseline base; const char* label; } kBases[] = {
-            { ETextBaseline::Top,        "Top"        },
-            { ETextBaseline::Middle,     "Middle"     },
-            { ETextBaseline::Bottom,     "Bottom"     },
-            { ETextBaseline::Alphabetic, "Alphabetic" },
-            { ETextBaseline::Hanging,    "Hanging"    },
-        };
-
-        for ( auto& e : kBases )
-        {
-            TextStyle ts = MakeStyle( 14.f );
-            ts.Render.Baseline = e.base;
-            AddRow( card, e.label, kBase, ts, ESizingMode::Flex );
         }
     }
 
@@ -417,37 +400,41 @@ private:
 
         // Violet underline + WrapWord
         {
-            TextStyle ts = MakeStyle( 14.f );
-            ts.Render.Color     = Colorsu8::AccentViolet;
-            ts.Render.Underline = true;
-            ts.Layout.Wrap = TextWrap::WrapWord();
-            AddRow( card, "Italic+UL", kLong, ts, ESizingMode::Flex );
+            TextStyle ts             = MakeStyle( 14.f );
+            ts.Render.Color          = Colorsu8::AccentViolet;
+            ts.Render.Underline      = true;
+            ts.Render.FadePercentage = 0.5f; // 50% faded underline
+            ts.Layout.Wrap           = TextWrap::NoWrap();
+            ts.Layout.Overflow       = ETextOverflow::Fade;
+            AddRow( card, "Fade+UL", kLong, ts, ESizingMode::Fixed, 200.f );
         }
         // Rose strikethrough + uppercase + WrapWord
         {
-            TextStyle ts = MakeStyle( 14.f );
-            ts.Render.Color         = Colorsu8::AccentRose;
-            ts.Render.Strikethrough = true;
-            ts.Layout.Transform     = ETextTransform::Uppercase;
-            ts.Layout.Wrap = TextWrap::WrapWord();
-            AddRow( card, "Bold+ST+UC", kLong, ts, ESizingMode::Flex );
+            TextStyle ts             = MakeStyle( 14.f );
+            ts.Render.Color          = Colorsu8::AccentRose;
+            ts.Render.Strikethrough  = true;
+            ts.Layout.Transform      = ETextTransform::Uppercase;
+            ts.Layout.Wrap           = TextWrap::NoWrap();
+            ts.Layout.Overflow       = ETextOverflow::Fade;
+            ts.Render.FadePercentage = 0.5f; // 50% faded strikethrough
+            AddRow( card, "Fade+ST+UC", kLong, ts, ESizingMode::Fixed, 200.f );
         }
         // Amber wide spacing + capitalize + ellipsis
         {
-            TextStyle ts = MakeStyle( 13.f );
+            TextStyle ts            = MakeStyle( 13.f );
             ts.Render.Color         = Colorsu8::AccentAmber;
             ts.Layout.LetterSpacing = 3.f;
             ts.Layout.Transform     = ETextTransform::Capitalize;
-            ts.Layout.Wrap = TextWrap::NoWrap();
+            ts.Layout.Wrap          = TextWrap::NoWrap();
             ts.Layout.Overflow      = ETextOverflow::Ellipsis;
             AddRow( card, "Wide+Cap", "the quick brown fox jumps over", ts, ESizingMode::Flex );
         }
         // Sky center-aligned large display
         {
-            TextStyle ts = MakeStyle( 22.f );
+            TextStyle ts         = MakeStyle( 22.f );
             ts.Render.Color      = Colorsu8::AccentSky;
             ts.Render.Align      = ETextAlign::Center;
-            ts.Layout.Wrap = TextWrap::WrapWord();
+            ts.Layout.Wrap       = TextWrap::WrapWord();
             ts.Layout.LineHeight = 30.f;
             AddRow( card, "Center 22px", "The beauty of typography lives in every detail.", ts, ESizingMode::Flex );
         }
