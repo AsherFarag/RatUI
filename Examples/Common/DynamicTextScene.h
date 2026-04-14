@@ -489,27 +489,47 @@ private:
         {
             auto* n = Node( m_AnimContainer );
             n->Style.WidthMode  = ESizingMode::Fixed;
-            n->Style.FixedWidth = 200.f;
+            n->Style.FixedWidth = 400.f;
             n->Style.HeightMode = ESizingMode::Content;
-            n->Style.LayoutType = ELayoutType::Overlay;
+            n->Style.LayoutType = ELayoutType::Horizontal;
             n->Style.Padding    = Edges{ 4.f };
+            n->Style.Spacing    = 4.f;
         }
 
-        TextStyle ts = MakeStyle( 13.f );
+        TextStyle ts       = MakeStyle( 13.f );
         ts.Render.Color    = Colorsu8::AccentBlue;
-        ts.Layout.Wrap = TextWrap::NoWrap();
+        ts.Layout.Wrap     = TextWrap::NoWrap();
         ts.Layout.Overflow = ETextOverflow::Ellipsis;
 
-        WidgetID txt = m_Scene.CreateWidget<TextWidget>(
-            m_AnimContainer,
-            "Pack my box with five dozen liquor jugs  —  sphinx of black quartz, judge my vow!",
-			ts.Layout, ts.Render
-        );
         {
-            auto* n = Node( txt );
-            n->Style.WidthMode  = ESizingMode::Flex;
-            n->Style.HeightMode = ESizingMode::Content;
+            WidgetID txt = m_Scene.CreateWidget<TextWidget>(
+            m_AnimContainer,
+            "The quick brown fox jumps over the lazy dog.",
+			ts.Layout, ts.Render
+            );
+            {
+                auto* n = Node( txt );
+                n->Style.WidthMode  = ESizingMode::Flex;
+                n->Style.HeightMode = ESizingMode::Content;
+                n->Style.FlexGrow = 1.f;
+            }
         }
+        
+        {
+            ts.Render.Color    = Colorsu8::AccentEmerald;
+            WidgetID txt = m_Scene.CreateWidget<TextWidget>(
+            m_AnimContainer,
+            "Amazingly few discotheques provide jukeboxes.",
+			ts.Layout, ts.Render
+            );
+            {
+                auto* n = Node( txt );
+                n->Style.WidthMode  = ESizingMode::Flex;
+                n->Style.HeightMode = ESizingMode::Content;
+                n->Style.FlexGrow = 2.f;
+            }
+        }
+
     }
 
     // =========================================================================
@@ -597,7 +617,7 @@ public:
             if ( LayoutNode* n = m_Scene.Layouts.Get( w->GetLayoutID() ) )
             {
                 const f32 t = ( std::sin( m_Time * 0.6f ) + 1.f ) * 0.5f;
-                n->Style.FixedWidth = 80.f + t * 420.f;
+                n->Style.FixedWidth = 80.f + t * 720.f;
                 n->Layout.IsDirty   = true;
             }
         }

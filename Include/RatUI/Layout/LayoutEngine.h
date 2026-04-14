@@ -210,7 +210,15 @@ namespace RatUI
                 return;
             }
 
-            Rectf childRect = AlignRect(child.Layout.DesiredSize, a_Inner, ResolveAlign(child, a_Node));
+            Vec2f childSize = child.Layout.DesiredSize;
+
+            // Flex children fill the entire overlay container on their flex axis,
+            // consistent with the cross-axis stretch behaviour in ArrangeLinear.
+            if ( child.Style.WidthMode  == ESizingMode::Flex ) childSize[0] = a_Inner.Size[0];
+            if ( child.Style.HeightMode == ESizingMode::Flex ) childSize[1] = a_Inner.Size[1];
+            
+            const Rectf childRect = AlignRect(childSize, a_Inner, ResolveAlign(child, a_Node));
+
             ArrangeLayoutNode(child, childRect);
         });
     }
@@ -236,14 +244,10 @@ namespace RatUI
         const LayoutStyle& s    = a_Node.Style;
         const bool         isHz = s.LayoutType == ELayoutType::Horizontal;
 
-        // returns true for children that fill the main axis without an explicit flex basis.
-        // These are excluded from totalFixed so their over-measured DesiredSize never prevents
-        // siblings from receiving their correct share of available space.
         const auto isPureStretchMain = [&]( const LayoutNode& child ) -> bool
         {
-            return ( child.Style.FlexGrow == 0.f ) &&
-                   ( ( isHz && child.Style.WidthMode  == ESizingMode::Flex ) ||
-                     ( !isHz && child.Style.HeightMode == ESizingMode::Flex ) );
+            return ( isHz  && child.Style.WidthMode  == ESizingMode::Flex ) ||
+                   ( !isHz && child.Style.HeightMode == ESizingMode::Flex );
         };
 
         // Pass 1: sum fixed space and total grow weight
@@ -272,8 +276,8 @@ namespace RatUI
                       - ( s.Spacing * std::max( 0u, numFlow - 1 ) );
         f32 leftover  = std::max( 0.f, available - totalFixed );
 
-        // Flex children that were measured as Content (due to circular dependency) also
-        // claim a share of leftover space - treat them as FlexGrow 1 if they have no grow set.
+        // Add implicit grow weight for WidthMode::Flex children that carry no explicit FlexGrow.
+        // Children with FlexGrow > 0 already contributed to totalGrow in pass 1; they are skipped.
         a_Node.ForEachChild( [&]( const LayoutNode& child )
         {
             if ( child.Style.PositionMode == EPositioningMode::Anchored ) return;

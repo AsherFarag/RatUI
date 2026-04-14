@@ -76,10 +76,21 @@ namespace RatUI
             f32 maxWidth = 0.f;
 
             if ( a_Node.Style.WidthMode == ESizingMode::Fixed )
+            {
                 maxWidth = a_Node.Style.FixedWidth;
+            }
+            else if ( a_Node.Style.WidthMode == ESizingMode::Flex && a_Node.Layout.FinalRect.Size[0] > 0.f )
+            {
+                // TODO: This is a bit of a hack to work around the circular dependency 
+                // where we need to know the final width of the node to shape the text, 
+                // but the final width depends on the intrinsic size which depends on shaping the text.
+                maxWidth = a_Node.Layout.FinalRect.Size[0] - a_Node.Style.Padding.Horizontal();
+            }
             else
+            {
                 maxWidth = a_AvailableSize[0] - a_Node.Style.Padding.Horizontal();
-
+            }
+                
             maxWidth = std::max( maxWidth, 0.f );
 
             // Re-shape only when prepared text changes or when available width changes (Expensive).
@@ -138,9 +149,10 @@ namespace RatUI
                     break;
                 }
                 default:
-					a_DrawList.AddRect( Colorsf::DarkRed, textRect ); // Debug: Draw a red rect around the text bounds to visualize where the text is being drawn and how overflow is being handled.
+                {
                     a_DrawList.AddText( &( *m_ShapedText ), effectiveRenderStyle, textRect );
                     break;
+                }
             }
         }
 
