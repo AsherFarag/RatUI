@@ -8,6 +8,64 @@
 namespace RatUI::SDL2
 {
     /**
+     * @brief RAII helper to save and restore SDL_Renderer state around custom rendering operations.
+     */
+    struct SDLRenderStateScope
+    {
+        SDL_Renderer* Renderer{ nullptr };
+        SDL_Texture*  Target{ nullptr };
+        SDL_Color     DrawColor{};
+        SDL_BlendMode BlendMode{};
+        SDL_Rect      Viewport{};
+        SDL_Rect      ClipRect{};
+        bool          ClipEnabled{ false };
+        f32           ScaleX{ 1.f };
+        f32           ScaleY{ 1.f };
+
+        SDLRenderStateScope( SDL_Renderer* a_Renderer )
+        {
+            Renderer = a_Renderer;
+            Target = SDL_GetRenderTarget( Renderer );
+        
+            SDL_GetRenderDrawColor( Renderer,
+                &DrawColor.r,
+                &DrawColor.g,
+                &DrawColor.b,
+                &DrawColor.a );
+            
+            SDL_GetRenderDrawBlendMode( Renderer, &BlendMode );
+            
+            SDL_RenderGetViewport( Renderer, &Viewport );
+            
+            ClipEnabled = SDL_RenderIsClipEnabled( Renderer );
+            if ( ClipEnabled )
+                SDL_RenderGetClipRect( Renderer, &ClipRect );
+            
+            SDL_RenderGetScale( Renderer, &ScaleX, &ScaleY );
+        }
+
+        ~SDLRenderStateScope()
+        {
+            SDL_SetRenderTarget(Renderer, Target);
+
+            SDL_SetRenderDrawColor(Renderer,
+                DrawColor.r,
+                DrawColor.g,
+                DrawColor.b,
+                DrawColor.a);
+
+            SDL_SetRenderDrawBlendMode(Renderer, BlendMode);
+
+            SDL_RenderSetViewport(Renderer, &Viewport);
+
+            if (ClipEnabled) SDL_RenderSetClipRect(Renderer, &ClipRect);
+            else             SDL_RenderSetClipRect(Renderer, nullptr);
+
+            SDL_RenderSetScale(Renderer, ScaleX, ScaleY);
+        }
+    };
+
+    /**
      * @brief SDL2-backed renderer.
      */
     class SDL2Renderer : public IRenderer
@@ -98,12 +156,8 @@ namespace RatUI::SDL2
         if ( !m_Renderer )
             return;
 
-        SDL_Rect prevClip;
-        SDL_RenderGetClipRect( m_Renderer, &prevClip );
-
-		SDL_BlendMode prevBlendMode;
-		SDL_GetRenderDrawBlendMode( m_Renderer, &prevBlendMode );
-        SDL_SetRenderDrawBlendMode( m_Renderer, SDL_BLENDMODE_BLEND );
+        // Save/restore SDL_Renderer state around our custom rendering.
+        SDLRenderStateScope stateScope( m_Renderer );
 
         for ( const DrawCmd& cmd : a_Commands )
         {
@@ -127,9 +181,6 @@ namespace RatUI::SDL2
             else if ( Holds<DrawCmd::ShapedTextCmd>  ( cmd.Payload ) ) { const auto& c = Get<DrawCmd::ShapedTextCmd>  ( cmd.Payload ); if ( c.Shaped ) RenderShapedText( *c.Shaped, c.Style, c.Rect, cmd.Transform ); }
             else if ( Holds<DrawCmd::CustomCmd>      ( cmd.Payload ) ) { const auto& c = Get<DrawCmd::CustomCmd>      ( cmd.Payload ); if ( c.Func ) c.Func( *this, cmd ); }
         }
-
-		SDL_SetRenderDrawBlendMode( m_Renderer, prevBlendMode );
-        SDL_RenderSetClipRect( m_Renderer, &prevClip );
     }
 
     inline Optional<TextureID> SDL2Renderer::CreateTexture( u32 a_Width, u32 a_Height, ETextureFormat a_Format, const void* a_Data )
