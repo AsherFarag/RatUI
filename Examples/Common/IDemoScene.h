@@ -29,14 +29,14 @@ protected:
 class RectWidget : public IWidget
 {
 public:
-	RectWidget( Colorf a_Color, StringView a_Name, CornerRounding a_Rounding = CornerRounding::Uniform( 10_deg ) )
+	RectWidget( Coloru8 a_Color, StringView a_Name, CornerRounding a_Rounding = CornerRounding::Uniform( 10_deg ) )
 		: Color( a_Color )
 		, Name( a_Name )
         , Rounding( a_Rounding )
     {}
 
 	StringView     Name;
-    Colorf         Color;
+    Coloru8         Color;
     CornerRounding Rounding;
 
 	void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
@@ -48,7 +48,7 @@ public:
         const Rectf& rect = node->Layout.FinalRect;
 
 		if ( a_Scene.GetFocusedWidget() == GetID() )
-			a_DrawList.AddRect( Colorsf::White, rect.Expanded( 4.f ), Rounding + 4_deg );
+			a_DrawList.AddRect( Colorsu8::White, rect.Expanded( 4.f ), Rounding + 4_deg );
 
 		a_DrawList.AddRect( Color, rect, Rounding );
 
@@ -71,10 +71,10 @@ class CircleWidget : public IWidget
 public:
 
     f32    Radius;
-    Colorf Color;
+    Coloru8 Color;
     bool   IsFilled;
 
-    CircleWidget( f32 a_Radius, Colorf a_Color, bool a_Filled = true )
+    CircleWidget( f32 a_Radius, Coloru8 a_Color, bool a_Filled = true )
         : Radius( a_Radius )
         , Color( a_Color )
         , IsFilled( a_Filled )
@@ -92,7 +92,7 @@ public:
         if ( IsFilled )
         {
             if ( a_Scene.GetFocusedWidget() == GetID() )
-			    a_DrawList.AddCircle( Colorsf::LightYellow, center, Radius + 4.f );
+			    a_DrawList.AddCircle( Colorsu8::LightYellow, center, Radius + 4.f );
 
             a_DrawList.AddCircle( Color, center, Radius );
         }
@@ -100,7 +100,7 @@ public:
         {
             const f32 borderThickness = 4.f;
             if ( a_Scene.GetFocusedWidget() == GetID() )
-                a_DrawList.AddCircleBorder( Colorsf::LightYellow, center, Radius + 4.f, borderThickness + 2.f );
+                a_DrawList.AddCircleBorder( Colorsu8::LightYellow, center, Radius + 4.f, borderThickness + 2.f );
 
             a_DrawList.AddCircleBorder( Color, center, Radius, borderThickness );
         }

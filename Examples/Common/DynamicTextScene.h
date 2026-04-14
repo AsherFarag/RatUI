@@ -103,7 +103,7 @@ private:
     WidgetID BeginCard( WidgetID parent, const char* title )
     {
         WidgetID card = m_Scene.CreateWidget<RectWidget>(
-            parent, Colorsf::Surface700, "Card",
+            parent, Colorsu8::Surface700, "Card",
             CornerRounding::Uniform( 6_deg )
         );
         {
@@ -118,7 +118,7 @@ private:
         AddText( card, title, SectionHeadingStyle(), ESizingMode::Flex );
 
         WidgetID div = m_Scene.CreateWidget<RectWidget>(
-            card, Colorsf::Surface500, "Div", CornerRounding::None()
+            card, Colorsu8::Surface500, "Div", CornerRounding::None()
         );
         {
             auto* n = Node( div );
@@ -134,7 +134,7 @@ private:
     std::pair<WidgetID, WidgetID> MakeCols( WidgetID parent )
     {
         WidgetID row = m_Scene.CreateWidget<RectWidget>(
-            parent, Colorsf::Surface900, "ColRow"
+            parent, Colorsu8::Surface900, "ColRow"
         );
         {
             auto* n = Node( row );
@@ -146,7 +146,7 @@ private:
 
         auto MakeCol = [&]() -> WidgetID
         {
-            WidgetID c = m_Scene.CreateWidget<RectWidget>( row, Colorsf::Surface900, "Col" );
+            WidgetID c = m_Scene.CreateWidget<RectWidget>( row, Colorsu8::Surface900, "Col" );
             auto* n = Node( c );
             n->Style.LayoutType = ELayoutType::Vertical;
             n->Style.Spacing    = 12.f;
@@ -169,7 +169,7 @@ private:
         f32         textFixedW = 0.f )
     {
         WidgetID row = m_Scene.CreateWidget<RectWidget>(
-            card, Colorsf::Surface800, "Row"
+            card, Colorsu8::Surface800, "Row"
         );
         {
             auto* n = Node( row );
@@ -448,7 +448,7 @@ private:
         );
 
         // Row container
-        WidgetID row = m_Scene.CreateWidget<RectWidget>( card, Colorsf::Transparent, "ARow" );
+        WidgetID row = m_Scene.CreateWidget<RectWidget>( card, Colorsu8::Transparent, "ARow" );
         {
             auto* n = Node( row );
             n->Style.LayoutType = ELayoutType::Horizontal;
@@ -470,7 +470,7 @@ private:
 
         // Animated box
         m_AnimContainer = m_Scene.CreateWidget<RectWidget>(
-            row, Colorsf::Surface600, "AnimBox",
+            row, Colorsu8::Surface600, "AnimBox",
             CornerRounding::Uniform( 4_deg )
         );
         {
@@ -526,7 +526,7 @@ public:
     {
         // Root
         WidgetID root = m_Scene.CreateRootWidget<RectWidget>(
-            Colorsf::Surface900, "Root", CornerRounding::None()
+            Colorsu8::Surface900, "Root", CornerRounding::None()
         );
         {
             auto* n = Node( root );
@@ -540,7 +540,7 @@ public:
         // Title bar
         {
             WidgetID bar = m_Scene.CreateWidget<RectWidget>(
-                root, Colorsf::Surface800, "TitleBar", CornerRounding::None()
+                root, Colorsu8::Surface800, "TitleBar", CornerRounding::None()
             );
             auto* n = Node( bar );
             n->Style.LayoutType = ELayoutType::Vertical;
@@ -568,7 +568,7 @@ public:
 
         // Scrollable / content column
         WidgetID content = m_Scene.CreateWidget<RectWidget>(
-            root, Colorsf::Surface900, "Content"
+            root, Colorsu8::Surface900, "Content"
         );
         {
             auto* n = Node( content );

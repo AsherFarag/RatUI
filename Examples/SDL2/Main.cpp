@@ -81,10 +81,11 @@ protected:
             return;
         }
 
-		DrawList drawList;
+        DrawBatcher drawBatcher;
+        DrawList drawList{ drawBatcher };
         m_Scene->Render( drawList );
 
-        a_Renderer.Execute( drawList.Commands );
+        a_Renderer.Execute( drawBatcher );
     }
 
     bool OnShutdown() override

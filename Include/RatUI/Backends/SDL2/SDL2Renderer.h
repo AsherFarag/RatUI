@@ -77,8 +77,7 @@ namespace RatUI::SDL2
             , m_FontCache ( a_FontCache )
             , m_GlyphAtlas( a_GlyphAtlas )
         {
-            Reserve( m_VertexScratch, 1024 * 4 ); // Avoid initial allocations for small draw calls.
-            Reserve( m_IndexScratch,  1024 * 6 );
+            Reserve( m_IndexBuffer,  1024 * 6 );
         }
 
         SDL_Renderer*         GetSDLRenderer() const { return m_Renderer; }
@@ -89,50 +88,12 @@ namespace RatUI::SDL2
         void SetFontCache( FreeType::FontCache* a_Cache )   { m_FontCache  = a_Cache;    }
         void SetGlyphAtlas( FreeType::GlyphAtlas* a_Atlas ) { m_GlyphAtlas = a_Atlas;    }
 
-        void Execute( Span<const DrawCmd> a_Commands ) override;
+        void Execute( const DrawBatcher& a_Batcher ) override;
 
         Optional<TextureID> CreateTexture( u32 a_Width, u32 a_Height, ETextureFormat a_Format, const void* a_Data ) override;
         bool UpdateTexture( TextureID a_Texture, u32 a_MipLevel, Rectu a_Region, const void* a_Data, size a_DataSizeBytes ) override;
         void DestroyTexture( TextureID a_Texture ) override;
         bool IsValidTexture( TextureID a_Texture ) const override;
-
-        void RenderFillRoundedRect(
-            Rectf a_Rect, CornerRounding a_Rounding, Colorf a_Color, const Mat3f& a_Transform );
-
-        void RenderFillRoundedRectBorder(
-            Rectf a_Rect, CornerRounding a_Rounding, Colorf a_Color, f32 a_Thickness, const Mat3f& a_Transform );
-
-        void RenderFillCircle(
-            Vec2f a_Center, f32 a_Radius, Colorf a_Color, const Mat3f& a_Transform );
-
-        void RenderFillCircleBorder(
-            Vec2f a_Center, f32 a_Radius, Colorf a_Color, f32 a_Thickness, const Mat3f& a_Transform );
-
-        void RenderShapedText(
-            const ShapedText& a_ShapedText, const TextRenderStyle& a_Style, Rectf a_Rect, const Mat3f& a_Transform );
-
-        // === Helpers
-
-        static SDL_FPoint TransformPoint( f32 a_X, f32 a_Y, const Mat3f& a_Transform )
-        {
-            Vec3f p = a_Transform * Vec3f{ a_X, a_Y, 1.f };
-            return SDL_FPoint{ p[0], p[1] };
-        };
-
-        static SDL_Color ToSDLColor( Colorf a_Color )
-        {
-            return SDL_Color{
-                static_cast<Uint8>( a_Color[0] * 255.f ),
-                static_cast<Uint8>( a_Color[1] * 255.f ),
-                static_cast<Uint8>( a_Color[2] * 255.f ),
-                static_cast<Uint8>( a_Color[3] * 255.f )
-            };
-        }
-
-        static SDL_Color ToSDLColor( Coloru8 a_Color )
-        {
-            return SDL_Color{ a_Color[0], a_Color[1], a_Color[2], a_Color[3] };
-        }
 
     protected:
         SDL_Renderer*         m_Renderer  { nullptr };
@@ -141,45 +102,60 @@ namespace RatUI::SDL2
 
         // Persistent scratch buffer for R8->RGBA expansion in UpdateTexture.
         // Grows as needed but never shrinks - avoids per-upload allocations.
-        Array<u8> m_RGBAScratch;
-
-        Array<SDL_Vertex> m_VertexScratch; ///< Scratch buffer for vertex data, to avoid per-render allocations.
-        Array<int>        m_IndexScratch;  ///< Scratch buffer for index data, to avoid per-render allocations.
+        Array<u8>  m_RGBAScratch;
+        Array<int> m_IndexBuffer;  ///< Scratch buffer for index data, to avoid per-render allocations.
     };
 
     // =========================================================================
     // Inline implementations
     // =========================================================================
 
-    inline void SDL2Renderer::Execute( Span<const DrawCmd> a_Commands )
+    inline void SDL2Renderer::Execute( const DrawBatcher& a_Batcher )
     {
-        if ( !m_Renderer )
-            return;
+        Clear( m_IndexBuffer );
+        Resize( m_IndexBuffer,  Size( a_Batcher.Indices ) );
 
-        // Save/restore SDL_Renderer state around our custom rendering.
+        // TODO: Is there a way sdl can use u16 indices?
+        for ( size i = 0; i < Size( a_Batcher.Indices ); ++i )
+            m_IndexBuffer[i] = static_cast<int>( a_Batcher.Indices[i] );
+
+        // Note: We're allowed to do this because our Vertex struct is laid out in memory exactly like SDL_Vertex, 
+        // so we can treat the DrawBatcher's vertex array as an array of SDL_Vertex without needing to transform it first.
+        // TODO: Add some static_asserts to ensure that this is always the case.
+        const SDL_Vertex* vertexData = reinterpret_cast<const SDL_Vertex*>( Data( a_Batcher.Vertices ) );
+
+        // Capture and restore SDL_Renderer state around our custom rendering to avoid interfering with any SDL-based rendering elsewhere in the application.
         SDLRenderStateScope stateScope( m_Renderer );
 
-        for ( const DrawCmd& cmd : a_Commands )
+        for ( const auto& batch : a_Batcher.Batches )
         {
-            if ( cmd.ClipRect.IsInfinite() )
-                SDL_RenderSetClipRect( m_Renderer, nullptr );
+            if ( HasValue( batch.ClipRect ) )
+            {
+                const SDL_Rect sdlClipRect{
+                    static_cast<int>( batch.ClipRect->Origin[0] ),
+                    static_cast<int>( batch.ClipRect->Origin[1] ),
+                    static_cast<int>( batch.ClipRect->Size[0] ),
+                    static_cast<int>( batch.ClipRect->Size[1] )
+                };
+                SDL_RenderSetClipRect( m_Renderer, &sdlClipRect );
+            }
             else
             {
-                SDL_Rect sdlClip{
-                    static_cast<int>( cmd.ClipRect.Origin[0] ),
-                    static_cast<int>( cmd.ClipRect.Origin[1] ),
-                    static_cast<int>( cmd.ClipRect.Size[0] ),
-                    static_cast<int>( cmd.ClipRect.Size[1] )
-                };
-                SDL_RenderSetClipRect( m_Renderer, &sdlClip );
+                SDL_RenderSetClipRect( m_Renderer, nullptr );
             }
 
-            if      ( Holds<DrawCmd::RectCmd>        ( cmd.Payload ) ) { const auto& c = Get<DrawCmd::RectCmd>        ( cmd.Payload ); RenderFillRoundedRect( c.Rect, c.Rounding, c.Color, cmd.Transform ); }
-            else if ( Holds<DrawCmd::RectBorderCmd>  ( cmd.Payload ) ) { const auto& c = Get<DrawCmd::RectBorderCmd>  ( cmd.Payload ); RenderFillRoundedRectBorder( c.Rect, c.Rounding, c.Color, c.Thickness, cmd.Transform ); }
-            else if ( Holds<DrawCmd::CircleCmd>      ( cmd.Payload ) ) { const auto& c = Get<DrawCmd::CircleCmd>      ( cmd.Payload ); RenderFillCircle( c.Center, c.Radius, c.Color, cmd.Transform ); }
-            else if ( Holds<DrawCmd::CircleBorderCmd>( cmd.Payload ) ) { const auto& c = Get<DrawCmd::CircleBorderCmd>( cmd.Payload ); RenderFillCircleBorder( c.Center, c.Radius, c.Color, c.Thickness, cmd.Transform ); }
-            else if ( Holds<DrawCmd::ShapedTextCmd>  ( cmd.Payload ) ) { const auto& c = Get<DrawCmd::ShapedTextCmd>  ( cmd.Payload ); if ( c.Shaped ) RenderShapedText( *c.Shaped, c.Style, c.Rect, cmd.Transform ); }
-            else if ( Holds<DrawCmd::CustomCmd>      ( cmd.Payload ) ) { const auto& c = Get<DrawCmd::CustomCmd>      ( cmd.Payload ); if ( c.Func ) c.Func( *this, cmd ); }
+            // TODO: We need to use the batch.Transform matrix here but we need SDL_GPU or something
+
+            SDL_Texture* tex = IsValidTexture( batch.Texture ) 
+                               ? static_cast<SDL_Texture*>( batch.Texture.Ptr ) 
+                               : nullptr;
+
+            SDL_SetTextureColorMod( tex, 255, 255, 255 );
+            SDL_SetTextureAlphaMod( tex, 255 );
+
+            SDL_RenderGeometry( m_Renderer, tex,
+                                vertexData, static_cast<int>( Size( a_Batcher.Vertices ) ),
+                                Data( m_IndexBuffer ) + batch.IndexOffset, batch.IndexCount );
         }
     }
 
@@ -276,215 +252,7 @@ namespace RatUI::SDL2
         return a_Texture.Ptr != nullptr;
     }
 
-    inline void SDL2Renderer::RenderFillRoundedRect(
-        Rectf a_Rect, CornerRounding a_Rounding, Colorf a_Color, const Mat3f& a_Transform )
-    {
-        constexpr int c_Segments   = 8;
-        constexpr int c_MaxVerts   = 5 * 4 + 4 * ( 1 + c_Segments + 1 );
-        constexpr int c_MaxIndices = 5 * 6 + 4 * c_Segments * 3;
-        constexpr f32 c_PI_2       = Pi<f32> / 2.f;
-
-        const SDL_Color sdlColor = ToSDLColor( a_Color );
-
-        SDL_Vertex vertices[c_MaxVerts];
-        int        indices[c_MaxIndices];
-        int        vertCount = 0;
-        int        idxCount  = 0;
-
-        const f32 x = a_Rect.Origin[0];
-        const f32 y = a_Rect.Origin[1];
-        const f32 w = a_Rect.Size[0];
-        const f32 h = a_Rect.Size[1];
-
-        f32 tlRadius = a_Rounding.TopLeft.Value;
-        f32 trRadius = a_Rounding.TopRight.Value;
-        f32 brRadius = a_Rounding.BottomRight.Value;
-        f32 blRadius = a_Rounding.BottomLeft.Value;
-
-        // Scale down radii if they exceed the rect dimensions.
-        {
-            f32 scaleX = w / std::max( 1.f, tlRadius + trRadius );
-            f32 scaleY = h / std::max( 1.f, tlRadius + blRadius );
-            scaleX     = std::min( scaleX, w / std::max( 1.f, blRadius + brRadius ) );
-            scaleY     = std::min( scaleY, h / std::max( 1.f, trRadius + brRadius ) );
-            f32 scale  = std::min( 1.f, std::min( scaleX, scaleY ) );
-            tlRadius  *= scale; trRadius *= scale; brRadius *= scale; blRadius *= scale;
-        }
-
-        auto pushVertex = [&]( f32 px, f32 py ) -> int
-        {
-            vertices[vertCount] = { TransformPoint( px, py, a_Transform ), sdlColor, { 0.f, 0.f } };
-            return vertCount++;
-        };
-
-        auto pushQuad = [&]( int tl, int tr, int br, int bl )
-        {
-            indices[idxCount++] = tl; indices[idxCount++] = tr; indices[idxCount++] = br;
-            indices[idxCount++] = tl; indices[idxCount++] = br; indices[idxCount++] = bl;
-        };
-
-        // Center rect
-        {
-            int tl = pushVertex( x + tlRadius,     y + tlRadius     );
-            int tr = pushVertex( x + w - trRadius, y + trRadius     );
-            int br = pushVertex( x + w - brRadius, y + h - brRadius );
-            int bl = pushVertex( x + blRadius,     y + h - blRadius );
-            pushQuad( tl, tr, br, bl );
-        }
-
-        // Top strip
-        {
-            int tl = pushVertex( x + tlRadius,     y            );
-            int tr = pushVertex( x + w - trRadius, y            );
-            int br = pushVertex( x + w - trRadius, y + trRadius );
-            int bl = pushVertex( x + tlRadius,     y + tlRadius );
-            pushQuad( tl, tr, br, bl );
-        }
-
-        // Bottom strip
-        {
-            int tl = pushVertex( x + blRadius,     y + h - blRadius );
-            int tr = pushVertex( x + w - brRadius, y + h - brRadius );
-            int br = pushVertex( x + w - brRadius, y + h            );
-            int bl = pushVertex( x + blRadius,     y + h            );
-            pushQuad( tl, tr, br, bl );
-        }
-
-        // Left strip
-        {
-            int tl = pushVertex( x,            y + tlRadius     );
-            int tr = pushVertex( x + tlRadius, y + tlRadius     );
-            int br = pushVertex( x + blRadius, y + h - blRadius );
-            int bl = pushVertex( x,            y + h - blRadius );
-            pushQuad( tl, tr, br, bl );
-        }
-
-        // Right strip
-        {
-            int tl = pushVertex( x + w - trRadius, y + trRadius     );
-            int tr = pushVertex( x + w,            y + trRadius     );
-            int br = pushVertex( x + w,            y + h - brRadius );
-            int bl = pushVertex( x + w - brRadius, y + h - brRadius );
-            pushQuad( tl, tr, br, bl );
-        }
-
-        auto addCorner = [&]( f32 cx, f32 cy, f32 startAngle, f32 r )
-        {
-            int center = pushVertex( cx, cy );
-            f32 step   = c_PI_2 / c_Segments;
-            int prev   = -1;
-            for ( int s = 0; s <= c_Segments; ++s )
-            {
-                f32 angle = startAngle + s * step;
-                int cur   = pushVertex( cx + cosf( angle ) * r, cy + sinf( angle ) * r );
-                if ( s > 0 ) 
-                { 
-                    indices[idxCount++] = center; 
-                    indices[idxCount++] = prev; 
-                    indices[idxCount++] = cur; 
-                }
-                prev = cur;
-            }
-        };
-
-        addCorner( x+tlRadius,     y+tlRadius,     Pi<f32>,        tlRadius );
-        addCorner( x+w-trRadius,   y+trRadius,     Pi<f32> * 1.5f, trRadius );
-        addCorner( x+w-brRadius,   y+h-brRadius,   0.f,            brRadius );
-        addCorner( x+blRadius,     y+h-blRadius,   c_PI_2,         blRadius );
-
-        SDL_RenderGeometry( m_Renderer, nullptr, vertices, vertCount, indices, idxCount );
-    }
-
-    inline void SDL2Renderer::RenderFillRoundedRectBorder(
-        Rectf /*a_Rect*/, CornerRounding /*a_Rounding*/, Colorf /*a_Color*/, f32 /*a_Thickness*/, const Mat3f& /*a_Transform*/ )
-    {
-        // TODO: implement rounded rect border rendering
-    }
-
-    inline void SDL2Renderer::RenderFillCircle(
-        Vec2f a_Center, f32 a_Radius, Colorf a_Color, const Mat3f& a_Transform )
-    {
-        constexpr int c_Segments   = 32;
-        constexpr int c_MaxVerts   = 1 + c_Segments;
-        constexpr int c_MaxIndices = c_Segments * 3;
-
-        const SDL_Color sdlColor = ToSDLColor( a_Color );
-        SDL_Vertex vertices[c_MaxVerts];
-        int        indices[c_MaxIndices];
-        int        vertCount = 0;
-        int        idxCount  = 0;
-
-        auto pushVertex = [&]( f32 px, f32 py ) -> int
-        {
-            vertices[vertCount] = { TransformPoint( px, py, a_Transform ), sdlColor, { 0.f, 0.f } };
-            return vertCount++;
-        };
-
-        int center = pushVertex( a_Center[0], a_Center[1] );
-        f32 step   = ( Pi<f32> * 2.f ) / c_Segments;
-
-        for ( int s = 0; s < c_Segments; ++s )
-        {
-            f32 angle = s * step;
-            pushVertex( a_Center[0] + cosf( angle ) * a_Radius,
-                        a_Center[1] + sinf( angle ) * a_Radius );
-        }
-
-        for ( int s = 0; s < c_Segments; ++s )
-        {
-            indices[idxCount++] = center;
-            indices[idxCount++] = 1 + s;
-            indices[idxCount++] = 1 + ( s + 1 ) % c_Segments;
-        }
-
-        SDL_RenderGeometry( m_Renderer, nullptr, vertices, vertCount, indices, idxCount );
-    }
-
-    inline void SDL2Renderer::RenderFillCircleBorder(
-        Vec2f a_Center, f32 a_Radius, Colorf a_Color, f32 a_Thickness, const Mat3f& a_Transform )
-    {
-        constexpr int c_Segments   = 32;
-        constexpr int c_MaxVerts   = c_Segments * 2;
-        constexpr int c_MaxIndices = c_Segments * 6;
-
-        const SDL_Color sdlColor = ToSDLColor( a_Color );
-        const f32       rOuter   = a_Radius;
-        const f32       rInner   = std::max( 0.f, a_Radius - a_Thickness );
-
-        SDL_Vertex vertices[c_MaxVerts];
-        int        indices[c_MaxIndices];
-        int        vertCount = 0;
-        int        idxCount  = 0;
-
-        auto pushVertex = [&]( f32 px, f32 py ) -> int
-        {
-            vertices[vertCount] = { TransformPoint( px, py, a_Transform ), sdlColor, { 0.f, 0.f } };
-            return vertCount++;
-        };
-
-        f32 step = ( Pi<f32> * 2.f ) / c_Segments;
-        for ( int s = 0; s < c_Segments; ++s )
-        {
-            f32 angle = s * step;
-            f32 cosA  = cosf( angle );
-            f32 sinA  = sinf( angle );
-            pushVertex( a_Center[0] + cosA * rOuter, a_Center[1] + sinA * rOuter );
-            pushVertex( a_Center[0] + cosA * rInner, a_Center[1] + sinA * rInner );
-        }
-
-        for ( int s = 0; s < c_Segments; ++s )
-        {
-            int o0 = s * 2;
-            int i0 = s * 2 + 1;
-            int o1 = ( ( s + 1 ) % c_Segments ) * 2;
-            int i1 = ( ( s + 1 ) % c_Segments ) * 2 + 1;
-
-            indices[idxCount++] = o0; indices[idxCount++] = o1; indices[idxCount++] = i1;
-            indices[idxCount++] = o0; indices[idxCount++] = i1; indices[idxCount++] = i0;
-        }
-
-        SDL_RenderGeometry( m_Renderer, nullptr, vertices, vertCount, indices, idxCount );
-    }
+    #if 0
 
     inline void SDL2Renderer::RenderShapedText(
         const ShapedText&      a_Shaped,
@@ -671,5 +439,7 @@ namespace RatUI::SDL2
         Clear( m_VertexScratch );
         Clear( m_IndexScratch );
     }
+
+    #endif
 
 } // namespace RatUI::SDL2

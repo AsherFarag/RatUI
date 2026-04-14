@@ -53,11 +53,11 @@ namespace RatUI
      */
     struct DrawBatch
     {
-        Optional<Rectf> ClipRect;
-        Mat3f           Transform;
-        TextureID       Texture{ 0 };
-        u32             IndexOffset{ 0 };
-        u32             IndexCount{ 0 };
+        Optional<Rectu16> ClipRect;
+        Mat3f             Transform;
+        TextureID         Texture{ 0 };
+        u32               IndexOffset{ 0 };
+        u32               IndexCount{ 0 };
 
         // TODO: Add custom draw callbacks.
     };
@@ -89,7 +89,7 @@ namespace RatUI
         }
 
         /** @brief Begins a new draw batch with the specified clipping rectangle, transformation, and texture. */
-        void BeginBatch( const Optional<Rectf>& a_ClipRect, const Mat3f& a_Transform, TextureID a_Texture )
+        void BeginBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, TextureID a_Texture )
         {
             EmplaceBack( Batches, DrawBatch{ a_ClipRect, a_Transform, a_Texture, static_cast<u32>( Indices.size() ), 0 } );
         }
@@ -393,6 +393,11 @@ namespace RatUI
                 indices[idxCount++] = o0; indices[idxCount++] = o1; indices[idxCount++] = i1;
                 indices[idxCount++] = o0; indices[idxCount++] = i1; indices[idxCount++] = i0;
             }
+        }
+
+        void EmitText( const ShapedText& a_Text, TextRenderStyle a_Style, Rectf a_LayoutRect )
+        {
+
         }
     };
 

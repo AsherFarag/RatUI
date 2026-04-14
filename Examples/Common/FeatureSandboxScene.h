@@ -14,7 +14,7 @@ public:
     void Init() override
     {
         // Root container - deep app background
-        WidgetID trueRoot = m_Scene.CreateRootWidget<RectWidget>( Colorsf::Surface900, "AppBackground" );
+        WidgetID trueRoot = m_Scene.CreateRootWidget<RectWidget>( Colorsu8::Surface900, "AppBackground" );
         LayoutNode* trueRootNode = m_Scene.Layouts.Get( m_Scene.GetWidget( trueRoot )->GetLayoutID() );
         trueRootNode->Style.LayoutType = ELayoutType::Vertical;
         trueRootNode->Style.Spacing = 10.f;
@@ -23,7 +23,7 @@ public:
         trueRootNode->Style.HeightMode = ESizingMode::Flex;
     
         // Main panel - slightly lighter surface
-        WidgetID root = m_Scene.CreateWidget<RectWidget>( trueRoot, Colorsf::Surface800, "MainPanel" );
+        WidgetID root = m_Scene.CreateWidget<RectWidget>( trueRoot, Colorsu8::Surface800, "MainPanel" );
         LayoutNode* rootNode = m_Scene.Layouts.Get( m_Scene.GetWidget( root )->GetLayoutID() );
         rootNode->Style.LayoutType = ELayoutType::Vertical;
         rootNode->Style.Spacing = 10.f;
@@ -33,7 +33,7 @@ public:
         rootNode->Style.IsFocusScope = true;
     
         // ---------------- HEADER BAR (was Red) ----------------
-        WidgetID headerBar = m_Scene.CreateWidget<RectWidget>( root, Colorsf::AccentBlue, "HeaderBar" );
+        WidgetID headerBar = m_Scene.CreateWidget<RectWidget>( root, Colorsu8::AccentBlue, "HeaderBar" );
         auto* headerBarNode = m_Scene.Layouts.Get( m_Scene.GetWidget( headerBar )->GetLayoutID() );
     
         headerBarNode->Style.FixedHeight = 100.f;
@@ -42,7 +42,7 @@ public:
         headerBarNode->Style.Margin = Edges{ 10.f };
     
         // ---------------- CONTENT ROW (was HBox) ----------------
-        WidgetID contentRow = m_Scene.CreateWidget<RectWidget>( root, Colorsf::Surface700, "ContentRow" );
+        WidgetID contentRow = m_Scene.CreateWidget<RectWidget>( root, Colorsu8::Surface700, "ContentRow" );
         auto* contentRowNode = m_Scene.Layouts.Get( m_Scene.GetWidget( contentRow )->GetLayoutID() );
     
         contentRowNode->Style.LayoutType = ELayoutType::Horizontal;
@@ -56,7 +56,7 @@ public:
     
         // ---------------- MAIN CONTENT AREA ----------------
         {
-            MainContentArea = m_Scene.CreateWidget<RectWidget>( contentRow, Colorsf::Surface600, "MainContentArea" );
+            MainContentArea = m_Scene.CreateWidget<RectWidget>( contentRow, Colorsu8::Surface600, "MainContentArea" );
             auto* mainContentNode = m_Scene.Layouts.Get( m_Scene.GetWidget( MainContentArea )->GetLayoutID() );
             
             mainContentNode->Style.WidthMode = ESizingMode::Flex;
@@ -90,7 +90,7 @@ public:
     
         // ---------------- SIDEBAR PANEL ----------------
         {
-            WidgetID sidebarPanel = m_Scene.CreateWidget<RectWidget>( contentRow, Colorsf::Surface600, "SidebarPanel" );
+            WidgetID sidebarPanel = m_Scene.CreateWidget<RectWidget>( contentRow, Colorsu8::Surface600, "SidebarPanel" );
             auto* sidebarNode = m_Scene.Layouts.Get( m_Scene.GetWidget( sidebarPanel )->GetLayoutID() );
     
             sidebarNode->Style.LayoutType = ELayoutType::Vertical;
@@ -103,7 +103,7 @@ public:
             sidebarNode->Style.IsFocusScope = true;
     
             // ---------------- STATUS INDICATOR ----------------
-            WidgetID statusIndicator = m_Scene.CreateWidget<RectWidget>( sidebarPanel, Colorsf::AccentEmerald, "StatusIndicator" );
+            WidgetID statusIndicator = m_Scene.CreateWidget<RectWidget>( sidebarPanel, Colorsu8::AccentEmerald, "StatusIndicator" );
             auto* statusNode = m_Scene.Layouts.Get( m_Scene.GetWidget( statusIndicator )->GetLayoutID() );
     
             statusNode->Style.WidthMode = ESizingMode::Flex;
@@ -112,7 +112,7 @@ public:
             statusNode->Style.FixedHeight = 60.f;
     
             // ---------------- NOTIFICATION DOT ----------------
-            WidgetID notificationDot = m_Scene.CreateWidget<RectWidget>( sidebarPanel, Colorsf::AccentRose, "NotificationDot" );
+            WidgetID notificationDot = m_Scene.CreateWidget<RectWidget>( sidebarPanel, Colorsu8::AccentRose, "NotificationDot" );
             auto* notifNode = m_Scene.Layouts.Get( m_Scene.GetWidget( notificationDot )->GetLayoutID() );
     
             notifNode->Style.WidthMode = ESizingMode::Flex;
@@ -124,7 +124,7 @@ public:
     
         // ---------------- SECONDARY CONTENT AREA ----------------
         {
-            WidgetID secondaryContent = m_Scene.CreateWidget<RectWidget>( contentRow, Colorsf::Surface600, "SecondaryContentArea" );
+            WidgetID secondaryContent = m_Scene.CreateWidget<RectWidget>( contentRow, Colorsu8::Surface600, "SecondaryContentArea" );
             auto* secondaryNode = m_Scene.Layouts.Get( m_Scene.GetWidget( secondaryContent )->GetLayoutID() );
             
             secondaryNode->Style.WidthMode = ESizingMode::Flex;
@@ -151,7 +151,7 @@ public:
     
         // ---------------- FOOTER BAR ----------------
         {
-            WidgetID footerBar = m_Scene.CreateWidget<RectWidget>( root, Colorsf::Surface700, "FooterBar" );
+            WidgetID footerBar = m_Scene.CreateWidget<RectWidget>( root, Colorsu8::Surface700, "FooterBar" );
             auto* footerNode = m_Scene.Layouts.Get( m_Scene.GetWidget( footerBar )->GetLayoutID() );
 
             footerNode->Style.FixedHeight = 120.f;
@@ -178,7 +178,7 @@ public:
         }
     
         // ---------------- ACCENT SWATCH ROW ----------------
-        WidgetID accentSwatchRow = m_Scene.CreateWidget<RectWidget>( root, Colorsf::Surface800, "AccentSwatchRow" );
+        WidgetID accentSwatchRow = m_Scene.CreateWidget<RectWidget>( root, Colorsu8::Surface800, "AccentSwatchRow" );
         auto* swatchRowNode = m_Scene.Layouts.Get( m_Scene.GetWidget( accentSwatchRow )->GetLayoutID() );
         swatchRowNode->Style.LayoutType = ELayoutType::Horizontal;
         swatchRowNode->Style.Spacing = 20.f;
@@ -189,12 +189,12 @@ public:
         swatchRowNode->Style.IsFocusScope = true;
     
         // Five accent swatches: blue, purple, violet, emerald, rose
-        constexpr Colorf accentSwatches[5] = {
-            Colorsf::AccentBlue,
-            Colorsf::AccentPurple,
-            Colorsf::AccentViolet,
-            Colorsf::AccentEmerald,
-            Colorsf::AccentRose,
+        constexpr Coloru8 accentSwatches[5] = {
+            Colorsu8::AccentBlue,
+            Colorsu8::AccentPurple,
+            Colorsu8::AccentViolet,
+            Colorsu8::AccentEmerald,
+            Colorsu8::AccentRose,
         };
     
         // Draw colored circles with increasing radius for each accent color

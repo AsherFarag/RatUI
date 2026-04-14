@@ -13,13 +13,13 @@ namespace RatUI
     {
         DrawBatcher& Batcher;
 
-        Array<Rectf> ClipStack;
-        Array<Mat3f> TransformStack;
+        Array<Rectu16> ClipStack;
+        Array<Mat3f>   TransformStack;
 
-        Optional<Rectf> CurrentClip;
-        Mat3f           CurrentTransform{ c_Identity<Mat3f> };
-        TextureID       CurrentTexture  { TextureID::Null() };
-        bool            HasActiveBatch  { false };
+        Optional<Rectu16> CurrentClip;
+        Mat3f             CurrentTransform{ c_Identity<Mat3f> };
+        TextureID         CurrentTexture  { TextureID::Null() };
+        bool              HasActiveBatch  { false };
 
         void Clear()
         {
@@ -97,13 +97,13 @@ namespace RatUI
         // Clip Stack
         // ========================
 
-        DrawList& PushClipRect( Rectf rect )
+        DrawList& PushClipRect( Rectu16 a_Rect )
         {
             if ( !Empty( ClipStack ) )
-                rect = rect.Intersection( Back( ClipStack ) );
+                a_Rect = a_Rect.Intersection( Back( ClipStack ) );
 
-            PushBack( ClipStack, rect );
-            CurrentClip = rect;
+            PushBack( ClipStack, a_Rect );
+            CurrentClip = a_Rect;
 
             UpdateBatchState();
             return *this;
@@ -166,6 +166,13 @@ namespace RatUI
         {
             EnsureBatch();
             Batcher.EmitCircleBorder( a_Center, a_Radius, a_Color, a_Thickness );
+            return *this;
+        }
+
+        DrawList& AddText( const ShapedText& a_Shaped, TextRenderStyle a_Style, Rectf a_Rect )
+        {
+            EnsureBatch();
+            Batcher.EmitText( a_Shaped, a_Style, a_Rect );
             return *this;
         }
 
