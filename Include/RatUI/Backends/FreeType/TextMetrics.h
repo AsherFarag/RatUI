@@ -1,6 +1,5 @@
 #pragma once
 #include "FontCache.h"
-#include "GlyphAtlas.h"
 #include "TextUtil.h"
 
 namespace RatUI::FreeType
@@ -9,8 +8,8 @@ namespace RatUI::FreeType
     class TextMetrics : public ITextMetrics
     {
     public:
-        TextMetrics( FontCache* a_FontCache = nullptr, GlyphAtlas* a_GlyphAtlas = nullptr )
-            : m_FontCache( a_FontCache ), m_GlyphAtlas( a_GlyphAtlas )
+        TextMetrics( FontCache* a_FontCache = nullptr )
+            : m_FontCache( a_FontCache )
         {}
 
         /** @brief Gets the underlying font cache set by the user. */
@@ -18,12 +17,6 @@ namespace RatUI::FreeType
 
         /** @brief Sets the font cache. */
         void SetFontCache( FontCache* a_Cache ) { m_FontCache = a_Cache; }
-
-        /** @brief Gets the glyph atlas used for glyph rasterization during shaping. */
-        GlyphAtlas* GetGlyphAtlas() const { return m_GlyphAtlas; }
-
-        /** @brief Sets the glyph atlas. Must be set before calling Shape(). */
-        void SetGlyphAtlas( GlyphAtlas* a_Atlas ) { m_GlyphAtlas = a_Atlas; }
 
         Optional<PreparedText> Prepare( StringView a_Text, const TextLayoutStyle& a_Style ) override
         {
@@ -124,19 +117,6 @@ namespace RatUI::FreeType
                     // Shape the line with HarfBuzz to get per-glyph positions.
                     paintWidth = ShapeLine( *font, lineText, a_Style, lineGlyphs );
 
-                    // Rasterize each glyph into the atlas and replace the HarfBuzz glyph ID
-                    // with the atlas index so the renderer can do O(1) lookups without FreeType.
-                    if ( m_GlyphAtlas )
-                    {
-                        // TODO: hacky but ill fix later
-                        for ( ShapedGlyph& g : lineGlyphs )
-                        {
-                            Optional<u32> atlasIdx = m_GlyphAtlas->GetOrRasterizeGlyphIndex( face, g.GlyphID, pixelSize );
-                            g.GlyphID = atlasIdx.value_or( Limits<u32>::max() );
-                        }
-                    }
-
-
                     // Append glyphs to the output and record the line metadata.
                     const u32 glyphStart = static_cast<u32>( Size( result.Glyphs ) );
                     Insert( result.Glyphs, End( result.Glyphs ), Begin( lineGlyphs ), End( lineGlyphs ) );
@@ -164,9 +144,39 @@ namespace RatUI::FreeType
             return result;
         }
 
+        bool RasterizeGlyph(
+            FontHandle a_Font, c32 a_CodePoint, u32 a_FontSize,
+            const Coloru8*& a_OutPixels, u32& a_OutWidth, u32& a_OutHeight,
+            Vec2i& a_OutBearing
+        )
+        {
+            if ( !m_FontCache )
+                return false;
+
+            Font* font = m_FontCache->GetOrLoadFont( a_Font, a_FontSize );
+            if ( !font )
+                return false;
+
+            FT_Face face = font->GetFace();
+
+            FT_UInt glyphIndex = FT_Get_Char_Index( face, a_CodePoint );
+            if ( glyphIndex == 0 )
+                return false; // Glyph not found in the font.
+
+            if ( FT_Load_Glyph( face, glyphIndex, FT_LOAD_RENDER ) != 0 )
+                return false; // Failed to load and render the glyph.
+
+            FT_GlyphSlot slot = face->glyph;
+            a_OutPixels       = reinterpret_cast<const Coloru8*>( slot->bitmap.buffer );
+            a_OutWidth        = slot->bitmap.width;
+            a_OutHeight       = slot->bitmap.rows;
+            a_OutBearing      = Vec2i{ slot->bitmap_left, slot->bitmap_top };
+
+            return true;
+        }
+
     protected:
         FontCache* m_FontCache{ nullptr };
-        GlyphAtlas* m_GlyphAtlas{ nullptr };
     };
 
 } // namespace RatUI::FreeType

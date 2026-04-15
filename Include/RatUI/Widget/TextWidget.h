@@ -143,20 +143,20 @@ namespace RatUI
                 case ETextOverflow::Clip:
                 {
                     a_DrawList.PushClipRect( textRect.Cast<u16>() );
-                    a_DrawList.AddText( *m_ShapedText, effectiveRenderStyle, textRect );
+                    a_DrawList.AddText( m_LayoutStyle.Font, *m_ShapedText, effectiveRenderStyle, textRect );
                     a_DrawList.PopClipRect();
                     break;
                 }
                 case ETextOverflow::Fade:
                 {
                     a_DrawList.PushClipRect( textRect.Cast<u16>() );
-                    a_DrawList.AddText( *m_ShapedText, effectiveRenderStyle, textRect );
+                    a_DrawList.AddText( m_LayoutStyle.Font, *m_ShapedText, effectiveRenderStyle, textRect );
                     a_DrawList.PopClipRect();
                     break;
                 }
                 default:
                 {
-                    a_DrawList.AddText( *m_ShapedText, effectiveRenderStyle, textRect );
+                    a_DrawList.AddText( m_LayoutStyle.Font, *m_ShapedText, effectiveRenderStyle, textRect );
                     break;
                 }
             }

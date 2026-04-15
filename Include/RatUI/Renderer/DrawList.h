@@ -12,6 +12,7 @@ namespace RatUI
     struct DrawList
     {
         DrawBatcher& Batcher;
+		GlyphAtlas&  Atlas;
 
         Array<Rectu16> ClipStack;
         Array<Mat3f>   TransformStack;
@@ -48,7 +49,7 @@ namespace RatUI
         {
             if ( !HasActiveBatch )
             {
-                Batcher.BeginBatch( CurrentClip, CurrentTransform, CurrentTexture );
+                Batcher.BeginGeoBatch( CurrentClip, CurrentTransform, CurrentTexture );
                 HasActiveBatch = true;
             }
         }
@@ -169,10 +170,10 @@ namespace RatUI
             return *this;
         }
 
-        DrawList& AddText( const ShapedText& a_Shaped, TextRenderStyle a_Style, Rectf a_Rect )
+        DrawList& AddText( FontHandle a_Font, const ShapedText& a_Shaped, TextRenderStyle a_Style, Rectf a_Rect )
         {
             EnsureBatch();
-            Batcher.EmitText( a_Shaped, a_Style, a_Rect );
+			Batcher.EmitText( a_Font, a_Shaped, a_Style, a_Rect, Atlas );
             return *this;
         }
 

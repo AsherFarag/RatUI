@@ -1,6 +1,5 @@
 ﻿#pragma once
 #include "../../RatUI.h"
-#include "../FreeType/GlyphAtlas.h"
 #include "../FreeType/FontCache.h"
 #include "../FreeType/TextUtil.h"
 #include <SDL.h>
@@ -72,21 +71,18 @@ namespace RatUI::SDL2
     {
     public:
         SDL2Renderer() = default;
-        SDL2Renderer( SDL_Renderer* a_Renderer, FreeType::FontCache* a_FontCache, FreeType::GlyphAtlas* a_GlyphAtlas = nullptr )
+        SDL2Renderer( SDL_Renderer* a_Renderer, FreeType::FontCache* a_FontCache )
             : m_Renderer  ( a_Renderer )
             , m_FontCache ( a_FontCache )
-            , m_GlyphAtlas( a_GlyphAtlas )
         {
             Reserve( m_IndexBuffer,  1024 * 6 );
         }
 
         SDL_Renderer*         GetSDLRenderer() const { return m_Renderer; }
         FreeType::FontCache*  GetFontCache()   const { return m_FontCache; }
-        FreeType::GlyphAtlas* GetGlyphAtlas()  const { return m_GlyphAtlas; }
 
         void SetSDLRenderer( SDL_Renderer* a_Renderer )     { m_Renderer   = a_Renderer; }
         void SetFontCache( FreeType::FontCache* a_Cache )   { m_FontCache  = a_Cache;    }
-        void SetGlyphAtlas( FreeType::GlyphAtlas* a_Atlas ) { m_GlyphAtlas = a_Atlas;    }
 
         void Execute( const DrawBatcher& a_Batcher ) override;
 
@@ -98,7 +94,6 @@ namespace RatUI::SDL2
     protected:
         SDL_Renderer*         m_Renderer  { nullptr };
         FreeType::FontCache*  m_FontCache { nullptr };
-        FreeType::GlyphAtlas* m_GlyphAtlas{ nullptr };
 
         // Persistent scratch buffer for R8->RGBA expansion in UpdateTexture.
         // Grows as needed but never shrinks - avoids per-upload allocations.

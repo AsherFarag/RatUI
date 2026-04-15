@@ -1,7 +1,6 @@
 #include "SDL2Application.h"
 #include <RatUI/Backends/SDL2/SDL2Renderer.h>
 #include <RatUI/Backends/FreeType/TextMetrics.h>
-#include <RatUI/Backends/FreeType/GlyphAtlas.h>
 #include <RatUI/Widget/TextWidget.h>
 #include <iostream>
 #include <functional>
@@ -31,18 +30,12 @@ protected:
 
     FreeType::FontCache m_FontCache;
     FreeType::TextMetrics m_TextMetrics{};
-    std::unique_ptr<FreeType::GlyphAtlas> m_GlyphAtlas;
 
     std::unique_ptr<IDemoScene> m_Scene;
     WidgetID green;
 
     bool OnInitialize() override
     {
-        // Create the glyph atlas backed by this renderer (must be done after the SDL_Renderer is ready).
-        m_GlyphAtlas = std::make_unique<FreeType::GlyphAtlas>( m_Renderer, 2048, 2048 );
-        m_Renderer.SetGlyphAtlas( m_GlyphAtlas.get() );
-        m_TextMetrics.SetGlyphAtlas( m_GlyphAtlas.get() );
-
         const FontHandle fontHandle = { 1 };
         m_FontCache.RegisterFontHandle( fontHandle, "Resources/Fonts/Roboto-Medium.ttf" );
 		m_TextMetrics.SetFontCache( &m_FontCache );
@@ -82,7 +75,8 @@ protected:
         }
 
         DrawBatcher drawBatcher;
-        DrawList drawList{ drawBatcher };
+        GlyphAtlas g{ a_Renderer, m_TextMetrics };
+        DrawList drawList{ drawBatcher, g };
         m_Scene->Render( drawList );
 
         a_Renderer.Execute( drawBatcher );

@@ -1,5 +1,6 @@
 #pragma once
 #include "Texture.h"
+#include "../Text/GlyphAtlas.h"
 
 namespace RatUI
 {
@@ -46,6 +47,12 @@ namespace RatUI
         Vec2f   UV;
     };
 
+    enum class EBatchType
+    {
+        Geometry,
+        MSDF,
+    };
+
     /**
      * @brief Represents a batch of draw calls that can be executed together. 
      * Each batch contains information about the clipping rectangle, transformation, texture, 
@@ -58,6 +65,12 @@ namespace RatUI
         TextureID         Texture{ 0 };
         u32               IndexOffset{ 0 };
         u32               IndexCount{ 0 };
+        EBatchType        Type{ EBatchType::Geometry };
+
+        struct
+        {
+            f32 Scale{ 1.f };
+        } MSDF;
 
         // TODO: Add custom draw callbacks.
     };
@@ -88,10 +101,21 @@ namespace RatUI
             return Span<u16>{ Data( Indices ) + offset, a_Count };
         }
 
-        /** @brief Begins a new draw batch with the specified clipping rectangle, transformation, and texture. */
-        void BeginBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, TextureID a_Texture )
+        void BeginBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, TextureID a_Texture, EBatchType a_Type )
         {
-            EmplaceBack( Batches, DrawBatch{ a_ClipRect, a_Transform, a_Texture, static_cast<u32>( Indices.size() ), 0 } );
+            EmplaceBack( Batches, DrawBatch{ a_ClipRect, a_Transform, a_Texture, static_cast<u32>( Indices.size() ), 0, a_Type } );
+        }
+
+        /** @brief Begins a new draw batch with the specified clipping rectangle, transformation, and texture. */
+        void BeginGeoBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, TextureID a_Texture )
+        {
+            BeginBatch( a_ClipRect, a_Transform, a_Texture, EBatchType::Geometry );
+        }
+
+        void BeginMSDFBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, TextureID a_Texture, f32 a_Scale )
+        {
+            BeginBatch( a_ClipRect, a_Transform, a_Texture, EBatchType::MSDF );
+            Back( Batches ).MSDF.Scale = a_Scale;
         }
 
         /** @brief Ends the current draw batch, calculating the number of indices used. */
@@ -395,9 +419,100 @@ namespace RatUI
             }
         }
 
-        void EmitText( const ShapedText& a_Text, TextRenderStyle a_Style, Rectf a_LayoutRect )
+        void EmitText( 
+            FontHandle a_Font,const ShapedText& a_Text, TextRenderStyle a_Style, Rectf a_LayoutRect, GlyphAtlas& a_Atlas )
         {
+            if ( Empty( a_Text.Glyphs ) || Empty( a_Text.Lines ) )
+                return;
 
+            const f32 atlasW = static_cast<f32>( a_Atlas.GetWidth() );
+            const f32 atlasH = static_cast<f32>( a_Atlas.GetHeight() );
+            const f32 rcpW   = atlasW > 0.f ? 1.f / atlasW : 0.f;
+            const f32 rcpH   = atlasH > 0.f ? 1.f / atlasH : 0.f;
+
+            const f32 scale = 1.f;
+
+            const f32 batchSdfPxRange = 4.f;
+
+            // Compute Y start based on vertical baseline alignment.
+            f32 startY = a_LayoutRect.Origin[1];
+            switch ( a_Style.Baseline )
+            {
+                case ETextBaseline::Middle:
+                    startY += ( a_LayoutRect.Size[1] - a_Text.TotalHeight ) * 0.5f;
+                    break;
+                case ETextBaseline::Bottom:
+                    startY += a_LayoutRect.Size[1] - a_Text.TotalHeight;
+                    break;
+                default: // Top / Alphabetic / Hanging
+                    break;
+            }
+
+            // Always open an MSDF text batch for the atlas texture.
+            BeginMSDFBatch( NullOpt, c_Identity<Mat3f>, a_Atlas.GetTexture(), scale );
+
+            f32 penY = startY + a_Text.Ascender;
+
+            for ( u32 lineIdx = 0; lineIdx < a_Text.LineCount(); ++lineIdx )
+            {
+                const ShapedLine& line = a_Text.Lines[ lineIdx ];
+
+                // Compute horizontal offset based on text alignment.
+                f32 lineX = a_LayoutRect.Origin[0];
+                switch ( a_Style.Align )
+                {
+                    case ETextAlign::Center:
+                        lineX += ( a_LayoutRect.Size[0] - line.Width ) * 0.5f;
+                        break;
+                    case ETextAlign::Right:
+                        lineX += a_LayoutRect.Size[0] - line.Width;
+                        break;
+                    default: // Left, Justify
+                        break;
+                }
+
+                f32 penX = lineX;
+
+                for ( u32 g = line.Start; g < line.End; ++g )
+                {
+                    const ShapedGlyph&  sg = a_Text.Glyphs[ g ];
+                    Optional<GlyphRect> gr = a_Atlas.GetOrRasterizeGlyph( a_Font, sg.GlyphID );
+
+                    if ( gr && gr->Rect.Size[0] > 0 && gr->Rect.Size[1] > 0 )
+                    {
+                        // Place the glyph quad relative to the pen (baseline) position.
+                        // Bearing is Y-up; negate to convert to screen-space Y-down.
+                        // Both bearing and quad size are scaled from the atlas base size
+                        // to the display size via 'scale'.
+                        const f32 gx = penX + sg.XOffset + static_cast<f32>( gr->Bearing[0] ) * scale;
+                        const f32 gy = penY + sg.YOffset - static_cast<f32>( gr->Bearing[1] ) * scale;
+                        const f32 gw = static_cast<f32>( gr->Rect.Size[0] ) * scale;
+                        const f32 gh = static_cast<f32>( gr->Rect.Size[1] ) * scale;
+
+                        const f32 u0 = static_cast<f32>( gr->Rect.Origin[0] ) * rcpW;
+                        const f32 v0 = static_cast<f32>( gr->Rect.Origin[1] ) * rcpH;
+                        const f32 u1 = u0 + static_cast<f32>( gr->Rect.Size[0] ) * rcpW;
+                        const f32 v1 = v0 + static_cast<f32>( gr->Rect.Size[1] ) * rcpH;
+
+                        const u32 vertexOffset = static_cast<u32>( Size( Vertices ) );
+                        auto verts = ReserveVertices( 4 );
+                        verts[0] = Vertex{ Vec2f{ gx,      gy      }, a_Style.Color, Vec2f{ u0, v0 } };
+                        verts[1] = Vertex{ Vec2f{ gx + gw, gy      }, a_Style.Color, Vec2f{ u1, v0 } };
+                        verts[2] = Vertex{ Vec2f{ gx,      gy + gh }, a_Style.Color, Vec2f{ u0, v1 } };
+                        verts[3] = Vertex{ Vec2f{ gx + gw, gy + gh }, a_Style.Color, Vec2f{ u1, v1 } };
+
+                        auto idx = ReserveIndices( 6 );
+                        idx[0] = vertexOffset + 0; idx[1] = vertexOffset + 1; idx[2] = vertexOffset + 2;
+                        idx[3] = vertexOffset + 1; idx[4] = vertexOffset + 3; idx[5] = vertexOffset + 2;
+                    }
+
+                    penX += sg.XAdvance;
+                }
+
+                penY += a_Text.LineHeight;
+            }
+
+            EndBatch();
         }
     };
 
