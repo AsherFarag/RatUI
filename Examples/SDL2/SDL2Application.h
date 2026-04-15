@@ -1,8 +1,10 @@
 #pragma once
 #include <RatUI/RatUI.h>
-#include <RatUI/Backends/SDL2/SDL2Renderer.h>
+#include <GL/glew.h>
+#include <RatUI/Backends/OpenGL/OpenGLRenderer.h>
 #include <SDL2/SDL.h>
 #include <iostream>
+#include <memory>
 
 using namespace RatUI;
 
@@ -30,34 +32,34 @@ static EButtonID SDLKeyboardToRatUIButtonID( SDL_Keycode a_Keycode )
 }
 
 /**
+ * @brief Configuration parameters for the application window.
+ */
+struct SDL2AppConfig
+{
+    std::string Title  = "RatUI Application";
+    Colorf      ClearColor{ 0.f, 0.f, 0.f, 1.f };
+    int         Width  = 1280;
+    int         Height = 720;
+};
+
+/**
  * @brief
- * Provides SDL2-backed windowing, event processing and a render loop.
+ * Provides SDL2-backed windowing with an OpenGL 3.3 context, event processing
+ * and a render loop.
  * Derive from this class and override the four virtual hooks to implement
  * your example.
  */
 class SDL2Application
 {
 public:
-    /**
-     * @brief Configuration parameters for the application window.
-     */
-    struct Config
-    {
-        std::string Title  = "RatUI Application";
-        Colorf      ClearColor{ 0.f, 0.f, 0.f, 1.f };
-        int         Width  = 1280;
-        int         Height = 720;
-    };
+    using Config = SDL2AppConfig;
 
     /** @brief Constructs an application with the window configuration. */
-    SDL2Application( Config a_Config = {} ) : m_Config( a_Config ) {}
+    SDL2Application( Config a_Config = {} ) : m_Config( std::move( a_Config ) ) {}
     virtual ~SDL2Application() = default;
 
     /** @brief Returns the underlying SDL_Window handle. */
-    SDL_Window*   GetWindow()   const { return m_Window; }
-
-    /** @brief Returns the underlying SDL_Renderer handle. */
-    SDL_Renderer* GetRenderer() const { return m_SDLRenderer; }
+    SDL_Window* GetWindow() const { return m_Window; }
 
     /** @brief Requests the application to exit the main loop and shut down. */
     void RequestExit() { m_Running = false; }
@@ -77,12 +79,15 @@ public:
                 ProcessEvents();
                 OnUpdate();
 
-                if ( m_SDLRenderer )
+                if ( m_Window && m_GLContext )
                 {
-                    SDL_SetRenderDrawColor( m_SDLRenderer, m_Config.ClearColor[0] * 255, m_Config.ClearColor[1] * 255, m_Config.ClearColor[2] * 255, m_Config.ClearColor[3] * 255 );
-                    SDL_RenderClear( m_SDLRenderer );
-                    OnRender( m_Renderer );
-                    SDL_RenderPresent( m_SDLRenderer );
+                    glClearColor( m_Config.ClearColor[0], m_Config.ClearColor[1],
+                                  m_Config.ClearColor[2], m_Config.ClearColor[3] );
+                    glClear( GL_COLOR_BUFFER_BIT );
+
+                    OnRender( *m_Renderer );
+
+                    SDL_GL_SwapWindow( m_Window );
                 }
             }
         }
@@ -107,11 +112,20 @@ protected:
     virtual bool OnShutdown() { return true; };
 	virtual void OnInputEvent( const RatUI::InputEvent& ) {}
 
+    /** @brief Returns the OpenGL renderer. */
+    OpenGL::OpenGLRenderer* GetRenderer() const { return m_Renderer.get(); }
+
 private:
     bool Initialize()
     {
         if ( SDL_Init( SDL_INIT_VIDEO | SDL_INIT_EVENTS ) != 0 )
             return false;
+
+        // Request OpenGL 3.3 core profile.
+        SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, 3 );
+        SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, 3 );
+        SDL_GL_SetAttribute( SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE );
+        SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 1 );
 
         m_Window = SDL_CreateWindow(
             m_Config.Title.c_str(),
@@ -119,7 +133,7 @@ private:
             SDL_WINDOWPOS_CENTERED,
             m_Config.Width,
             m_Config.Height,
-            SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
+            SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
         );
 
         if ( !m_Window )
@@ -128,12 +142,8 @@ private:
             return false;
         }
 
-        m_SDLRenderer = SDL_CreateRenderer(
-            m_Window, -1,
-            SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
-        );
-
-        if ( !m_SDLRenderer )
+        m_GLContext = SDL_GL_CreateContext( m_Window );
+        if ( !m_GLContext )
         {
             SDL_DestroyWindow( m_Window );
             m_Window = nullptr;
@@ -141,7 +151,22 @@ private:
             return false;
         }
 
-        m_Renderer.SetSDLRenderer( m_SDLRenderer );
+        SDL_GL_MakeCurrent( m_Window, m_GLContext );
+        SDL_GL_SetSwapInterval( 1 ); // VSync
+
+        // Load OpenGL function pointers via glad using SDL's loader.
+        int gladLoaded = glewInit( );
+        if ( gladLoaded )
+        {
+            SDL_GL_DeleteContext( m_GLContext );
+            m_GLContext = nullptr;
+            SDL_DestroyWindow( m_Window );
+            m_Window = nullptr;
+            SDL_Quit();
+            return false;
+        }
+
+        m_Renderer = std::make_unique<OpenGL::OpenGLRenderer>( m_Config.Width, m_Config.Height );
 
         return OnInitialize();
     }
@@ -157,6 +182,16 @@ private:
             {
                 RequestExit();
                 return;
+            }
+            else if ( sdlEvent.type == SDL_WINDOWEVENT )
+            {
+                if ( sdlEvent.window.event == SDL_WINDOWEVENT_SIZE_CHANGED && m_Renderer )
+                {
+                    int w = sdlEvent.window.data1;
+                    int h = sdlEvent.window.data2;
+                    glViewport( 0, 0, w, h );
+                    m_Renderer->SetViewport( w, h );
+                }
             }
             else if ( sdlEvent.type == SDL_KEYDOWN || sdlEvent.type == SDL_KEYUP )
             {
@@ -212,12 +247,12 @@ private:
     {
         bool result = OnShutdown();
 
-        m_Renderer = {};
+        m_Renderer.reset();
 
-        if ( m_SDLRenderer )
+        if ( m_GLContext )
         {
-            SDL_DestroyRenderer( m_SDLRenderer );
-            m_SDLRenderer = nullptr;
+            SDL_GL_DeleteContext( m_GLContext );
+            m_GLContext = nullptr;
         }
 
         if ( m_Window )
@@ -231,9 +266,9 @@ private:
     }
 
 protected:
-    Config              m_Config;
-    bool                m_Running{ true };
-    SDL_Window*         m_Window{ nullptr };
-    SDL_Renderer*       m_SDLRenderer{ nullptr };
-    SDL2::SDL2Renderer  m_Renderer{};
+    Config                                     m_Config;
+    bool                                       m_Running{ true };
+    SDL_Window*                                m_Window{ nullptr };
+    SDL_GLContext                               m_GLContext{ nullptr };
+    std::unique_ptr<OpenGL::OpenGLRenderer>    m_Renderer;
 };

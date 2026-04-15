@@ -101,28 +101,22 @@ namespace RatUI
             return Span<u16>{ Data( Indices ) + offset, a_Count };
         }
 
-        void BeginBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, TextureID a_Texture, EBatchType a_Type )
+        void Clear()
+        {
+            ::RatUI::Clear( Vertices );
+            ::RatUI::Clear( Indices );
+            ::RatUI::Clear( Batches );
+        }
+
+        DrawBatch& BeginBatch( EBatchType a_Type, const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, TextureID a_Texture )
         {
             EmplaceBack( Batches, DrawBatch{ a_ClipRect, a_Transform, a_Texture, static_cast<u32>( Indices.size() ), 0, a_Type } );
-        }
-
-        /** @brief Begins a new draw batch with the specified clipping rectangle, transformation, and texture. */
-        void BeginGeoBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, TextureID a_Texture )
-        {
-            BeginBatch( a_ClipRect, a_Transform, a_Texture, EBatchType::Geometry );
-        }
-
-        void BeginMSDFBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, TextureID a_Texture, f32 a_Scale )
-        {
-            BeginBatch( a_ClipRect, a_Transform, a_Texture, EBatchType::MSDF );
-            Back( Batches ).MSDF.Scale = a_Scale;
+            return Back( Batches );
         }
 
         /** @brief Ends the current draw batch, calculating the number of indices used. */
         void EndBatch()
         {
-            RATUI_USER_ASSERT( !Empty( Batches ), "Called EndBatch without a corresponding BeginBatch." );
-
             if ( Empty( Batches ) )
                 return;
 
@@ -430,9 +424,13 @@ namespace RatUI
             const f32 rcpW   = atlasW > 0.f ? 1.f / atlasW : 0.f;
             const f32 rcpH   = atlasH > 0.f ? 1.f / atlasH : 0.f;
 
-            const f32 scale = 1.f;
-
-            const f32 batchSdfPxRange = 4.f;
+            // Scale from atlas base size to the display size.
+            // All glyphs are rasterized at a_Atlas.GetBaseSize() (e.g. 64 px) for the MSDF bitmap.
+            // When rendering at a different font size the quad and bearing must be scaled
+            // proportionally so glyph geometry matches the shaped advances.
+            const f32 scale = ( a_Atlas.GetBaseSize() > 0u && a_Text.FontSize > 0.f )
+                ? a_Text.FontSize / static_cast<f32>( a_Atlas.GetBaseSize() )
+                : 1.f;
 
             // Compute Y start based on vertical baseline alignment.
             f32 startY = a_LayoutRect.Origin[1];
@@ -447,9 +445,6 @@ namespace RatUI
                 default: // Top / Alphabetic / Hanging
                     break;
             }
-
-            // Always open an MSDF text batch for the atlas texture.
-            BeginMSDFBatch( NullOpt, c_Identity<Mat3f>, a_Atlas.GetTexture(), scale );
 
             f32 penY = startY + a_Text.Ascender;
 
@@ -511,8 +506,6 @@ namespace RatUI
 
                 penY += a_Text.LineHeight;
             }
-
-            EndBatch();
         }
     };
 

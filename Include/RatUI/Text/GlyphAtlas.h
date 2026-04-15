@@ -97,8 +97,8 @@ namespace RatUI
             // Upload the glyph bitmap to the atlas texture.
             if ( auto region = AllocateRegion( static_cast<u16>( width ), static_cast<u16>( height ) ) )
             {
-                const size pixelCount = static_cast<size>( width ) * height;
-                m_Renderer.UpdateTexture( m_Texture, 0, region->Cast<u32>(), pixels, pixelCount );
+                const size dataSizeBytes = static_cast<size>( width ) * height * sizeof( Coloru8 );
+                m_Renderer.UpdateTexture( m_Texture, 0, region->Cast<u32>(), pixels, dataSizeBytes );
                 GlyphRect rect{ .Rect = *region, .Bearing = bearing };
                 m_GlyphMap[key] = rect;
                 return rect;

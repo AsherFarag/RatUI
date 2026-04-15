@@ -30,19 +30,19 @@ namespace RatUI
          *        the pixel data owned by the implementation.
          *        The returned pointer is valid until the next call to RasterizeGlyph.
          *
-         * @param a_Font          Font resource to rasterize from.
-         * @param a_CodePoint     Unicode codepoint to rasterize.
-         * @param a_OutPixels     Set to the RGB8 pixel data (3 bytes per texel, row-major, Y-down).
-         * @param a_OutWidth      Set to the bitmap width in pixels.
-         * @param a_OutHeight     Set to the bitmap height in pixels.
-         * @param a_OutBearing    Set to the glyph bearing (offset from baseline origin to bitmap
+         * @param a_Font       Font resource to rasterize from.
+		 * @param a_GlyphIndex The index of the glyph to rasterize (not the Unicode codepoint).
+         * @param o_Pixels     Set to the RGBA8 pixel data (4 bytes per texel, row-major, Y-down).
+         * @param o_Width      Set to the bitmap width in pixels.
+         * @param o_Height     Set to the bitmap height in pixels.
+         * @param o_Bearing    Set to the glyph bearing (offset from baseline origin to bitmap
          *                        top-left, Y-up convention matching FreeType).
          * @return true on success, false if the glyph could not be rasterized.
          */
         virtual bool RasterizeGlyph(
-            FontHandle a_Font, c32 a_CodePoint, u32 a_FontSize,
-            const Coloru8*& a_OutPixels, u32& a_OutWidth, u32& a_OutHeight,
-            Vec2i& a_OutBearing
+            FontHandle a_Font, u32 a_GlyphIndex, u32 a_FontSize,
+            const Coloru8*& o_Pixels, u32& o_Width, u32& o_Height,
+            Vec2i& o_Bearing
         ) = 0;
 
     };

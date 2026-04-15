@@ -1,9 +1,17 @@
 #pragma once
 #include "FontCache.h"
 #include "TextUtil.h"
+#include "../../Text/GlyphAtlas.h"
+#include <msdfgen.h>
+#include <ext/import-font.h>
+#include <msdfgen-ext.h>
+
+#include <cmath>
 
 namespace RatUI::FreeType
 {
+    // TODO: Shouldnt be here
+    inline constexpr double c_MtsdfPxRange = 4.0;
 
     class TextMetrics : public ITextMetrics
     {
@@ -59,6 +67,7 @@ namespace RatUI::FreeType
 
             ShapedText result;
             result.Font               = a_Style.Font;
+            result.FontSize           = a_Style.Size;
             result.LineHeight         = GetLineHeight( face, a_Style ) + a_Style.LineSpacing;
             result.Ascender           = face->size->metrics.ascender  / 64.f;
             result.Descender          = face->size->metrics.descender / 64.f;
@@ -145,10 +154,10 @@ namespace RatUI::FreeType
         }
 
         bool RasterizeGlyph(
-            FontHandle a_Font, c32 a_CodePoint, u32 a_FontSize,
-            const Coloru8*& a_OutPixels, u32& a_OutWidth, u32& a_OutHeight,
-            Vec2i& a_OutBearing
-        )
+            FontHandle a_Font, u32 a_GlyphIndex, u32 a_FontSize,
+            const Coloru8*& o_Pixels, u32& o_Width, u32& o_Height,
+            Vec2i& o_Bearing
+        ) override
         {
             if ( !m_FontCache )
                 return false;
@@ -159,24 +168,104 @@ namespace RatUI::FreeType
 
             FT_Face face = font->GetFace();
 
-            FT_UInt glyphIndex = FT_Get_Char_Index( face, a_CodePoint );
-            if ( glyphIndex == 0 )
-                return false; // Glyph not found in the font.
+            // Wrap the existing FreeType face for msdfgen (non-owning).
+            msdfgen::FontHandle* msdfFont = msdfgen::adoptFreetypeFont( face );
+            if ( !msdfFont )
+                return false;
 
-            if ( FT_Load_Glyph( face, glyphIndex, FT_LOAD_RENDER ) != 0 )
-                return false; // Failed to load and render the glyph.
+            // Load the glyph shape from the font.
+            msdfgen::Shape shape;
+            double advance = 0.0;
+            const bool glyphLoaded = msdfgen::loadGlyph( shape, msdfFont, msdfgen::GlyphIndex( a_GlyphIndex ), &advance );
+            msdfgen::destroyFont( msdfFont );
 
-            FT_GlyphSlot slot = face->glyph;
-            a_OutPixels       = reinterpret_cast<const Coloru8*>( slot->bitmap.buffer );
-            a_OutWidth        = slot->bitmap.width;
-            a_OutHeight       = slot->bitmap.rows;
-            a_OutBearing      = Vec2i{ slot->bitmap_left, slot->bitmap_top };
+            if ( !glyphLoaded )
+                return false;
+
+            // Handle empty/invisible glyphs (e.g., space).
+            if ( shape.contours.empty() )
+            {
+                o_Pixels  = nullptr;
+                o_Width   = 0;
+                o_Height  = 0;
+                o_Bearing = Vec2i{ 0, 0 };
+                return true;
+            }
+
+            // Normalize shape windings and assign edge colors for MTSDF generation.
+            shape.normalize();
+            msdfgen::edgeColoringSimple( shape, 3.0 );
+
+            // Get shape bounds in font design units.
+            double boundsL = 0.0, boundsB = 0.0, boundsR = 0.0, boundsT = 0.0;
+            shape.bound( boundsL, boundsB, boundsR, boundsT );
+
+            // Scale from design units to pixels.
+            const double emSize = static_cast<double>( face->units_per_EM );
+            const double scale  = 64.0 * static_cast<double>( a_FontSize ) / emSize;
+
+            const int padding = static_cast<int>( std::ceil( c_MtsdfPxRange ) );
+
+            // Bitmap dimensions in pixels.
+            const int w = static_cast<int>( std::ceil( ( boundsR - boundsL ) * scale ) ) + 2 * padding;
+            const int h = static_cast<int>( std::ceil( ( boundsT - boundsB ) * scale ) ) + 2 * padding;
+
+            if ( w <= 0 || h <= 0 )
+            {
+                o_Pixels  = nullptr;
+                o_Width   = 0;
+                o_Height  = 0;
+                o_Bearing = Vec2i{ 0, 0 };
+                return true;
+            }
+
+            // Projection: map shape design-unit coordinates to bitmap pixel coordinates.
+            // The translation positions the glyph so that its bounds start at the padding offset.
+            const msdfgen::Projection projection(
+                msdfgen::Vector2( scale, scale ),
+                msdfgen::Vector2( -boundsL * scale + padding, -boundsB * scale + padding )
+            );
+
+            // Generate the multi-channel typed signed distance field (RGBA: RGB = MSDF, A = SDF).
+            msdfgen::Bitmap<float, 4> mtsdf( w, h );
+            msdfgen::generateMTSDF( mtsdf, shape, projection, c_MtsdfPxRange );
+
+            // Convert the float RGBA MTSDF bitmap to RGBA8 (Y-down, row-major).
+            Resize( m_RasterBuffer, static_cast<size>( w ) * h );
+
+            auto toU8 = []( float v ) -> u8 {
+                return static_cast<u8>( std::clamp( static_cast<int>( v * 255.f + 0.5f ), 0, 255 ) );
+            };
+
+            for ( int y = 0; y < h; ++y )
+            {
+                for ( int x = 0; x < w; ++x )
+                {
+                    const float* px = mtsdf( x, h - 1 - y ); // msdfgen is Y-up; we need Y-down.
+                    RawAt( m_RasterBuffer, static_cast<size>( y ) * w + x ) = Coloru8{
+                        toU8( px[0] ), toU8( px[1] ), toU8( px[2] ), toU8( px[3] )
+                    };
+                }
+            }
+
+            o_Pixels = Data( m_RasterBuffer );
+            o_Width  = static_cast<u32>( w );
+            o_Height = static_cast<u32>( h );
+
+            // Bearing: offset from glyph origin to bitmap top-left.
+            // X: left edge of glyph in pixels minus padding.
+            // Y: top edge of glyph in pixels plus padding (FreeType Y-up convention).
+            o_Bearing = Vec2i{
+                static_cast<i32>( std::floor( boundsL * scale ) ) - padding,
+                static_cast<i32>( std::ceil( boundsT * scale ) ) + padding
+            };
 
             return true;
         }
 
     protected:
         FontCache* m_FontCache{ nullptr };
+        Array<Coloru8> m_RasterBuffer; ///< Persistent buffer for the last rasterized glyph's RGBA8 pixel data.
     };
 
 } // namespace RatUI::FreeType

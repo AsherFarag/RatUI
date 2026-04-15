@@ -4,6 +4,8 @@ find_package(harfbuzz QUIET)
 
 include(FetchContent)
 
+set(RATUI_GLEW_IS_STATIC OFF)
+
 if(NOT SDL2_FOUND)
     FetchContent_Declare(
         SDL2
@@ -42,6 +44,51 @@ if(NOT harfbuzz_FOUND)
     endif()
 endif()
 
+find_package(msdfgen QUIET)
+if(NOT msdfgen_FOUND)
+    FetchContent_Declare(
+        msdfgen
+        GIT_REPOSITORY https://github.com/Chlumsky/msdfgen.git
+        GIT_TAG        v1.12
+    )
+    set(MSDFGEN_BUILD_STANDALONE OFF CACHE BOOL "" FORCE)
+    set(MSDFGEN_INSTALL OFF CACHE BOOL "" FORCE)
+    set(MSDFGEN_USE_VCPKG OFF CACHE BOOL "" FORCE)
+    set(MSDFGEN_DYNAMIC_RUNTIME ON CACHE BOOL "" FORCE)
+    set(MSDFGEN_USE_SKIA OFF CACHE BOOL "" FORCE)
+    set(MSDFGEN_DISABLE_SVG ON CACHE BOOL "" FORCE)
+    set(MSDFGEN_DISABLE_PNG ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(msdfgen)
+endif()
+
+# ─── GLEW (OpenGL loader) ────────────────────────────────────────────────────
+find_package(GLEW QUIET)
+
+if(NOT GLEW_FOUND)
+    FetchContent_Declare(
+        glew
+        URL https://downloads.sourceforge.net/project/glew/glew/2.2.0/glew-2.2.0.tgz
+    )
+
+    FetchContent_MakeAvailable(glew)
+
+    # Manually create glew target
+    add_library(glew STATIC
+        ${glew_SOURCE_DIR}/src/glew.c
+    )
+
+    target_include_directories(glew PUBLIC
+        ${glew_SOURCE_DIR}/include
+    )
+
+    target_compile_definitions(glew PRIVATE GLEW_STATIC)
+
+    add_library(GLEW::GLEW ALIAS glew)
+    set(RATUI_GLEW_IS_STATIC ON)
+endif()
+
+find_package(OpenGL REQUIRED)
+
 # Interface library providing dependencies shared by all examples
 add_library(RatUI_Examples_Common INTERFACE)
 
@@ -50,12 +97,22 @@ target_include_directories(RatUI_Examples_Common
         ${CMAKE_CURRENT_SOURCE_DIR}/Common
 )
 
+if(RATUI_GLEW_IS_STATIC)
+    target_compile_definitions(RatUI_Examples_Common
+        INTERFACE
+            GLEW_STATIC
+    )
+endif()
+
 target_link_libraries(RatUI_Examples_Common
     INTERFACE
         RatUI
         SDL2::SDL2
         Freetype::Freetype
         harfbuzz::harfbuzz
+        msdfgen::msdfgen
+        GLEW::GLEW
+        OpenGL::GL
 )
 
 # ─── Examples ────────────────────────────────────────────────────────────────

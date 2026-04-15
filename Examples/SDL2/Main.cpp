@@ -28,6 +28,8 @@ public:
 
 protected:
 
+    DrawBatcher m_DrawBatcher;
+    Unique<GlyphAtlas> m_Atlas;
     FreeType::FontCache m_FontCache;
     FreeType::TextMetrics m_TextMetrics{};
 
@@ -39,10 +41,12 @@ protected:
         const FontHandle fontHandle = { 1 };
         m_FontCache.RegisterFontHandle( fontHandle, "Resources/Fonts/Roboto-Medium.ttf" );
 		m_TextMetrics.SetFontCache( &m_FontCache );
-		m_Renderer.SetFontCache( &m_FontCache );
+		//m_Renderer->SetFontCache( &m_FontCache );
 
-        m_Scene = std::make_unique<DynamicTextScene>( fontHandle, &m_TextMetrics );
+        m_Scene = std::make_unique<FeatureSandboxScene>( fontHandle, &m_TextMetrics );
         m_Scene->Init();
+
+        m_Atlas = MakeUnique<GlyphAtlas>( *m_Renderer, m_TextMetrics );
     
         return true;
     }
@@ -74,12 +78,13 @@ protected:
             return;
         }
 
-        DrawBatcher drawBatcher;
-        GlyphAtlas g{ a_Renderer, m_TextMetrics };
-        DrawList drawList{ drawBatcher, g };
-        m_Scene->Render( drawList );
+		m_DrawBatcher.Clear();
 
-        a_Renderer.Execute( drawBatcher );
+        DrawList drawList{ m_DrawBatcher, *m_Atlas };
+        m_Scene->Render( drawList );
+        drawList.Finish();
+
+        a_Renderer.Execute( m_DrawBatcher );
     }
 
     bool OnShutdown() override
