@@ -420,7 +420,7 @@ namespace RatUI
         }
 
         void EmitText( 
-            FontHandle a_Font,const ShapedText& a_Text, TextRenderStyle a_Style, Rectf a_LayoutRect, GlyphAtlas& a_Atlas )
+            const ShapedText& a_Text, TextRenderStyle a_Style, Rectf a_LayoutRect, GlyphAtlas& a_Atlas )
         {
             if ( Empty( a_Text.Glyphs ) || Empty( a_Text.Lines ) )
                 return;
@@ -476,7 +476,7 @@ namespace RatUI
                 for ( u32 g = line.Start; g < line.End; ++g )
                 {
                     const ShapedGlyph&  sg = a_Text.Glyphs[ g ];
-                    Optional<GlyphRect> gr = a_Atlas.GetOrRasterizeGlyph( a_Font, sg.GlyphID );
+                    Optional<GlyphRect> gr = a_Atlas.GetOrRasterizeGlyph( a_Text.Font, sg.GlyphID );
 
                     if ( gr && gr->Rect.Size[0] > 0 && gr->Rect.Size[1] > 0 )
                     {

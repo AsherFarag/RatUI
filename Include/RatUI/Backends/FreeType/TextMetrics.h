@@ -58,7 +58,7 @@ namespace RatUI::FreeType
             const u32 pixelSize = static_cast<u32>( a_Style.Size );
 
             ShapedText result;
-            result.PixelSize          = pixelSize;
+            result.Font               = a_Style.Font;
             result.LineHeight         = GetLineHeight( face, a_Style ) + a_Style.LineSpacing;
             result.Ascender           = face->size->metrics.ascender  / 64.f;
             result.Descender          = face->size->metrics.descender / 64.f;

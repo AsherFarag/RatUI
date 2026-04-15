@@ -262,8 +262,8 @@ namespace RatUI
     {
         Array<ShapedGlyph> Glyphs; ///< The sequence of shaped glyphs that represent the rendered text.
         Array<ShapedLine>  Lines;  ///< Metadata about the lines in the shaped text.
+        FontHandle         Font{}; ///< The font used for shaping the text, which may be needed for rendering and glyph atlas lookups.
 
-        u32 PixelSize  { 0 };
         f32 LineHeight { 0.f };
         f32 Ascender   { 0.f };
         f32 Descender  { 0.f };

@@ -170,10 +170,10 @@ namespace RatUI
             return *this;
         }
 
-        DrawList& AddText( FontHandle a_Font, const ShapedText& a_Shaped, TextRenderStyle a_Style, Rectf a_Rect )
+        DrawList& AddText( const ShapedText& a_Shaped, TextRenderStyle a_Style, Rectf a_Rect )
         {
             EnsureBatch();
-			Batcher.EmitText( a_Font, a_Shaped, a_Style, a_Rect, Atlas );
+			Batcher.EmitText( a_Shaped, a_Style, a_Rect, Atlas );
             return *this;
         }
 
