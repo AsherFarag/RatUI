@@ -141,15 +141,15 @@ namespace RatUI
             switch ( m_LayoutStyle.Overflow )
             {
                 case ETextOverflow::Clip:
-                {
-                    a_DrawList.PushClipRect( textRect.Cast<u16>() );
-                    a_DrawList.AddText( *m_ShapedText, effectiveRenderStyle, textRect );
-                    a_DrawList.PopClipRect();
-                    break;
-                }
                 case ETextOverflow::Fade:
                 {
-                    a_DrawList.PushClipRect( textRect.Cast<u16>() );
+                    const Rectu16 clipRect{
+                        { static_cast<u16>( std::floor( textRect.Left()   ) ),
+                          static_cast<u16>( std::floor( textRect.Top()    ) ) },
+                        { static_cast<u16>( std::ceil ( textRect.Right()  ) - std::floor( textRect.Left() ) ),
+                          static_cast<u16>( std::ceil ( textRect.Bottom() ) - std::floor( textRect.Top()  ) ) }
+                    };
+                    a_DrawList.PushClipRect( clipRect );
                     a_DrawList.AddText( *m_ShapedText, effectiveRenderStyle, textRect );
                     a_DrawList.PopClipRect();
                     break;

@@ -166,13 +166,13 @@ namespace RatUI
             Reserve( Indices,  4 * 6 ); // 4 rects with 2 triangles (6 indices) each
 
             // Top
-            EmitRect( Rectf{ tl, Vec2f{ tr[0], tl[1] + t } }, a_Color );
+            EmitRect( Rectf::FromMinMax( tl, Vec2f{ tr[0], tl[1] + t } ), a_Color );
             // Bottom
-            EmitRect( Rectf{ Vec2f{ bl[0], bl[1] - t }, Vec2f{ br[0], bl[1] } }, a_Color );
+            EmitRect( Rectf::FromMinMax( Vec2f{ bl[0], bl[1] - t }, Vec2f{ br[0], bl[1] } ), a_Color );
             // Left
-            EmitRect( Rectf{ Vec2f{ tl[0], tl[1] + t }, Vec2f{ tl[0] + t, bl[1] - t } }, a_Color );
+            EmitRect( Rectf::FromMinMax( Vec2f{ tl[0], tl[1] + t }, Vec2f{ tl[0] + t, bl[1] - t } ), a_Color );
             // Right
-            EmitRect( Rectf{ Vec2f{ tr[0] - t, tr[1] + t }, Vec2f{ tr[0], br[1] - t } }, a_Color );
+            EmitRect( Rectf::FromMinMax( Vec2f{ tr[0] - t, tr[1] + t }, Vec2f{ tr[0], br[1] - t } ), a_Color );
         }
 
         /** 
@@ -473,21 +473,23 @@ namespace RatUI
                     const ShapedGlyph&  sg = a_Text.Glyphs[ g ];
                     Optional<GlyphRect> gr = a_Atlas.GetOrRasterizeGlyph( a_Text.Font, sg.GlyphID );
 
-                    if ( gr && gr->Rect.Size[0] > 0 && gr->Rect.Size[1] > 0 )
+                    if ( gr && gr->PlaneSize[0] > 0 && gr->PlaneSize[1] > 0 )
                     {
-                        // Place the glyph quad relative to the pen (baseline) position.
-                        // Bearing is Y-up; negate to convert to screen-space Y-down.
-                        // Both bearing and quad size are scaled from the atlas base size
-                        // to the display size via 'scale'.
+                        // Place the glyph quad using the full SDF bitmap (ink + SDF padding).
+                        // Bearing already accounts for the padding offset so the ink aligns with
+                        // the pen position.  Using the full bitmap preserves the natural SDF
+                        // fade-out at glyph edges, which is essential for correct anti-aliasing.
                         const f32 gx = penX + sg.XOffset + static_cast<f32>( gr->Bearing[0] ) * scale;
                         const f32 gy = penY + sg.YOffset - static_cast<f32>( gr->Bearing[1] ) * scale;
                         const f32 gw = static_cast<f32>( gr->Rect.Size[0] ) * scale;
                         const f32 gh = static_cast<f32>( gr->Rect.Size[1] ) * scale;
 
+                        // Full atlas UV: covers the entire SDF bitmap including padding, so the
+                        // SDF transitions are sampled correctly by the fragment shader.
                         const f32 u0 = static_cast<f32>( gr->Rect.Origin[0] ) * rcpW;
                         const f32 v0 = static_cast<f32>( gr->Rect.Origin[1] ) * rcpH;
-                        const f32 u1 = u0 + static_cast<f32>( gr->Rect.Size[0] ) * rcpW;
-                        const f32 v1 = v0 + static_cast<f32>( gr->Rect.Size[1] ) * rcpH;
+                        const f32 u1 = static_cast<f32>( gr->Rect.Origin[0] + gr->Rect.Size[0] ) * rcpW;
+                        const f32 v1 = static_cast<f32>( gr->Rect.Origin[1] + gr->Rect.Size[1] ) * rcpH;
 
                         const u32 vertexOffset = static_cast<u32>( Size( Vertices ) );
                         auto verts = ReserveVertices( 4 );

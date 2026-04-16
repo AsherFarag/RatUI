@@ -4,13 +4,20 @@
 
 namespace RatUI
 {
+    // TODO: This should be configurable
+    inline constexpr f64 c_MsdfPxRange = 4.0;
+
     /**
      * @brief Describes the pixel rectangle and glyph bearing within a GlyphAtlas texture.
+     * The atlas Rect covers the full padded MSDF bitmap.  Bearing and PlaneSize describe
+     * the plane bounds (ink extent only, without SDF padding) in base-size pixels so that
+     * the rendered quad never overruns the font metrics and is not clipped by a layout rect.
      */
     struct GlyphRect
     {
-        Rectu16 Rect;    ///< Rectangle within the atlas texture, in pixel coordinates.
-        Vec2i   Bearing; ///< Offset from the baseline origin to the top-left of the glyph bitmap (Y-up).
+        Rectu16 Rect;      ///< Rectangle within the atlas texture, in pixel coordinates (full SDF bitmap including padding).
+        Vec2i   Bearing;   ///< Offset from the baseline origin to the top-left of the SDF bitmap (Y-up), including SDF padding.
+        Vec2i   PlaneSize; ///< Ink-only width and height in base-size pixels (bitmap minus the two SDF padding rings). Informational.
     };
 
     /**
@@ -79,14 +86,16 @@ namespace RatUI
             const Coloru8* pixels     = nullptr; // In RGBA8 format
             u32            width      = 0, height = 0;
             Vec2i          bearing{};
+            Vec2i          planeSize{};
 
-            if ( !m_TextMetrics.RasterizeGlyph( a_Font, a_GlyphIndex, m_BaseSize, pixels, width, height, bearing ) )
+            if ( !m_TextMetrics.RasterizeGlyph( a_Font, a_GlyphIndex, m_BaseSize, 
+                pixels, width, height, bearing, planeSize ) )
                 return NullOpt; // Rasterization failed (e.g. missing glyph in font).
 
             if ( width == 0 || height == 0 )
             {
                 // Cache invisible glyphs as zero-size rects to avoid repeated rasterization attempts.
-                GlyphRect invisibleRect{ .Rect = Rectu16{ .Origin = { 0, 0 }, .Size = { 0, 0 } }, .Bearing = bearing };
+                GlyphRect invisibleRect{};
                 m_GlyphMap[key] = invisibleRect;
                 return invisibleRect;
             }
@@ -99,7 +108,7 @@ namespace RatUI
             {
                 const size dataSizeBytes = static_cast<size>( width ) * height * sizeof( Coloru8 );
                 m_Renderer.UpdateTexture( m_Texture, 0, region->Cast<u32>(), pixels, dataSizeBytes );
-                GlyphRect rect{ .Rect = *region, .Bearing = bearing };
+                GlyphRect rect{ .Rect = *region, .Bearing = bearing, .PlaneSize = planeSize };
                 m_GlyphMap[key] = rect;
                 return rect;
             }

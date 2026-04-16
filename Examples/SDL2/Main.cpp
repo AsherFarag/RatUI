@@ -43,7 +43,7 @@ protected:
 		m_TextMetrics.SetFontCache( &m_FontCache );
 		//m_Renderer->SetFontCache( &m_FontCache );
 
-        m_Scene = std::make_unique<FeatureSandboxScene>( fontHandle, &m_TextMetrics );
+        m_Scene = std::make_unique<DynamicTextScene>( fontHandle, &m_TextMetrics );
         m_Scene->Init();
 
         m_Atlas = MakeUnique<GlyphAtlas>( *m_Renderer, m_TextMetrics );

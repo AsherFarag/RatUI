@@ -10,9 +10,6 @@
 
 namespace RatUI::FreeType
 {
-    // TODO: Shouldnt be here
-    inline constexpr double c_MtsdfPxRange = 4.0;
-
     class TextMetrics : public ITextMetrics
     {
     public:
@@ -144,11 +141,11 @@ namespace RatUI::FreeType
             if ( Empty( result.Lines ) )
                 return NullOpt;
 
-			// Total height is the distance from the top of the first line to the bottom of the last line, including line spacing.
-			// TotalHeight = Ascender + (LineCount - 1) * LineHeight + abs(Descender)
+            const f32 sdfPadDisplay = static_cast<f32>( c_MsdfPxRange ) * a_Style.Size / 64.f;
+            result.Ascender += sdfPadDisplay;         // shifts penY down → headroom above caps
             result.TotalHeight = result.Ascender
-                + std::max( 0.f, static_cast<f32>( result.LineCount() ) - 1.f ) * result.LineHeight
-                + std::abs( result.Descender );
+                + ( result.LineCount() - 1.f ) * result.LineHeight
+                + std::abs( result.Descender ) + sdfPadDisplay;   // extra depth below descenders
 
             return result;
         }
@@ -156,7 +153,7 @@ namespace RatUI::FreeType
         bool RasterizeGlyph(
             FontHandle a_Font, u32 a_GlyphIndex, u32 a_FontSize,
             const Coloru8*& o_Pixels, u32& o_Width, u32& o_Height,
-            Vec2i& o_Bearing
+            Vec2i& o_Bearing, Vec2i& o_PlaneSize
         ) override
         {
             if ( !m_FontCache )
@@ -175,7 +172,7 @@ namespace RatUI::FreeType
 
             // Load the glyph shape from the font.
             msdfgen::Shape shape;
-            double advance = 0.0;
+            f64 advance = 0.0;
             const bool glyphLoaded = msdfgen::loadGlyph( shape, msdfFont, msdfgen::GlyphIndex( a_GlyphIndex ), &advance );
             msdfgen::destroyFont( msdfFont );
 
@@ -185,10 +182,11 @@ namespace RatUI::FreeType
             // Handle empty/invisible glyphs (e.g., space).
             if ( shape.contours.empty() )
             {
-                o_Pixels  = nullptr;
-                o_Width   = 0;
-                o_Height  = 0;
-                o_Bearing = Vec2i{ 0, 0 };
+                o_Pixels    = nullptr;
+                o_Width     = 0;
+                o_Height    = 0;
+                o_Bearing   = Vec2i{ 0, 0 };
+                o_PlaneSize = Vec2i{ 0, 0 };
                 return true;
             }
 
@@ -197,25 +195,26 @@ namespace RatUI::FreeType
             msdfgen::edgeColoringSimple( shape, 3.0 );
 
             // Get shape bounds in font design units.
-            double boundsL = 0.0, boundsB = 0.0, boundsR = 0.0, boundsT = 0.0;
+            f64 boundsL = 0.0, boundsB = 0.0, boundsR = 0.0, boundsT = 0.0;
             shape.bound( boundsL, boundsB, boundsR, boundsT );
 
             // Scale from design units to pixels.
-            const double emSize = static_cast<double>( face->units_per_EM );
-            const double scale  = 64.0 * static_cast<double>( a_FontSize ) / emSize;
+            const f64 emSize = static_cast<f64>( face->units_per_EM );
+            const f64 scale  = 64.0 * static_cast<f64>( a_FontSize ) / emSize;
 
-            const int padding = static_cast<int>( std::ceil( c_MtsdfPxRange ) );
+            const i32 padding = static_cast<i32>( std::ceil( c_MsdfPxRange ) );
 
             // Bitmap dimensions in pixels.
-            const int w = static_cast<int>( std::ceil( ( boundsR - boundsL ) * scale ) ) + 2 * padding;
-            const int h = static_cast<int>( std::ceil( ( boundsT - boundsB ) * scale ) ) + 2 * padding;
+            const i32 w = static_cast<i32>( std::ceil( ( boundsR - boundsL ) * scale ) ) + 2 * padding;
+            const i32 h = static_cast<i32>( std::ceil( ( boundsT - boundsB ) * scale ) ) + 2 * padding;
 
             if ( w <= 0 || h <= 0 )
             {
-                o_Pixels  = nullptr;
-                o_Width   = 0;
-                o_Height  = 0;
-                o_Bearing = Vec2i{ 0, 0 };
+                o_Pixels    = nullptr;
+                o_Width     = 0;
+                o_Height    = 0;
+                o_Bearing   = Vec2i{ 0, 0 };
+                o_PlaneSize = Vec2i{ 0, 0 };
                 return true;
             }
 
@@ -228,18 +227,18 @@ namespace RatUI::FreeType
 
             // Generate the multi-channel typed signed distance field (RGBA: RGB = MSDF, A = SDF).
             msdfgen::Bitmap<float, 4> mtsdf( w, h );
-            msdfgen::generateMTSDF( mtsdf, shape, projection, c_MtsdfPxRange );
+            msdfgen::generateMTSDF( mtsdf, shape, projection, c_MsdfPxRange );
 
             // Convert the float RGBA MTSDF bitmap to RGBA8 (Y-down, row-major).
             Resize( m_RasterBuffer, static_cast<size>( w ) * h );
 
             auto toU8 = []( float v ) -> u8 {
-                return static_cast<u8>( std::clamp( static_cast<int>( v * 255.f + 0.5f ), 0, 255 ) );
+                return static_cast<u8>( std::clamp( static_cast<i32>( v * 255.f + 0.5f ), 0, 255 ) );
             };
 
-            for ( int y = 0; y < h; ++y )
+            for ( i32 y = 0; y < h; ++y )
             {
-                for ( int x = 0; x < w; ++x )
+                for ( i32 x = 0; x < w; ++x )
                 {
                     const float* px = mtsdf( x, h - 1 - y ); // msdfgen is Y-up; we need Y-down.
                     RawAt( m_RasterBuffer, static_cast<size>( y ) * w + x ) = Coloru8{
@@ -252,12 +251,18 @@ namespace RatUI::FreeType
             o_Width  = static_cast<u32>( w );
             o_Height = static_cast<u32>( h );
 
-            // Bearing: offset from glyph origin to bitmap top-left.
-            // X: left edge of glyph in pixels minus padding.
-            // Y: top edge of glyph in pixels plus padding (FreeType Y-up convention).
+            // Bearing: offset from the baseline origin to the top-left corner of the SDF bitmap
+            // (including SDF padding). X is the left edge in base-size pixels from the pen origin;
+            // Y is the top edge in base-size pixels above the baseline (Y-up convention).
             o_Bearing = Vec2i{
                 static_cast<i32>( std::floor( boundsL * scale ) ) - padding,
                 static_cast<i32>( std::ceil( boundsT * scale ) ) + padding
+            };
+
+            // PlaneSize: ink-only extent in base-size pixels (bitmap minus the two SDF padding rings).
+            o_PlaneSize = Vec2i{
+                w - 2 * padding,
+                h - 2 * padding
             };
 
             return true;
