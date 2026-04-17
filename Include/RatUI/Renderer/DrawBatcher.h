@@ -424,14 +424,10 @@ namespace RatUI
             const f32 rcpW   = atlasW > 0.f ? 1.f / atlasW : 0.f;
             const f32 rcpH   = atlasH > 0.f ? 1.f / atlasH : 0.f;
 
-            // Scale from atlas base size to the display size.
-            // All glyphs are rasterized at a_Atlas.GetBaseSize() (e.g. 64 px) for the MSDF bitmap.
-            // When rendering at a different font size the quad and bearing must be scaled
-            // proportionally so glyph geometry matches the shaped advances.
             const f32 scale = ( a_Atlas.GetBaseSize() > 0u && a_Text.FontSize > 0.f )
-                ? a_Text.FontSize / static_cast<f32>( a_Atlas.GetBaseSize() )
+                ? ( a_Text.FontSize * 2 ) / static_cast<f32>( a_Atlas.GetBaseSize() )
                 : 1.f;
-
+                
             // Compute Y start based on vertical baseline alignment.
             f32 startY = a_LayoutRect.Origin[1];
             switch ( a_Style.Baseline )

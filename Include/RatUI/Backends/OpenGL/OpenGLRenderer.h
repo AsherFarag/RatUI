@@ -118,19 +118,16 @@ namespace RatUI::OpenGL
                 // MTSDF: RGB = multi-channel SDF, A = single-channel SDF fallback.
                 vec4  mtsdf = texture(u_Texture, v_UV);
                 float dist  = median(mtsdf.r, mtsdf.g, mtsdf.b);
+                
                 // Use the SDF alpha channel as a fallback so MSDF corner artifacts
                 // (where the median can dip below 0.5 inside the glyph) are corrected.
                 dist = max(dist, mtsdf.a);
 
-                // screenPxRange: how many screen pixels the SDF transition region spans.
-                // fwidth(v_UV) gives the UV change per screen pixel; multiplying by the texture
-                // dimensions converts to texels per screen pixel.  Dividing pxRange (in texels)
-                // by that value yields the range in screen pixels.
-                vec2  texSize          = vec2(textureSize(u_Texture, 0));
-                float screenPxPerTexel = length(fwidth(v_UV) * texSize);
-                float screenPxRange    = u_PxRange / screenPxPerTexel;
-                screenPxRange          = max(screenPxRange, 1.0); // Clamp so very small glyphs don't produce
-                                                                  // excessively thin smoothing edges that alias.
+                vec2  texSize       = vec2(textureSize(u_Texture, 0));
+                vec2  uvToTex       = fwidth(v_UV) * texSize;   // texels per screen pixel
+                float screenPxRange = u_PxRange * length(uvToTex);
+                screenPxRange       = max(screenPxRange, 1.0); // Clamp so very small glyphs don't produce
+                                                               // excessively thin smoothing edges that alias.
             
                 float smoothW = 0.5 / screenPxRange;
                 float alpha   = smoothstep(0.5 - smoothW, 0.5 + smoothW, dist);

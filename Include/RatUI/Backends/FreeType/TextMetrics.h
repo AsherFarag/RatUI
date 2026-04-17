@@ -194,19 +194,21 @@ namespace RatUI::FreeType
             shape.normalize();
             msdfgen::edgeColoringSimple( shape, 3.0 );
 
-            // Get shape bounds in font design units.
+            // Get shape bounds in msdfgen's coordinate space.
             f64 boundsL = 0.0, boundsB = 0.0, boundsR = 0.0, boundsT = 0.0;
             shape.bound( boundsL, boundsB, boundsR, boundsT );
 
-            // Scale from design units to pixels.
-            const f64 emSize = static_cast<f64>( face->units_per_EM );
-            const f64 scale  = 64.0 * static_cast<f64>( a_FontSize ) / emSize;
+            const f64 scale = 1.f; // TODO
 
             const i32 padding = static_cast<i32>( std::ceil( c_MsdfPxRange ) );
 
             // Bitmap dimensions in pixels.
             const i32 w = static_cast<i32>( std::ceil( ( boundsR - boundsL ) * scale ) ) + 2 * padding;
             const i32 h = static_cast<i32>( std::ceil( ( boundsT - boundsB ) * scale ) ) + 2 * padding;
+
+            printf( "y_ppem: %d\n", face->size->metrics.y_ppem );
+            printf( "ascender: %f\n", face->size->metrics.ascender / 64.0 );
+            printf( "height: %f\n", face->size->metrics.height / 64.0 );
 
             if ( w <= 0 || h <= 0 )
             {
@@ -218,7 +220,7 @@ namespace RatUI::FreeType
                 return true;
             }
 
-            // Projection: map shape design-unit coordinates to bitmap pixel coordinates.
+            // Projection: map shape coordinates to bitmap pixel coordinates.
             // The translation positions the glyph so that its bounds start at the padding offset.
             const msdfgen::Projection projection(
                 msdfgen::Vector2( scale, scale ),
@@ -252,14 +254,14 @@ namespace RatUI::FreeType
             o_Height = static_cast<u32>( h );
 
             // Bearing: offset from the baseline origin to the top-left corner of the SDF bitmap
-            // (including SDF padding). X is the left edge in base-size pixels from the pen origin;
-            // Y is the top edge in base-size pixels above the baseline (Y-up convention).
+            // (including SDF padding). X is the left edge in pixels from the pen origin;
+            // Y is the top edge in pixels above the baseline (Y-up convention).
             o_Bearing = Vec2i{
                 static_cast<i32>( std::floor( boundsL * scale ) ) - padding,
-                static_cast<i32>( std::ceil( boundsT * scale ) ) + padding
+                static_cast<i32>( std::ceil ( boundsT * scale ) ) + padding
             };
 
-            // PlaneSize: ink-only extent in base-size pixels (bitmap minus the two SDF padding rings).
+            // PlaneSize: ink-only extent in pixels (bitmap minus the two SDF padding rings).
             o_PlaneSize = Vec2i{
                 w - 2 * padding,
                 h - 2 * padding
