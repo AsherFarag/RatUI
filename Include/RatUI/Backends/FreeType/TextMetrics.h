@@ -142,7 +142,7 @@ namespace RatUI::FreeType
                 return NullOpt;
 
             const f32 sdfPadDisplay = static_cast<f32>( c_MsdfPxRange ) * a_Style.Size / 64.f;
-            result.Ascender += sdfPadDisplay;         // shifts penY down → headroom above caps
+            result.Ascender += sdfPadDisplay;         // shifts penY down -> headroom above caps
             result.TotalHeight = result.Ascender
                 + ( result.LineCount() - 1.f ) * result.LineHeight
                 + std::abs( result.Descender ) + sdfPadDisplay;   // extra depth below descenders
@@ -151,122 +151,129 @@ namespace RatUI::FreeType
         }
 
         bool RasterizeGlyph(
-            FontHandle a_Font, u32 a_GlyphIndex, u32 a_FontSize,
+            FontHandle a_Font, u32 a_GlyphIndex, u32 a_SdfPixelSize,
             const Coloru8*& o_Pixels, u32& o_Width, u32& o_Height,
-            Vec2i& o_Bearing, Vec2i& o_PlaneSize
+            Vec2<FontUnit>& o_Bearing, FontUnit& o_XAdvance
         ) override
         {
-            if ( !m_FontCache )
+            o_Pixels    = nullptr;
+            o_Width     = 0;
+            o_Height    = 0;
+            o_Bearing   = Vec2<FontUnit>{ 0_fu, 0_fu };
+            o_XAdvance  = 0_fu;
+        
+            if (!m_FontCache)
                 return false;
-
-            Font* font = m_FontCache->GetOrLoadFont( a_Font, a_FontSize );
-            if ( !font )
+        
+            Font* font = m_FontCache->GetOrLoadFont(a_Font, a_SdfPixelSize);
+            if (!font || !font->IsValid())
                 return false;
-
-            FT_Face face = font->GetFace();
-
-            // Wrap the existing FreeType face for msdfgen (non-owning).
-            msdfgen::FontHandle* msdfFont = msdfgen::adoptFreetypeFont( face );
-            if ( !msdfFont )
-                return false;
-
-            // Load the glyph shape from the font.
+        
+            const FT_Face face = font->GetFace();
+            msdfgen::FontHandle* msdfFont = font->GetMsdfgenFontHandle();
+        
+            // ----------------------------
+            // Load glyph shape + advance
+            // ----------------------------
             msdfgen::Shape shape;
             f64 advance = 0.0;
-            const bool glyphLoaded = msdfgen::loadGlyph( shape, msdfFont, msdfgen::GlyphIndex( a_GlyphIndex ), &advance );
-            msdfgen::destroyFont( msdfFont );
-
-            if ( !glyphLoaded )
+        
+            if (!msdfgen::loadGlyph(
+                    shape,
+                    msdfFont,
+                    msdfgen::GlyphIndex(a_GlyphIndex),
+                    msdfgen::FONT_SCALING_EM_NORMALIZED,
+                    &advance))
+            {
                 return false;
-
-            // Handle empty/invisible glyphs (e.g., space).
-            if ( shape.contours.empty() )
-            {
-                o_Pixels    = nullptr;
-                o_Width     = 0;
-                o_Height    = 0;
-                o_Bearing   = Vec2i{ 0, 0 };
-                o_PlaneSize = Vec2i{ 0, 0 };
-                return true;
             }
-
-            // Normalize shape windings and assign edge colors for MTSDF generation.
+        
+            // Convert advance directly into font units (Do NOT scale here)
+            o_XAdvance = static_cast<FontUnit>(advance);
+        
+            // Empty glyph (space, etc.)
+            if (shape.contours.empty())
+                return true;
+        
             shape.normalize();
-            msdfgen::edgeColoringSimple( shape, 3.0 );
-
-            // Get shape bounds in msdfgen's coordinate space.
-            f64 boundsL = 0.0, boundsB = 0.0, boundsR = 0.0, boundsT = 0.0;
-            shape.bound( boundsL, boundsB, boundsR, boundsT );
-
-            const f64 scale = 1.f; // TODO
-
+            msdfgen::edgeColoringSimple(shape, 3.0);
+        
+            // ----------------------------
+            // Shape bounds (font space)
+            // ----------------------------
+            f64 l = 0.0, b = 0.0, r = 0.0, t = 0.0;
+            shape.bound(l, b, r, t);
+        
+            // ----------------------------
+            // Correct scale
+            // ----------------------------
+            // Convert font units -> pixels at SDF resolution
+            const f64 unitsPerEm = static_cast<f64>(face->units_per_EM);
+            const f64 scale = static_cast<f64>( a_SdfPixelSize ) / unitsPerEm;
+        
+            // Add padding to prevent clipping of SDF fringes (in pixels at SDF resolution)
             const i32 padding = static_cast<i32>( std::ceil( c_MsdfPxRange ) );
-
-            // Bitmap dimensions in pixels.
-            const i32 w = static_cast<i32>( std::ceil( ( boundsR - boundsL ) * scale ) ) + 2 * padding;
-            const i32 h = static_cast<i32>( std::ceil( ( boundsT - boundsB ) * scale ) ) + 2 * padding;
-
-            printf( "y_ppem: %d\n", face->size->metrics.y_ppem );
-            printf( "ascender: %f\n", face->size->metrics.ascender / 64.0 );
-            printf( "height: %f\n", face->size->metrics.height / 64.0 );
-
-            if ( w <= 0 || h <= 0 )
-            {
-                o_Pixels    = nullptr;
-                o_Width     = 0;
-                o_Height    = 0;
-                o_Bearing   = Vec2i{ 0, 0 };
-                o_PlaneSize = Vec2i{ 0, 0 };
+        
+            const i32 w = static_cast<i32>(std::ceil((r - l) * scale)) + 2 * padding;
+            const i32 h = static_cast<i32>(std::ceil((t - b) * scale)) + 2 * padding;
+        
+            if (w <= 0 || h <= 0)
                 return true;
-            }
-
-            // Projection: map shape coordinates to bitmap pixel coordinates.
-            // The translation positions the glyph so that its bounds start at the padding offset.
+        
+            // ----------------------------
+            // Projection (font space -> pixel space)
+            // ----------------------------
             const msdfgen::Projection projection(
-                msdfgen::Vector2( scale, scale ),
-                msdfgen::Vector2( -boundsL * scale + padding, -boundsB * scale + padding )
+                msdfgen::Vector2(scale, scale),
+                msdfgen::Vector2(
+                    -l * scale + padding,
+                    -b * scale + padding
+                )
             );
-
-            // Generate the multi-channel typed signed distance field (RGBA: RGB = MSDF, A = SDF).
-            msdfgen::Bitmap<float, 4> mtsdf( w, h );
-            msdfgen::generateMTSDF( mtsdf, shape, projection, c_MsdfPxRange );
-
-            // Convert the float RGBA MTSDF bitmap to RGBA8 (Y-down, row-major).
-            Resize( m_RasterBuffer, static_cast<size>( w ) * h );
-
-            auto toU8 = []( float v ) -> u8 {
-                return static_cast<u8>( std::clamp( static_cast<i32>( v * 255.f + 0.5f ), 0, 255 ) );
-            };
-
-            for ( i32 y = 0; y < h; ++y )
+        
+            msdfgen::Bitmap<f32, 4> mtsdf(w, h);
+            msdfgen::generateMTSDF(mtsdf, shape, projection, c_MsdfPxRange);
+        
+            // ----------------------------
+            // Convert to RGBA8
+            // ----------------------------
+            Resize(m_RasterBuffer, static_cast<size>(w) * h);
+        
+            auto toU8 = [](f32 v) -> u8
             {
-                for ( i32 x = 0; x < w; ++x )
+                return static_cast<u8>(
+                    std::clamp(static_cast<i32>(v * 255.0f + 0.5f), 0, 255)
+                );
+            };
+        
+            // TODO: SIMD this?
+            for (i32 y = 0; y < h; ++y)
+            {
+                for (i32 x = 0; x < w; ++x)
                 {
-                    const float* px = mtsdf( x, h - 1 - y ); // msdfgen is Y-up; we need Y-down.
-                    RawAt( m_RasterBuffer, static_cast<size>( y ) * w + x ) = Coloru8{
-                        toU8( px[0] ), toU8( px[1] ), toU8( px[2] ), toU8( px[3] )
+                    const f32* px = mtsdf(x, h - 1 - y); // flip Y 
+                    const size idx = static_cast<size>(y) * w + x;
+                    RawAt(m_RasterBuffer, idx) = Coloru8{
+                        toU8(px[0]), toU8(px[1]), toU8(px[2]), toU8(px[3])
                     };
                 }
             }
-
-            o_Pixels = Data( m_RasterBuffer );
-            o_Width  = static_cast<u32>( w );
-            o_Height = static_cast<u32>( h );
-
-            // Bearing: offset from the baseline origin to the top-left corner of the SDF bitmap
-            // (including SDF padding). X is the left edge in pixels from the pen origin;
-            // Y is the top edge in pixels above the baseline (Y-up convention).
-            o_Bearing = Vec2i{
-                static_cast<i32>( std::floor( boundsL * scale ) ) - padding,
-                static_cast<i32>( std::ceil ( boundsT * scale ) ) + padding
+        
+            o_Pixels = Data(m_RasterBuffer);
+            o_Width  = static_cast<u32>(w);
+            o_Height = static_cast<u32>(h);
+        
+            // ----------------------------
+            // Calculate bearing (FontUnit = normalized EM space)
+            // ----------------------------
+            // shape.bound() returns coords in EM-normalized font space (same as FontUnit).
+            // bearing X = left edge of glyph bounding box
+            // bearing Y = top edge of glyph bounding box (ascent from baseline)
+            o_Bearing = Vec2<FontUnit>{
+                static_cast<FontUnit>(l),   // left edge in EM space
+                static_cast<FontUnit>(t)    // top edge in EM space (positive = above baseline)
             };
-
-            // PlaneSize: ink-only extent in pixels (bitmap minus the two SDF padding rings).
-            o_PlaneSize = Vec2i{
-                w - 2 * padding,
-                h - 2 * padding
-            };
-
+        
             return true;
         }
 

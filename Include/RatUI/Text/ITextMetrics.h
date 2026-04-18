@@ -37,13 +37,12 @@ namespace RatUI
          * @param o_Height     Set to the bitmap height in pixels (plane height + 2 * SDF padding).
          * @param o_Bearing    Set to the plane-bounds bearing: offset from baseline origin to the
          *                     plane-bounds top-left in base-size pixels (no SDF padding, Y-up).
-         * @param o_PlaneSize  Set to the plane-bounds dimensions in base-size pixels (no SDF padding).
          * @return true on success, false if the glyph could not be rasterized.
          */
         virtual bool RasterizeGlyph(
             FontHandle a_Font, u32 a_GlyphIndex, u32 a_FontSize,
             const Coloru8*& o_Pixels, u32& o_Width, u32& o_Height,
-            Vec2i& o_Bearing, Vec2i& o_PlaneSize
+            Vec2<FontUnit>& o_Bearing, FontUnit& o_XAdvance
         ) = 0;
 
     };

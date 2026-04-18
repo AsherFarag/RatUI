@@ -16,6 +16,16 @@ namespace RatUI
         constexpr bool operator==(const FontHandle& other) const { return ID == other.ID; }
     };
 
+    /**
+     * @brief Metrics describing the overall dimensions and scaling of a font, used for layout and scaling of glyphs.
+     */
+    struct FontMetrics
+    {
+        FontUnit Ascent;       ///< Distance from the baseline to the highest point of any glyph in the font.
+        FontUnit Descent;      ///< Distance from the baseline to the lowest point of any glyph in the font (typically negative).
+        FontUnit LineGap;      ///< Additional vertical spacing between lines of text (can be positive, negative, or zero).
+    };
+
 } // namespace RatUI
 
 // TODO: Should implement a RatUI::Hash<T> type instead of using std::hash

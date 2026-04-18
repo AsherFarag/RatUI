@@ -8,16 +8,26 @@ namespace RatUI
     inline constexpr f64 c_MsdfPxRange = 4.0;
 
     /**
-     * @brief Describes the pixel rectangle and glyph bearing within a GlyphAtlas texture.
-     * The atlas Rect covers the full padded MSDF bitmap.  Bearing and PlaneSize describe
-     * the plane bounds (ink extent only, without SDF padding) in base-size pixels so that
-     * the rendered quad never overruns the font metrics and is not clipped by a layout rect.
+     * @brief Metrics describing the position of a rasterized glyph within the atlas texture and how to position it relative to the baseline when rendering.
      */
-    struct GlyphRect
+    struct GlyphMetrics
     {
-        Rectu16 Rect;      ///< Rectangle within the atlas texture, in pixel coordinates (full SDF bitmap including padding).
-        Vec2i   Bearing;   ///< Offset from the baseline origin to the top-left of the SDF bitmap (Y-up), including SDF padding.
-        Vec2i   PlaneSize; ///< Ink-only width and height in base-size pixels (bitmap minus the two SDF padding rings). Informational.
+        Vec2<FontUnit> Bearing;   ///< Offset from the baseline origin to the top-left of the glyph bitmap (Y-up).
+        Rectu16        AtlasRect; ///< Rectangle within the glyph atlas texture where the glyph's bitmap is stored, in pixel coordinates.
+        FontUnit       XAdvance;  ///< Horizontal advance to the next glyph. TODO: Should we support YAdvance for vertical text layout in the future?
+    };
+
+    /**
+     * @brief Configuration settings for the glyph atlas.
+     */
+    struct GlyphAtlasConfig
+    {
+        u16 AtlasWidth   { 2048 };  ///< The width of the glyph atlas texture in pixels.
+        u16 AtlasHeight  { 2048 };  ///< The height of the glyph atlas texture in pixels.
+        FontUnit BaseSize{ 56_fu }; ///< The base font size in pixels at which glyphs are rasterized.
+                                    ///< Higher values => better quality at larger sizes but more texture space used. 
+                                    ///< Lower values => more efficient for small text but missing details at large sizes.
+                                    ///< Ideal range is typically around 48-64.              
     };
 
     /**
@@ -32,14 +42,12 @@ namespace RatUI
     {
     public:
         GlyphAtlas( IRenderer& a_Renderer, ITextMetrics& a_TextMetrics,
-                    u16 a_Width = 4096, u16 a_Height = 4096, u32 a_BaseSize = 64u )
+                    const GlyphAtlasConfig& a_Config = {} )
             : m_Renderer   ( a_Renderer )
             , m_TextMetrics( a_TextMetrics )
-            , m_AtlasWidth ( a_Width )
-            , m_AtlasHeight( a_Height )
-            , m_BaseSize   ( a_BaseSize )
+            , m_Config     ( a_Config )
         {
-            m_Texture = m_Renderer.CreateTexture( a_Width, a_Height, ETextureFormat::RGBA8, nullptr )
+            m_Texture = m_Renderer.CreateTexture( m_Config.AtlasWidth, m_Config.AtlasHeight, ETextureFormat::RGBA8, nullptr )
                         .value_or( TextureID::Null() );
         }
 
@@ -55,17 +63,8 @@ namespace RatUI
         /** @brief Returns the GPU texture that holds the rasterized glyph bitmaps. */
         TextureID GetTexture() const { return m_Texture; }
 
-        /** @brief Returns the pixel width of the atlas texture. */
-        u16 GetWidth() const { return m_AtlasWidth; }
-
-        /** @brief Returns the pixel height of the atlas texture. */
-        u16 GetHeight() const { return m_AtlasHeight; }
-
-        /**  @brief Returns true if the atlas ran out of space. */
-        bool IsAtlasFull() const { return m_AtlasFull; }
-
-        /** @brief Returns the fixed base size passed to RasterizeGlyph for all codepoints. */
-        u32 GetBaseSize() const { return m_BaseSize; }
+        /** @brief Returns a reference to the configuration settings of the glyph atlas. */
+        const GlyphAtlasConfig& GetConfig() const { return m_Config; }
 
         /** @brief Returns a reference to the renderer used by the glyph atlas. */
         IRenderer& GetRenderer() const { return m_Renderer; }
@@ -74,41 +73,45 @@ namespace RatUI
         ITextMetrics& GetTextMetrics() const { return m_TextMetrics; }
 
         /**
-         * @brief Looks up or rasterizes a glyph in the atlas.
+         * @brief
          */
-        Optional<GlyphRect> GetOrRasterizeGlyph( FontHandle a_Font, u32 a_GlyphIndex )
+		Optional<GlyphMetrics> GetOrRasterizeGlyph( FontHandle a_Font, codepoint a_CP )
         {
-            const GlyphKey key{ a_Font, a_GlyphIndex };
+            const GlyphKey key{ a_Font, a_CP };
 
             if ( const auto it = Find( m_GlyphMap, key ); it != End( m_GlyphMap ) )
                 return it->second;
 
-            const Coloru8* pixels     = nullptr; // In RGBA8 format
-            u32            width      = 0, height = 0;
-            Vec2i          bearing{};
-            Vec2i          planeSize{};
+            if ( !m_Texture.IsValid() )
+                return NullOpt; // Can't upload if texture is invalid.
 
-            if ( !m_TextMetrics.RasterizeGlyph( a_Font, a_GlyphIndex, m_BaseSize, 
-                pixels, width, height, bearing, planeSize ) )
+            const Coloru8* pixels = nullptr; // In RGBA8 format
+            u32            width  = 0, height = 0;
+            Vec2<FontUnit> bearing{};
+            FontUnit       xAdvance{};
+
+            if ( !m_TextMetrics.RasterizeGlyph( a_Font, a_CP, m_Config.BaseSize,
+                pixels, width, height, bearing, xAdvance ) )
                 return NullOpt; // Rasterization failed (e.g. missing glyph in font).
 
             if ( width == 0 || height == 0 )
             {
                 // Cache invisible glyphs as zero-size rects to avoid repeated rasterization attempts.
-                GlyphRect invisibleRect{};
+                constexpr GlyphMetrics invisibleRect{};
                 m_GlyphMap[key] = invisibleRect;
                 return invisibleRect;
             }
-
-            if ( !m_Texture.IsValid() )
-                return NullOpt; // Can't upload if texture is invalid.
 
             // Upload the glyph bitmap to the atlas texture.
             if ( auto region = AllocateRegion( static_cast<u16>( width ), static_cast<u16>( height ) ) )
             {
                 const size dataSizeBytes = static_cast<size>( width ) * height * sizeof( Coloru8 );
                 m_Renderer.UpdateTexture( m_Texture, 0, region->Cast<u32>(), pixels, dataSizeBytes );
-                GlyphRect rect{ .Rect = *region, .Bearing = bearing, .PlaneSize = planeSize };
+
+                GlyphMetrics rect { .Bearing   = bearing,
+                                    .AtlasRect = *region,
+                                    .XAdvance  = xAdvance };
+
                 m_GlyphMap[key] = rect;
                 return rect;
             }
@@ -123,18 +126,18 @@ namespace RatUI
             if ( m_AtlasFull )
                 return NullOpt; // Fast exit once full - don't re-attempt every frame.
 
-            if ( a_Width > m_AtlasWidth || a_Height > m_AtlasHeight )
+            if ( a_Width > m_Config.AtlasWidth || a_Height > m_Config.AtlasHeight )
                 return NullOpt; // Glyph is too large to fit in the atlas.
 
             // Check horizontal overflow and move to next row if needed.
-            if ( m_CursorX + a_Width > m_AtlasWidth )
+            if ( m_CursorX + a_Width > m_Config.AtlasWidth )
             {
                 m_CursorX = 0;
                 m_CursorY = m_RowBottom;
             }
 
             // Check vertical overflow.
-            if ( m_CursorY + a_Height > m_AtlasHeight )
+            if ( m_CursorY + a_Height > m_Config.AtlasHeight )
             {
                 m_AtlasFull = true;
                 RATUI_ASSERT( false, "GlyphAtlas is full - increase atlas dimensions" );
@@ -151,18 +154,17 @@ namespace RatUI
         }
 
     protected:
-        IRenderer&     m_Renderer;
-        ITextMetrics&  m_TextMetrics;
-        TextureID      m_Texture{ TextureID::Null() };
-        u16            m_AtlasWidth{ 0 }, m_AtlasHeight{ 0 };
-        u32            m_BaseSize{ 64u }; ///< Fixed rasterization size used for all MSDF glyph generation.
-        u16            m_CursorX{ 0 }, m_CursorY{ 0 }, m_RowBottom{ 0 };
-        bool           m_AtlasFull{ false };
+        IRenderer&       m_Renderer;
+        ITextMetrics&    m_TextMetrics;
+        TextureID        m_Texture{ TextureID::Null() };
+        GlyphAtlasConfig m_Config;
+        u16              m_CursorX{ 0 }, m_CursorY{ 0 }, m_RowBottom{ 0 };
+        bool             m_AtlasFull{ false };
 
         struct GlyphKey
         {
             FontHandle Font;
-            u32        GlyphIndex;
+            codepoint  Codepoint;
 
             bool operator==( const GlyphKey& a_Other ) const = default;
         };
@@ -174,12 +176,12 @@ namespace RatUI
                 // FNV-1a hash combine
                 std::size_t hash = 2166136261u;
                 hash = ( hash ^ std::hash<FontHandle>{}( a_Key.Font ) ) * 16777619u;
-                hash = ( hash ^ std::hash<u32>{}( a_Key.GlyphIndex ) ) * 16777619u;
+                hash = ( hash ^ std::hash<codepoint>{}( a_Key.Codepoint ) ) * 16777619u;
                 return hash;
             }
         };
 
-        HashMap<GlyphKey, GlyphRect, GlyphKeyHasher> m_GlyphMap;
+        HashMap<GlyphKey, GlyphMetrics, GlyphKeyHasher> m_GlyphMap;
     };
 
 } // namespace RatUI

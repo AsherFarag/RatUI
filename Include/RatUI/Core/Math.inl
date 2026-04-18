@@ -82,7 +82,7 @@ namespace RatUI
 
     // === Vector Types ===
 
-    template<typename T, size Dim> requires std::is_arithmetic_v<T>
+    template<typename T, size Dim>
     using Vec = RATUI_VEC_IMPL<T, Dim>;
 
     template<typename T> using Vec2 = Vec<T, 2>;
@@ -101,7 +101,7 @@ namespace RatUI
 
     // === Matrix Types ===
 
-    template<typename T, size Dim> requires std::is_arithmetic_v<T>
+    template<typename T, size Dim>
     using Mat = RATUI_MATRIX_IMPL<T, Dim>;
 
     template<typename T> using Mat2 = Mat<T, 2>;
@@ -159,7 +159,7 @@ namespace RatUI
      * @brief A simple axis-aligned rectangle structure defined by its origin (top-left) and size.
      * @tparam T The type of the rectangle's coordinates and dimensions (e.g., float, int).
      */
-    template<typename T> requires std::is_arithmetic_v<T>
+    template<typename T>
     struct Rect
     {
         using ValueType = T;

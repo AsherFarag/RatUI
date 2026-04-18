@@ -20,7 +20,7 @@ namespace RatUI::Unicode
     /** 
      * @brief Returns true if @p a_CP is an ASCII codepoint (U+0000–U+007F).
      */
-    constexpr inline bool IsASCII( c32 a_CP )
+    constexpr inline bool IsASCII( codepoint a_CP )
     {
         return a_CP <= 0x7F;
     }
@@ -28,7 +28,7 @@ namespace RatUI::Unicode
     /** 
      * @brief Returns true if @p a_CP is an ASCII whitespace codepoint (U+0020 SPACE, U+0009 TAB, U+000A LINE FEED, U+000D CARRIAGE RETURN, or U+000C FORM FEED). 
      */
-    constexpr inline bool IsASCIIWhitespace( c32 a_CP )
+    constexpr inline bool IsASCIIWhitespace( codepoint a_CP )
     {
         return a_CP == 0x20 || ( a_CP >= 0x09 && a_CP <= 0x0D );
     }
@@ -40,7 +40,7 @@ namespace RatUI::Unicode
      *               U+2000–U+200A EN QUAD through HAIR SPACE, U+2028 LINE SEPARATOR,
      *               U+2029 PARAGRAPH SEPARATOR, and U+202F NARROW NO-BREAK SPACE.
      */
-    constexpr inline bool IsWhitespace( c32 a_CP )
+    constexpr inline bool IsWhitespace( codepoint a_CP )
     {
         return IsASCIIWhitespace( a_CP ) ||
                a_CP == 0x85 ||   // NEXT LINE
@@ -59,7 +59,7 @@ namespace RatUI::Unicode
      * @note Last audited against Unicode 15.1. Check for new CJK Extension
      *       blocks when upgrading the targeted Unicode version.
      */
-    constexpr inline bool IsCJK( c32 a_CP )
+    constexpr inline bool IsCJK( codepoint a_CP )
     {
         return ( a_CP >= 0x4E00  && a_CP <= 0x9FFF  ) || // CJK Unified Ideographs
                ( a_CP >= 0x3400  && a_CP <= 0x4DBF  ) || // CJK Extension A
@@ -102,7 +102,7 @@ namespace RatUI::Unicode
      * These are typically closing brackets, terminal punctuation, and
      * iteration marks that must always follow the character they relate to.
      */
-    constexpr inline bool IsLineStartProhibited( c32 a_CP )
+    constexpr inline bool IsLineStartProhibited( codepoint a_CP )
     {
         switch ( a_CP )
         {
@@ -145,7 +145,7 @@ namespace RatUI::Unicode
      * These are typically opening brackets and quotation marks that must
      * always precede the content they open.
      */
-    constexpr inline bool IsLineEndProhibited( c32 a_CP )
+    constexpr inline bool IsLineEndProhibited( codepoint a_CP )
     {
         switch ( a_CP )
         {
@@ -184,7 +184,7 @@ namespace RatUI::Unicode
      *       Opening equivalents (line-end-sticky) are not yet implemented for
      *       these scripts; see IsLineEndProhibited for CJK opening brackets.
      */
-    constexpr inline bool IsLineStartStickyPunctuation( c32 a_CP )
+    constexpr inline bool IsLineStartStickyPunctuation( codepoint a_CP )
     {
         switch ( a_CP )
         {
@@ -402,10 +402,10 @@ namespace RatUI::Unicode
             return UTF8Iterator( a_String, Size( a_String ) );
         }
 
-        constexpr c32 operator*()          const { return m_Current;                }
-        constexpr explicit operator bool()      const { return m_Index < Size( m_Data ); }
-        constexpr size     ByteIndex()          const { return m_Index;                  }
-        constexpr size     SequenceByteLength() const { return m_SequenceLen;            }
+        constexpr codepoint operator*()          const { return m_Current;                }
+        constexpr explicit  operator bool()      const { return m_Index < Size( m_Data ); }
+        constexpr size      ByteIndex()          const { return m_Index;                  }
+        constexpr size      SequenceByteLength() const { return m_SequenceLen;            }
 
         constexpr UTF8Iterator& operator++()
         {
@@ -431,7 +431,7 @@ namespace RatUI::Unicode
     private:
         StringView m_Data;
         size       m_Index{ 0 };
-        c32   m_Current{ 0 };
+        codepoint  m_Current{ 0 };
         size       m_SequenceLen{ 0 }; // byte length of m_Current's sequence (>= 1)
 
         static constexpr bool IsCont( u8 b ) { return ( b & 0xC0 ) == 0x80; }
@@ -444,7 +444,7 @@ namespace RatUI::Unicode
          * the ill-formed sequence (always >= 1), so that the caller advances past
          * exactly those bytes and emits exactly one U+FFFD per ill-formed sequence.
          */
-        constexpr void DecodeAt( size a_At, c32& a_CP, size& a_Len ) const
+        constexpr void DecodeAt( size a_At, codepoint& a_CP, size& a_Len ) const
         {
             const u8*  s   = static_cast<const u8*>( (const void*)Data( m_Data ) ) + a_At;
             const size rem = Size( m_Data ) - a_At;
@@ -463,7 +463,7 @@ namespace RatUI::Unicode
             {
                 if ( rem >= 2 && IsCont( s[1] ) )
                 {
-                    const c32 cp = static_cast<c32>( ( ( b0 & 0x1F ) << 6 ) | ( s[1] & 0x3F ) );
+                    const codepoint cp = static_cast<codepoint>( ( ( b0 & 0x1F ) << 6 ) | ( s[1] & 0x3F ) );
                     if ( cp >= 0x80 ) // reject overlong (cp < 0x80 would be encoded in 1 byte)
                     {
                         a_CP  = cp;
@@ -485,7 +485,7 @@ namespace RatUI::Unicode
                 {
                     if ( rem >= 3 && IsCont( s[2] ) )
                     {
-                        const c32 cp = static_cast<c32>(
+                        const codepoint cp = static_cast<codepoint>(
                             ( ( b0 & 0x0F ) << 12 ) | ( ( s[1] & 0x3F ) << 6 ) | ( s[2] & 0x3F ) );
                         // Reject overlong (< 0x800) and surrogates (0xD800–0xDFFF)
                         if ( cp >= 0x800 && !( cp >= 0xD800 && cp <= 0xDFFF ) )
@@ -515,7 +515,7 @@ namespace RatUI::Unicode
                     {
                         if ( rem >= 4 && IsCont( s[3] ) )
                         {
-                            const c32 cp = static_cast<c32>(
+                            const codepoint cp = static_cast<codepoint>(
                                 ( ( b0 & 0x07 ) << 18 ) | ( ( s[1] & 0x3F ) << 12 ) |
                                 ( ( s[2] & 0x3F ) << 6 )  | ( s[3] & 0x3F ) );
                             // Reject overlong (< 0x10000) and out-of-Unicode (> 0x10FFFF)
@@ -554,7 +554,7 @@ namespace RatUI::Unicode
      *        UTF8Iterator pair, enabling range-for loops:
      *
      * @code
-     *     for ( c32 cp : UTF8Range( myStringView ) )
+     *     for ( codepoint cp : UTF8Range( myStringView ) )
      *         Process( cp );
      * @endcode
      */
@@ -602,7 +602,7 @@ namespace RatUI::Unicode
         UTF8Range range{ a_Text };
         for ( auto it = range.begin(); it != range.end(); ++it )
         {
-            const c32 cp = *it;
+            const codepoint cp = *it;
 
             if ( IsASCII( cp ) )
             {
