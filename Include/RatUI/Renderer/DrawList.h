@@ -140,7 +140,8 @@ namespace RatUI
 
         DrawList& AddText( const ShapedText& a_Shaped, TextRenderStyle a_Style, Rectf a_Rect )
         {
-			EnsureMSDFBatch( a_Shaped.FontSize / Atlas.GetBaseSize() );
+			const f32 baseSize = Atlas.GetConfig().BaseSize.ToFloat();
+			EnsureMSDFBatch( baseSize > 0.f ? a_Shaped.FontSize / baseSize : 1.f );
 			Batcher.EmitText( a_Shaped, a_Style, a_Rect, Atlas );
             return *this;
         }

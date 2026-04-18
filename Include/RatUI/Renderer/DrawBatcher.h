@@ -419,13 +419,14 @@ namespace RatUI
             if ( Empty( a_Text.Glyphs ) || Empty( a_Text.Lines ) )
                 return;
 
-            const f32 atlasW = static_cast<f32>( a_Atlas.GetWidth() );
-            const f32 atlasH = static_cast<f32>( a_Atlas.GetHeight() );
+            const f32 atlasW = static_cast<f32>( a_Atlas.GetConfig().AtlasWidth );
+            const f32 atlasH = static_cast<f32>( a_Atlas.GetConfig().AtlasHeight );
             const f32 rcpW   = atlasW > 0.f ? 1.f / atlasW : 0.f;
             const f32 rcpH   = atlasH > 0.f ? 1.f / atlasH : 0.f;
 
-            const f32 scale = ( a_Atlas.GetBaseSize() > 0u && a_Text.FontSize > 0.f )
-                ? ( a_Text.FontSize * 2 ) / static_cast<f32>( a_Atlas.GetBaseSize() )
+            const f32 baseSize = a_Atlas.GetConfig().BaseSize.ToFloat();
+            const f32 scale = ( baseSize > 0.f && a_Text.FontSize > 0.f )
+                ? a_Text.FontSize / baseSize
                 : 1.f;
                 
             // Compute Y start based on vertical baseline alignment.
@@ -467,9 +468,9 @@ namespace RatUI
                 for ( u32 g = line.Start; g < line.End; ++g )
                 {
                     const ShapedGlyph&  sg = a_Text.Glyphs[ g ];
-                    Optional<GlyphRect> gr = a_Atlas.GetOrRasterizeGlyph( a_Text.Font, sg.GlyphID );
+                    Optional<GlyphMetrics> gr = a_Atlas.GetOrRasterizeGlyph( a_Text.Font, sg.GlyphID );
 
-                    if ( gr && gr->PlaneSize[0] > 0 && gr->PlaneSize[1] > 0 )
+                    if ( gr && gr->AtlasRect.Size[0] > 0 && gr->AtlasRect.Size[1] > 0 )
                     {
                         // Place the glyph quad using the full SDF bitmap (ink + SDF padding).
                         // Bearing already accounts for the padding offset so the ink aligns with
@@ -477,15 +478,15 @@ namespace RatUI
                         // fade-out at glyph edges, which is essential for correct anti-aliasing.
                         const f32 gx = penX + sg.XOffset + static_cast<f32>( gr->Bearing[0] ) * scale;
                         const f32 gy = penY + sg.YOffset - static_cast<f32>( gr->Bearing[1] ) * scale;
-                        const f32 gw = static_cast<f32>( gr->Rect.Size[0] ) * scale;
-                        const f32 gh = static_cast<f32>( gr->Rect.Size[1] ) * scale;
+                        const f32 gw = static_cast<f32>( gr->AtlasRect.Size[0] ) * scale;
+                        const f32 gh = static_cast<f32>( gr->AtlasRect.Size[1] ) * scale;
 
                         // Full atlas UV: covers the entire SDF bitmap including padding, so the
                         // SDF transitions are sampled correctly by the fragment shader.
-                        const f32 u0 = static_cast<f32>( gr->Rect.Origin[0] ) * rcpW;
-                        const f32 v0 = static_cast<f32>( gr->Rect.Origin[1] ) * rcpH;
-                        const f32 u1 = static_cast<f32>( gr->Rect.Origin[0] + gr->Rect.Size[0] ) * rcpW;
-                        const f32 v1 = static_cast<f32>( gr->Rect.Origin[1] + gr->Rect.Size[1] ) * rcpH;
+                        const f32 u0 = static_cast<f32>( gr->AtlasRect.Origin[0] ) * rcpW;
+                        const f32 v0 = static_cast<f32>( gr->AtlasRect.Origin[1] ) * rcpH;
+                        const f32 u1 = static_cast<f32>( gr->AtlasRect.Origin[0] + gr->AtlasRect.Size[0] ) * rcpW;
+                        const f32 v1 = static_cast<f32>( gr->AtlasRect.Origin[1] + gr->AtlasRect.Size[1] ) * rcpH;
 
                         const u32 vertexOffset = static_cast<u32>( Size( Vertices ) );
                         auto verts = ReserveVertices( 4 );

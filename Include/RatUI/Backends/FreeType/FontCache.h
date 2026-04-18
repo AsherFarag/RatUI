@@ -145,8 +145,8 @@ namespace RatUI::FreeType
         {
             if ( m_Buffer   ) hb_buffer_destroy(    std::exchange( m_Buffer,   nullptr ) );
             if ( m_Font     ) hb_font_destroy(      std::exchange( m_Font,     nullptr ) );
-            if ( m_Face     ) FT_Done_Face(         std::exchange( m_Face,     nullptr ) );
             if ( m_MsdfFont ) msdfgen::destroyFont( std::exchange( m_MsdfFont, nullptr ) );
+            if ( m_Face     ) FT_Done_Face(         std::exchange( m_Face,     nullptr ) );
         }
 
 		// TODO: m_Buffer is not thread-safe if we want to shape text from multiple threads. We could either:
@@ -233,7 +233,7 @@ namespace RatUI::FreeType
                 return nullptr;
 
             const String& filePath = pathIt->second;
-            auto fontOpt = Font::LoadFromFile( m_Library, CStr( filePath ), a_PixelSize );
+            auto fontOpt = Font::LoadFromFile( m_Library, CStr( filePath ) );
             if ( !fontOpt )
                 return nullptr;
 

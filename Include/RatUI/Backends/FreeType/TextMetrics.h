@@ -170,7 +170,7 @@ namespace RatUI::FreeType
                 return false;
         
             const FT_Face face = font->GetFace();
-            msdfgen::FontHandle* msdfFont = font->GetMsdfgenFontHandle();
+            msdfgen::FontHandle* msdfFont = font->GetMsdfFont();
         
             // ----------------------------
             // Load glyph shape + advance

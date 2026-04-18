@@ -90,7 +90,13 @@ namespace RatUI
             Vec2<FontUnit> bearing{};
             FontUnit       xAdvance{};
 
-            if ( !m_TextMetrics.RasterizeGlyph( a_Font, a_CP, m_Config.BaseSize,
+            const f32 baseSize = m_Config.BaseSize.ToFloat();
+            if ( !std::isfinite( baseSize ) || baseSize <= 0.f )
+                return NullOpt;
+
+            const u32 baseSizePx = static_cast<u32>( std::max( 1.0f, baseSize ) );
+
+            if ( !m_TextMetrics.RasterizeGlyph( a_Font, a_CP, baseSizePx,
                 pixels, width, height, bearing, xAdvance ) )
                 return NullOpt; // Rasterization failed (e.g. missing glyph in font).
 
