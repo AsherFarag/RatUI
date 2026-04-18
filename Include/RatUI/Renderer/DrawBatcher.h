@@ -425,22 +425,15 @@ namespace RatUI
             const f32 rcpH   = atlasH > 0.f ? 1.f / atlasH : 0.f;
 
             const f32 baseSize = a_Atlas.GetConfig().BaseSize.ToFloat();
-            const f32 scale = ( baseSize > 0.f && a_Text.FontSize > 0.f )
-                ? a_Text.FontSize / baseSize
-                : 1.f;
+			const f32 scale = a_Text.FontSize;
                 
             // Compute Y start based on vertical baseline alignment.
             f32 startY = a_LayoutRect.Origin[1];
             switch ( a_Style.Baseline )
             {
-                case ETextBaseline::Middle:
-                    startY += ( a_LayoutRect.Size[1] - a_Text.TotalHeight ) * 0.5f;
-                    break;
-                case ETextBaseline::Bottom:
-                    startY += a_LayoutRect.Size[1] - a_Text.TotalHeight;
-                    break;
-                default: // Top / Alphabetic / Hanging
-                    break;
+                case ETextBaseline::Middle: startY += ( a_LayoutRect.Size[1] - a_Text.TotalHeight ) * 0.5f; break;
+                case ETextBaseline::Bottom: startY += a_LayoutRect.Size[1] - a_Text.TotalHeight;            break;
+                default: break;
             }
 
             f32 penY = startY + a_Text.Ascender;
@@ -453,14 +446,9 @@ namespace RatUI
                 f32 lineX = a_LayoutRect.Origin[0];
                 switch ( a_Style.Align )
                 {
-                    case ETextAlign::Center:
-                        lineX += ( a_LayoutRect.Size[0] - line.Width ) * 0.5f;
-                        break;
-                    case ETextAlign::Right:
-                        lineX += a_LayoutRect.Size[0] - line.Width;
-                        break;
-                    default: // Left, Justify
-                        break;
+                    case ETextAlign::Center: lineX += ( a_LayoutRect.Size[0] - line.Width ) * 0.5f; break;
+                    case ETextAlign::Right:  lineX += a_LayoutRect.Size[0] - line.Width;            break;
+                    default: break;
                 }
 
                 f32 penX = lineX;
@@ -472,17 +460,22 @@ namespace RatUI
 
                     if ( gr && gr->AtlasRect.Size[0] > 0 && gr->AtlasRect.Size[1] > 0 )
                     {
-                        // Place the glyph quad using the full SDF bitmap (ink + SDF padding).
-                        // Bearing already accounts for the padding offset so the ink aligns with
-                        // the pen position.  Using the full bitmap preserves the natural SDF
-                        // fade-out at glyph edges, which is essential for correct anti-aliasing.
-                        const f32 gx = penX + sg.XOffset + static_cast<f32>( gr->Bearing[0] ) * scale;
-                        const f32 gy = penY + sg.YOffset - static_cast<f32>( gr->Bearing[1] ) * scale;
-                        const f32 gw = static_cast<f32>( gr->AtlasRect.Size[0] ) * scale;
-                        const f32 gh = static_cast<f32>( gr->AtlasRect.Size[1] ) * scale;
+                        const f32 gx =
+                            penX
+                            + sg.XOffset * scale
+                            + static_cast<f32>( gr->Bearing[0] ) * scale;
 
-                        // Full atlas UV: covers the entire SDF bitmap including padding, so the
-                        // SDF transitions are sampled correctly by the fragment shader.
+                        const f32 gy =
+                            penY
+                            + sg.YOffset * scale
+                            - static_cast<f32>( gr->Bearing[1] ) * scale;
+
+                        const f32 emW = static_cast<f32>( gr->AtlasRect.Size[0] ) / baseSize;
+                        const f32 emH = static_cast<f32>( gr->AtlasRect.Size[1] ) / baseSize;
+
+                        const f32 gw = emW * scale;
+                        const f32 gh = emH * scale;
+
                         const f32 u0 = static_cast<f32>( gr->AtlasRect.Origin[0] ) * rcpW;
                         const f32 v0 = static_cast<f32>( gr->AtlasRect.Origin[1] ) * rcpH;
                         const f32 u1 = static_cast<f32>( gr->AtlasRect.Origin[0] + gr->AtlasRect.Size[0] ) * rcpW;
@@ -500,7 +493,7 @@ namespace RatUI
                         idx[3] = vertexOffset + 1; idx[4] = vertexOffset + 3; idx[5] = vertexOffset + 2;
                     }
 
-                    penX += sg.XAdvance;
+					penX += sg.XAdvance * scale;
                 }
 
                 penY += a_Text.LineHeight;

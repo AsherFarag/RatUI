@@ -4,6 +4,9 @@
 #include FT_FREETYPE_H
 #include <hb.h>
 #include <hb-ft.h>
+#include <msdfgen.h>
+#include <ext/import-font.h>
+#include <msdfgen-ext.h>
 
 #include <map> // TODO: Remove me once we have Map<>
 
@@ -114,6 +117,12 @@ namespace RatUI::FreeType
     private:
         static Optional<Font> LoadFromFace( FT_Face a_Face )
         {
+            if ( FT_Set_Pixel_Sizes( a_Face, 0, 0 ) != 0 )
+            {
+                FT_Done_Face( a_Face );
+                return NullOpt;
+            }
+
             hb_font_t* hbFont = hb_ft_font_create( a_Face, nullptr );
             if ( !hbFont )
             {

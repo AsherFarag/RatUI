@@ -137,7 +137,7 @@ namespace RatUI::FreeType::TextUtil
         {
 			const c32 cp = *it;
             const u32 glyphIdx = FT_Get_Char_Index( face, cp );
-            const f32 advance = a_Font.GetAdvanceX( glyphIdx );
+            const f32 advance = 1; // TODO
 
             if ( hasPrev )
             {

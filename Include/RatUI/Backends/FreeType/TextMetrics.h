@@ -2,9 +2,6 @@
 #include "FontCache.h"
 #include "TextUtil.h"
 #include "../../Text/GlyphAtlas.h"
-#include <msdfgen.h>
-#include <ext/import-font.h>
-#include <msdfgen-ext.h>
 
 #include <cmath>
 
@@ -209,7 +206,7 @@ namespace RatUI::FreeType
             // ----------------------------
             // Convert font units -> pixels at SDF resolution
             const f64 unitsPerEm = static_cast<f64>(face->units_per_EM);
-            const f64 scale = static_cast<f64>( a_SdfPixelSize ) / unitsPerEm;
+            const f64 scale = static_cast<f64>( a_SdfPixelSize );
         
             // Add padding to prevent clipping of SDF fringes (in pixels at SDF resolution)
             const i32 padding = static_cast<i32>( std::ceil( c_MsdfPxRange ) );

@@ -81,7 +81,7 @@ namespace RatUI::TextLayout
         size wordStartByteOffset = 0;
 
         // Flush any pending Latin/script word run ( wordStartByteOffset .. upTo ) as a Text segment.
-        auto flushWord =[&]( size upTo )
+        auto flushWord = [&]( size upTo )
         {
             if ( upTo <= wordStartByteOffset )
                 return; // No word to flush.
