@@ -17,12 +17,12 @@ namespace RatUI::FreeType
      * If TextStyle::LineHeight is non-zero, that value is used directly.
      * Otherwise, the line height is derived from the face's size metrics.
      */
-    inline f32 GetLineHeight( FT_Face a_Face, const TextLayoutStyle& a_Style )
+    inline Unit GetLineHeight( FT_Face a_Face, const TextLayoutStyle& a_Style )
     {
-        if ( a_Style.LineHeight > 0.f )
+        if ( a_Style.LineHeight > 0_u )
             return a_Style.LineHeight;
 
-        return a_Face->size->metrics.height / 64.f;
+        return ToUnit( FontUnit{ static_cast<f32>( a_Face->size->metrics.height ) }, static_cast<f32>( a_Face->units_per_EM ) );
     }
 
     /**
@@ -153,8 +153,8 @@ namespace RatUI::FreeType
         void Destroy()
         {
             if ( m_Buffer   ) hb_buffer_destroy(    std::exchange( m_Buffer,   nullptr ) );
-            if ( m_Font     ) hb_font_destroy(      std::exchange( m_Font,     nullptr ) );
             if ( m_MsdfFont ) msdfgen::destroyFont( std::exchange( m_MsdfFont, nullptr ) );
+            if ( m_Font     ) hb_font_destroy(      std::exchange( m_Font,     nullptr ) );
             if ( m_Face     ) FT_Done_Face(         std::exchange( m_Face,     nullptr ) );
         }
 

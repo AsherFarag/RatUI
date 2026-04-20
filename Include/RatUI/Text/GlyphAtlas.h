@@ -22,12 +22,12 @@ namespace RatUI
      */
     struct GlyphAtlasConfig
     {
-        u16 AtlasWidth   { 2048 };  ///< The width of the glyph atlas texture in pixels.
-        u16 AtlasHeight  { 2048 };  ///< The height of the glyph atlas texture in pixels.
-        FontUnit BaseSize{ 56_fu }; ///< The base font size in pixels at which glyphs are rasterized.
-                                    ///< Higher values => better quality at larger sizes but more texture space used. 
-                                    ///< Lower values => more efficient for small text but missing details at large sizes.
-                                    ///< Ideal range is typically around 48-64.              
+        u16      AtlasWidth { 2048 }; ///< The width of the glyph atlas texture in pixels.
+        u16      AtlasHeight{ 2048 }; ///< The height of the glyph atlas texture in pixels.
+        Pixel    BaseSize{ 56_fu };   ///< The base font size in pixels at which glyphs are rasterized.
+                                      ///< Higher values => better quality at larger sizes but more texture space used. 
+                                      ///< Lower values => more efficient for small text but missing details at large sizes.
+                                      ///< Ideal range is typically around 48-64.              
     };
 
     /**

@@ -150,13 +150,13 @@ namespace RatUI
      */
     struct TextLayoutStyle
     {
-        FontHandle     Font{};                 ///< The font to use for rendering the text, specified as a FontHandle. If not set, a default font will be used.
-        f32            Size{ 16.0f };          ///< The size of the font in points, which determines the height of the characters. Default is 16.0f.          
-        f32            LineHeight{ 0.0f };     ///< The height of each line of text, including spacing. If set to 0, it will be automatically calculated based on the font size and metrics.
-        f32            LetterSpacing{ 0.0f };  ///< The spacing between characters in the text, specified in points. Default is 0.0f.
-		f32            WordSpacing{ 0.0f };    ///< The spacing between words in the text, specified in points. Default is 0.0f.
-		f32            LineSpacing{ 0.0f };    ///< The additional spacing between lines of text, specified in points. Default is 0.0f.
-		u16            MaxLines{ 0 };          ///< The maximum number of lines to display. If set to 0, there is no limit and all lines will be displayed.
+        FontHandle     Font              {}; ///< The font to use for rendering the text, specified as a FontHandle. If not set, a default font will be used.
+        Unit           Size        { 16_u }; ///< The size of the font in points, which determines the height of the characters. Default is 16.0f.          
+        Unit           LineHeight   { 0_u }; ///< The height of each line of text, including spacing. If set to 0, it will be automatically calculated based on the font size and metrics.
+        Unit           LetterSpacing{ 0_u }; ///< The spacing between characters in the text, specified in points. Default is 0.0f.
+		Unit           WordSpacing  { 0_u }; ///< The spacing between words in the text, specified in points. Default is 0.0f.
+		Unit           LineSpacing  { 0_u }; ///< The additional spacing between lines of text, specified in points. Default is 0.0f.
+		Unit           MaxLines     { 0_u }; ///< The maximum number of lines to display. If set to 0, there is no limit and all lines will be displayed.
 
         ETextDirection Direction  { ETextDirection::Auto };
         TextWrap       Wrap       { TextWrap::Normal() }; 
@@ -212,13 +212,13 @@ namespace RatUI
      */
     struct TextSegment
     {
-        u32 StartByte{ 0 };    ///< Byte offset inside PreparedText::NormalizedText.
-        u32 ByteLength{ 0 };   ///< Length in bytes.
-        f32 Width{ 0.f };      ///< Pixel advance used for line-fit checks (includes any spacing).
-        f32 PaintWidth{ 0.f }; ///< Pixel width of visible rendered content.
-                               ///<   Text     : equals Width.
-                               ///<   Space    : 0 (trailing spaces hang past the edge).
-                               ///<   HardBreak: 0.
+        u32  StartByte{ 0 };    ///< Byte offset inside PreparedText::NormalizedText.
+        u32  ByteLength{ 0 };   ///< Length in bytes.
+        Unit Width{ 0_u };      ///< Point advance used for line-fit checks (includes any spacing).
+        Unit PaintWidth{ 0_u }; ///< Point width of visible rendered content.
+                                ///<   Text     : equals Width.
+                                ///<   Space    : 0 (trailing spaces hang past the edge).
+                                ///<   HardBreak: 0.
 
         ESegmentKind Kind{ ESegmentKind::Text };
         bool         IsCJKChar{ false }; ///< True when this is a single CJK codepoint.
@@ -232,7 +232,7 @@ namespace RatUI
     {
         String             NormalizedText;     ///< Text after whitespace normalisation.
         Array<TextSegment> Segments;           ///< Pre-measured segments in logical order.
-        f32                HyphenWidth{ 0.f }; ///< Width of "-" (reserved for soft-hyphen support).
+        Unit               HyphenWidth{ 0_u }; ///< Width of "-" (reserved for soft-hyphen support).
     };
 
     /**
@@ -240,9 +240,9 @@ namespace RatUI
      */
     struct ShapedGlyph
     {
-        u32 GlyphID { 0 };                    ///< The backend-specific ID of the glyph, used for rendering. Usually the GlyphAtlas index.
-        f32 XAdvance{ 0.f }, YAdvance{ 0.f }; ///< The advance of the glyph in pixels, to move the pen position after rendering this glyph.
-        f32 XOffset { 0.f },  YOffset{ 0.f }; ///< The offset of the glyph in pixels, relative to the pen position when rendering.
+        u32 GlyphID { 0 };                         ///< The backend-specific ID of the glyph, used for rendering. Usually the GlyphAtlas index.
+        FontUnit XAdvance{ 0.f }, YAdvance{ 0.f }; ///< The advance of the glyph, to move the pen position after rendering this glyph.
+        FontUnit XOffset { 0.f },  YOffset{ 0.f }; ///< The offset of the glyph, relative to the pen position when rendering.
     };
 
     /**
@@ -264,15 +264,15 @@ namespace RatUI
         Array<ShapedLine>  Lines;  ///< Metadata about the lines in the shaped text.
         FontHandle         Font{}; ///< The font used for shaping the text, which is needed for rendering and glyph atlas lookups.
 
-        f32 FontSize   { 0.f }; ///< The font size used for shaping the text, which is needed for rendering and layout calculations.
-        f32 LineHeight { 0.f };
-        f32 Ascender   { 0.f };
-        f32 Descender  { 0.f };
+        Unit FontSize   { 0_u }; ///< The font size used for shaping the text, which is needed for rendering and layout calculations.
+        Unit LineHeight { 0_u };
+        Unit Ascender   { 0_u };
+        Unit Descender  { 0_u };
 
-        f32 MaxWidth          { 0.f }; ///< The maximum line width, used for overflow checks when rendering.
-        f32 TotalHeight       { 0.f }; ///< The total height of the shaped text block, used for vertical alignment and spacing calculations.
-        f32 UnderlinePosition { 0.f }; ///< The vertical position of the underline relative to the baseline, used for rendering underlines.
-        f32 UnderlineThickness{ 0.f }; ///< The thickness of the underline, used for rendering underlines.
+        Unit MaxWidth          { 0_u }; ///< The maximum line width, used for overflow checks when rendering.
+        Unit TotalHeight       { 0_u }; ///< The total height of the shaped text block, used for vertical alignment and spacing calculations.
+        Unit UnderlinePosition { 0_u }; ///< The vertical position of the underline relative to the baseline, used for rendering underlines.
+        Unit UnderlineThickness{ 0_u }; ///< The thickness of the underline, used for rendering underlines.
 
 		/** @brief Returns the number of lines in the shaped text, which can be used for layout and spacing calculations. */
 		u32 LineCount() const { return static_cast<u32>( Size( Lines ) ); }
