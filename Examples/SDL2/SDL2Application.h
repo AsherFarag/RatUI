@@ -173,6 +173,8 @@ private:
 
     void ProcessEvents()
     {
+		// TODO: Convert from Pixel space to Unit space for input events, and handle DPI scaling if needed.
+
         SDL_Event sdlEvent;
         while ( SDL_PollEvent( &sdlEvent ) )
         {
@@ -223,18 +225,18 @@ private:
                     .Device = EDeviceID::Mouse,
                     .Payload = PointerEvent{
                         .Type = EPointerType::Mouse,
-                        .ScrollDelta = Vec2f{ (f32)sdlEvent.wheel.x, (f32)sdlEvent.wheel.y }
+                        .ScrollDelta = Vec2<Unit>{ Unit{ (f32)sdlEvent.wheel.x }, Unit{ (f32)sdlEvent.wheel.y } }
                     }
                 };
             }
             else if ( sdlEvent.type == SDL_MOUSEMOTION )
             {
                 inputEvent = InputEvent{
-                    .Device = EDeviceID::Mouse,
-                    .Payload = PointerEvent{
-                        .Position = Vec2f{ (f32)sdlEvent.motion.x, (f32)sdlEvent.motion.y },
-                        .Delta = Vec2f{ (f32)sdlEvent.motion.xrel, (f32)sdlEvent.motion.yrel },
-                        .Type = EPointerType::Mouse
+                    .Device       = EDeviceID::Mouse,
+                    .Payload      = PointerEvent{
+                        .Position = Vec2<Unit>{ Unit{ (f32)sdlEvent.motion.x }, Unit{ (f32)sdlEvent.motion.y } },
+                        .Delta    = Vec2<Unit>{ Unit{ (f32)sdlEvent.motion.xrel }, Unit{ (f32)sdlEvent.motion.yrel } },
+                        .Type     = EPointerType::Mouse
                     }
                 };
             }
@@ -269,6 +271,6 @@ protected:
     Config                                     m_Config;
     bool                                       m_Running{ true };
     SDL_Window*                                m_Window{ nullptr };
-    SDL_GLContext                               m_GLContext{ nullptr };
+    SDL_GLContext                              m_GLContext{ nullptr };
     std::unique_ptr<OpenGL::OpenGLRenderer>    m_Renderer;
 };

@@ -15,9 +15,10 @@ namespace RatUI
         DrawBatcher& Batcher;
 		GlyphAtlas&  Atlas;
 
-		DrawList( DrawBatcher& a_Batcher, GlyphAtlas& a_Atlas )
+		DrawList( DrawBatcher& a_Batcher, GlyphAtlas& a_Atlas, f32 a_DPIScale = 1.f )
             : Batcher( a_Batcher )
             , Atlas( a_Atlas )
+            , m_DPIScale( a_DPIScale )
         {}
 
         void Clear()
@@ -66,7 +67,7 @@ namespace RatUI
         // Clip Stack
         // ========================
 
-        DrawList& PushClipRect( Rectu16 a_Rect )
+        DrawList& PushClipRect( Rect<Unit> a_Rect )
         {
             if ( !Empty( m_ClipStack ) )
                 a_Rect = a_Rect.Intersection( Back( m_ClipStack ) );
@@ -96,53 +97,54 @@ namespace RatUI
         // Drawing
         // ========================
 
-        DrawList& AddRect( Coloru8 a_Color, Rectf a_Rect )
+        DrawList& AddRect( Coloru8 a_Color, const Rect<Unit>& a_Rect )
         {
             EnsureGeoBatch();
-            Batcher.EmitRect( a_Rect, a_Color );
+            Batcher.EmitRect( ToPixelRect( a_Rect ), a_Color );
             return *this;
         }
 
-        DrawList& AddRect( Coloru8 a_Color, Rectf a_Rect, CornerRounding a_Rounding )
+        DrawList& AddRect( Coloru8 a_Color, const Rect<Unit>& a_Rect, CornerRounding a_Rounding )
         {
             EnsureGeoBatch();
-            Batcher.EmitRoundedRect( a_Rect, a_Rounding, a_Color );
+            Batcher.EmitRoundedRect( ToPixelRect( a_Rect ), a_Rounding, a_Color );
             return *this;
         }
 
-        DrawList& AddRectBorder( Coloru8 a_Color, Rectf a_Rect, f32 a_Thickness = 1.f )
+        DrawList& AddRectBorder( Coloru8 a_Color, const Rect<Unit>& a_Rect, Unit a_Thickness = 1_u )
         {
             EnsureGeoBatch();
-            Batcher.EmitRectBorder( a_Rect, 0.f, a_Color, a_Thickness );
+            Batcher.EmitRectBorder( ToPixelRect( a_Rect ), 0.f, a_Color, ToPixel( a_Thickness, m_DPIScale ).ToFloat() );
             return *this;
         }
 
-        DrawList& AddRectBorder( Coloru8 a_Color, Rectf a_Rect, CornerRounding a_Rounding, f32 a_Thickness = 1.f )
+        DrawList& AddRectBorder( Coloru8 a_Color, const Rect<Unit>& a_Rect, CornerRounding a_Rounding, Unit a_Thickness = 1_u )
         {
             EnsureGeoBatch();
-            Batcher.EmitRoundedRectBorder( a_Rect, a_Rounding, a_Color, a_Thickness );
+            Batcher.EmitRoundedRectBorder( ToPixelRect( a_Rect ), a_Rounding, a_Color, ToPixel( a_Thickness, m_DPIScale ).ToFloat() );
             return *this;
         }
 
-        DrawList& AddCircle( Coloru8 a_Color, Vec2f a_Center, f32 a_Radius )
+        DrawList& AddCircle( Coloru8 a_Color, Vec2<Unit> a_Center, Unit a_Radius )
         {
             EnsureGeoBatch();
-            Batcher.EmitCircle( a_Center, a_Radius, a_Color );
+            Batcher.EmitCircle( ToPixelVec2( a_Center ), ToPixel( a_Radius, m_DPIScale ).ToFloat(), a_Color );
             return *this;
         }
 
-        DrawList& AddCircleBorder( Coloru8 a_Color, Vec2f a_Center, f32 a_Radius, f32 a_Thickness = 1.f )
+        DrawList& AddCircleBorder( Coloru8 a_Color, Vec2<Unit> a_Center, Unit a_Radius, Unit a_Thickness = 1_u )
         {
             EnsureGeoBatch();
-            Batcher.EmitCircleBorder( a_Center, a_Radius, a_Color, a_Thickness );
+            Batcher.EmitCircleBorder( ToPixelVec2( a_Center ), ToPixel( a_Radius, m_DPIScale ).ToFloat(), a_Color, ToPixel( a_Thickness, m_DPIScale ).ToFloat() );
             return *this;
         }
 
-        DrawList& AddText( const ShapedText& a_Shaped, TextRenderStyle a_Style, Rectf a_Rect )
-        {
+        DrawList& AddText( const ShapedText& a_Shaped, TextRenderStyle a_Style, Rect<Unit> a_Rect )
+		{
 			const f32 baseSize = Atlas.GetConfig().BaseSize.ToFloat();
-			EnsureMSDFBatch( baseSize > 0.f ? a_Shaped.FontSize / baseSize : 1.f );
-			Batcher.EmitText( a_Shaped, a_Style, a_Rect, Atlas );
+            const f32 fontSizePx = ToPixel( a_Shaped.FontSize, m_DPIScale ).ToFloat();
+			EnsureMSDFBatch( baseSize > 0.f ? fontSizePx / baseSize : 1.f );
+			Batcher.EmitText( a_Shaped, a_Style, ToPixelRect( a_Rect ), Atlas );
             return *this;
         }
 
@@ -152,13 +154,42 @@ namespace RatUI
         }
 
     private:
-        Array<Rectu16>    m_ClipStack;
+        Array<Rect<Unit>> m_ClipStack;
         Array<Mat3f>      m_TransformStack;
 
-        Optional<Rectu16> m_CurrentClip;
-        Mat3f             m_CurrentTransform{ c_Identity<Mat3f> };
-        TextureID         m_CurrentTexture{ TextureID::Null() };
-        bool              m_HasActiveBatch{ false };
+        Optional<Rect<Unit>> m_CurrentClip;
+        Mat3f                m_CurrentTransform{ c_Identity<Mat3f> };
+        TextureID            m_CurrentTexture{ TextureID::Null() };
+        bool                 m_HasActiveBatch{ false };
+        f32                  m_DPIScale{ 1.f };
+
+        Vec2<Pixel> ToPixelVec2( const Vec2<Unit>& a_Vec ) const
+        {
+            return Vec2<Pixel>{
+                ToPixel( a_Vec[ 0 ], m_DPIScale ),
+                ToPixel( a_Vec[ 1 ], m_DPIScale )
+            };
+        }
+
+        Rect<Pixel> ToPixelRect( const Rect<Unit>& a_Rect ) const
+        {
+            return Rect<Pixel>{
+                ToPixelVec2( a_Rect.Origin ),
+                ToPixelVec2( a_Rect.Size )
+            };
+        }
+
+        Optional<Rectu16> GetClipRect() const
+        {
+            if ( !m_CurrentClip )
+                return NullOpt;
+
+			Rect<Pixel> pixelRect = ToPixelRect( *m_CurrentClip );
+            return Rectu16{
+                Vec2<u16>{ static_cast<u16>( pixelRect.Left().ToFloat() ), static_cast<u16>( pixelRect.Top().ToFloat() ) },
+                Vec2<u16>{ static_cast<u16>( pixelRect.Width().ToFloat() ), static_cast<u16>( pixelRect.Height().ToFloat() ) }
+			};
+        }
 
         void FlushBatch()
         {
@@ -171,10 +202,10 @@ namespace RatUI
 
         bool IsBatchStateCompatible( const DrawBatch& a_Batch, EBatchType a_Type ) const
         {
-            return a_Batch.Type == a_Type &&
-                a_Batch.ClipRect == m_CurrentClip &&
+            return a_Batch.Type   == a_Type &&
+                a_Batch.ClipRect  == GetClipRect() &&
                 a_Batch.Transform == m_CurrentTransform &&
-                a_Batch.Texture == m_CurrentTexture;
+                a_Batch.Texture   == m_CurrentTexture;
         }
 
         void UpdateBatchState()
@@ -199,7 +230,7 @@ namespace RatUI
                 return; // Current batch is already compatible.
 
             FlushBatch();
-            Batcher.BeginBatch( EBatchType::Geometry, m_CurrentClip, m_CurrentTransform, m_CurrentTexture );
+            Batcher.BeginBatch( EBatchType::Geometry, GetClipRect(), m_CurrentTransform, m_CurrentTexture);
             m_HasActiveBatch = true;
         }
 
@@ -217,7 +248,7 @@ namespace RatUI
             }
 
             FlushBatch();
-            DrawBatch& batch = Batcher.BeginBatch( EBatchType::MSDF, m_CurrentClip, m_CurrentTransform, m_CurrentTexture );
+            DrawBatch& batch = Batcher.BeginBatch( EBatchType::MSDF, GetClipRect(), m_CurrentTransform, m_CurrentTexture);
 
             batch.MSDF.Scale = a_Scale;
             m_HasActiveBatch = true;

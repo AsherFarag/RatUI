@@ -45,10 +45,10 @@ namespace RatUI
 #include "Core/Debug.inl"
 #include "Core/Containers.inl"
 #include "Core/Callback.inl"
+#include "Core/Units.inl"
 #include "Core/Math.inl"
 #include "Core/String.inl"
 #include "Core/Memory.inl"
-#include "Core/Units.inl"
 #include "Core/Pool.inl"
 
 #undef RATUI_TRY_EXPR

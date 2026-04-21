@@ -46,42 +46,42 @@ namespace RatUI
     		return nullptr; // Invalid starting node
 
         // Determine the preferred direction vector
-        Vec2f dir{};
+        Vec2<Unit> dir{};
         switch ( a_Action )
         {
-            case ENavAction::MoveLeft:  dir = { -1,  0 }; break;
-            case ENavAction::MoveRight: dir = {  1,  0 }; break;
-            case ENavAction::MoveUp:    dir = {  0, -1 }; break;
-            case ENavAction::MoveDown:  dir = {  0,  1 }; break;
+            case ENavAction::MoveLeft:  dir = { -1_u,  0_u }; break;
+            case ENavAction::MoveRight: dir = {  1_u,  0_u }; break;
+            case ENavAction::MoveUp:    dir = {  0_u, -1_u }; break;
+            case ENavAction::MoveDown:  dir = {  0_u,  1_u }; break;
     		default:                    return nullptr; // Unsupported action
         }
 
-        const Vec2f startCenter = a_Start->Layout.FinalRect.Center();
+        const Vec2<Unit> startCenter = a_Start->Layout.FinalRect.Center();
 
     	const LayoutNode* best = nullptr;
-        f32 bestScore = Limits<f32>::max();
-
-        for ( const LayoutNode* candidate : a_Nodes )
-        {
-            if ( candidate == a_Start ) continue;
-
-    		Vec2f candidateCenter = candidate->Layout.FinalRect.Center();
-            Vec2f delta = candidateCenter - startCenter;
-
-    		// Reject candidates not in the movement direction
-    		const f32 forward = nm::dot( delta, dir );
-            if ( forward <= 0 ) continue;
-
-    		// Score candidates based on a combination of forward distance and lateral deviation
-            f32 lateral = nm::length( delta - dir * forward );
-            f32 score   = forward + lateral * a_LateralPenaltyWeight;
-
-            if ( score < bestScore ) 
-            { 
-                bestScore = score;
-                best = candidate; 
-            }
-        }
+        //Unit bestScore = Limits<Unit>::max();
+        //
+        //for ( const LayoutNode* candidate : a_Nodes )
+        //{
+        //    if ( candidate == a_Start ) continue;
+        //
+    	//	const Vec2<f32> candidateCenter = candidate->Layout.FinalRect.Center();
+        //    const Vec2<f32> delta = candidateCenter - startCenter;
+        //
+    	//	// Reject candidates not in the movement direction
+        //    const f32 forward{ Math::Sq( Math::Dot( delta, dir ).ToFloat() ) };
+        //    if ( forward <= 0_u ) continue;
+        //
+    	//	// Score candidates based on a combination of forward distance and lateral deviation
+        //    Unit lateral = Math::LengthSq( delta - dir * forward );
+        //    Unit score   = forward + lateral * a_LateralPenaltyWeight;
+        //
+        //    if ( score < bestScore ) 
+        //    { 
+        //        bestScore = score;
+        //        best = candidate; 
+        //    }
+        //}
 
         return best;
     }

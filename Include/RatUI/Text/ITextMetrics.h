@@ -23,7 +23,7 @@ namespace RatUI
         /**
 		 * @brief Builds optimised render data (glyph quads, line metadata, etc.) from the prepared text and style.
          */
-		virtual Optional<ShapedText> Shape( const PreparedText& a_Prepared, const TextLayoutStyle& a_Style, Vec2f a_MaxSize = { Limits<f32>::max(), Limits<f32>::max() } ) = 0;
+		virtual Optional<ShapedText> Shape( const PreparedText& a_Prepared, const TextLayoutStyle& a_Style, Vec2<Unit> a_MaxSize = { Limits<Unit>::max(), Limits<Unit>::max() } ) = 0;
 
         /**
          * @brief Rasterizes a single glyph as an MTSDF (RGBA8, 4 bytes per texel) and returns

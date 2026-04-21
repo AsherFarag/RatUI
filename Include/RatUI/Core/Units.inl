@@ -1,11 +1,10 @@
 #pragma once
 #include "../Core.h"
 
-namespace RatUI
-{
+namespace RatUI {
     /**
      * @brief Unit template for type-safe representation of various units of measurement in RatUI.
-     * 
+     *
      */
     template<typename _Tag>
     struct UnitBase
@@ -17,23 +16,28 @@ namespace RatUI
         constexpr UnitBase() : Value( static_cast<ValueType>( 0 ) ) {}
         constexpr explicit UnitBase( ValueType a_Value ) : Value( a_Value ) {}
 
+        constexpr UnitBase  operator- ()                         const { return UnitBase{ -Value }; }
         constexpr UnitBase  operator+ ( UnitBase a_Other )       const { return UnitBase{ Value + a_Other.Value }; }
         constexpr UnitBase  operator- ( UnitBase a_Other )       const { return UnitBase{ Value - a_Other.Value }; }
+        constexpr UnitBase  operator* ( UnitBase a_Other )       const { return UnitBase{ Value * a_Other.Value }; }
+        constexpr UnitBase  operator/ ( UnitBase a_Other )       const { return UnitBase{ Value / a_Other.Value }; }
         constexpr UnitBase  operator* ( ValueType a_Scalar )     const { return UnitBase{ Value * a_Scalar }; }
         constexpr UnitBase  operator/ ( ValueType a_Scalar )     const { return UnitBase{ Value / a_Scalar }; }
         constexpr UnitBase& operator+=( UnitBase a_Other )             { Value += a_Other.Value; return *this; }
         constexpr UnitBase& operator-=( UnitBase a_Other )             { Value -= a_Other.Value; return *this; }
+        constexpr UnitBase& operator*=( UnitBase a_Other )             { Value *= a_Other.Value; return *this; }
+        constexpr UnitBase& operator/=( UnitBase a_Other )             { Value /= a_Other.Value; return *this; }
         constexpr UnitBase& operator*=( ValueType a_Scalar )           { Value *= a_Scalar; return *this; }
         constexpr UnitBase& operator/=( ValueType a_Scalar )           { Value /= a_Scalar; return *this; }
 
-		constexpr bool operator== ( UnitBase a_Other ) const { return Value == a_Other.Value; }
-		constexpr auto operator<=>( UnitBase a_Other ) const { return Value <=> a_Other.Value; }
+        constexpr bool operator== ( UnitBase a_Other ) const { return Value == a_Other.Value; }
+        constexpr auto operator<=>( UnitBase a_Other ) const { return Value <=> a_Other.Value; }
 
         constexpr explicit operator ValueType() const { return Value; }
         constexpr f32 ToFloat()                 const { return Value; }
     };
 
-    template <typename _Tag> 
+    template <typename _Tag>
     constexpr inline UnitBase<_Tag> operator*( f32 a_Scalar, UnitBase<_Tag> a_Unit ) { return a_Unit * a_Scalar; }
 
     /**
@@ -94,7 +98,7 @@ namespace RatUI
     template<typename T>
     struct Degrees;
 
-    /** 
+    /**
      * @brief A unit representing radians.
      * @note _rad literals for this type are defined in the Literals namespace, e.g., 3.14159_rad.
      */
@@ -107,12 +111,12 @@ namespace RatUI
 
         // === Constructors ===
 
-        constexpr Radians() : Value(static_cast<T>( 0 )) {}
+        constexpr Radians() : Value( static_cast<T>( 0 ) ) {}
         constexpr explicit Radians( T a_Value ) : Value( a_Value ) {}
         constexpr explicit Radians( Degrees<T> a_Degrees );
 
         template<typename U>
-		constexpr Radians( Radians<U> a_Other ) : Value( static_cast<T>( a_Other.Value ) ) {}
+        constexpr Radians( Radians<U> a_Other ) : Value( static_cast<T>( a_Other.Value ) ) {}
 
         // === Conversion Operators ===
 
@@ -148,12 +152,12 @@ namespace RatUI
 
         // === Constructors ===
 
-        constexpr Degrees() : Value(static_cast<T>( 0 )) {}
+        constexpr Degrees() : Value( static_cast<T>( 0 ) ) {}
         constexpr explicit Degrees( T a_Value ) : Value( a_Value ) {}
         constexpr explicit Degrees( Radians<T> a_Radians ) : Value( RadToDeg( a_Radians.Value ) ) {}
 
-		template<typename U>
-		constexpr Degrees( Degrees<U> a_Other ) : Value( static_cast<T>( a_Other.Value ) ) {}
+        template<typename U>
+        constexpr Degrees( Degrees<U> a_Other ) : Value( static_cast<T>( a_Other.Value ) ) {}
 
         // === Conversion Operators ===
 
@@ -183,22 +187,21 @@ namespace RatUI
     using Degreesf = Degrees<f32>;
     using Radiansf = Radians<f32>;
 
-    /** 
+    /**
      * @brief A namespace containing literals for RatUI units.
      */
-    namespace Literals
-    {
-        constexpr Radians<f64> operator"" _rad( long double a_Value )        { return Radians<f64>{ static_cast<f64>( a_Value ) }; }
-        constexpr Degrees<f64> operator"" _deg( long double a_Value )        { return Degrees<f64>{ static_cast<f64>( a_Value ) }; }
+    namespace Literals {
+        constexpr Radians<f64> operator"" _rad( long double a_Value ) { return Radians<f64>{ static_cast<f64>( a_Value ) }; }
+        constexpr Degrees<f64> operator"" _deg( long double a_Value ) { return Degrees<f64>{ static_cast<f64>( a_Value ) }; }
         constexpr Radians<f64> operator"" _rad( unsigned long long a_Value ) { return Radians<f64>{ static_cast<f64>( a_Value ) }; }
         constexpr Degrees<f64> operator"" _deg( unsigned long long a_Value ) { return Degrees<f64>{ static_cast<f64>( a_Value ) }; }
 
-        constexpr FontUnit     operator"" _fu ( long double a_Value )        { return FontUnit{ static_cast<f32>( a_Value ) }; }
-        constexpr FontUnit     operator"" _fu ( unsigned long long a_Value ) { return FontUnit{ static_cast<f32>( a_Value ) }; }
-        constexpr Unit         operator"" _u  ( long double a_Value )        { return Unit{  static_cast<f32>( a_Value ) }; }
-        constexpr Unit         operator"" _u  ( unsigned long long a_Value ) { return Unit{  static_cast<f32>( a_Value ) }; }
-        constexpr Pixel        operator"" _px ( unsigned long long a_Value ) { return Pixel{ static_cast<f32>( a_Value ) }; }
-        constexpr Pixel        operator"" _px ( long double a_Value )        { return Pixel{ static_cast<f32>( a_Value ) }; }
+        constexpr FontUnit     operator"" _fu( long double a_Value ) { return FontUnit{ static_cast<f32>( a_Value ) }; }
+        constexpr FontUnit     operator"" _fu( unsigned long long a_Value ) { return FontUnit{ static_cast<f32>( a_Value ) }; }
+        constexpr Unit         operator"" _u( long double a_Value ) { return Unit{ static_cast<f32>( a_Value ) }; }
+        constexpr Unit         operator"" _u( unsigned long long a_Value ) { return Unit{ static_cast<f32>( a_Value ) }; }
+        constexpr Pixel        operator"" _px( unsigned long long a_Value ) { return Pixel{ static_cast<f32>( a_Value ) }; }
+        constexpr Pixel        operator"" _px( long double a_Value ) { return Pixel{ static_cast<f32>( a_Value ) }; }
     }
 
     using namespace Literals;
@@ -209,13 +212,68 @@ namespace RatUI
 
     template<typename T>
     constexpr Radians<T>::Radians( Degrees<T> a_Degrees )
-     : Value( DegToRad( a_Degrees.Value ) )
-    {
-    }
+        : Value( DegToRad( a_Degrees.Value ) )
+    {}
 
     template<typename T>
     constexpr Radians<T>::operator Degrees<T>() const
     {
         return Degrees<T>{ RadToDeg( Value ) };
     }
-}
+
+} // namespace RatUI
+
+// =========================================================
+// std Implementations
+// =========================================================
+
+namespace std
+{
+	using RatUI::UnitBase;
+
+    template<typename _Tag>
+    class std::numeric_limits<UnitBase<_Tag>>
+    {
+    public:
+        using UnitType = UnitBase<_Tag>;
+        using Limit    = std::numeric_limits<typename UnitType::ValueType>;
+
+		RATUI_NODISCARD static constexpr UnitType min() noexcept { return UnitType{ Limit::min() }; }
+                                                  
+        RATUI_NODISCARD static constexpr UnitType max() noexcept { return UnitType{ Limit::max() }; }
+
+        RATUI_NODISCARD static constexpr UnitType lowest() noexcept { return UnitType{ Limit::lowest() }; }
+
+        RATUI_NODISCARD static constexpr UnitType epsilon() noexcept { return UnitType{ Limit::epsilon() }; }
+
+        RATUI_NODISCARD static constexpr UnitType round_error() noexcept { return UnitType{ Limit::round_error() }; }
+
+        RATUI_NODISCARD static constexpr UnitType denorm_min() noexcept { return UnitType{ Limit::denorm_min() }; }
+
+        RATUI_NODISCARD static constexpr UnitType infinity() noexcept { return UnitType{ Limit::infinity() }; }
+
+        RATUI_NODISCARD static constexpr UnitType quiet_NaN() noexcept { return UnitType{ Limit::quiet_NaN() }; }
+
+        RATUI_NODISCARD static constexpr UnitType signaling_NaN() noexcept { return UnitType{ Limit::signaling_NaN() }; }
+
+        static constexpr auto digits         = Limit::digits;
+        static constexpr auto digits10       = Limit::digits10;
+        static constexpr auto max_digits10   = Limit::max_digits10;
+        static constexpr auto max_exponent   = Limit::max_exponent;
+        static constexpr auto max_exponent10 = Limit::max_exponent10;
+        static constexpr auto min_exponent   = Limit::min_exponent;
+        static constexpr auto min_exponent10 = Limit::min_exponent10;
+
+        // float base
+
+        static constexpr auto has_infinity             = Limit::has_infinity;
+        static constexpr auto has_quiet_NaN            = Limit::has_quiet_NaN;
+        static constexpr auto has_signaling_NaN        = Limit::has_signaling_NaN;
+        static constexpr auto is_bounded               = Limit::is_bounded;
+        static constexpr auto is_iec559                = Limit::is_iec559;
+        static constexpr auto is_signed                = Limit::is_signed;
+        static constexpr auto is_specialized           = Limit::is_specialized;
+        static constexpr auto round_style              = Limit::round_style;
+        static constexpr auto radix                    = Limit::radix;
+    };
+} // namespace std

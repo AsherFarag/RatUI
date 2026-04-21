@@ -68,7 +68,7 @@ protected:
         // Update the layout with the current window size as the available space.
         i32 windowWidth, windowHeight;
         SDL_GetWindowSize( GetWindow(), &windowWidth, &windowHeight );
-        m_Scene->GetScene().UpdateLayout( Vec2f{ static_cast<f32>( windowWidth ), static_cast<f32>( windowHeight ) } );
+        m_Scene->GetScene().UpdateLayout( Vec2<Unit>{ Unit{ static_cast<f32>( windowWidth ) }, Unit{ static_cast<f32>( windowHeight ) } } );
     }
 
     void OnRender( IRenderer& a_Renderer ) override

@@ -45,10 +45,10 @@ public:
         if ( !node )
             return;
 
-        const Rectf& rect = node->Layout.FinalRect;
+        const Rect<Unit>& rect = node->Layout.FinalRect;
 
 		if ( a_Scene.GetFocusedWidget() == GetID() )
-			a_DrawList.AddRect( Colorsu8::White, rect.Expanded( 4.f ), Rounding + 4_deg );
+			a_DrawList.AddRect( Colorsu8::White, rect.Expanded( 4_u ), Rounding + 4_deg );
 
 		a_DrawList.AddRect( Color, rect, Rounding );
 
@@ -70,11 +70,11 @@ class CircleWidget : public IWidget
 {
 public:
 
-    f32    Radius;
+    Unit    Radius;
     Coloru8 Color;
-    bool   IsFilled;
+    bool    IsFilled;
 
-    CircleWidget( f32 a_Radius, Coloru8 a_Color, bool a_Filled = true )
+    CircleWidget( Unit a_Radius, Coloru8 a_Color, bool a_Filled = true )
         : Radius( a_Radius )
         , Color( a_Color )
         , IsFilled( a_Filled )
@@ -86,21 +86,21 @@ public:
         if ( !node )
             return;
 
-        const Rectf& rect = node->Layout.FinalRect;
-        Vec2f center = rect.Center();
+        const Rect<Unit>& rect = node->Layout.FinalRect;
+        Vec2<Unit> center = rect.Center();
 
         if ( IsFilled )
         {
             if ( a_Scene.GetFocusedWidget() == GetID() )
-			    a_DrawList.AddCircle( Colorsu8::LightYellow, center, Radius + 4.f );
+			    a_DrawList.AddCircle( Colorsu8::LightYellow, center, Radius + 4_u );
 
             a_DrawList.AddCircle( Color, center, Radius );
         }
         else
         {
-            const f32 borderThickness = 4.f;
+            const Unit borderThickness = 4_u;
             if ( a_Scene.GetFocusedWidget() == GetID() )
-                a_DrawList.AddCircleBorder( Colorsu8::LightYellow, center, Radius + 4.f, borderThickness + 2.f );
+                a_DrawList.AddCircleBorder( Colorsu8::LightYellow, center, Radius + 4_u, borderThickness + 2_u );
 
             a_DrawList.AddCircleBorder( Color, center, Radius, borderThickness );
         }

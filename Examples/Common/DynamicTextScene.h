@@ -53,7 +53,7 @@ private:
     // Style factories
     // -------------------------------------------------------------------------
 
-    TextStyle MakeStyle( f32 sz = 14.f ) const
+    TextStyle MakeStyle( Unit sz = 14_u ) const
     {
         TextStyle s;
         s.Layout.Font    = m_Font;
@@ -66,7 +66,7 @@ private:
 
     TextStyle SectionHeadingStyle() const
     {
-        TextStyle s = MakeStyle( 9.f );
+        TextStyle s = MakeStyle( 9_u );
         s.Render.Color      = Colorsu8::TextSecondary;
         s.Layout.Transform  = ETextTransform::Uppercase;
         return s;
@@ -74,7 +74,7 @@ private:
 
     TextStyle RowLabelStyle() const
     {
-        TextStyle s = MakeStyle( 10.f );
+        TextStyle s = MakeStyle( 10_u );
         s.Render.Color = Colorsu8::TextDisabled;
         return s;
     }
@@ -89,7 +89,7 @@ private:
         const char* text,
         TextStyle   style,
         ESizingMode wMode = ESizingMode::Flex,
-        f32         fixedW = 0.f )
+        Unit        fixedW = 0_u )
     {
         WidgetID w = m_Scene.CreateWidget<TextWidget>( parent, text, style.Layout, style.Render );
         auto* n = Node( w );
@@ -109,8 +109,8 @@ private:
         {
             auto* n = Node( card );
             n->Style.LayoutType = ELayoutType::Vertical;
-            n->Style.Padding    = Edges{ 12.f };
-            n->Style.Spacing    = 5.f;
+            n->Style.Padding    = Edges::Uniform( 12_u );
+            n->Style.Spacing    = 5_u;
             n->Style.WidthMode  = ESizingMode::Flex;
             n->Style.HeightMode = ESizingMode::Content;
         }
@@ -124,7 +124,7 @@ private:
             auto* n = Node( div );
             n->Style.WidthMode   = ESizingMode::Flex;
             n->Style.HeightMode  = ESizingMode::Fixed;
-            n->Style.FixedHeight = 1.f;
+            n->Style.FixedHeight = 1_u;
         }
 
         return card;
@@ -139,7 +139,7 @@ private:
         {
             auto* n = Node( row );
             n->Style.LayoutType = ELayoutType::Horizontal;
-            n->Style.Spacing    = 12.f;
+            n->Style.Spacing    = 12_u;
             n->Style.WidthMode  = ESizingMode::Flex;
             n->Style.HeightMode = ESizingMode::Content;
         }
@@ -149,7 +149,7 @@ private:
             WidgetID c = m_Scene.CreateWidget<RectWidget>( row, Colorsu8::Surface900, "Col" );
             auto* n = Node( c );
             n->Style.LayoutType = ELayoutType::Vertical;
-            n->Style.Spacing    = 12.f;
+            n->Style.Spacing    = 12_u;
             n->Style.WidthMode  = ESizingMode::Flex;
             n->Style.FlexGrow   = 1.f;
             n->Style.HeightMode = ESizingMode::Content;
@@ -166,7 +166,7 @@ private:
         const char* demoText,
         TextStyle   style,
         ESizingMode textWMode = ESizingMode::Flex,
-        f32         textFixedW = 0.f )
+        Unit        textFixedW = 0_u )
     {
         WidgetID row = m_Scene.CreateWidget<RectWidget>(
             card, Colorsu8::Surface800, "Row"
@@ -174,7 +174,7 @@ private:
         {
             auto* n = Node( row );
             n->Style.LayoutType = ELayoutType::Horizontal;
-            n->Style.Spacing    = 8.f;
+            n->Style.Spacing    = 8_u;
             n->Style.WidthMode  = ESizingMode::Flex;
             n->Style.HeightMode = ESizingMode::Content;
         }
@@ -184,9 +184,9 @@ private:
         WidgetID lbl = m_Scene.CreateWidget<TextWidget>( row, rowLabel, lblStyle.Layout, lblStyle.Render );
         {
             auto* n = Node( lbl );
-            n->Style.Padding    = Edges{ 4.f };
+            n->Style.Padding    = Edges::Uniform( 4_u );
             n->Style.WidthMode  = ESizingMode::Fixed;
-            n->Style.FixedWidth = 112.f;
+            n->Style.FixedWidth = 112_u;
             n->Style.HeightMode = ESizingMode::Content;
         }
 
@@ -201,14 +201,14 @@ private:
     {
         WidgetID card = BeginCard( parent, "Font Sizes" );
 
-        constexpr struct { f32 sz; const char* label; } kSizes[] = {
-            {  8.f, "8 px - caption"  },
-            { 11.f, "11 px - small"   },
-            { 13.f, "13 px - ui"      },
-            { 16.f, "16 px - body"    },
-            { 20.f, "20 px - lead"    },
-            { 28.f, "28 px - h3"      },
-            { 40.f, "40 px - h1"      },
+        constexpr struct { Unit sz; const char* label; } kSizes[] = {
+            {  8_u, "8 px - caption"  },
+            { 11_u, "11 px - small"   },
+            { 13_u, "13 px - ui"      },
+            { 16_u, "16 px - body"    },
+            { 20_u, "20 px - lead"    },
+            { 28_u, "28 px - h3"      },
+            { 40_u, "40 px - h1"      },
         };
         for ( auto& e : kSizes )
             AddRow( card, e.label, "The quick brown fox", MakeStyle( e.sz ) );
@@ -232,7 +232,7 @@ private:
         };
         for ( auto& e : kCols )
         {
-            TextStyle ts = MakeStyle( 14.f );
+            TextStyle ts = MakeStyle( 14_u );
             ts.Render.Color = e.col;
             AddRow( card, e.label, "Aa  The quick brown fox", ts );
         }
@@ -251,7 +251,7 @@ private:
 
         for ( auto& e : kAligns )
         {
-            TextStyle ts = MakeStyle( 14.f );
+            TextStyle ts = MakeStyle( 14_u );
             ts.Render.Align = e.align;
             ts.Layout.Wrap = TextWrap::WrapWord();
             AddRow( card, e.label, kSent, ts, ESizingMode::Flex );
@@ -267,18 +267,18 @@ private:
             "Amazingly few discotheques provide jukeboxes.";
 
         {
-            TextStyle ts = MakeStyle( 13.f );
+            TextStyle ts = MakeStyle( 13_u );
             ts.Layout.Wrap = TextWrap::NoWrap();
             ts.Layout.Overflow = ETextOverflow::Ellipsis;
             AddRow( card, "NoWrap+Ellipsis", kLong, ts, ESizingMode::Flex );
         }
         {
-            TextStyle ts = MakeStyle( 13.f );
+            TextStyle ts = MakeStyle( 13_u );
             ts.Layout.Wrap = TextWrap::WrapWord();
             AddRow( card, "WrapWord", kLong, ts, ESizingMode::Flex );
         }
         {
-            TextStyle ts = MakeStyle( 13.f );
+            TextStyle ts = MakeStyle( 13_u );
             ts.Layout.Wrap = TextWrap::WrapChar();
             AddRow( card, "WrapChar", kLong, ts, ESizingMode::Flex );
         }
@@ -293,11 +293,11 @@ private:
 
         auto add = [&]( const char* label, TextWrap wrap, ETextOverflow overflow, u16 maxLines )
         {
-            TextStyle ts = MakeStyle( 13.f );
+            TextStyle ts = MakeStyle( 13_u );
             ts.Layout.Wrap = wrap;
             ts.Layout.Overflow = overflow;
             ts.Layout.MaxLines = maxLines;
-            AddRow( card, label, kLong, ts, ESizingMode::Fixed, 260.f );
+            AddRow( card, label, kLong, ts, ESizingMode::Fixed, 260_u );
         };
 
         add( "Clip",         TextWrap::NoWrap(),   ETextOverflow::Clip,     0 );
@@ -320,7 +320,7 @@ private:
         };
         for ( auto& e : kXforms )
         {
-            TextStyle ts = MakeStyle( 14.f );
+            TextStyle ts = MakeStyle( 14_u );
             ts.Layout.Transform = e.xf;
             AddRow( card, e.label, kRaw, ts );
         }
@@ -330,16 +330,16 @@ private:
     {
         WidgetID card = BeginCard( parent, "Letter Spacing" );
 
-        constexpr struct { f32 sp; const char* label; } kSpacings[] = {
-            { -1.0f, "-1 px  tight"  },
-            {  0.0f, " 0 px  normal" },
-            {  1.0f, "+1 px"         },
-            {  2.5f, "+2.5 px"       },
-            {  5.0f, "+5 px  wide"   },
+        constexpr struct { Unit sp; const char* label; } kSpacings[] = {
+            { -1_u,   "-1 px  tight"  },
+            {  0_u,   " 0 px  normal" },
+            {  1_u,   "+1 px"         },
+            {  2.5_u, "+2.5 px"       },
+            {  5.0_u, "+5 px  wide"   },
         };
         for ( auto& e : kSpacings )
         {
-            TextStyle ts = MakeStyle( 14.f );
+            TextStyle ts = MakeStyle( 14_u );
             ts.Layout.LetterSpacing = e.sp;
             ts.Layout.Wrap = TextWrap::NoWrap();
             ts.Layout.Overflow = ETextOverflow::Clip;
@@ -355,16 +355,16 @@ private:
             "Waves break; seagulls call out.\n"
             "Dusk paints the harbour crimson.";
 
-        constexpr struct { f32 lh; const char* label; } kLH[] = {
-            {  0.f, "Auto"          },
-            { 12.f, "12 px  tight"  },
-            { 20.f, "20 px  normal" },
-            { 30.f, "30 px  loose"  },
+        constexpr struct { Unit lh; const char* label; } kLH[] = {
+            {  0_u, "Auto"          },
+            { 12_u, "12 px  tight"  },
+            { 20_u, "20 px  normal" },
+            { 30_u, "30 px  loose"  },
         };
 
         for ( auto& e : kLH )
         {
-            TextStyle ts = MakeStyle( 13.f );
+            TextStyle ts = MakeStyle( 13_u );
             ts.Layout.LineHeight = e.lh;
             ts.Layout.Wrap = TextWrap::WrapWord();
             AddRow( card, e.label, kPara, ts, ESizingMode::Flex );
@@ -384,7 +384,7 @@ private:
         };
         for ( auto& e : kDec )
         {
-            TextStyle ts = MakeStyle( 14.f );
+            TextStyle ts = MakeStyle( 14_u );
             ts.Render.Underline     = e.ul;
             ts.Render.Strikethrough = e.st;
             AddRow( card, e.label, kSamp, ts );
@@ -400,30 +400,30 @@ private:
 
         // Violet underline + WrapWord
         {
-            TextStyle ts             = MakeStyle( 14.f );
+            TextStyle ts             = MakeStyle( 14_u );
             ts.Render.Color          = Colorsu8::AccentViolet;
             ts.Render.Underline      = true;
             ts.Render.FadePercentage = 0.5f; // 50% faded underline
             ts.Layout.Wrap           = TextWrap::NoWrap();
             ts.Layout.Overflow       = ETextOverflow::Fade;
-            AddRow( card, "Fade+UL", kLong, ts, ESizingMode::Fixed, 200.f );
+            AddRow( card, "Fade+UL", kLong, ts, ESizingMode::Fixed, 200_u );
         }
         // Rose strikethrough + uppercase + WrapWord
         {
-            TextStyle ts             = MakeStyle( 14.f );
+            TextStyle ts             = MakeStyle( 14_u );
             ts.Render.Color          = Colorsu8::AccentRose;
             ts.Render.Strikethrough  = true;
             ts.Layout.Transform      = ETextTransform::Uppercase;
             ts.Layout.Wrap           = TextWrap::NoWrap();
             ts.Layout.Overflow       = ETextOverflow::Fade;
             ts.Render.FadePercentage = 0.5f; // 50% faded strikethrough
-            AddRow( card, "Fade+ST+UC", kLong, ts, ESizingMode::Fixed, 200.f );
+            AddRow( card, "Fade+ST+UC", kLong, ts, ESizingMode::Fixed, 200_u );
         }
         // Amber wide spacing + capitalize + ellipsis
         {
-            TextStyle ts            = MakeStyle( 13.f );
+            TextStyle ts            = MakeStyle( 13_u );
             ts.Render.Color         = Colorsu8::AccentAmber;
-            ts.Layout.LetterSpacing = 3.f;
+            ts.Layout.LetterSpacing = 3_u;
             ts.Layout.Transform     = ETextTransform::Capitalize;
             ts.Layout.Wrap          = TextWrap::NoWrap();
             ts.Layout.Overflow      = ETextOverflow::Ellipsis;
@@ -431,11 +431,11 @@ private:
         }
         // Sky center-aligned large display
         {
-            TextStyle ts         = MakeStyle( 22.f );
+            TextStyle ts         = MakeStyle( 22_u );
             ts.Render.Color      = Colorsu8::AccentSky;
             ts.Render.Align      = ETextAlign::Center;
             ts.Layout.Wrap       = TextWrap::WrapWord();
-            ts.Layout.LineHeight = 30.f;
+            ts.Layout.LineHeight = 30_u;
             AddRow( card, "Center 22px", "The beauty of typography lives in every detail.", ts, ESizingMode::Flex );
         }
     }
@@ -452,7 +452,7 @@ private:
         {
             auto* n = Node( row );
             n->Style.LayoutType = ELayoutType::Horizontal;
-            n->Style.Spacing    = 8.f;
+            n->Style.Spacing    = 8_u;
             n->Style.WidthMode  = ESizingMode::Flex;
             n->Style.HeightMode = ESizingMode::Content;
         }
@@ -462,9 +462,9 @@ private:
 		WidgetID lbl = m_Scene.CreateWidget<TextWidget>( row, "Ellipsis", lblStyle.Layout, lblStyle.Render );
         {
             auto* n = Node( lbl );
-            n->Style.Padding = Edges{ 4.f };
+            n->Style.Padding = Edges::Uniform( 4_u );
             n->Style.WidthMode  = ESizingMode::Fixed;
-            n->Style.FixedWidth = 112.f;
+            n->Style.FixedWidth = 112_u;
             n->Style.HeightMode = ESizingMode::Content;
         }
 
@@ -476,14 +476,14 @@ private:
         {
             auto* n = Node( m_AnimContainer );
             n->Style.WidthMode  = ESizingMode::Fixed;
-            n->Style.FixedWidth = 400.f;
+            n->Style.FixedWidth = 400_u;
             n->Style.HeightMode = ESizingMode::Content;
             n->Style.LayoutType = ELayoutType::Horizontal;
-            n->Style.Padding    = Edges{ 4.f };
-            n->Style.Spacing    = 4.f;
+            n->Style.Padding    = Edges::Uniform( 4_u );
+            n->Style.Spacing    = 4_u;
         }
 
-        TextStyle ts       = MakeStyle( 13.f );
+        TextStyle ts       = MakeStyle( 13_u );
         ts.Render.Color    = Colorsu8::AccentBlue;
         ts.Layout.Wrap     = TextWrap::NoWrap();
         ts.Layout.Overflow = ETextOverflow::Ellipsis;
@@ -531,8 +531,8 @@ public:
         {
             auto* n = Node( root );
             n->Style.LayoutType = ELayoutType::Vertical;
-            n->Style.Spacing    = 0.f;
-            n->Style.Padding    = Edges{ 0.f };
+            n->Style.Spacing    = 0_u;
+            n->Style.Padding    = Edges::Uniform( 0_u );
             n->Style.WidthMode  = ESizingMode::Flex;
             n->Style.HeightMode = ESizingMode::Flex;
         }
@@ -544,18 +544,18 @@ public:
             );
             auto* n = Node( bar );
             n->Style.LayoutType = ELayoutType::Vertical;
-            n->Style.Padding    = Edges{ 14.f, 28.f, 10.f, 28.f };
-            n->Style.Spacing    = 4.f;
+            n->Style.Padding    = Edges{ 14_u, 28_u, 10_u, 28_u };
+            n->Style.Spacing    = 4_u;
             n->Style.WidthMode  = ESizingMode::Flex;
             n->Style.HeightMode = ESizingMode::Content;
 
             {
-                TextStyle ts = MakeStyle( 22.f );
+                TextStyle ts = MakeStyle( 22_u );
                 ts.Render.Color = Colorsu8::TextPrimary;
                 AddText( bar, "Text Feature Showcase", ts, ESizingMode::Flex );
             }
             {
-                TextStyle ts = MakeStyle( 11.f );
+                TextStyle ts = MakeStyle( 11_u );
                 ts.Render.Color   = Colorsu8::TextSecondary;
                 ts.Layout.Wrap = TextWrap::NoWrap();
                 ts.Layout.Overflow = ETextOverflow::Clip;
@@ -573,8 +573,8 @@ public:
         {
             auto* n = Node( content );
             n->Style.LayoutType = ELayoutType::Vertical;
-            n->Style.Padding    = Edges{ 16.f, 24.f, 24.f, 24.f };
-            n->Style.Spacing    = 12.f;
+            n->Style.Padding    = Edges{ 16_u, 24_u, 24_u, 24_u };
+            n->Style.Spacing    = 12_u;
             n->Style.WidthMode  = ESizingMode::Flex;
             n->Style.HeightMode = ESizingMode::Content;
         }
@@ -604,7 +604,7 @@ public:
             if ( LayoutNode* n = m_Scene.Layouts.Get( w->GetLayoutID() ) )
             {
                 const f32 t = ( std::sin( m_Time * 0.6f ) + 1.f ) * 0.5f;
-                n->Style.FixedWidth = 80.f + t * 720.f;
+                n->Style.FixedWidth = 80_u + t * 720_u; // 80 + (0..1) * 720 -> 80..800
                 n->Layout.IsDirty   = true;
             }
         }

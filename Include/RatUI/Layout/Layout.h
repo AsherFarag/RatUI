@@ -101,10 +101,10 @@ namespace RatUI
      */
     struct Anchor
     {
-        Vec2f Min{ 0.0f, 0.0f };    ///< The minimum anchor point (top-left corner). (Values are normalized 0.0 to 1.0)
-        Vec2f Max{ 0.0f, 0.0f };    ///< The maximum anchor point (bottom-right corner). (Values are normalized 0.0 to 1.0)
-        Vec2f Pivot{ 0.0f, 0.0f };  ///< The pivot point for rotation and scaling, relative to the element's size. (Values are normalized 0.0 to 1.0)
-        Vec2f Offset{ 0.0f, 0.0f }; ///< The pixel offset from the anchored position, allowing for fine-tuning of the element's position. (Values are in pixels)
+        Vec2f      Min{ 0.0f, 0.0f };    ///< The minimum anchor point (top-left corner). (Values are normalized 0.0 to 1.0)
+        Vec2f      Max{ 0.0f, 0.0f };    ///< The maximum anchor point (bottom-right corner). (Values are normalized 0.0 to 1.0)
+        Vec2f      Pivot{ 0.0f, 0.0f };  ///< The pivot point for rotation and scaling, relative to the element's size. (Values are normalized 0.0 to 1.0)
+        Vec2<Unit> Offset{ 0_u, 0_u };   ///< The offset from the anchored position, allowing for fine-tuning of the element's position. (Values are in pixels)
 
         static constexpr Anchor TopLeft()      { return { { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f } }; }
         static constexpr Anchor TopCenter()    { return { { 0.5f, 0.0f }, { 0.5f, 0.0f }, { 0.5f, 0.0f } }; }
@@ -154,25 +154,25 @@ namespace RatUI
      */
     struct Edges
     {
-        f32 Top;
-        f32 Right;
-        f32 Bottom;
-        f32 Left;
+        Unit Top;
+        Unit Right;
+        Unit Bottom;
+        Unit Left;
 
         /** @brief Calculates the total horizontal inset. */
-        constexpr f32 Horizontal() const { return Left + Right; }
+        constexpr Unit Horizontal() const { return Left + Right; }
 
         /** @brief Calculates the total vertical inset. */
-        constexpr f32 Vertical() const { return Top + Bottom; }
+        constexpr Unit Vertical() const { return Top + Bottom; }
 
         /** @brief Calculates the total inset as a vector. */
-        constexpr Vec2f Total() const { return { Horizontal(), Vertical() }; }
+        constexpr Vec2<Unit> Total() const { return { Horizontal(), Vertical() }; }
 
         /** @brief Applies the edge insets to a given rectangle, returning a new rectangle that is reduced by the specified insets. */
-        constexpr Rectf Apply( Rectf a_Rect ) const
+        constexpr Rect<Unit> Apply( const Rect<Unit>& a_Rect ) const
         {
-			return a_Rect.FromMinMax( a_Rect.Min() + Vec2f{ Left, Top },
-                                      a_Rect.Max() - Vec2f{ Right, Bottom } );
+			return Rect<Unit>::FromMinMax( a_Rect.Min() + Vec2<Unit>{ Left, Top },
+                                           a_Rect.Max() - Vec2<Unit>{ Right, Bottom } );
         }
 
         /** @brief Combines two Edges by adding their respective values together. */
@@ -194,22 +194,22 @@ namespace RatUI
         }
 
 		/** @brief Initializes all edges to the same value. */
-		constexpr Edges( f32 a_UniformValue = 0.0f ) : Top( a_UniformValue ), Right( a_UniformValue ), Bottom( a_UniformValue ), Left( a_UniformValue ) {}
+		constexpr Edges( Unit a_UniformValue = 0_u ) : Top( a_UniformValue ), Right( a_UniformValue ), Bottom( a_UniformValue ), Left( a_UniformValue ) {}
 
 		/** @brief Initializes horizontal and vertical edges separately. */
-		constexpr Edges( f32 a_Horizontal, f32 a_Vertical ) : Top( a_Vertical ), Right( a_Horizontal ), Bottom( a_Vertical ), Left( a_Horizontal ) {}
+		constexpr Edges( Unit a_Horizontal, Unit a_Vertical ) : Top( a_Vertical ), Right( a_Horizontal ), Bottom( a_Vertical ), Left( a_Horizontal ) {}
 
 		/** @brief Initializes each edge individually. */
-		constexpr Edges( f32 a_Top, f32 a_Right, f32 a_Bottom, f32 a_Left ) : Top( a_Top ), Right( a_Right ), Bottom( a_Bottom ), Left( a_Left ) {}
+		constexpr Edges( Unit a_Top, Unit a_Right, Unit a_Bottom, Unit a_Left ) : Top( a_Top ), Right( a_Right ), Bottom( a_Bottom ), Left( a_Left ) {}
 
         /** @brief Initializes all edges to the same value. */
-        static constexpr Edges Uniform( f32 a_Value ) { return { a_Value }; }
+        static constexpr Edges Uniform( Unit a_Value ) { return { a_Value }; }
 
         /** @brief Initializes horizontal and vertical edges separately. */
-        static constexpr Edges Symmetric( f32 a_Horizontal, f32 a_Vertical ) { return { a_Horizontal, a_Vertical }; }
+        static constexpr Edges Symmetric( Unit a_Horizontal, Unit a_Vertical ) { return { a_Horizontal, a_Vertical }; }
 
         /** @brief Initializes each edge individually. */
-        static constexpr Edges Asymmetric( f32 a_Top, f32 a_Right, f32 a_Bottom, f32 a_Left ) { return { a_Top, a_Right, a_Bottom, a_Left }; }
+        static constexpr Edges Asymmetric( Unit a_Top, Unit a_Right, Unit a_Bottom, Unit a_Left ) { return { a_Top, a_Right, a_Bottom, a_Left }; }
     };
 
     /**
@@ -217,20 +217,20 @@ namespace RatUI
      */
     struct Constraints
     {
-        Vec2f MinSize{ 0.0f, 0.0f };
-        Vec2f MaxSize{ Limits<f32>::max(), Limits<f32>::max() };
+        Vec2<Unit> MinSize{ 0_u, 0_u };
+        Vec2<Unit> MaxSize{ Limits<Unit>::max(), Limits<Unit>::max() };
 
         /** @brief Creates unbounded constraints (i.e., no minimum or maximum size limits). */
         static constexpr Constraints Unbounded() { return {}; }
 
         /** @brief Creates fixed size constraints. */
-        static constexpr Constraints Fixed( Vec2f a_Size ) { return { a_Size, a_Size }; }
+        static constexpr Constraints Fixed( Vec2<Unit> a_Size ) { return { a_Size, a_Size }; }
 
         /** @brief Creates minimum size constraints with no maximum limit. */
-        static constexpr Constraints AtLeast( Vec2f a_Min ) { return { a_Min, { Limits<f32>::max(), Limits<f32>::max() } }; }
+        static constexpr Constraints AtLeast( Vec2<Unit> a_Min ) { return { a_Min, { Limits<Unit>::max(), Limits<Unit>::max() } }; }
 
         /** @brief Creates maximum size constraints with no minimum limit. */
-        static constexpr Constraints AtMost ( Vec2f a_Max ) { return { { 0.0f, 0.0f }, a_Max }; }
+        static constexpr Constraints AtMost ( Vec2<Unit> a_Max ) { return { { 0_u, 0_u }, a_Max }; }
     };
 
     /**
@@ -239,7 +239,7 @@ namespace RatUI
     struct LayoutStyle
     {
         // - Layout properties
-        f32         Spacing{ 0.0f };                    ///< The spacing to apply between child elements in a container, in pixels.
+        Unit        Spacing{ 0_u };                     ///< The spacing to apply between child elements in a container.
         ELayoutType LayoutType{ ELayoutType::Overlay }; ///< The layout type to use for arranging child elements (if this element is a container).
         EAlignment  ChildAlign{ EAlignment::TopLeft };  ///< Default alignment for child elements within this container.
         EWrapMode   WrapMode{ EWrapMode::NoWrap };      ///< The wrap mode to use when child elements exceed the available space in a container.
@@ -264,8 +264,8 @@ namespace RatUI
         // - Sizing properties
         ESizingMode WidthMode{ ESizingMode::Content };  ///< The sizing mode for the width of the element.
         ESizingMode HeightMode{ ESizingMode::Content }; ///< The sizing mode for the height of the element.
-        f32 FixedWidth{ 0.0f };  ///< The fixed width to use when WidthMode is set to Fixed.
-        f32 FixedHeight{ 0.0f }; ///< The fixed height to use when HeightMode is set to Fixed.
+        Unit FixedWidth{ 0_u };  ///< The fixed width to use when WidthMode is set to Fixed.
+        Unit FixedHeight{ 0_u }; ///< The fixed height to use when HeightMode is set to Fixed.
         
         /**
          * @note PercentWidth/PercentHeight are only meaningful when the parent axis is Fixed or Flex.
@@ -284,12 +284,12 @@ namespace RatUI
      */
     struct LayoutResult
     {
-        Rectf FinalRect{};               ///< The final position and size of the element after layout, in absolute coordinates. Filled by the Arrange step.
-        Vec2f DesiredSize{};             ///< The desired size of the element based on its content and constraints. Filled by the Measure step.
+        Rect<Unit> FinalRect{};          ///< The final position and size of the element after layout, in absolute coordinates. Filled by the Arrange step.
+        Vec2<Unit> DesiredSize{};        ///< The desired size of the element based on its content and constraints. Filled by the Measure step.
 
 		// TODO: This works as a hot fix for text support but it doesnt work with text wrapping etc.
         // Figure out a clean solution without coupling the layout engine to the widgets.
-		Vec2f IntrinsicSize{};           ///< The natural content size set by the user before layout. (e.g., the size of an image or text block).
+		Vec2<Unit> IntrinsicSize{};      ///< The natural content size set by the user before layout. (e.g., the size of an image or text block).
 
         struct Visibility Visibility {}; ///< The visibility state of the element, which can affect both rendering and layout.
         bool IsDirty{ true };            ///< Whether the layout needs to be recalculated. Set to true when properties affecting layout are changed.

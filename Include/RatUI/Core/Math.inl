@@ -127,31 +127,50 @@ namespace RatUI
     using Coloru8 = /* TODO: RATUI_COLOR_IMPL */ Vec4<u8>;
 
     /** @brief Creates a color from f32 RGBA components in the range [0, 1]. */
-    constexpr Colorf MakeColorF32( f32 a_Red, f32 a_Green, f32 a_Blue, f32 a_Alpha = 1.f );
+    template<typename ColorType>
+    constexpr ColorType MakeColorF32( f32 a_Red, f32 a_Green, f32 a_Blue, f32 a_Alpha = 1.f )
+    {
+        if constexpr ( std::is_same_v<ColorType, Colorf> )
+        {
+            return ColorType{ a_Red, a_Green, a_Blue, a_Alpha };
+        }
+        else if constexpr ( std::is_same_v<ColorType, Coloru8> )
+        {
+            return ColorType{
+                static_cast<u8>( a_Red * 255.f ),
+                static_cast<u8>( a_Green * 255.f ),
+                static_cast<u8>( a_Blue * 255.f ),
+                static_cast<u8>( a_Alpha * 255.f )
+            };
+        }
+        else
+        {
+            static_assert( AlwaysFalse<void>, "Unsupported color type" );
+        }
+    }
 
     /** @brief Creates a color from u8 RGBA components in the range [0, 255]. */
-    constexpr Colorf MakeColorU8( u8 a_Red, u8 a_Green, u8 a_Blue, u8 a_Alpha = 255 );
-
-#ifdef RATUI_BUILTIN_MATH
-
-    inline constexpr Colorf MakeColorF32( f32 a_Red, f32 a_Green, f32 a_Blue, f32 a_Alpha )
+    template<typename ColorType>
+    constexpr ColorType MakeColorU8( u8 a_Red, u8 a_Green, u8 a_Blue, u8 a_Alpha = 255 )
     {
-        // Built-in Color is Vec4<f32> with RGBA components in [0, 1], so we can just construct it directly
-        return Colorf{ a_Red, a_Green, a_Blue, a_Alpha };
+        if constexpr ( std::is_same_v<ColorType, Colorf> )
+        {
+            return ColorType{
+                static_cast<f32>( a_Red ) / 255.f,
+                static_cast<f32>( a_Green ) / 255.f,
+                static_cast<f32>( a_Blue ) / 255.f,
+                static_cast<f32>( a_Alpha ) / 255.f
+            };
+        }
+        else if constexpr ( std::is_same_v<ColorType, Coloru8> )
+        {
+            return ColorType{ a_Red, a_Green, a_Blue, a_Alpha };
+        }
+        else
+        {
+            static_assert( AlwaysFalse<void>, "Unsupported color type" );
+        }
     }
-
-    inline constexpr Colorf MakeColorU8( u8 a_Red, u8 a_Green, u8 a_Blue, u8 a_Alpha )
-    {
-        // Built-in Color is Vec4<f32> with RGBA components in [0, 1], so we need to convert from [0, 255] to [0, 1]
-        return Colorf{
-            static_cast<f32>(a_Red) / 255.f,
-            static_cast<f32>(a_Green) / 255.f,
-            static_cast<f32>(a_Blue) / 255.f,
-            static_cast<f32>(a_Alpha) / 255.f
-        };
-    }
-
-#endif // RATUI_BUILTIN_MATH
 
     // === Rectangles ===
 
@@ -179,7 +198,7 @@ namespace RatUI
         constexpr Vec2<T> TopRight() const { return Vec2<T>{ Origin[ 0 ] + Size[ 0 ], Origin[ 1 ] }; }
         constexpr Vec2<T> BottomLeft() const { return Vec2<T>{ Origin[ 0 ], Origin[ 1 ] + Size[ 1 ] }; }
         constexpr Vec2<T> BottomRight() const { return Origin + Size; }
-		constexpr Vec2<T> Center() const { return Origin + Size * static_cast<T>( 0.5 ); }
+		constexpr Vec2<T> Center() const { return Origin + Size / static_cast<T>( 2 ); }
 
         constexpr Vec2<T> Min() const { return TopLeft(); }
         constexpr Vec2<T> Max() const { return BottomRight(); }
@@ -204,7 +223,7 @@ namespace RatUI
         {
             return {
                 Vec2<T>{ Origin[ 0 ] - a_Amount, Origin[ 1 ] - a_Amount },
-                Vec2<T>{ Size[ 0 ] + static_cast<T>( 2 ) * a_Amount, Size[ 1 ] + static_cast<T>( 2 ) * a_Amount }
+                Vec2<T>{ Size[0] + static_cast<T>( 2 ) * a_Amount, Size[1] + static_cast<T>( 2 ) * a_Amount }
             };
         }
 
@@ -265,6 +284,49 @@ namespace RatUI
     using Recti = Rect<i32>;
     using Rectu = Rect<u32>;
     using Rectu16 = Rect<u16>;
+
+    namespace Math 
+    {
+        template<typename T>
+        constexpr T Sq( const T& a_Value ) 
+        { 
+            return a_Value * a_Value; 
+        }
+
+        template<typename T>
+        constexpr T Clamp( const T& a_Value, const T& a_Min, const T& a_Max )
+        {
+            return std::max( a_Min, std::min( a_Value, a_Max ) );
+        }
+
+        template<typename T>
+        constexpr T Lerp( const T& a_Start, const T& a_End, f32 a_T )
+        {
+            return a_Start + ( a_End - a_Start ) * a_T;
+        }
+
+		template<typename Scalar, size Dim>
+        constexpr Scalar Dot( const Vec<Scalar, Dim>& a_Left, const Vec<Scalar, Dim>& a_Right )
+        {
+            Scalar result = static_cast<Scalar>( 0 );
+            for ( size i = 0; i < Dim; ++i )
+                result += a_Left[ i ] * a_Right[ i ];
+            return result;
+		}
+
+		template<typename Scalar, size Dim>
+        constexpr Scalar LengthSq( const Vec<Scalar, Dim>& a_Vec )
+        {
+            return Dot( a_Vec, a_Vec );
+        }
+
+		template<typename Scalar, size Dim>
+        Scalar Length(const Vec<Scalar, Dim>& a_Vec)
+        {
+            return std::sqrt( LengthSq( a_Vec ) );
+		}
+
+	} // namespace Math
 
 	template<typename ColorType>
     struct Colors

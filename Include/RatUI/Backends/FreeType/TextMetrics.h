@@ -25,7 +25,7 @@ namespace RatUI::FreeType
             if ( !m_FontCache || !a_Style.Font.IsValid() || Empty( a_Text ) )
                 return NullOpt;
 
-            Font* font = m_FontCache->GetOrLoadFont( a_Style.Font, static_cast<u32>( a_Style.Size ) );
+            Font* font = m_FontCache->GetOrLoadFont( a_Style.Font, static_cast<u32>( a_Style.Size.ToFloat() ) );
             if ( !font )
                 return NullOpt;
 
@@ -44,31 +44,31 @@ namespace RatUI::FreeType
                 } );
         }
 
-        Optional<ShapedText> Shape( const PreparedText& a_Prepared, const TextLayoutStyle& a_Style, Vec2f a_MaxSize = { Limits<f32>::max(), Limits<f32>::max() } ) override
+        Optional<ShapedText> Shape( const PreparedText& a_Prepared, const TextLayoutStyle& a_Style, Vec2<Unit> a_MaxSize = { Limits<Unit>::max(), Limits<Unit>::max() } ) override
         {
-            if ( a_MaxSize[0] <= 0.f || a_MaxSize[1] <= 0.f )
+            if ( a_MaxSize[0] <= 0_u || a_MaxSize[1] <= 0_u )
                 return NullOpt; // Return empty shaped text if the available space is zero or negative.
 
             if ( !m_FontCache || !a_Style.Font.IsValid() || Empty( a_Prepared.Segments ) )
                 return NullOpt; // Return empty shaped text if there are no segments to shape.
 
-            Font* font = m_FontCache->GetOrLoadFont( a_Style.Font, static_cast<u32>( a_Style.Size ) );
+            Font* font = m_FontCache->GetOrLoadFont( a_Style.Font, static_cast<u32>( a_Style.Size.ToFloat() ) );
             if ( !font )
                 return NullOpt; // Return empty shaped text if the font couldn't be loaded.
 
             FT_Face   face      = font->GetFace();
-            const u32 pixelSize = static_cast<u32>( a_Style.Size );
+            const u32 pixelSize = static_cast<u32>( a_Style.Size.ToFloat() );
 
             ShapedText result;
             result.Font               = a_Style.Font;
             result.FontSize           = a_Style.Size;
             result.LineHeight         = GetLineHeight( face, a_Style ) + a_Style.LineSpacing;
-            result.Ascender           = face->size->metrics.ascender  / 64.f;
-            result.Descender          = face->size->metrics.descender / 64.f;
-            result.UnderlinePosition  = -( FT_MulFix( face->underline_position,  face->size->metrics.y_scale ) / 64.f );
-            result.UnderlineThickness = std::max( 1.f, FT_MulFix( face->underline_thickness, face->size->metrics.y_scale ) / 64.f );
+            result.Ascender           = Unit{ face->size->metrics.ascender  / 64.f };
+            result.Descender          = Unit{ face->size->metrics.descender / 64.f };
+            result.UnderlinePosition  = Unit{ -( FT_MulFix( face->underline_position,  face->size->metrics.y_scale ) / 64.f ) };
+            result.UnderlineThickness = Unit{ std::max( 1.f, FT_MulFix( face->underline_thickness, face->size->metrics.y_scale ) / 64.f ) };
 
-            const f32 maxWidth = a_MaxSize[0];
+            const Unit maxWidth = a_MaxSize[0];
             const u32 maxLines = a_Style.MaxLines;
 
             // Pre-walk to detect whether the text would exceed the line limit (for forced ellipsis on the last line).
@@ -76,18 +76,18 @@ namespace RatUI::FreeType
             if ( maxLines > 0 )
             {
                 u32 totalLines = 0;
-                TextLayout::WalkLines( a_Prepared, maxWidth, maxLines + 1u, [&]( u32, u32, f32 ) { ++totalLines; } );
+                TextLayout::WalkLines( a_Prepared, maxWidth, maxLines + 1u, [&]( u32, u32, Unit ) { ++totalLines; } );
                 exceededMaxLines = ( totalLines > maxLines );
             }
 
             const bool ellipsis           = ( a_Style.Overflow == ETextOverflow::Ellipsis );
-            const bool hasWidthConstraint = ( maxWidth < Limits<f32>::max() );
+            const bool hasWidthConstraint = ( maxWidth < Limits<Unit>::max() );
             const StringView norm         = a_Prepared.NormalizedText;
 
             Array<ShapedGlyph> lineGlyphs; // reused per line
 
             TextLayout::WalkLines( a_Prepared, maxWidth, maxLines,
-                [&]( u32 lineStartSeg, u32 lineEndSeg, f32 paintWidth )
+                [&]( u32 lineStartSeg, u32 lineEndSeg, Unit paintWidth )
                 {
                     // Materialize the line text from segment byte ranges.
                     const auto& segs = a_Prepared.Segments;
@@ -128,21 +128,22 @@ namespace RatUI::FreeType
                     PushBack( result.Lines, ShapedLine{
                         .Start   = glyphStart,
                         .End     = glyphEnd,
-                        .Width   = paintWidth,
+                        .Width   = Unit{ paintWidth },
                     } );
 
-                    result.MaxWidth = std::max( result.MaxWidth, paintWidth );
+                    result.MaxWidth = Unit{ std::max( result.MaxWidth, paintWidth ) };
                 }
             );
 
             if ( Empty( result.Lines ) )
                 return NullOpt;
 
-            const f32 sdfPadDisplay = static_cast<f32>( c_MsdfPxRange ) * a_Style.Size / 64.f;
-            result.Ascender += sdfPadDisplay;         // shifts penY down -> headroom above caps
+            const f32 sdfPadDisplay = static_cast<f32>( c_MsdfPxRange ) * a_Style.Size.ToFloat() / 64.f;
+            result.Ascender += Unit{ sdfPadDisplay }; // shifts penY down -> headroom above caps
+            const u32 extraLines = result.LineCount() > 0 ? ( result.LineCount() - 1u ) : 0u;
             result.TotalHeight = result.Ascender
-                + ( result.LineCount() - 1.f ) * result.LineHeight
-                + std::abs( result.Descender ) + sdfPadDisplay;   // extra depth below descenders
+                + result.LineHeight * static_cast<f32>( extraLines )
+                + Unit{ std::abs( result.Descender.ToFloat() ) + sdfPadDisplay };   // extra depth below descenders
 
             return result;
         }

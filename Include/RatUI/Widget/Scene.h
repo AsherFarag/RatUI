@@ -98,7 +98,7 @@ namespace RatUI
          * This involves measuring and arranging each widget according to its layout properties and the layout algorithm.
          * @param a_AvailableSize The total available size for the scene, which is typically the size of the window or rendering area.
          */
-        void UpdateLayout( Vec2f a_AvailableSize );
+        void UpdateLayout( Vec2<Unit> a_AvailableSize );
 
         /**
          * @brief Renders the scene by invoking the OnPaint method of the root widget, which recursively renders all child widgets.
@@ -158,7 +158,7 @@ namespace RatUI
     protected:
         bool ProcessPointerEvent( const PointerEvent& a_Event );
         bool ProcessButtonEvent( const ButtonEvent& a_Event );
-        WidgetID HitTest( WidgetID a_ID, Vec2f a_LogicalPos );
+        WidgetID HitTest( WidgetID a_ID, Vec2<Unit> a_LogicalPos );
 
         WidgetID m_FocusedWidget{ c_InvalidPoolID };
         WidgetID m_HoveredWidget{ c_InvalidPoolID };
@@ -185,7 +185,7 @@ namespace RatUI
         return false; // Event type not handled
     }
 
-    inline void Scene::UpdateLayout( Vec2f a_AvailableSize )
+    inline void Scene::UpdateLayout( Vec2<Unit> a_AvailableSize )
     {
         IWidget* root = GetWidget( RootWidget );
         if ( !root ) return;
@@ -197,18 +197,19 @@ namespace RatUI
 
 		// Walks the layout tree, calling OnSyncLayout on each widget to allow them to update their layout properties based on their children and the available size.
 		// Returns true if any widget's intrinsic size changed, which indicates a need for a second pass to remeasure and rearrange.
-        const auto SyncSubtree = [&]( auto& Self, LayoutNode& node, Vec2f parentSize ) -> bool
+        const auto SyncSubtree = [&]( auto& Self, LayoutNode& node, Vec2<Unit> parentSize ) -> bool
         {
             bool anyChanged = false;
 
             if ( IWidget* widget = GetWidget( node.WidgetID ) )
             {
-                const Vec2f oldIntrinsics = node.Layout.IntrinsicSize;
+                const Vec2<Unit> oldIntrinsics = node.Layout.IntrinsicSize;
                 widget->OnSyncLayout( *this, node, parentSize );
                 anyChanged |= ( node.Layout.IntrinsicSize != oldIntrinsics );
             }
 
-            const Vec2f innerSize = node.Layout.FinalRect.Size - Vec2f{ node.Style.Padding.Horizontal(), node.Style.Padding.Vertical() };
+            const Vec2<Unit> innerSize( node.Layout.FinalRect.Size[0] - node.Style.Padding.Horizontal(),
+                                        node.Layout.FinalRect.Size[1] - node.Style.Padding.Vertical() );
             node.ForEachChild( [&]( LayoutNode& child )
             {
                 anyChanged |= Self( Self, child, innerSize );
@@ -221,7 +222,7 @@ namespace RatUI
 
 		SyncSubtree( SyncSubtree, *rootNode, a_AvailableSize );
         MeasureLayoutNode( *rootNode, a_AvailableSize );
-        ArrangeLayoutNode( *rootNode, Rectf{ Vec2f{ 0.f, 0.f }, a_AvailableSize } );
+        ArrangeLayoutNode( *rootNode, Rect<Unit>{ Vec2<Unit>( 0_u, 0_u ), a_AvailableSize } );
 
         // - Pass 2: If any widget reported a change in intrinsic size during the first pass, 
         // we need to re-run the layout to account for those changes. 
@@ -230,7 +231,7 @@ namespace RatUI
 		if ( bool needsSecondPass = SyncSubtree( SyncSubtree, *rootNode, a_AvailableSize ) )
         {
             MeasureLayoutNode( *rootNode, a_AvailableSize );
-            ArrangeLayoutNode( *rootNode, Rectf{ Vec2f{ 0.f, 0.f }, a_AvailableSize } );
+            ArrangeLayoutNode( *rootNode, Rect<Unit>{ Vec2<Unit>( 0_u, 0_u ), a_AvailableSize } );
         }
 
         // Re-run hit test to update hovered widget based on new layout
@@ -489,7 +490,7 @@ namespace RatUI
         });
     }
 
-    inline WidgetID Scene::HitTest( WidgetID a_ID, Vec2f a_LogicalPos )
+    inline WidgetID Scene::HitTest( WidgetID a_ID, Vec2<Unit> a_LogicalPos )
     {
         IWidget* widget = GetWidget( a_ID );
         if ( !widget ) return c_InvalidPoolID;

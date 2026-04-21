@@ -42,9 +42,9 @@ namespace RatUI
      */
     struct Vertex
     {
-        Vec2f   Position;
-        Coloru8 Color;
-        Vec2f   UV;
+        Vec2<Pixel> Position;
+        Coloru8     Color;
+        Vec2f       UV;
     };
 
     enum class EBatchType
@@ -129,7 +129,7 @@ namespace RatUI
          * @param a_Rect The rectangle to render, defined by its origin and size.
          * @param a_Color The color to use for the rectangle.
          */
-        void EmitRect( const Rectf& a_Rect, Coloru8 a_Color )
+        void EmitRect( const Rect<Pixel>& a_Rect, Coloru8 a_Color )
         {
             const u32 vertexOffset = static_cast<u32>( Size( Vertices ) );
 
@@ -151,28 +151,28 @@ namespace RatUI
          * @param a_Color The color to use for the border.
          * @param a_Thickness The thickness of the border in pixels.
          */
-        void EmitRectBorder( const Rectf& a_Rect, f32 a_Radius, Coloru8 a_Color, f32 a_Thickness )
+        void EmitRectBorder( const Rect<Pixel>& a_Rect, f32 a_Radius, Coloru8 a_Color, f32 a_Thickness )
         {
             if ( a_Thickness <= 0.f )
                 return;
 
             const f32 t = a_Thickness;
-            const Vec2f tl = a_Rect.TopLeft();
-            const Vec2f tr = a_Rect.TopRight();
-            const Vec2f bl = a_Rect.BottomLeft();
-            const Vec2f br = a_Rect.BottomRight();
+            const Vec2<Pixel> tl = a_Rect.TopLeft();
+            const Vec2<Pixel> tr = a_Rect.TopRight();
+            const Vec2<Pixel> bl = a_Rect.BottomLeft();
+            const Vec2<Pixel> br = a_Rect.BottomRight();
 
             Reserve( Vertices, 4 * 4 ); // 4 rects with 4 vertices each
             Reserve( Indices,  4 * 6 ); // 4 rects with 2 triangles (6 indices) each
 
             // Top
-            EmitRect( Rectf::FromMinMax( tl, Vec2f{ tr[0], tl[1] + t } ), a_Color );
+            EmitRect( Rect<Pixel>::FromMinMax( tl, Vec2<Pixel>{ tr[0], tl[1] + Pixel{ t } } ), a_Color );
             // Bottom
-            EmitRect( Rectf::FromMinMax( Vec2f{ bl[0], bl[1] - t }, Vec2f{ br[0], bl[1] } ), a_Color );
+            EmitRect( Rect<Pixel>::FromMinMax( Vec2<Pixel>{ bl[0], bl[1] - Pixel{ t } }, Vec2<Pixel>{ br[0], bl[1] } ), a_Color );
             // Left
-            EmitRect( Rectf::FromMinMax( Vec2f{ tl[0], tl[1] + t }, Vec2f{ tl[0] + t, bl[1] - t } ), a_Color );
+            EmitRect( Rect<Pixel>::FromMinMax( Vec2<Pixel>{ tl[0], tl[1] + Pixel{ t } }, Vec2<Pixel>{ tl[0] + Pixel{ t }, bl[1] - Pixel{ t } } ), a_Color );
             // Right
-            EmitRect( Rectf::FromMinMax( Vec2f{ tr[0] - t, tr[1] + t }, Vec2f{ tr[0], br[1] - t } ), a_Color );
+            EmitRect( Rect<Pixel>::FromMinMax( Vec2<Pixel>{ tr[0] - Pixel{ t }, tr[1] + Pixel{ t } }, Vec2<Pixel>{ tr[0], br[1] - Pixel{ t } } ), a_Color );
         }
 
         /** 
@@ -182,7 +182,7 @@ namespace RatUI
          * @param a_Rounding The rounding values for each corner of the rectangle.
          * @param a_Color The color to use for the rectangle.
          */
-        void EmitRoundedRect( const Rectf& a_Rect, CornerRounding a_Rounding, Coloru8 a_Color )
+        void EmitRoundedRect( const Rect<Pixel>& a_Rect, CornerRounding a_Rounding, Coloru8 a_Color )
         {
             // TODO: Add UV's
 
@@ -198,10 +198,10 @@ namespace RatUI
             u32  vertCount = 0;
             u32  idxCount  = 0;
 
-            const f32 x = a_Rect.Origin[0];
-            const f32 y = a_Rect.Origin[1];
-            const f32 w = a_Rect.Size[0];
-            const f32 h = a_Rect.Size[1];
+            const f32 x = a_Rect.Origin[0].ToFloat();
+            const f32 y = a_Rect.Origin[1].ToFloat();
+            const f32 w = a_Rect.Size[0].ToFloat();
+            const f32 h = a_Rect.Size[1].ToFloat();
 
             f32 tlRadius = a_Rounding.TopLeft.Value;
             f32 trRadius = a_Rounding.TopRight.Value;
@@ -220,7 +220,7 @@ namespace RatUI
 
             auto pushVertex = [&]( f32 px, f32 py, f32 u = 0.f, f32 v = 0.f ) -> u32
             {
-                vertices[vertCount] = Vertex{ Vec2f{ px, py }, a_Color, Vec2f{ u, v } };
+                vertices[vertCount] = Vertex{ Vec2<Pixel>{ Pixel{ px }, Pixel{ py } }, a_Color, Vec2f{ u, v } };
                 return vertexOffset + vertCount++;
             };
 
@@ -311,7 +311,7 @@ namespace RatUI
          * @param a_Color The color to use for the border.
          * @param a_Thickness The thickness of the border in pixels.
          */
-        void EmitRoundedRectBorder( const Rectf& a_Rect, CornerRounding a_Rounding, Coloru8 a_Color, f32 a_Thickness )
+        void EmitRoundedRectBorder( const Rect<Pixel>& a_Rect, CornerRounding a_Rounding, Coloru8 a_Color, f32 a_Thickness )
         {
             // TODO
         }
@@ -323,7 +323,7 @@ namespace RatUI
          * @param a_Radius The radius of the circle.
          * @param a_Color The color to use for the circle.
          */
-        void EmitCircle( const Vec2f& a_Center, f32 a_Radius, Coloru8 a_Color )
+        void EmitCircle( const Vec2<Pixel>& a_Center, f32 a_Radius, Coloru8 a_Color )
         {
             constexpr u32 c_Segments   = 32;
             constexpr u32 c_MaxVerts   = 1 + c_Segments;
@@ -338,18 +338,18 @@ namespace RatUI
 
             auto pushVertex = [&]( f32 x, f32 y, f32 u = 0.f, f32 v = 0.f ) -> u32
             {
-                vertices[vertCount++] = Vertex{ Vec2f{ x, y }, a_Color, Vec2f{ u, v } };
+                vertices[vertCount++] = Vertex{ Vec2<Pixel>{ Pixel{ x }, Pixel{ y } }, a_Color, Vec2f{ u, v } };
                 return vertexOffset + vertCount - 1;
             };
 
-            u32 center = pushVertex( a_Center[0], a_Center[1] );
+            u32 center = pushVertex( a_Center[0].ToFloat(), a_Center[1].ToFloat() );
             f32 step   = ( Pi<f32> * 2.f ) / c_Segments;
 
             for ( u32 s = 0; s < c_Segments; ++s )
             {
                 f32 angle = s * step;
-                pushVertex( a_Center[0] + cosf( angle ) * a_Radius,
-                            a_Center[1] + sinf( angle ) * a_Radius,
+                pushVertex( a_Center[0].ToFloat() + cosf( angle ) * a_Radius,
+                            a_Center[1].ToFloat() + sinf( angle ) * a_Radius,
                             ( cosf( angle ) + 1.f ) * 0.5f, ( sinf( angle ) + 1.f ) * 0.5f );
             }
 
@@ -370,7 +370,7 @@ namespace RatUI
          * @param a_Color The color to use for the circle border.
          * @param a_Thickness The thickness of the border in pixels.
          */
-        void EmitCircleBorder( const Vec2f& a_Center, f32 a_Radius, Coloru8 a_Color, f32 a_Thickness )
+        void EmitCircleBorder( const Vec2<Pixel>& a_Center, f32 a_Radius, Coloru8 a_Color, f32 a_Thickness )
         {
             constexpr u32 c_Segments   = 32;
             constexpr u32 c_MaxVerts   = c_Segments * 2;
@@ -388,7 +388,7 @@ namespace RatUI
 
             auto pushVertex = [&]( f32 x, f32 y )
             {
-                vertices[vertCount++] = Vertex{ Vec2f{ x, y }, a_Color, Vec2f{ 0.f, 0.f } };
+                vertices[vertCount++] = Vertex{ Vec2<Pixel>{ Pixel{ x }, Pixel{ y } }, a_Color, Vec2f{ 0.f, 0.f } };
             };
 
             f32 step = ( Pi<f32> * 2.f ) / c_Segments;
@@ -397,8 +397,8 @@ namespace RatUI
                 f32 angle = s * step;
                 f32 cosA  = cosf( angle );
                 f32 sinA  = sinf( angle );
-                pushVertex( a_Center[0] + cosA * rOuter, a_Center[1] + sinA * rOuter );
-                pushVertex( a_Center[0] + cosA * rInner, a_Center[1] + sinA * rInner );
+                pushVertex( a_Center[0].ToFloat() + cosA * rOuter, a_Center[1].ToFloat() + sinA * rOuter );
+                pushVertex( a_Center[0].ToFloat() + cosA * rInner, a_Center[1].ToFloat() + sinA * rInner );
             }
 
             for ( u32 s = 0; s < c_Segments; ++s )
@@ -414,7 +414,7 @@ namespace RatUI
         }
 
         void EmitText( 
-            const ShapedText& a_Text, TextRenderStyle a_Style, Rectf a_LayoutRect, GlyphAtlas& a_Atlas )
+            const ShapedText& a_Text, TextRenderStyle a_Style, Rect<Pixel> a_LayoutRect, GlyphAtlas& a_Atlas )
         {
             if ( Empty( a_Text.Glyphs ) || Empty( a_Text.Lines ) )
                 return;
@@ -425,29 +425,28 @@ namespace RatUI
             const f32 rcpH   = atlasH > 0.f ? 1.f / atlasH : 0.f;
 
             const f32 baseSize = a_Atlas.GetConfig().BaseSize.ToFloat();
-			const f32 scale = a_Text.FontSize;
+			const f32 scale = a_Text.FontSize.ToFloat();
                 
-            // Compute Y start based on vertical baseline alignment.
-            f32 startY = a_LayoutRect.Origin[1];
+            f32 startY = a_LayoutRect.Origin[1].ToFloat();
             switch ( a_Style.Baseline )
             {
-                case ETextBaseline::Middle: startY += ( a_LayoutRect.Size[1] - a_Text.TotalHeight ) * 0.5f; break;
-                case ETextBaseline::Bottom: startY += a_LayoutRect.Size[1] - a_Text.TotalHeight;            break;
+                case ETextBaseline::Middle: startY += ( a_LayoutRect.Size[1].ToFloat() - a_Text.TotalHeight.ToFloat() ) * 0.5f; break;
+                case ETextBaseline::Bottom: startY +=   a_LayoutRect.Size[1].ToFloat() - a_Text.TotalHeight.ToFloat();          break;
                 default: break;
             }
 
-            f32 penY = startY + a_Text.Ascender;
+            f32 penY = startY + a_Text.Ascender.ToFloat();
 
             for ( u32 lineIdx = 0; lineIdx < a_Text.LineCount(); ++lineIdx )
             {
                 const ShapedLine& line = a_Text.Lines[ lineIdx ];
 
                 // Compute horizontal offset based on text alignment.
-                f32 lineX = a_LayoutRect.Origin[0];
+                f32 lineX = a_LayoutRect.Origin[0].ToFloat();
                 switch ( a_Style.Align )
                 {
-                    case ETextAlign::Center: lineX += ( a_LayoutRect.Size[0] - line.Width ) * 0.5f; break;
-                    case ETextAlign::Right:  lineX += a_LayoutRect.Size[0] - line.Width;            break;
+                    case ETextAlign::Center: lineX += ( a_LayoutRect.Size[0].ToFloat() - line.Width.ToFloat() ) * 0.5f; break;
+                    case ETextAlign::Right:  lineX += a_LayoutRect.Size[0].ToFloat() - line.Width.ToFloat();            break;
                     default: break;
                 }
 
@@ -462,12 +461,12 @@ namespace RatUI
                     {
                         const f32 gx =
                             penX
-                            + sg.XOffset * scale
+                            + sg.XOffset.ToFloat() * scale
                             + static_cast<f32>( gr->Bearing[0] ) * scale;
 
                         const f32 gy =
                             penY
-                            + sg.YOffset * scale
+                            + sg.YOffset.ToFloat() * scale
                             - static_cast<f32>( gr->Bearing[1] ) * scale;
 
                         const f32 emW = static_cast<f32>( gr->AtlasRect.Size[0] ) / baseSize;
@@ -483,20 +482,20 @@ namespace RatUI
 
                         const u32 vertexOffset = static_cast<u32>( Size( Vertices ) );
                         auto verts = ReserveVertices( 4 );
-                        verts[0] = Vertex{ Vec2f{ gx,      gy      }, a_Style.Color, Vec2f{ u0, v0 } };
-                        verts[1] = Vertex{ Vec2f{ gx + gw, gy      }, a_Style.Color, Vec2f{ u1, v0 } };
-                        verts[2] = Vertex{ Vec2f{ gx,      gy + gh }, a_Style.Color, Vec2f{ u0, v1 } };
-                        verts[3] = Vertex{ Vec2f{ gx + gw, gy + gh }, a_Style.Color, Vec2f{ u1, v1 } };
+                        verts[0] = Vertex{ Vec2<Pixel>{ Pixel{ gx      }, Pixel{ gy      } }, a_Style.Color, Vec2f{ u0, v0 } };
+                        verts[1] = Vertex{ Vec2<Pixel>{ Pixel{ gx + gw }, Pixel{ gy      } }, a_Style.Color, Vec2f{ u1, v0 } };
+                        verts[2] = Vertex{ Vec2<Pixel>{ Pixel{ gx      }, Pixel{ gy + gh } }, a_Style.Color, Vec2f{ u0, v1 } };
+                        verts[3] = Vertex{ Vec2<Pixel>{ Pixel{ gx + gw }, Pixel{ gy + gh } }, a_Style.Color, Vec2f{ u1, v1 } };
 
                         auto idx = ReserveIndices( 6 );
                         idx[0] = vertexOffset + 0; idx[1] = vertexOffset + 1; idx[2] = vertexOffset + 2;
                         idx[3] = vertexOffset + 1; idx[4] = vertexOffset + 3; idx[5] = vertexOffset + 2;
                     }
 
-					penX += sg.XAdvance * scale;
+					penX += sg.XAdvance.ToFloat() * scale;
                 }
 
-                penY += a_Text.LineHeight;
+                penY += a_Text.LineHeight.ToFloat();
             }
         }
     };

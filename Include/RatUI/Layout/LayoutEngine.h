@@ -5,32 +5,32 @@
 namespace RatUI
 {
     // Forward declarations of layout functions
-    Vec2f MeasureLayoutNode   ( LayoutNode& a_Node, Vec2f a_AvailableSize );
-    void  ArrangeLayoutNode   ( LayoutNode& a_Node, Rectf a_AllocatedRect );
+    Vec2<Unit> MeasureLayoutNode   ( LayoutNode& a_Node, Vec2<Unit> a_AvailableSize );
+    void       ArrangeLayoutNode   ( LayoutNode& a_Node, Rect<Unit> a_AllocatedRect );
     
-    void  ArrangeAnchored ( LayoutNode& a_Node, Rectf a_Container );
-    void  ArrangeOverlay  ( LayoutNode& a_Node, Rectf a_Inner );
-    void  ArrangeLinear   ( LayoutNode& a_Node, Rectf a_Inner );
+    void  ArrangeAnchored ( LayoutNode& a_Node, Rect<Unit> a_Container );
+    void  ArrangeOverlay  ( LayoutNode& a_Node, Rect<Unit> a_Inner );
+    void  ArrangeLinear   ( LayoutNode& a_Node, Rect<Unit> a_Inner );
 
     EAlignment ResolveAlign( const LayoutNode& a_Child, const LayoutNode& a_Parent );
-    Rectf AlignRect( Vec2f a_ContentSize, Rectf a_Container, EAlignment a_Align );
-    f32   AlignCrossAxis( f32 a_ChildSize, f32 a_ParentPos,
-                          f32 a_ParentSize, EAlignment a_Align, bool a_IsMainAxisHorizontal );
+    Rect<Unit> AlignRect( Vec2<Unit> a_ContentSize, Rect<Unit> a_Container, EAlignment a_Align );
+    Unit       AlignCrossAxis( Unit a_ChildSize, Unit a_ParentPos,
+                               Unit a_ParentSize, EAlignment a_Align, bool a_IsMainAxisHorizontal );
 
 
     // TODO: These functions are getting pretty fat, should consider making RatUI a static lib or doing something like stb lib
     // TODO: Currently uses recursion but will need to switch to an iterative approach with an explicit stack for deep hierarchies to avoid stack overflow
-    inline Vec2f MeasureLayoutNode( LayoutNode& a_Node, Vec2f a_AvailableSize )
+    inline Vec2<Unit> MeasureLayoutNode( LayoutNode& a_Node, Vec2<Unit> a_AvailableSize )
     {
         // Collapsed LayoutNodes take no space
         if (!a_Node.Layout.Visibility.AffectsLayout())
         {
-            a_Node.Layout.DesiredSize = { 0.f, 0.f };
-            return { 0.f, 0.f };
+            a_Node.Layout.DesiredSize = Vec2<Unit>( 0_u, 0_u );
+            return Vec2<Unit>( 0_u, 0_u );
         }
     
         const LayoutStyle& s = a_Node.Style;
-        Vec2f desired{ 0.0f, 0.0f };
+        Vec2<Unit> desired( 0_u, 0_u );
     
         // Resolve width
         switch (s.WidthMode)
@@ -52,10 +52,10 @@ namespace RatUI
     
         // Accumulate children for content mode
         {
-            const Vec2f padding = s.Padding.Total();
-            Vec2f       contentSize = a_Node.Layout.IntrinsicSize; // Start with intrinsic size, if any
-            Vec2f       childAvailSize = a_AvailableSize - padding;
-            u32         numFlow = 0;
+            const Vec2<Unit> padding = s.Padding.Total();
+            Vec2<Unit>       contentSize = a_Node.Layout.IntrinsicSize; // Start with intrinsic size, if any
+            Vec2<Unit>       childAvailSize( a_AvailableSize[0] - padding[0], a_AvailableSize[1] - padding[1] );
+            u32              numFlow = 0;
         
             a_Node.ForEachChild( [&]( LayoutNode& child )
             {
@@ -70,20 +70,20 @@ namespace RatUI
             
                 numFlow++;
             
-                const Vec2f childDesired = MeasureLayoutNode( child, childAvailSize )
-                                         + Vec2f{ child.Style.Margin.Horizontal(),
-                                                  child.Style.Margin.Vertical() };
+                const Vec2<Unit> childDesired = MeasureLayoutNode( child, childAvailSize )
+                                             + Vec2<Unit>( child.Style.Margin.Horizontal(),
+                                                           child.Style.Margin.Vertical() );
                                         
                 switch ( s.LayoutType )
                 {
                     case ELayoutType::Horizontal:
-                        contentSize[0] += childDesired[0] + s.Spacing;
-                        contentSize[1]  = std::max( contentSize[1], childDesired[1] );
+                        contentSize[0] = contentSize[0] + childDesired[0] + s.Spacing;
+                        contentSize[1] = std::max( contentSize[1], childDesired[1] );
                         break;
                 
                     case ELayoutType::Vertical:
-                        contentSize[0]  = std::max( contentSize[0], childDesired[0] );
-                        contentSize[1] += childDesired[1] + s.Spacing;
+                        contentSize[0] = std::max( contentSize[0], childDesired[0] );
+                        contentSize[1] = contentSize[1] + childDesired[1] + s.Spacing;
                         break;
                 
                     case ELayoutType::Overlay:
@@ -110,11 +110,11 @@ namespace RatUI
             // Remove trailing spacing added after last child
             if ( numFlow > 0 )
             {
-                if ( s.LayoutType == ELayoutType::Horizontal ) contentSize[0] -= s.Spacing;
-                if ( s.LayoutType == ELayoutType::Vertical )   contentSize[1] -= s.Spacing;
+                if ( s.LayoutType == ELayoutType::Horizontal ) contentSize[0] = contentSize[0] - s.Spacing;
+                if ( s.LayoutType == ELayoutType::Vertical )   contentSize[1] = contentSize[1] - s.Spacing;
             }
         
-            contentSize = contentSize + padding;
+            contentSize = Vec2<Unit>( contentSize[0] + padding[0], contentSize[1] + padding[1] );
         
             // If node is sized to content, use the accumulated content size
             if ( s.WidthMode  == ESizingMode::Content ) desired[0] = contentSize[0];
@@ -138,9 +138,9 @@ namespace RatUI
     }
 
     /** Aligns a rectangle of the given content size within the container rect according to the specified alignment flags. */
-    inline Rectf AlignRect( Vec2f a_ContentSize, Rectf a_Container, EAlignment a_Align )
+    inline Rect<Unit> AlignRect( Vec2<Unit> a_ContentSize, Rect<Unit> a_Container, EAlignment a_Align )
     {
-        Vec2f offset{ 0.0f, 0.0f };
+        Vec2<Unit> offset( 0_u, 0_u );
 
         if ( ( a_Align & EAlignment::HCenter ) == EAlignment::HCenter )
             offset[0] = ( a_Container.Size[0] - a_ContentSize[0] ) / 2.f;
@@ -152,55 +152,55 @@ namespace RatUI
         else if ( ( a_Align & EAlignment::Bottom ) == EAlignment::Bottom )
             offset[1] = a_Container.Size[1] - a_ContentSize[1];
 
-        return Rectf{ .Origin = a_Container.Origin + offset, .Size = a_ContentSize };
+        return Rect<Unit>{ Vec2<Unit>( a_Container.Origin[0] + offset[0], a_Container.Origin[1] + offset[1] ), a_ContentSize };
     }
 
     /** Aligns a LayoutNode with an anchored position within a container. */
-    inline void ArrangeAnchored( LayoutNode& a_Node, Rectf a_Container )
+    inline void ArrangeAnchored( LayoutNode& a_Node, Rect<Unit> a_Container )
     {
-        const Anchor& anchor = a_Node.Style.Anchor;
-        const Vec2f   parentSz = a_Container.Size;
+        const Anchor&    anchor   = a_Node.Style.Anchor;
+        const Vec2<Unit> parentSz = a_Container.Size;
 
         const bool stretchX = anchor.Min[0] != anchor.Max[0];
         const bool stretchY = anchor.Min[1] != anchor.Max[1];
 
-		Vec2f origin{}; // Top left corner of the node's final rect
-        Vec2f size = a_Node.Layout.DesiredSize;
+        Vec2<Unit> origin( 0_u, 0_u ); // Top left corner of the node's final rect
+        Vec2<Unit> size = a_Node.Layout.DesiredSize;
 
         // X axis
         if ( stretchX )
         {
             // Span the anchor region - offset pushes the edges inward symmetrically
-            origin[0] = a_Container.Origin[0] + parentSz[0] * anchor.Min[0] + anchor.Offset[0];
-            f32 right = a_Container.Origin[0] + parentSz[0] * anchor.Max[0] - anchor.Offset[0];
-            size[0] = std::max( 0.f, right - origin[0] );
+            origin[0]  = a_Container.Origin[0] + ( parentSz[0] * anchor.Min[0] ) + anchor.Offset[0];
+            Unit right = a_Container.Origin[0] + ( parentSz[0] * anchor.Max[0] ) - anchor.Offset[0];
+            size[0] = std::max( 0_u, right - origin[0] );
         }
         else
         {
             // Point anchor - place pivot at anchor point, then nudge by offset
-            f32 anchorX = a_Container.Origin[0] + parentSz[0] * anchor.Min[0];
-            origin[0] = anchorX - size[0] * anchor.Pivot[0] + anchor.Offset[0];
+            Unit anchorX = a_Container.Origin[0] + ( parentSz[0] * anchor.Min[0] );
+            origin[0] = anchorX - ( size[0] * anchor.Pivot[0] ) + anchor.Offset[0];
         }
 
         // Y axis
         if ( stretchY )
         {
-            origin[1] = a_Container.Origin[1] + parentSz[1] * anchor.Min[1] + anchor.Offset[1];
-            f32 bottom = a_Container.Origin[1] + parentSz[1] * anchor.Max[1] - anchor.Offset[1];
-            size[1] = std::max( 0.f, bottom - origin[1] );
+            origin[1]   = a_Container.Origin[1] + ( parentSz[1] * anchor.Min[1] ) + anchor.Offset[1];
+            Unit bottom = a_Container.Origin[1] + ( parentSz[1] * anchor.Max[1] ) - anchor.Offset[1];
+            size[1] = std::max( 0_u, bottom - origin[1] );
         }
         else
         {
             // Point anchor - place pivot at anchor point, then nudge by offset
-            f32 anchorY = a_Container.Origin[1] + parentSz[1] * anchor.Min[1];
-            origin[1] = anchorY - size[1] * anchor.Pivot[1] + anchor.Offset[1];
+            Unit anchorY = a_Container.Origin[1] + ( parentSz[1] * anchor.Min[1] );
+            origin[1]    = anchorY - ( size[1] * anchor.Pivot[1] ) + anchor.Offset[1];
         }
 
-        ArrangeLayoutNode( a_Node, { .Origin = origin, .Size = size } );
+        ArrangeLayoutNode( a_Node, Rect<Unit>{ origin, size } );
     }
 
     /** Arranges children in an overlay layout, aligning each child within the inner rect according to its alignment flags. */
-    inline void ArrangeOverlay( LayoutNode& a_Node, Rectf a_Inner )
+    inline void ArrangeOverlay( LayoutNode& a_Node, Rect<Unit> a_Inner )
     {
         a_Node.ForEachChild( [&]( LayoutNode& child )
         {
@@ -210,22 +210,22 @@ namespace RatUI
                 return;
             }
 
-            Vec2f childSize = child.Layout.DesiredSize;
+            Vec2<Unit> childSize = child.Layout.DesiredSize;
 
             // Flex children fill the entire overlay container on their flex axis,
             // consistent with the cross-axis stretch behaviour in ArrangeLinear.
             if ( child.Style.WidthMode  == ESizingMode::Flex ) childSize[0] = a_Inner.Size[0];
             if ( child.Style.HeightMode == ESizingMode::Flex ) childSize[1] = a_Inner.Size[1];
             
-            const Rectf childRect = AlignRect(childSize, a_Inner, ResolveAlign(child, a_Node));
+            const Rect<Unit> childRect = AlignRect(childSize, a_Inner, ResolveAlign(child, a_Node));
 
             ArrangeLayoutNode(child, childRect);
         });
     }
 
     /** @brief Aligns a child LayoutNode along the cross axis - used by linear layouts to position children that don't stretch */
-    inline f32 AlignCrossAxis( f32 a_ChildSize, f32 a_ParentPos,
-                               f32 a_ParentSize, EAlignment a_Align, bool a_IsMainAxisHorizontal )
+    inline Unit AlignCrossAxis( Unit a_ChildSize, Unit a_ParentPos,
+                                Unit a_ParentSize, EAlignment a_Align, bool a_IsMainAxisHorizontal )
     {
         // Cross axis of horizontal layout is vertical - check V flags
         bool center = a_IsMainAxisHorizontal ? (a_Align & EAlignment::VCenter)
@@ -239,7 +239,7 @@ namespace RatUI
     }
 
     /** Arranges children in a linear layout, positioning them along the main axis and aligning them on the cross axis. */
-    inline void ArrangeLinear( LayoutNode& a_Node, Rectf a_Inner )
+    inline void ArrangeLinear( LayoutNode& a_Node, Rect<Unit> a_Inner )
     {
         const LayoutStyle& s    = a_Node.Style;
         const bool         isHz = s.LayoutType == ELayoutType::Horizontal;
@@ -251,9 +251,9 @@ namespace RatUI
         };
 
         // Pass 1: sum fixed space and total grow weight
-        f32 totalFixed = 0.f;
-        f32 totalGrow  = 0.f;
-        u32 numFlow    = 0;
+        Unit totalFixed( 0_u );
+        f32  totalGrow  = 0.f;
+        u32  numFlow    = 0;
 
         a_Node.ForEachChild( [&]( const LayoutNode& child )
         {
@@ -264,17 +264,17 @@ namespace RatUI
             // whatever space remains after all other children are allocated.
             if ( !isPureStretchMain( child ) )
             {
-                totalFixed += isHz ? child.Layout.DesiredSize[0] + child.Style.Margin.Horizontal()
-                                   : child.Layout.DesiredSize[1] + child.Style.Margin.Vertical();
+                totalFixed = totalFixed + ( isHz ? child.Layout.DesiredSize[0] + child.Style.Margin.Horizontal()
+                                                 : child.Layout.DesiredSize[1] + child.Style.Margin.Vertical() );
             }
 
             totalGrow  += child.Style.FlexGrow;
             numFlow++;
         } );
 
-        f32 available = ( isHz ? a_Inner.Size[0] : a_Inner.Size[1] )
-                      - ( s.Spacing * std::max( 0u, numFlow - 1 ) );
-        f32 leftover  = std::max( 0.f, available - totalFixed );
+        Unit available = ( isHz ? a_Inner.Size[0] : a_Inner.Size[1] )
+                       - s.Spacing * static_cast<f32>( std::max( 0u, numFlow - 1 ) );
+        Unit leftover  = std::max( 0_u, available - totalFixed );
 
         // Add implicit grow weight for WidthMode::Flex children that carry no explicit FlexGrow.
         // Children with FlexGrow > 0 already contributed to totalGrow in pass 1; they are skipped.
@@ -292,7 +292,7 @@ namespace RatUI
         } );
 
         // Pass 2: assign rects
-        f32 cursor = isHz ? a_Inner.Origin[0] : a_Inner.Origin[1];
+        Unit cursor = isHz ? a_Inner.Origin[0] : a_Inner.Origin[1];
 
         a_Node.ForEachChild( [&]( LayoutNode& child )
         {
@@ -305,7 +305,7 @@ namespace RatUI
             if ( !child.Layout.Visibility.AffectsLayout() )
                 return;
 
-            Vec2f childSize = child.Layout.DesiredSize;
+            Vec2<Unit> childSize = child.Layout.DesiredSize;
 
             // Determine effective grow weight - explicit FlexGrow or implicit 1 for Flex children
             f32 growWeight = child.Style.FlexGrow;
@@ -321,7 +321,7 @@ namespace RatUI
             if ( growWeight > 0.f && totalGrow > 0.f )
             {
                 const Constraints& c     = child.Style.SizeConstraints;
-                f32                share = leftover * ( growWeight / totalGrow );
+                Unit               share = leftover * ( growWeight / totalGrow );
 
                 // Pure stretch flex children receive exactly their share of the remaining space
                 // (their DesiredSize is not used as a flex basis to avoid inflated measurements
@@ -347,7 +347,7 @@ namespace RatUI
                 childSize[0] = a_Inner.Size[0];
 
             // Position on main axis, align on cross axis
-            Rectf childRect;
+            Rect<Unit> childRect;
             if ( isHz )
             {
                 childRect.Origin[0] = cursor;
@@ -361,28 +361,28 @@ namespace RatUI
             childRect.Size = childSize;
 
             // Apply margins
-            childRect.Origin[0] += child.Style.Margin.Left;
-            childRect.Origin[1] += child.Style.Margin.Top;
-            childRect.Size[0]   -= child.Style.Margin.Horizontal();
-            childRect.Size[1]   -= child.Style.Margin.Vertical();
+            childRect.Origin[0] = childRect.Origin[0] + child.Style.Margin.Left;
+            childRect.Origin[1] = childRect.Origin[1] + child.Style.Margin.Top;
+            childRect.Size[0]   = childRect.Size[0]   - child.Style.Margin.Horizontal();
+            childRect.Size[1]   = childRect.Size[1]   - child.Style.Margin.Vertical();
 
-            childRect.Size[0] = std::max( 0.f, childRect.Size[0] );
-            childRect.Size[1] = std::max( 0.f, childRect.Size[1] );
+            childRect.Size[0] = std::max( 0_u, childRect.Size[0] );
+            childRect.Size[1] = std::max( 0_u, childRect.Size[1] );
 
-            cursor += s.Spacing;
-            cursor += isHz ? childSize[0] + child.Style.Margin.Horizontal()
-                           : childSize[1] + child.Style.Margin.Vertical();
+            cursor = cursor + s.Spacing;
+            cursor = cursor + ( isHz ? childSize[0] + child.Style.Margin.Horizontal()
+                                     : childSize[1] + child.Style.Margin.Vertical() );
 
             ArrangeLayoutNode( child, childRect );
         } );
     }
 
-    inline void ArrangeGrid( LayoutNode& a_Node, Rectf a_Inner )
+    inline void ArrangeGrid( LayoutNode& a_Node, Rect<Unit> a_Inner )
     {
         // TODO:
     }
 
-    inline void ArrangeLayoutNode( LayoutNode& a_Node, Rectf a_AllocatedRect )
+    inline void ArrangeLayoutNode( LayoutNode& a_Node, Rect<Unit> a_AllocatedRect )
     {
         const LayoutStyle& s = a_Node.Style;
         a_Node.Layout.FinalRect = a_AllocatedRect;
@@ -391,7 +391,7 @@ namespace RatUI
             return; // No need to arrange children if there are none
 
         
-        const Rectf inner = s.Padding.Apply( a_AllocatedRect );
+        const Rect<Unit> inner = s.Padding.Apply( a_AllocatedRect );
 
         switch (s.LayoutType)
         {

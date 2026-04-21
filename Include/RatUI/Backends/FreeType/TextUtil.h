@@ -21,13 +21,13 @@ namespace RatUI::FreeType::TextUtil
      * @param a_Style TextLayoutStyle for letter spacing.
      * @return The measured width in pixels.
      */
-    inline f32 MeasureLineWidth(
+    inline Unit MeasureLineWidth(
         Font& a_Font,
         StringView a_Line,
         const TextLayoutStyle& a_Style )
     {
         if ( Empty( a_Line ) )
-            return 0.f;
+            return 0_u;
 
         hb_buffer_t* buffer = a_Font.GetHBBuffer();
 
@@ -48,37 +48,40 @@ namespace RatUI::FreeType::TextUtil
         hb_glyph_info_t* infos = hb_buffer_get_glyph_infos( buffer, &glyphCount );
 
         if ( !positions || !infos || glyphCount == 0 )
-            return 0.f;
+            return 0_u;
 
-        f32 width = 0.f;
+		const f32 unitsPerEM = static_cast<f32>( a_Font.GetFace()->units_per_EM );
+
+
+        Unit width = 0_u;
 
         u32 prevCluster       = infos[0].cluster;
         u32 clusterCount      = 1;
         u32 spaceClusterCount = 0;
 
-        width += positions[0].x_advance / 64.f;
+		width += ToUnit( FontUnit{ static_cast<f32>( positions[0].x_advance ) }, unitsPerEM );
 
-        if ( a_Style.WordSpacing != 0.f && Unicode::IsWhitespaceCluster( a_Line, infos[0].cluster ) )
+        if ( a_Style.WordSpacing != 0_u && Unicode::IsWhitespaceCluster( a_Line, infos[0].cluster ) )
             ++spaceClusterCount;
 
         for ( u32 i = 1; i < glyphCount; ++i )
         {
-            width += positions[i].x_advance / 64.f;
+            width += ToUnit( FontUnit{ static_cast<f32>( positions[i].x_advance ) }, unitsPerEM );
 
             if ( infos[i].cluster != prevCluster )
             {
                 ++clusterCount;
                 prevCluster = infos[i].cluster;
 
-                if ( a_Style.WordSpacing != 0.f && Unicode::IsWhitespaceCluster( a_Line, infos[i].cluster ) )
+                if ( a_Style.WordSpacing != 0_u && Unicode::IsWhitespaceCluster( a_Line, infos[i].cluster ) )
                     ++spaceClusterCount;
             }
         }
 
-        if ( a_Style.LetterSpacing != 0.f && clusterCount > 1 )
+        if ( a_Style.LetterSpacing != 0_u && clusterCount > 1 )
             width += a_Style.LetterSpacing * ( clusterCount - 1 );
 
-        if ( a_Style.WordSpacing != 0.f && spaceClusterCount > 0 )
+        if ( a_Style.WordSpacing != 0_u && spaceClusterCount > 0 )
             width += a_Style.WordSpacing * static_cast<f32>( spaceClusterCount );
 
         return width;
@@ -112,7 +115,7 @@ namespace RatUI::FreeType::TextUtil
         Font&                  a_Font,
         StringView             a_Line,
         const TextLayoutStyle& a_Style,
-        f32                    a_MaxWidth,
+        Unit                   a_MaxWidth,
         bool                   a_ForceEllipsis )
     {
         FT_Face face = a_Font.GetFace();
@@ -121,14 +124,15 @@ namespace RatUI::FreeType::TextUtil
             return String( Begin( a_Line ), End( a_Line ) );
 
         constexpr StringView c_Ellipsis = "...";
-        const f32 ellipsisWidth = MeasureLineWidth( a_Font, c_Ellipsis, a_Style );
+        const Unit ellipsisWidth = MeasureLineWidth( a_Font, c_Ellipsis, a_Style );
         if ( ellipsisWidth > a_MaxWidth )
             return {};
 
         const u32 dotGlyphIdx = FT_Get_Char_Index( face, U'.' );
+		const f32 unitsPerEM = static_cast<f32>( face->units_per_EM );
 
         size_t bestPrefixByteCount = 0;
-        f32    prefixWidth         = 0.f;
+        Unit   prefixWidth         = 0_u;
         u32    prevGlyphIdx        = 0;
         bool   hasPrev             = false;
 
@@ -145,25 +149,25 @@ namespace RatUI::FreeType::TextUtil
                 {
                     FT_Vector kerning;
                     if ( FT_Get_Kerning( face, prevGlyphIdx, glyphIdx, FT_KERNING_DEFAULT, &kerning ) == 0 )
-                        prefixWidth += kerning.x / 64.f;
+						prefixWidth += ToUnit( FontUnit{ static_cast<f32>( kerning.x ) }, unitsPerEM );
                 }
                 prefixWidth += a_Style.LetterSpacing;
             }
 
-            prefixWidth  += advance;
+            prefixWidth  += ToUnit( FontUnit{ advance }, unitsPerEM );
             prevGlyphIdx  = glyphIdx;
             hasPrev       = true;
 
             // Candidate = prefix + LetterSpacing + crossKerning(last, '.') + "..."
-            f32 crossKerning = 0.f;
+            Unit crossKerning = 0_u;
             if ( FT_HAS_KERNING( face ) )
             {
                 FT_Vector kerning;
                 if ( FT_Get_Kerning( face, prevGlyphIdx, dotGlyphIdx, FT_KERNING_DEFAULT, &kerning ) == 0 )
-                    crossKerning = kerning.x / 64.f;
+					crossKerning = ToUnit( FontUnit{ static_cast<f32>( kerning.x ) }, unitsPerEM );
             }
             
-            const f32 candidateWidth = prefixWidth + a_Style.LetterSpacing + crossKerning + ellipsisWidth;
+            const Unit candidateWidth = prefixWidth + a_Style.LetterSpacing + crossKerning + ellipsisWidth;
 
             if ( candidateWidth <= a_MaxWidth ) 
             {

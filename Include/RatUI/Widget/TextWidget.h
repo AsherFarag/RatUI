@@ -51,10 +51,10 @@ namespace RatUI
         /**
          * @brief 
          */
-        void OnSyncLayout( Scene& a_Scene, LayoutNode& a_Node, Vec2f a_AvailableSize ) override
+        void OnSyncLayout( Scene& a_Scene, LayoutNode& a_Node, Vec2<Unit> a_AvailableSize ) override
         {
             ITextMetrics* metrics = a_Scene.TextMetrics;
-            a_Node.Layout.IntrinsicSize = { 0.f, 0.f };
+            a_Node.Layout.IntrinsicSize = { 0_u, 0_u };
 
 			if ( !metrics || Empty( m_Text ) )
                 return;
@@ -73,13 +73,13 @@ namespace RatUI
                 InvalidateShaped();
             }
 
-            f32 maxWidth = 0.f;
+            Unit maxWidth = 0_u;
 
             if ( a_Node.Style.WidthMode == ESizingMode::Fixed )
             {
                 maxWidth = a_Node.Style.FixedWidth;
             }
-            else if ( a_Node.Style.WidthMode == ESizingMode::Flex && a_Node.Layout.FinalRect.Size[0] > 0.f )
+            else if ( a_Node.Style.WidthMode == ESizingMode::Flex && a_Node.Layout.FinalRect.Size[0] > 0_u )
             {
                 // TODO: This is a bit of a hack to work around the circular dependency 
                 // where we need to know the final width of the node to shape the text, 
@@ -91,18 +91,18 @@ namespace RatUI
                 maxWidth = a_AvailableSize[0] - a_Node.Style.Padding.Horizontal();
             }
                 
-            maxWidth = std::max( maxWidth, 0.f );
+            maxWidth = std::max( maxWidth, 0_u );
 
-            if ( !IsApproxEqual( maxWidth, m_LastAvailableWidth ) )
+            if ( !IsApproxEqual( maxWidth.ToFloat(), m_LastAvailableWidth.ToFloat() ) )
             {
                 m_LastAvailableWidth = maxWidth;
                 InvalidateShaped();
             }
 
             // Re-shape only when prepared text changes or when available width changes (Expensive).
-            if ( !m_ShapedText || !IsApproxEqual( maxWidth, m_ShapedWidth ) )
+            if ( !m_ShapedText || !IsApproxEqual( maxWidth.ToFloat(), m_ShapedWidth.ToFloat() ) )
             {
-                m_ShapedText  = metrics->Shape( *m_PreparedText, m_LayoutStyle, { maxWidth, Limits<f32>::max() } );                  
+                m_ShapedText  = metrics->Shape( *m_PreparedText, m_LayoutStyle, { maxWidth, Limits<Unit>::max() } );                  
                 m_ShapedWidth = maxWidth;
             }
 
@@ -128,7 +128,7 @@ namespace RatUI
             if ( !m_ShapedText ) 
                 return; // Don't attempt to paint if we have no text or if the text isn't prepared or shaped.
 
-            const Rectf textRect = node->Style.Padding.Apply( node->Layout.FinalRect );
+            const Rect<Unit> textRect = node->Style.Padding.Apply( node->Layout.FinalRect );
 
             // TODO: Pushing a clip rect doesnt work if this text is rotated or transformed in some other way. 
             // Need to use stencil clipping instead of scissor
@@ -143,13 +143,7 @@ namespace RatUI
                 case ETextOverflow::Clip:
                 case ETextOverflow::Fade:
                 {
-                    const Rectu16 clipRect{
-                        { static_cast<u16>( std::floor( textRect.Left()   ) ),
-                          static_cast<u16>( std::floor( textRect.Top()    ) ) },
-                        { static_cast<u16>( std::ceil ( textRect.Right()  ) - std::floor( textRect.Left() ) ),
-                          static_cast<u16>( std::ceil ( textRect.Bottom() ) - std::floor( textRect.Top()  ) ) }
-                    };
-                    a_DrawList.PushClipRect( clipRect );
+                    a_DrawList.PushClipRect( textRect );
                     a_DrawList.AddText( *m_ShapedText, effectiveRenderStyle, textRect );
                     a_DrawList.PopClipRect();
                     break;
@@ -179,8 +173,8 @@ namespace RatUI
         TextRenderStyle        m_RenderStyle;  ///< The render style for the text, including color and decorations like underline or strikethrough.
         Optional<PreparedText> m_PreparedText; ///< Cached prepared text (segments + normalized string). Rebuilt when text or style changes.
         Optional<ShapedText>   m_ShapedText;   ///< Cached shaped text (glyph atlas indices + line metadata). Rebuilt when prepared text or width changes.
-        f32 m_ShapedWidth       { -1.f }; ///< The maxWidth used for the last Shape() call; used to detect when re-shaping is needed.
-        f32 m_LastAvailableWidth{ -1.f }; ///< The last effective width constraint used during layout; used to invalidate stale shaped text.
+        Unit m_ShapedWidth       { -1_u };      ///< The maxWidth used for the last Shape() call; used to detect when re-shaping is needed.
+        Unit m_LastAvailableWidth{ -1_u };      ///< The last effective width constraint used during layout; used to invalidate stale shaped text.
     };
 
 } // namespace RatUI

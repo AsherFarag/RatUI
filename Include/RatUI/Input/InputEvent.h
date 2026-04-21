@@ -163,19 +163,19 @@ namespace RatUI
      */
     struct PointerEvent
     {
-        Vec2f Position{ 0.f, 0.f };
-        Vec2f Delta{ 0.f, 0.f };
+        Vec2<Unit>   Position{ 0_u, 0_u };
+        Vec2<Unit>   Delta{ 0_u, 0_u };
         EPointerType Type{ EPointerType::Unknown };
 
-        u32      PointerID{ 0 };          // TouchID or PenID or 0 for mouse
-        Vec2f    ScrollDelta{ 0.f, 0.f }; // Mouse
-        f32      Pressure{ 0.f };         // Touch/pen pressure (0.0 to 1.0)
-		Degreesf TiltX{ 0.f };            // Pen tilt X in degrees
-		Degreesf TiltY{ 0.f };            // Pen tilt Y in degrees
+        u32        PointerID{ 0 };          // TouchID or PenID or 0 for mouse
+        Vec2<Unit> ScrollDelta{ 0_u, 0_u }; // Mouse
+        f32        Pressure{ 0.f };         // Touch/pen pressure (0.0 to 1.0)
+		Degreesf   TiltX{ 0.f };            // Pen tilt X in degrees
+		Degreesf   TiltY{ 0.f };            // Pen tilt Y in degrees
 
         constexpr bool IsMouse() const { return Type == EPointerType::Mouse; }
         constexpr bool IsTouch() const { return Type == EPointerType::Touch; }
-        constexpr bool IsPen() const { return Type == EPointerType::Pen; }
+        constexpr bool IsPen()   const { return Type == EPointerType::Pen; }
     };
 
     /**

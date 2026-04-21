@@ -24,7 +24,7 @@ namespace RatUI::TextLayout
     //       I hate text man.
 
 
-    constexpr f32 c_LineFitEpsilon = 0.01f; ///< Tolerance for floating-point line-fit checks
+    constexpr Unit c_LineFitEpsilon = 0.01_u; ///< Tolerance for floating-point line-fit checks
 
     // =========================================================================
     // Prepare phase
@@ -37,7 +37,7 @@ namespace RatUI::TextLayout
      * @param a_Measure A callable that takes a StringView and returns its measured width in pixels.  This is used to pre-measure segments during preparation.
      * @return A PreparedText containing the normalised text and its pre-measured segments.
      */
-    template<std::invocable<StringView> MeasureFn>
+	template<typename MeasureFn> requires std::is_invocable_r_v<Unit, MeasureFn, StringView>
     inline PreparedText Prepare( StringView a_Text, TextWrap a_Wrap, MeasureFn&& a_Measure )
     {
         // TODO: This doesnt handle 'graphemes' correctly, e.g. emoji sequences with skin-tone modifiers or ZWJ.  
@@ -62,7 +62,7 @@ namespace RatUI::TextLayout
         // For NoWrap mode, we can skip segmentation and just measure the whole text as a single line.
         if ( a_Wrap.BreakMode == EBreakMode::None )
         {
-            const f32 lineWidth = a_Measure( norm );
+            const Unit lineWidth = a_Measure( norm );
             PushBack( result.Segments,
                 TextSegment{
                     .StartByte = 0,
@@ -86,9 +86,9 @@ namespace RatUI::TextLayout
             if ( upTo <= wordStartByteOffset )
                 return; // No word to flush.
 
-            const u32 start = static_cast<u32>( wordStartByteOffset );
-            const u32 len   = static_cast<u32>( upTo - wordStartByteOffset );
-            const f32 width = a_Measure( StringView{ Data( norm ) + start, len } );
+            const u32  start = static_cast<u32>( wordStartByteOffset );
+            const u32  len   = static_cast<u32>( upTo - wordStartByteOffset );
+            const Unit width = a_Measure( StringView{ Data( norm ) + start, len } );
 
             PushBack( result.Segments,
                 TextSegment{ 
@@ -126,8 +126,8 @@ namespace RatUI::TextLayout
                     TextSegment{ 
                         .StartByte = static_cast<u32>( idx ), 
                         .ByteLength = static_cast<u32>( len ),
-                        .Width = 0.f,
-                        .PaintWidth = 0.f, 
+                        .Width = 0_u,
+                        .PaintWidth = 0_u, 
                         .Kind = ESegmentKind::HardBreak, 
                         .IsCJKChar = false 
                     } 
@@ -150,7 +150,7 @@ namespace RatUI::TextLayout
                 const size spaceEnd = it.ByteIndex();
                 const u32  sStart   = static_cast<u32>( spaceStart );
                 const u32  sLen     = static_cast<u32>( spaceEnd - spaceStart );
-                const f32  sw       = a_Measure( StringView{ Data( norm ) + sStart, sLen } );
+                const Unit sw       = a_Measure( StringView{ Data( norm ) + sStart, sLen } );
 
                 // PaintWidth is 0: trailing spaces are invisible (they hang off the edge).
                 PushBack( result.Segments,
@@ -158,7 +158,7 @@ namespace RatUI::TextLayout
                         .StartByte = sStart,
                         .ByteLength = sLen,
                         .Width = sw,
-                        .PaintWidth = 0.f,
+                        .PaintWidth = 0_u,
                         .Kind = ESegmentKind::Space,
                         .IsCJKChar = false 
                     } 
@@ -175,7 +175,7 @@ namespace RatUI::TextLayout
                 flushWord( idx );
 
                 const bool isCJK = Unicode::IsCJK( cp );
-                const f32  w     = a_Measure( StringView{ Data( norm ) + idx, static_cast<u32>( len ) } );
+                const Unit w     = a_Measure( StringView{ Data( norm ) + idx, static_cast<u32>( len ) } );
 
                 PushBack( result.Segments,
                     TextSegment{ 
@@ -197,7 +197,7 @@ namespace RatUI::TextLayout
             if ( Unicode::IsCJK( cp ) )
             {
                 flushWord( idx );
-                const f32 w = a_Measure( StringView{ Data( norm ) + idx, static_cast<u32>( len ) } );
+                const Unit w = a_Measure( StringView{ Data( norm ) + idx, static_cast<u32>( len ) } );
 
                 PushBack( result.Segments,
                     TextSegment{ 
@@ -262,8 +262,8 @@ namespace RatUI::TextLayout
      * @param a_OnLine    Callback invoked for each emitted line.
      * @return            Total number of lines emitted.
      */
-    template<std::invocable<u32/*lineStartSeg*/, u32/*lineEndSeg*/, f32/*paintWidth*/> OnLineFn>
-    inline u32 WalkLines( const PreparedText& a_Prepared, f32 a_MaxWidth, u32 a_MaxLines,
+    template<std::invocable<u32/*lineStartSeg*/, u32/*lineEndSeg*/, Unit/*paintWidth*/> OnLineFn>
+    inline u32 WalkLines( const PreparedText& a_Prepared, Unit a_MaxWidth, u32 a_MaxLines,
                           OnLineFn&& a_OnLine )
     {
         const auto& segs = a_Prepared.Segments;
@@ -274,23 +274,23 @@ namespace RatUI::TextLayout
         const u32 segCount = static_cast<u32>( Size( segs ) );
 
         u32  lineCount          = 0;
-        f32  lineW              = 0.f;   // total accumulated width (used for fit-checks)
-        f32  paintLineW         = 0.f;   // width of visible content (excludes trailing spaces)
+        Unit lineW              = 0_u;   // total accumulated width (used for fit-checks)
+        Unit paintLineW         = 0_u;   // width of visible content (excludes trailing spaces)
         bool hasContent         = false; // whether we've seen any non-space content on the current line (used to skip leading spaces and for paint width)
         u32  lineStartSeg       = 0;
         u32  pendingBreakSeg    = c_InvalidSeg; // first seg of the NEXT line at break
-        f32  pendingBreakPaintW = 0.f;          // paintLineW at the recorded break
+        Unit pendingBreakPaintW = 0_u;          // paintLineW at the recorded break
 
         // Returns true when the caller should continue emitting lines.
-        auto emitLine = [&]( u32 endSeg, f32 paintW ) -> bool
+        auto emitLine = [&]( u32 endSeg, Unit paintW ) -> bool
         {
             a_OnLine( lineStartSeg, endSeg, paintW );
             ++lineCount;
-            lineW = 0.f;
-            paintLineW = 0.f;
+            lineW = 0_u;
+            paintLineW = 0_u;
             hasContent = false;
             pendingBreakSeg = c_InvalidSeg;
-            pendingBreakPaintW = 0.f;
+            pendingBreakPaintW = 0_u;
 
             return a_MaxLines == 0u || lineCount < a_MaxLines;
         };
@@ -331,13 +331,13 @@ namespace RatUI::TextLayout
             }
 
             const TextSegment& seg = segs[i];
-            const f32          w = seg.Width;
+            const Unit         w = seg.Width;
             const ESegmentKind k = seg.Kind;
 
             // - Hard break: force-emit the current line.
             if ( k == ESegmentKind::HardBreak )
             {
-                if ( !emitLine( i, hasContent ? paintLineW : 0.f ) )
+                if ( !emitLine( i, hasContent ? paintLineW : 0_u ) )
                     return lineCount;
                 lineStartSeg = i + 1;
                 ++i;
@@ -354,7 +354,7 @@ namespace RatUI::TextLayout
                 continue;
             }
 
-            const f32 newW = lineW + w;
+            const Unit newW = lineW + w;
 
             // - Space segment.
             if ( k == ESegmentKind::Space )

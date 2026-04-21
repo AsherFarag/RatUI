@@ -284,7 +284,7 @@ namespace RatUI::FreeType
      *       These should be derived from the text content (e.g. via ICU or hb-unicode)
      *       to support RTL scripts and non-Latin writing systems correctly.
      */
-    inline f32 ShapeLine(
+    inline Unit ShapeLine(
         Font&                  a_Font,
         StringView             a_TextUTF8,
         const TextLayoutStyle& a_Layout,
@@ -292,7 +292,7 @@ namespace RatUI::FreeType
     )
     {
         if ( Empty( a_TextUTF8 ) )
-            return 0.f;
+            return 0_u;
 
         hb_buffer_t* buf = a_Font.GetHBBuffer();
         hb_buffer_reset( buf );
@@ -348,11 +348,11 @@ namespace RatUI::FreeType
         Clear( o_Glyphs );
         Reserve( o_Glyphs, glyphCount );
 
-        const f32 scale         = 1.0f / 64.0f;
-        const f32 letterSpacing = a_Layout.LetterSpacing;
-        const f32 wordSpacing   = a_Layout.WordSpacing;
+        const f32      unitsPerEM    = static_cast<f32>( a_Font.GetFace()->units_per_EM );
+		const FontUnit letterSpacing = ToFontUnit( a_Layout.LetterSpacing, unitsPerEM );
+		const FontUnit wordSpacing   = ToFontUnit( a_Layout.WordSpacing, unitsPerEM );
 
-        f32 lineWidth = 0.f;
+        FontUnit lineWidth = 0_fu;
 
         // Track the last cluster we checked for word-spacing so that multi-glyph
         // clusters (e.g. ligature components) only receive the extra advance once.
@@ -361,15 +361,15 @@ namespace RatUI::FreeType
 
         for ( unsigned i = 0; i < glyphCount; ++i )
         {
-            f32 xAdvance = positions[i].x_advance * scale;
-            f32 yAdvance = positions[i].y_advance * scale;
+			FontUnit xAdvance = FontUnit{ static_cast<f32>( positions[i].x_advance ) };
+			FontUnit yAdvance = FontUnit{ static_cast<f32>( positions[i].y_advance ) };
 
             // Apply letter spacing between clusters, not inside a multi-glyph cluster.
-            if ( letterSpacing != 0.f && i + 1 < glyphCount && infos[i].cluster != infos[i + 1].cluster )
+            if ( letterSpacing != 0_fu && i + 1 < glyphCount && infos[i].cluster != infos[i + 1].cluster )
                 xAdvance += letterSpacing;
 
             // Apply word spacing for whitespace glyphs (once per unique whitespace cluster).
-            if ( wordSpacing != 0.f && infos[i].cluster != lastWordSpacingCluster )
+            if ( wordSpacing != 0_fu && infos[i].cluster != lastWordSpacingCluster )
             {
                 lastWordSpacingCluster = infos[i].cluster;
                 if ( Unicode::IsWhitespaceCluster( a_TextUTF8, infos[i].cluster ) )
@@ -381,14 +381,14 @@ namespace RatUI::FreeType
                 /* GlyphID   */ infos[i].codepoint,
                 /* XAdvance  */ xAdvance,
                 /* YAdvance  */ yAdvance,
-                /* XOffset   */ positions[i].x_offset * scale,
-                /* YOffset   */ positions[i].y_offset * scale
+				/* XOffset   */ FontUnit{ static_cast<f32>( positions[i].x_offset ) },
+				/* YOffset   */ FontUnit{ static_cast<f32>( positions[i].y_offset ) }
             );
 
             lineWidth += xAdvance;
         }
 
-        return lineWidth;
+		return ToUnit( lineWidth, unitsPerEM );
     }
 
 } // namespace RatUI::FreeType
