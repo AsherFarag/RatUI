@@ -22,7 +22,8 @@ namespace RatUI::FreeType
         if ( a_Style.LineHeight > 0_u )
             return a_Style.LineHeight;
 
-        return ToUnit( FontUnit{ static_cast<f32>( a_Face->size->metrics.height ) }, static_cast<f32>( a_Face->units_per_EM ) );
+        // Convert EM -> layout Unit using font size
+        return Unit{ ( static_cast<f32>( a_Face->height ) / static_cast<f32>( a_Face->units_per_EM ) ) * a_Style.Size };
     }
 
     /**
@@ -117,7 +118,8 @@ namespace RatUI::FreeType
     private:
         static Optional<Font> LoadFromFace( FT_Face a_Face )
         {
-            if ( FT_Set_Pixel_Sizes( a_Face, 0, 0 ) != 0 )
+			// NOTE: We set the character size to 64x64 pixels at 72 DPI, which is a common default for SDF generation and provides a good balance of precision and performance for typical UI font sizes.
+            if ( FT_Set_Char_Size( a_Face, 0, 64 * 64, 0, 0 ) != 0 )
             {
                 FT_Done_Face( a_Face );
                 return NullOpt;
@@ -223,18 +225,18 @@ namespace RatUI::FreeType
             return true;
         }
 
-        Font* GetFont( FontHandle a_Handle, u32 a_PixelSize )
+        Font* GetFont( FontHandle a_Handle )
         {
             if ( !a_Handle.IsValid() )
                 return nullptr;
 
-            auto it = Find( m_Cache, FontKey{ a_Handle, a_PixelSize } );
+            auto it = Find( m_Cache, a_Handle );
             return it != End( m_Cache ) ? &it->second : nullptr;
         }
 
-        Font* GetOrLoadFont( FontHandle a_Handle, u32 a_PixelSize )
+        Font* GetOrLoadFont( FontHandle a_Handle )
         {
-            if ( Font* cachedFont = GetFont( a_Handle, a_PixelSize ) )
+            if ( Font* cachedFont = GetFont( a_Handle ) )
                 return cachedFont;
 
             auto pathIt = Find( m_HandleToPath, a_Handle );
@@ -246,36 +248,21 @@ namespace RatUI::FreeType
             if ( !fontOpt )
                 return nullptr;
 
-            auto [insertIt, success] = Emplace( m_Cache, FontKey{ a_Handle, a_PixelSize }, std::move( *fontOpt ) );
+            auto [insertIt, success] = Emplace( m_Cache, a_Handle, std::move( *fontOpt ) );
             return success ? &insertIt->second : nullptr;
         }
 
         void Evict( FontHandle a_Handle, u32 a_PixelSize )
         {
-            Erase( m_Cache, FontKey{ a_Handle, a_PixelSize } );
+			Erase( m_Cache, a_Handle );
         }
 
         size CachedCount() const { return Size( m_Cache ); }
 
     private:
-        struct FontKey
-        {
-            FontHandle Handle;
-            u32        PixelSize;
-            bool operator==( const FontKey& ) const = default;
-        };
-
-        struct FontKeyHasher
-        {
-            size_t operator()( const FontKey& a_Key ) const noexcept
-            {
-                return std::hash<u32>{}( a_Key.Handle.ID ) ^ ( std::hash<u32>{}( a_Key.PixelSize ) << 1 );
-            }
-        };
-
         FT_Library m_Library{ nullptr };
-        HashMap<FontKey, Font, FontKeyHasher> m_Cache;
-        HashMap<FontHandle, String>           m_HandleToPath;
+        HashMap<FontHandle, Font>   m_Cache;
+        HashMap<FontHandle, String>  m_HandleToPath;
     };
 
     /**
@@ -284,7 +271,7 @@ namespace RatUI::FreeType
      *       These should be derived from the text content (e.g. via ICU or hb-unicode)
      *       to support RTL scripts and non-Latin writing systems correctly.
      */
-    inline Unit ShapeLine(
+    inline FontUnit ShapeLine(
         Font&                  a_Font,
         StringView             a_TextUTF8,
         const TextLayoutStyle& a_Layout,
@@ -292,11 +279,11 @@ namespace RatUI::FreeType
     )
     {
         if ( Empty( a_TextUTF8 ) )
-            return 0_u;
-
+            return 0_fu;
+ 
         hb_buffer_t* buf = a_Font.GetHBBuffer();
         hb_buffer_reset( buf );
-
+ 
         hb_buffer_add_utf8(
             buf,
             Data( a_TextUTF8 ),
@@ -304,70 +291,62 @@ namespace RatUI::FreeType
             0,
             -1
         );
-
+ 
         // TODO: Should be user defined not auto guessed
         hb_buffer_guess_segment_properties( buf ); // auto direction/script/lang
-
-        // TODO: Should these be apart of the TextStyle or the Font?
-
-        // - Options for shaping features (e.g., bold, italic) could be set here
-
-        // hb_feature_t features[2];
-        // unsigned int featureCount = 0;
-
-        //if ( a_Style.Bold )
-        //{
-        //    features[featureCount++] = {
-        //        HB_TAG('e','m','b','d'), 1, 0, (unsigned int)-1
-        //    };
-        //}
-
-        //if ( a_Style.Italic )
-        //{
-        //    features[featureCount++] = {
-        //        HB_TAG('i','t','a','l'), 1, 0, (unsigned int)-1
-        //    };
-        //}
-
+ 
         hb_shape(
             a_Font.GetHBFont(),
             buf,
             /*features=*/nullptr, /*num_features=*/0
         );
-
-        // - Extract glyph info and positioning data from the HarfBuzz buffer and populate the output array of ShapedGlyphs.
-
+ 
         unsigned int glyphCount = 0;
-
+ 
         hb_glyph_info_t* infos =
             hb_buffer_get_glyph_infos( buf, &glyphCount );
-
+ 
         hb_glyph_position_t* positions =
             hb_buffer_get_glyph_positions( buf, &glyphCount );
-
+ 
         Clear( o_Glyphs );
         Reserve( o_Glyphs, glyphCount );
 
-        const f32      unitsPerEM    = static_cast<f32>( a_Font.GetFace()->units_per_EM );
-		const FontUnit letterSpacing = ToFontUnit( a_Layout.LetterSpacing, unitsPerEM );
-		const FontUnit wordSpacing   = ToFontUnit( a_Layout.WordSpacing, unitsPerEM );
-
+		// hb_ft_font_create inherits the FreeType face's current pixel size.
+        // HarfBuzz positions are in 26.6 fixed-point *scaled pixel* units:
+        //   raw_value / 64  -> pixel advance at the face's base render size (ppem)
+        //   / ppem          -> EM-normalised [0, 1] FontUnit
+        // The combined divisor is 64 * ppem.
+        const f32 ppem      = static_cast<f32>( a_Font.GetFace()->size->metrics.y_ppem );
+        RATUI_ASSERT( ppem > 0.f, "Invalid font metrics: y_ppem must be > 0." );
+        const f32 emNormDiv = 64.f * ppem;
+		const Unit fontSize = a_Layout.Size;
+ 
+        // Letter and word spacing arrive as Unit (display-space). Convert to EM-normalised
+        // FontUnit so they can be added directly to the HB advances after normalisation.
+        const FontUnit letterSpacing = ToFontUnit( a_Layout.LetterSpacing, fontSize );
+        const FontUnit wordSpacing   = ToFontUnit( a_Layout.WordSpacing,   fontSize );
+ 
         FontUnit lineWidth = 0_fu;
-
+ 
         // Track the last cluster we checked for word-spacing so that multi-glyph
         // clusters (e.g. ligature components) only receive the extra advance once.
         constexpr u32 c_NoCluster = Limits<u32>::max();
         u32 lastWordSpacingCluster = c_NoCluster;
-
+ 
         for ( unsigned i = 0; i < glyphCount; ++i )
         {
-			FontUnit xAdvance = FontUnit{ static_cast<f32>( positions[i].x_advance ) };
-			FontUnit yAdvance = FontUnit{ static_cast<f32>( positions[i].y_advance ) };
-
+            // Convert HarfBuzz 26.6 scaled-pixel positions to EM-normalised FontUnit.
+            // Multiplying by fontSizePx at render time then yields correct screen pixels.
+            FontUnit xAdvance = FontUnit{ static_cast<f32>( positions[i].x_advance ) / emNormDiv };
+            FontUnit yAdvance = FontUnit{ static_cast<f32>( positions[i].y_advance ) / emNormDiv };
+            FontUnit xOffset  = FontUnit{ static_cast<f32>( positions[i].x_offset  ) / emNormDiv };
+            FontUnit yOffset  = FontUnit{ static_cast<f32>( positions[i].y_offset  ) / emNormDiv };
+ 
             // Apply letter spacing between clusters, not inside a multi-glyph cluster.
             if ( letterSpacing != 0_fu && i + 1 < glyphCount && infos[i].cluster != infos[i + 1].cluster )
                 xAdvance += letterSpacing;
-
+ 
             // Apply word spacing for whitespace glyphs (once per unique whitespace cluster).
             if ( wordSpacing != 0_fu && infos[i].cluster != lastWordSpacingCluster )
             {
@@ -375,20 +354,20 @@ namespace RatUI::FreeType
                 if ( Unicode::IsWhitespaceCluster( a_TextUTF8, infos[i].cluster ) )
                     xAdvance += wordSpacing;
             }
-
+ 
             EmplaceBack(
                 o_Glyphs,
                 /* GlyphID   */ infos[i].codepoint,
                 /* XAdvance  */ xAdvance,
                 /* YAdvance  */ yAdvance,
-				/* XOffset   */ FontUnit{ static_cast<f32>( positions[i].x_offset ) },
-				/* YOffset   */ FontUnit{ static_cast<f32>( positions[i].y_offset ) }
+                /* XOffset   */ xOffset,
+                /* YOffset   */ yOffset
             );
-
+ 
             lineWidth += xAdvance;
         }
-
-		return ToUnit( lineWidth, unitsPerEM );
+ 
+        return lineWidth;
     }
 
 } // namespace RatUI::FreeType

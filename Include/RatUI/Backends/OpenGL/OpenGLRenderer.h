@@ -115,19 +115,15 @@ namespace RatUI::OpenGL
             
             void main()
             {
-                // MTSDF: RGB = multi-channel SDF, A = single-channel SDF fallback.
+                // MTSDF: RGB = multi-channel SDF, A = TODO
                 vec4  mtsdf = texture(u_Texture, v_UV);
                 float dist  = median(mtsdf.r, mtsdf.g, mtsdf.b);
-                
-                // Use the SDF alpha channel as a fallback so MSDF corner artifacts
-                // (where the median can dip below 0.5 inside the glyph) are corrected.
-                dist = max(dist, mtsdf.a);
 
+                // Reference formula from msdfgen
                 vec2  texSize       = vec2(textureSize(u_Texture, 0));
-                vec2  uvToTex       = fwidth(v_UV) * texSize;   // texels per screen pixel
-                float screenPxRange = u_PxRange * length(uvToTex);
-                screenPxRange       = max(screenPxRange, 1.0); // Clamp so very small glyphs don't produce
-                                                               // excessively thin smoothing edges that alias.
+                vec2  unitRange     = vec2(u_PxRange) / texSize;
+                vec2  screenTexSize = vec2(1.0) / fwidth(v_UV);
+                float screenPxRange = max(0.5 * dot(unitRange, screenTexSize), 1.0);
             
                 float smoothW = 0.5 / screenPxRange;
                 float alpha   = smoothstep(0.5 - smoothW, 0.5 + smoothW, dist);
@@ -341,7 +337,7 @@ namespace RatUI::OpenGL
                     glUseProgram( m_MSDFProgram );
                     glUniformMatrix4fv( m_MSDFLoc_Projection, 1, GL_FALSE, m_Projection );
                     glUniform1i( m_MSDFLoc_Texture,  0 );
-                    glUniform1f( m_MSDFLoc_PxRange,  static_cast<float>( c_MsdfPxRange ) );
+                    glUniform1f( m_MSDFLoc_PxRange,  batch.MSDF.PixelRange );
                     glUniform1f( m_MSDFLoc_Scale,    batch.MSDF.Scale );
                 }
                 else

@@ -130,8 +130,15 @@ private:
         return card;
     }
 
-    /// Two-column horizontal container inside a vertical parent.
-    std::pair<WidgetID, WidgetID> MakeCols( WidgetID parent )
+    struct ColumnSet3
+    {
+        WidgetID A{};
+        WidgetID B{};
+        WidgetID C{};
+    };
+
+    /// Three-column horizontal container inside a vertical parent.
+    ColumnSet3 MakeCols( WidgetID parent )
     {
         WidgetID row = m_Scene.CreateWidget<RectWidget>(
             parent, Colorsu8::Surface900, "ColRow"
@@ -156,7 +163,7 @@ private:
             return c;
         };
 
-        return { MakeCol(), MakeCol() };
+        return { MakeCol(), MakeCol(), MakeCol() };
     }
 
     /// Horizontal row: 112 px label | demo text.  Returns demo text WidgetID.
@@ -256,6 +263,64 @@ private:
             ts.Layout.Wrap = TextWrap::WrapWord();
             AddRow( card, e.label, kSent, ts, ESizingMode::Flex );
         }
+
+        constexpr struct { ETextBaseline baseline; const char* label; } kBaselines[] = {
+            { ETextBaseline::Alphabetic, "Alphabetic" },
+            { ETextBaseline::Top,        "Top"        },
+            { ETextBaseline::Middle,     "Middle"     },
+            { ETextBaseline::Bottom,     "Bottom"     },
+            { ETextBaseline::Hanging,    "Hanging"    },
+        };
+
+        WidgetID row = m_Scene.CreateWidget<RectWidget>( card, Colorsu8::Surface800, "BaselineRow" );
+        {
+            auto* n = Node( row );
+            n->Style.LayoutType = ELayoutType::Horizontal;
+            n->Style.Spacing    = 8_u;
+            n->Style.WidthMode  = ESizingMode::Flex;
+            n->Style.HeightMode = ESizingMode::Content;
+        }
+
+        TextStyle lblStyle = RowLabelStyle();
+        WidgetID lbl = m_Scene.CreateWidget<TextWidget>( row, "Baseline", lblStyle.Layout, lblStyle.Render );
+        {
+            auto* n = Node( lbl );
+            n->Style.Padding    = Edges::Uniform( 4_u );
+            n->Style.WidthMode  = ESizingMode::Fixed;
+            n->Style.FixedWidth = 112_u;
+            n->Style.HeightMode = ESizingMode::Content;
+        }
+
+        WidgetID box = m_Scene.CreateWidget<RectWidget>(
+            row, Colorsu8::Transparent, "BaselineBox", CornerRounding::Uniform( 4_deg )
+        );
+        {
+            auto* n = Node( box );
+            n->Style.Padding    = Edges::Uniform( 4_u );
+            n->Style.LayoutType = ELayoutType::Horizontal;
+            n->Style.Spacing    = 4_u;
+            n->Style.WidthMode  = ESizingMode::Flex;
+            n->Style.HeightMode = ESizingMode::Fixed;
+            n->Style.FixedHeight = 40_u;
+        }
+
+        TextStyle ts = MakeStyle( 14_u );
+        ts.Render.Color    = Colorsu8::AccentSky;
+        ts.Render.FadePercentage = 0.0f;
+        ts.Layout.Wrap     = TextWrap::NoWrap();
+        ts.Layout.Overflow = ETextOverflow::Clip;
+
+        for ( const auto& e : kBaselines )
+        {
+            ts.Render.Baseline = e.baseline;
+
+            WidgetID txt = m_Scene.CreateWidget<TextWidget>( box, e.label, ts.Layout, ts.Render );
+            {
+                auto* n = Node( txt );
+                n->Style.WidthMode  = ESizingMode::Content;
+                n->Style.HeightMode = ESizingMode::Flex;
+            }
+        }
     }
 
     void BuildWrapping( WidgetID parent )
@@ -328,19 +393,35 @@ private:
 
     void BuildLetterSpacing( WidgetID parent )
     {
-        WidgetID card = BeginCard( parent, "Letter Spacing" );
+        WidgetID card = BeginCard( parent, "Letter & Word Spacing" );
 
-        constexpr struct { Unit sp; const char* label; } kSpacings[] = {
+        // Letter spacing demo
+        constexpr struct { Unit sp; const char* label; } kLetterSpacing[] = {
             { -1_u,   "-1 px  tight"  },
             {  0_u,   " 0 px  normal" },
             {  1_u,   "+1 px"         },
             {  2.5_u, "+2.5 px"       },
             {  5.0_u, "+5 px  wide"   },
         };
-        for ( auto& e : kSpacings )
+        for ( auto& e : kLetterSpacing )
         {
             TextStyle ts = MakeStyle( 14_u );
             ts.Layout.LetterSpacing = e.sp;
+            ts.Layout.Wrap = TextWrap::NoWrap();
+            ts.Layout.Overflow = ETextOverflow::Clip;
+            AddRow( card, e.label, "LOREM IPSUM SIT AMET", ts );
+        }
+        
+        // Word spacing demo
+        constexpr struct { Unit sp; const char* label; } kWordSpacing[] = {
+            {  0_u,   " 0 px  normal" },
+            {  5.0_u, "+5 px  wide"   },
+            {  15_u,  "+15 px extra wide" },
+        };
+        for ( auto& e : kWordSpacing )
+        {
+            TextStyle ts = MakeStyle( 14_u );
+            ts.Layout.WordSpacing = e.sp;
             ts.Layout.Wrap = TextWrap::NoWrap();
             ts.Layout.Overflow = ETextOverflow::Clip;
             AddRow( card, e.label, "LOREM IPSUM SIT AMET", ts );
@@ -448,7 +529,7 @@ private:
         );
 
         // Row container
-        WidgetID row = m_Scene.CreateWidget<RectWidget>( card, Colorsu8::Transparent, "ARow" );
+        WidgetID row = m_Scene.CreateWidget<RectWidget>( card, Colorsu8::Surface800, "ARow" );
         {
             auto* n = Node( row );
             n->Style.LayoutType = ELayoutType::Horizontal;
@@ -469,19 +550,30 @@ private:
         }
 
         // Animated box
-        m_AnimContainer = m_Scene.CreateWidget<RectWidget>(
-            row, Colorsu8::Surface600, "AnimBox",
-            CornerRounding::Uniform( 4_deg )
-        );
         {
-            auto* n = Node( m_AnimContainer );
-            n->Style.WidthMode  = ESizingMode::Fixed;
-            n->Style.FixedWidth = 400_u;
-            n->Style.HeightMode = ESizingMode::Content;
-            n->Style.LayoutType = ELayoutType::Horizontal;
-            n->Style.Padding    = Edges::Uniform( 4_u );
-            n->Style.Spacing    = 4_u;
+            // We wrap the animated container in a flex parent because percent widths are based on the parent's content width, not the available width.
+
+            WidgetID container = m_Scene.CreateWidget<RectWidget>( row, Colorsu8::Transparent, "ARow" );
+            {
+                auto* n = Node( container );
+                n->Style.WidthMode  = ESizingMode::Flex;
+                n->Style.HeightMode = ESizingMode::Content;
+            }
+
+            m_AnimContainer = m_Scene.CreateWidget<RectWidget>(
+                container, Colorsu8::Surface600, "AnimBox",
+                CornerRounding::Uniform( 6_deg )
+            );
+            {
+                auto* n = Node( m_AnimContainer );
+                n->Style.WidthMode  = ESizingMode::Percent;
+                n->Style.HeightMode = ESizingMode::Content;
+                n->Style.LayoutType = ELayoutType::Horizontal;
+                n->Style.Padding    = Edges::Uniform( 4_u );
+                n->Style.Spacing    = 4_u;
+            }
         }
+        
 
         TextStyle ts       = MakeStyle( 13_u );
         ts.Render.Color    = Colorsu8::AccentBlue;
@@ -513,7 +605,7 @@ private:
                 auto* n = Node( txt );
                 n->Style.WidthMode  = ESizingMode::Flex;
                 n->Style.HeightMode = ESizingMode::Content;
-                n->Style.FlexGrow = 2.f;
+                n->Style.FlexGrow = 1.f;
             }
         }
 
@@ -579,14 +671,31 @@ public:
             n->Style.HeightMode = ESizingMode::Content;
         }
 
-        // Layout: 2-column grid
-        { auto [l, r] = MakeCols( content ); BuildFontSizes( l );      BuildColors( r );        }
-        { auto [l, r] = MakeCols( content ); BuildAlignment( l );      BuildTransform( r );     }
-        { auto [l, r] = MakeCols( content ); BuildWrapping( l );       BuildOverflow( r );      }
-        { auto [l, r] = MakeCols( content ); BuildLetterSpacing( l );  BuildLineHeight( r );    }
-        { auto [l, r] = MakeCols( content ); BuildDecoration( l );     BuildCombined( r );      }
-
-        BuildAnimated( content );
+        // Layout: 3-column grid
+        {
+            auto [l, m, r] = MakeCols( content );
+            BuildFontSizes( l );
+            BuildColors( m );
+            BuildAlignment( r );
+        }
+        {
+            auto [l, m, r] = MakeCols( content );
+            BuildWrapping( l );
+            BuildOverflow( m );
+            BuildTransform( r );
+        }
+        {
+            auto [l, m, r] = MakeCols( content );
+            BuildLetterSpacing( l );
+            BuildLineHeight( m );
+            BuildDecoration( r );
+        }
+        {
+            auto [l, m, r] = MakeCols( content );
+            BuildCombined( l );
+            BuildAnimated( m );
+            (void)r;
+        }
     }
 
     void OnInputEvent( const InputEvent& a_Event ) override
@@ -604,7 +713,7 @@ public:
             if ( LayoutNode* n = m_Scene.Layouts.Get( w->GetLayoutID() ) )
             {
                 const f32 t = ( std::sin( m_Time * 0.6f ) + 1.f ) * 0.5f;
-                n->Style.FixedWidth = 80_u + t * 720_u; // 80 + (0..1) * 720 -> 80..800
+                n->Style.PercentWidth = Math::Lerp( 0.1f, 1.f, t );
                 n->Layout.IsDirty   = true;
             }
         }

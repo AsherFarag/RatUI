@@ -69,6 +69,7 @@ namespace RatUI
 
         struct
         {
+            f32 PixelRange{ c_MsdfPxRange };
             f32 Scale{ 1.f };
         } MSDF;
 
@@ -413,89 +414,198 @@ namespace RatUI
             }
         }
 
-        void EmitText( 
-            const ShapedText& a_Text, TextRenderStyle a_Style, Rect<Pixel> a_LayoutRect, GlyphAtlas& a_Atlas )
+        /**
+         * @brief Emits glyph quads for a block of shaped text into the vertex/index buffers.
+         */
+        void EmitText(
+            const ShapedText&      a_Text,
+            const TextRenderStyle& a_Style,
+            Rect<Pixel>            a_LayoutRect,
+            GlyphAtlas&            a_Atlas,
+			f32                    a_DpiScale )
         {
             if ( Empty( a_Text.Glyphs ) || Empty( a_Text.Lines ) )
                 return;
 
-            const f32 atlasW = static_cast<f32>( a_Atlas.GetConfig().AtlasWidth );
-            const f32 atlasH = static_cast<f32>( a_Atlas.GetConfig().AtlasHeight );
-            const f32 rcpW   = atlasW > 0.f ? 1.f / atlasW : 0.f;
-            const f32 rcpH   = atlasH > 0.f ? 1.f / atlasH : 0.f;
+            const f32 atlasW    = static_cast<f32>( a_Atlas.GetConfig().AtlasWidth );
+            const f32 atlasH    = static_cast<f32>( a_Atlas.GetConfig().AtlasHeight );
+            const f32 rcpAtlasW = atlasW > 0.f ? 1.f / atlasW : 0.f;
+            const f32 rcpAtlasH = atlasH > 0.f ? 1.f / atlasH : 0.f;
 
-            const f32 baseSize = a_Atlas.GetConfig().BaseSize.ToFloat();
-			const f32 scale = a_Text.FontSize.ToFloat();
-                
-            f32 startY = a_LayoutRect.Origin[1].ToFloat();
+            const Unit  fontSize   = a_Text.FontSize;
+			const Pixel textWidth  = ToPixel( a_Text.MaxWidth, a_DpiScale );
+			const Pixel textHeight = ToPixel( a_Text.TotalHeight, a_DpiScale );
+			const Pixel ascender   = ToPixel( a_Text.Ascender, a_DpiScale );
+
+            // baseSize is the atlas raster size in pixels. Dividing atlas pixel dimensions
+            // by baseSize gives EM-normalised glyph extents, which are then scaled by
+            // fontSizePx to get on-screen pixel sizes.
+            const f32 baseSize   = a_Atlas.GetConfig().BaseSize.ToFloat();
+            const f32 rcpBase    = baseSize > 0.f ? 1.f / baseSize : 0.f;
+			const f32 fontSizePx = ToPixel( fontSize, a_DpiScale ).ToFloat();
+
+            const Pixel layoutLeft  = a_LayoutRect.Origin[0];
+            const Pixel layoutRight = a_LayoutRect.Origin[0] + a_LayoutRect.Size[0];
+            const f32   fadePct     = std::clamp( a_Style.FadePercentage, 0.0f, 1.0f );
+            const Pixel fadeWidth   = a_LayoutRect.Size[0] * fadePct;
+            const Pixel fadeStartX  = layoutRight - fadeWidth;
+            const Pixel fadeEndX    = layoutRight;
+
+            auto computeFadeAlpha = [&]( Pixel x ) -> u8
+            {
+                if ( fadePct <= 0.f )  return a_Style.Color[3];
+                if ( x <= fadeStartX ) return a_Style.Color[3];
+                if ( x >= fadeEndX )   return 0;
+            
+                const f32 t = ( x - fadeStartX ).ToFloat() / ( fadeEndX - fadeStartX ).ToFloat();
+                const f32 alpha = ( 1.0f - t ) * a_Style.Color[3];
+            
+                return static_cast<u8>( std::clamp( alpha, 0.0f, 255.0f ) );
+            };
+
+            // Vertical start position, adjusted for baseline alignment.
+            Pixel startY = a_LayoutRect.Origin[1];
             switch ( a_Style.Baseline )
             {
-                case ETextBaseline::Middle: startY += ( a_LayoutRect.Size[1].ToFloat() - a_Text.TotalHeight.ToFloat() ) * 0.5f; break;
-                case ETextBaseline::Bottom: startY +=   a_LayoutRect.Size[1].ToFloat() - a_Text.TotalHeight.ToFloat();          break;
+                case ETextBaseline::Middle: startY += ( a_LayoutRect.Size[1] - textHeight ) * 0.5f;  break;
+                case ETextBaseline::Bottom: startY +=   a_LayoutRect.Size[1] - textHeight;           break;
                 default: break;
             }
 
-            f32 penY = startY + a_Text.Ascender.ToFloat();
+			Pixel penY = startY + ascender;
 
             for ( u32 lineIdx = 0; lineIdx < a_Text.LineCount(); ++lineIdx )
             {
                 const ShapedLine& line = a_Text.Lines[ lineIdx ];
 
-                // Compute horizontal offset based on text alignment.
-                f32 lineX = a_LayoutRect.Origin[0].ToFloat();
+                // Horizontal alignment offset.
+                Pixel lineX = a_LayoutRect.Origin[0];
                 switch ( a_Style.Align )
                 {
-                    case ETextAlign::Center: lineX += ( a_LayoutRect.Size[0].ToFloat() - line.Width.ToFloat() ) * 0.5f; break;
-                    case ETextAlign::Right:  lineX += a_LayoutRect.Size[0].ToFloat() - line.Width.ToFloat();            break;
+                    case ETextAlign::Center: lineX += ( a_LayoutRect.Size[0] - ToPixel( line.Width, a_DpiScale ) ) * 0.5f; break;
+					case ETextAlign::Right:  lineX +=   a_LayoutRect.Size[0] - ToPixel( line.Width, a_DpiScale );          break;
                     default: break;
                 }
 
-                f32 penX = lineX;
+                Pixel penX = lineX;
 
                 for ( u32 g = line.Start; g < line.End; ++g )
                 {
-                    const ShapedGlyph&  sg = a_Text.Glyphs[ g ];
+                    const ShapedGlyph& sg = a_Text.Glyphs[ g ];
+
+                    // Get the glyph in the atlas.
                     Optional<GlyphMetrics> gr = a_Atlas.GetOrRasterizeGlyph( a_Text.Font, sg.GlyphID );
 
                     if ( gr && gr->AtlasRect.Size[0] > 0 && gr->AtlasRect.Size[1] > 0 )
                     {
-                        const f32 gx =
-                            penX
-                            + sg.XOffset.ToFloat() * scale
-                            + static_cast<f32>( gr->Bearing[0] ) * scale;
+                        // Glyph position in screen pixels.
+                        const Pixel gx = penX + ToPixel( sg.XOffset + gr->Bearing[0], fontSize, a_DpiScale );
+                        const Pixel gy = penY + ToPixel( sg.YOffset - gr->Bearing[1], fontSize, a_DpiScale );
 
-                        const f32 gy =
-                            penY
-                            + sg.YOffset.ToFloat() * scale
-                            - static_cast<f32>( gr->Bearing[1] ) * scale;
+                        // On-screen glyph size in pixels.
+						// gr->AtlasRect.Size is in atlas pixels.
+                        // Divide by baseSize to get EM-normalised units, then multiply by fontSizePx to get display pixels.
+                        const Pixel gw = static_cast<Pixel>( gr->AtlasRect.Size[0] ) * rcpBase * fontSizePx;
+                        const Pixel gh = static_cast<Pixel>( gr->AtlasRect.Size[1] ) * rcpBase * fontSizePx;
 
-                        const f32 emW = static_cast<f32>( gr->AtlasRect.Size[0] ) / baseSize;
-                        const f32 emH = static_cast<f32>( gr->AtlasRect.Size[1] ) / baseSize;
+                        // Atlas UV coordinates.
+                        const f32 u0 = static_cast<f32>( gr->AtlasRect.Origin[0]                         ) * rcpAtlasW;
+                        const f32 v0 = static_cast<f32>( gr->AtlasRect.Origin[1]                         ) * rcpAtlasH;
+                        const f32 u1 = static_cast<f32>( gr->AtlasRect.Origin[0] + gr->AtlasRect.Size[0] ) * rcpAtlasW;
+                        const f32 v1 = static_cast<f32>( gr->AtlasRect.Origin[1] + gr->AtlasRect.Size[1] ) * rcpAtlasH;
 
-                        const f32 gw = emW * scale;
-                        const f32 gh = emH * scale;
-
-                        const f32 u0 = static_cast<f32>( gr->AtlasRect.Origin[0] ) * rcpW;
-                        const f32 v0 = static_cast<f32>( gr->AtlasRect.Origin[1] ) * rcpH;
-                        const f32 u1 = static_cast<f32>( gr->AtlasRect.Origin[0] + gr->AtlasRect.Size[0] ) * rcpW;
-                        const f32 v1 = static_cast<f32>( gr->AtlasRect.Origin[1] + gr->AtlasRect.Size[1] ) * rcpH;
+                        // If the glyph is in the fade region, we need to lerp the fade color based on the distance to the fade edge. 
+                        // This creates a smooth fade-out effect for glyphs that are partially outside the layout rect.
+                        const Coloru8 colorA = { a_Style.Color[0], a_Style.Color[1], a_Style.Color[2], computeFadeAlpha( gx ) };
+                        const Coloru8 colorB = { a_Style.Color[0], a_Style.Color[1], a_Style.Color[2], computeFadeAlpha( gx + gw ) };
 
                         const u32 vertexOffset = static_cast<u32>( Size( Vertices ) );
                         auto verts = ReserveVertices( 4 );
-                        verts[0] = Vertex{ Vec2<Pixel>{ Pixel{ gx      }, Pixel{ gy      } }, a_Style.Color, Vec2f{ u0, v0 } };
-                        verts[1] = Vertex{ Vec2<Pixel>{ Pixel{ gx + gw }, Pixel{ gy      } }, a_Style.Color, Vec2f{ u1, v0 } };
-                        verts[2] = Vertex{ Vec2<Pixel>{ Pixel{ gx      }, Pixel{ gy + gh } }, a_Style.Color, Vec2f{ u0, v1 } };
-                        verts[3] = Vertex{ Vec2<Pixel>{ Pixel{ gx + gw }, Pixel{ gy + gh } }, a_Style.Color, Vec2f{ u1, v1 } };
+                        verts[0] = Vertex{ Vec2<Pixel>{ Pixel{ gx      }, Pixel{ gy      } }, colorA, Vec2f{ u0, v0 } };
+                        verts[1] = Vertex{ Vec2<Pixel>{ Pixel{ gx + gw }, Pixel{ gy      } }, colorB, Vec2f{ u1, v0 } };
+                        verts[2] = Vertex{ Vec2<Pixel>{ Pixel{ gx      }, Pixel{ gy + gh } }, colorA, Vec2f{ u0, v1 } };
+                        verts[3] = Vertex{ Vec2<Pixel>{ Pixel{ gx + gw }, Pixel{ gy + gh } }, colorB, Vec2f{ u1, v1 } };
 
                         auto idx = ReserveIndices( 6 );
                         idx[0] = vertexOffset + 0; idx[1] = vertexOffset + 1; idx[2] = vertexOffset + 2;
                         idx[3] = vertexOffset + 1; idx[4] = vertexOffset + 3; idx[5] = vertexOffset + 2;
                     }
 
-					penX += sg.XAdvance.ToFloat() * scale;
+                    // Advance the pen by the glyph's horizontal advance.
+                    // sg.XAdvance is EM-normalised; multiply by fontSizePx to get pixels.
+					penX += ToPixel( sg.XAdvance, fontSize, a_DpiScale );
                 }
 
-                penY += a_Text.LineHeight.ToFloat();
+                // TODO: Can I add underlines and strikethrough without requiring a different draw batch for the lines?
+                //// Text decorations (underline / strikethrough)
+                //if ( a_Style.Underline || a_Style.Strikethrough )
+                //{
+                //    const Pixel lineWidthPx = ToPixel( line.Width, a_DpiScale );
+                //    if ( lineWidthPx <= Pixel{ 0 } )
+                //        continue;
+                //
+                //    const Pixel lineStartX = lineX;
+                //    const Pixel lineEndX   = lineX + lineWidthPx;
+                //
+                //    // Thickness in pixels (you should ideally get this from font metrics)
+                //    const Pixel thickness = ToPixel( a_Text.UnderlineThickness, a_DpiScale );
+                //    const Pixel halfT     = thickness * 0.5f;
+                //
+                //    auto emitLine = [&]( Pixel yCenter )
+                //    {
+                //        const Pixel y0 = yCenter - halfT;
+                //        const Pixel y1 = yCenter + halfT;
+                //    
+                //        const Coloru8 colorA =
+                //        {
+                //            a_Style.Color[0],
+                //            a_Style.Color[1],
+                //            a_Style.Color[2],
+                //            computeFadeAlpha( lineStartX )
+                //        };
+                //    
+                //        const Coloru8 colorB =
+                //        {
+                //            a_Style.Color[0],
+                //            a_Style.Color[1],
+                //            a_Style.Color[2],
+                //            computeFadeAlpha( lineEndX )
+                //        };
+                //    
+                //        const u32 vertexOffset = static_cast<u32>( Size( Vertices ) );
+                //        auto verts = ReserveVertices( 4 );
+                //    
+                //        verts[0] = Vertex{ Vec2<Pixel>{ lineStartX, y0 }, colorA, Vec2f{ 0.f, 0.f } };
+                //        verts[1] = Vertex{ Vec2<Pixel>{ lineEndX,   y0 }, colorB, Vec2f{ 0.f, 0.f } };
+                //        verts[2] = Vertex{ Vec2<Pixel>{ lineStartX, y1 }, colorA, Vec2f{ 0.f, 0.f } };
+                //        verts[3] = Vertex{ Vec2<Pixel>{ lineEndX,   y1 }, colorB, Vec2f{ 0.f, 0.f } };
+                //    
+                //        auto idx = ReserveIndices( 6 );
+                //        idx[0] = vertexOffset + 0; idx[1] = vertexOffset + 1; idx[2] = vertexOffset + 2;
+                //        idx[3] = vertexOffset + 1; idx[4] = vertexOffset + 3; idx[5] = vertexOffset + 2;
+                //    };
+                //
+                //    // Underline position is relative to baseline
+                //    if ( a_Style.Underline )
+                //    {
+                //        const Pixel underlineY =
+                //            penY + ToPixel( a_Text.UnderlinePosition, a_DpiScale );
+                //    
+                //        emitLine( underlineY );
+                //    }
+                //
+                //    // Strikethrough - typically around mid ascender
+                //    if ( a_Style.Strikethrough )
+                //    {
+                //        const Pixel strikeY =
+                //            penY - ( ascender * 0.35f );
+                //    
+                //        emitLine( strikeY );
+                //    }
+                //}
+
+                // Advance to the next line.
+				penY += ToPixel( a_Text.LineHeight, a_DpiScale );
             }
         }
     };

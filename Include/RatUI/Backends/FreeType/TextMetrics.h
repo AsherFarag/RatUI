@@ -25,7 +25,7 @@ namespace RatUI::FreeType
             if ( !m_FontCache || !a_Style.Font.IsValid() || Empty( a_Text ) )
                 return NullOpt;
 
-            Font* font = m_FontCache->GetOrLoadFont( a_Style.Font, static_cast<u32>( a_Style.Size.ToFloat() ) );
+            Font* font = m_FontCache->GetOrLoadFont( a_Style.Font );
             if ( !font )
                 return NullOpt;
 
@@ -52,21 +52,23 @@ namespace RatUI::FreeType
             if ( !m_FontCache || !a_Style.Font.IsValid() || Empty( a_Prepared.Segments ) )
                 return NullOpt; // Return empty shaped text if there are no segments to shape.
 
-            Font* font = m_FontCache->GetOrLoadFont( a_Style.Font, static_cast<u32>( a_Style.Size.ToFloat() ) );
+            Font* font = m_FontCache->GetOrLoadFont( a_Style.Font );
             if ( !font )
                 return NullOpt; // Return empty shaped text if the font couldn't be loaded.
 
             FT_Face   face      = font->GetFace();
             const u32 pixelSize = static_cast<u32>( a_Style.Size.ToFloat() );
 
+            const f32 unitsPerEM = static_cast<f32>( face->units_per_EM );
+
             ShapedText result;
             result.Font               = a_Style.Font;
             result.FontSize           = a_Style.Size;
             result.LineHeight         = GetLineHeight( face, a_Style ) + a_Style.LineSpacing;
-            result.Ascender           = Unit{ face->size->metrics.ascender  / 64.f };
-            result.Descender          = Unit{ face->size->metrics.descender / 64.f };
-            result.UnderlinePosition  = Unit{ -( FT_MulFix( face->underline_position,  face->size->metrics.y_scale ) / 64.f ) };
-            result.UnderlineThickness = Unit{ std::max( 1.f, FT_MulFix( face->underline_thickness, face->size->metrics.y_scale ) / 64.f ) };
+            result.Ascender           = Unit{ ( static_cast<f32>( face->ascender )  / unitsPerEM ) * a_Style.Size.ToFloat() };
+            result.Descender          = Unit{ ( static_cast<f32>( face->descender ) / unitsPerEM ) * a_Style.Size.ToFloat() };
+            result.UnderlinePosition  = Unit{ -( static_cast<f32>( face->underline_position  ) / unitsPerEM ) * a_Style.Size.ToFloat() };
+			result.UnderlineThickness = Unit{ std::max( 1.f, ( static_cast<f32>( face->underline_thickness ) / unitsPerEM ) * a_Style.Size.ToFloat() ) };
 
             const Unit maxWidth = a_MaxSize[0];
             const u32 maxLines = a_Style.MaxLines;
@@ -86,6 +88,18 @@ namespace RatUI::FreeType
 
             Array<ShapedGlyph> lineGlyphs; // reused per line
 
+            Array<ShapedGlyph> ellipsisGlyphs;
+            Unit ellipsisWidth = 0_u;
+
+            if ( ellipsis )
+            {
+                constexpr StringView c_Ellipsis = "...";
+                ellipsisWidth = ToUnit(
+                    ShapeLine( *font, c_Ellipsis, a_Style, ellipsisGlyphs ),
+                    a_Style.Size
+                );
+            }
+
             TextLayout::WalkLines( a_Prepared, maxWidth, maxLines,
                 [&]( u32 lineStartSeg, u32 lineEndSeg, Unit paintWidth )
                 {
@@ -103,22 +117,51 @@ namespace RatUI::FreeType
                         lineText = StringView{ Data( norm ) + byteStart, byteEnd - byteStart };
                     }
 
-                    // Ellipsis: force-truncate the last line when maxLines is exceeded, or truncate
-                    // any line that is wider than the available width (e.g. NoWrap + Ellipsis mode).
-                    String truncated;
-                    const bool isLastLine    = ( maxLines > 0 && result.LineCount() == maxLines - 1 );
+                    // Shape the line with HarfBuzz to get per-glyph positions.
+					paintWidth = ToUnit( ShapeLine( *font, lineText, a_Style, lineGlyphs ), a_Style.Size );
+
+                    const bool isLastLine = ( maxLines > 0 && result.LineCount() == maxLines - 1 );
                     const bool forceEllipsis = ellipsis && exceededMaxLines && isLastLine;
                     const bool lineOverflows = ellipsis && hasWidthConstraint
-                                              && paintWidth > maxWidth + TextLayout::c_LineFitEpsilon;
+                        && paintWidth > maxWidth + TextLayout::c_LineFitEpsilon;
 
-                    if ( ( forceEllipsis || lineOverflows ) && !Empty( lineText ) )
+                    if ( ( forceEllipsis || lineOverflows ) && !Empty( lineGlyphs ) )
                     {
-                        truncated  = TextUtil::TruncateLineWithEllipsis( *font, lineText, a_Style, maxWidth, forceEllipsis );
-                        lineText   = StringView{ truncated };
-                    }
+                        if ( ellipsisWidth <= maxWidth )
+                        {
+                            const Unit prefixBudget = maxWidth - ellipsisWidth;
 
-                    // Shape the line with HarfBuzz to get per-glyph positions.
-                    paintWidth = ShapeLine( *font, lineText, a_Style, lineGlyphs );
+                            Unit accumulated = 0_u;
+                            u32  keepCount = 0;
+
+                            for ( u32 i = 0; i < Size( lineGlyphs ); ++i )
+                            {
+                                const Unit adv = ToUnit( lineGlyphs[i].XAdvance, a_Style.Size );
+
+                                if ( accumulated + adv > prefixBudget )
+                                    break;
+
+                                accumulated += adv;
+                                ++keepCount;
+                            }
+
+                            Resize( lineGlyphs, keepCount );
+
+                            Insert(
+                                lineGlyphs,
+                                End( lineGlyphs ),
+                                Begin( ellipsisGlyphs ),
+                                End( ellipsisGlyphs )
+                            );
+
+                            paintWidth = accumulated + ellipsisWidth;
+                        }
+                        else
+                        {
+                            Clear( lineGlyphs );
+                            paintWidth = 0_u;
+                        }
+                    }
 
                     // Append glyphs to the output and record the line metadata.
                     const u32 glyphStart = static_cast<u32>( Size( result.Glyphs ) );
@@ -128,21 +171,21 @@ namespace RatUI::FreeType
                     PushBack( result.Lines, ShapedLine{
                         .Start   = glyphStart,
                         .End     = glyphEnd,
-                        .Width   = Unit{ paintWidth },
+                        .Width   = paintWidth
                     } );
 
-                    result.MaxWidth = Unit{ std::max( result.MaxWidth, paintWidth ) };
+                    result.MaxWidth = Unit{ std::max( result.MaxWidth.ToFloat(), paintWidth.ToFloat() ) };
                 }
             );
 
             if ( Empty( result.Lines ) )
                 return NullOpt;
 
-            const f32 sdfPadDisplay = static_cast<f32>( c_MsdfPxRange ) * a_Style.Size.ToFloat() / 64.f;
+            // SDF padding in display units.
+            const f32 sdfPadDisplay = static_cast<f32>( c_MsdfPxRange );
+
             result.Ascender += Unit{ sdfPadDisplay }; // shifts penY down -> headroom above caps
-            const u32 extraLines = result.LineCount() > 0 ? ( result.LineCount() - 1u ) : 0u;
-            result.TotalHeight = result.Ascender
-                + result.LineHeight * static_cast<f32>( extraLines )
+			result.TotalHeight = result.LineHeight * result.LineCount()
                 + Unit{ std::abs( result.Descender.ToFloat() ) + sdfPadDisplay };   // extra depth below descenders
 
             return result;
@@ -163,7 +206,7 @@ namespace RatUI::FreeType
             if (!m_FontCache)
                 return false;
         
-            Font* font = m_FontCache->GetOrLoadFont(a_Font, a_SdfPixelSize);
+            Font* font = m_FontCache->GetOrLoadFont( a_Font );
             if (!font || !font->IsValid())
                 return false;
         
@@ -181,35 +224,34 @@ namespace RatUI::FreeType
                     msdfFont,
                     msdfgen::GlyphIndex(a_GlyphIndex),
                     msdfgen::FONT_SCALING_EM_NORMALIZED,
-                    &advance))
+                    &advance
+                ))
             {
                 return false;
             }
-        
-            // Convert advance directly into font units (Do NOT scale here)
-            o_XAdvance = static_cast<FontUnit>(advance);
+
+            o_XAdvance = FontUnit{ static_cast<f32>(advance) };
         
             // Empty glyph (space, etc.)
             if (shape.contours.empty())
                 return true;
         
-            shape.normalize();
+            //shape.normalize();
             msdfgen::edgeColoringSimple(shape, 3.0);
         
             // ----------------------------
-            // Shape bounds (font space)
+            // Shape bounds (EM-normalised font space)
             // ----------------------------
             f64 l = 0.0, b = 0.0, r = 0.0, t = 0.0;
             shape.bound(l, b, r, t);
         
             // ----------------------------
-            // Correct scale
+            // Scale: EM-normalised units -> atlas pixels
+            // With FONT_SCALING_EM_NORMALIZED, 1.0 == 1 EM.
             // ----------------------------
-            // Convert font units -> pixels at SDF resolution
-            const f64 unitsPerEm = static_cast<f64>(face->units_per_EM);
             const f64 scale = static_cast<f64>( a_SdfPixelSize );
         
-            // Add padding to prevent clipping of SDF fringes (in pixels at SDF resolution)
+            // Add padding to prevent clipping of SDF fringes (in atlas pixels)
             const i32 padding = static_cast<i32>( std::ceil( c_MsdfPxRange ) );
         
             const i32 w = static_cast<i32>(std::ceil((r - l) * scale)) + 2 * padding;
@@ -219,57 +261,83 @@ namespace RatUI::FreeType
                 return true;
         
             // ----------------------------
-            // Projection (font space -> pixel space)
+            // Projection (EM-normalised space -> atlas pixel space)
+            //
+            // msdfgen::Projection::project(coord) = scale * (coord + translate)
+            // so translate must be in EM space, not pixel space.
+            //
+            // We want: project(l) = padding  and  project(b) = padding
+            //   scale * (l + translate.x) = padding  =>  translate.x = padding/scale - l
+            //   scale * (b + translate.y) = padding  =>  translate.y = padding/scale - b
             // ----------------------------
+            const f64 padEm = static_cast<f64>(padding) / scale; // SDF padding in EM units
             const msdfgen::Projection projection(
                 msdfgen::Vector2(scale, scale),
                 msdfgen::Vector2(
-                    -l * scale + padding,
-                    -b * scale + padding
+                    padEm - l,
+                    padEm - b
                 )
             );
         
             msdfgen::Bitmap<f32, 4> mtsdf(w, h);
-            msdfgen::generateMTSDF(mtsdf, shape, projection, c_MsdfPxRange);
+            // c_MsdfPxRange is in atlas pixels; generateMTSDF expects the range in shape-space
+            // units (EM-normalised, since FONT_SCALING_EM_NORMALIZED is used).
+            // Convert: range_em = pxRange / pixels_per_EM = c_MsdfPxRange / scale.
+            msdfgen::generateMTSDF(mtsdf, shape, projection, c_MsdfPxRange / scale);
         
             // ----------------------------
             // Convert to RGBA8
             // ----------------------------
-            Resize(m_RasterBuffer, static_cast<size>(w) * h);
-        
-            auto toU8 = [](f32 v) -> u8
             {
-                return static_cast<u8>(
-                    std::clamp(static_cast<i32>(v * 255.0f + 0.5f), 0, 255)
-                );
-            };
-        
-            // TODO: SIMD this?
-            for (i32 y = 0; y < h; ++y)
-            {
-                for (i32 x = 0; x < w; ++x)
+                Resize(m_RasterBuffer, static_cast<size>(w) * h);
+                
+                auto toU8 = +[](f32 v) -> u8
                 {
-                    const f32* px = mtsdf(x, h - 1 - y); // flip Y 
-                    const size idx = static_cast<size>(y) * w + x;
-                    RawAt(m_RasterBuffer, idx) = Coloru8{
-                        toU8(px[0]), toU8(px[1]), toU8(px[2]), toU8(px[3])
-                    };
+                    return static_cast<u8>(
+                        std::clamp(static_cast<i32>(v * 255.0f + 0.5f), 0, 255)
+                    );
+                };
+            
+                // TODO: SIMD this?
+                for (i32 y = 0; y < h; ++y)
+                {
+                    for (i32 x = 0; x < w; ++x)
+                    {
+                        const size idx = static_cast<size>(y) * w + x;
+                        auto px = mtsdf( x, h - 1 - y );
+
+                        RawAt( m_RasterBuffer, idx ) = Coloru8{
+                            toU8( px[0] ),
+                            toU8( px[1] ),
+                            toU8( px[2] ),
+                            toU8( px[3] )
+                        };
+                    }
                 }
             }
+            
         
             o_Pixels = Data(m_RasterBuffer);
             o_Width  = static_cast<u32>(w);
             o_Height = static_cast<u32>(h);
         
             // ----------------------------
-            // Calculate bearing (FontUnit = normalized EM space)
+            // Bearing (EM-normalised space, same coordinate system as FontUnit)
+            //
+            // The atlas bitmap includes `padding` pixels of SDF fringe on every side,
+            // so the bitmap's top-left corner in EM space is:
+            //
+            //   left  = l - padEm   (padEm pixels to the LEFT  of the shape left edge)
+            //   top   = t + padEm   (padEm pixels ABOVE the shape top edge)
+            //
+            // In DrawBatcher::EmitText the bearing is used to position the glyph quad
+            // (which covers the full bitmap, fringe included):
+            //   gx = penX + XOffset_display + Bearing[0] * fontSize
+            //   gy = penY + YOffset_display - Bearing[1] * fontSize
             // ----------------------------
-            // shape.bound() returns coords in EM-normalized font space (same as FontUnit).
-            // bearing X = left edge of glyph bounding box
-            // bearing Y = top edge of glyph bounding box (ascent from baseline)
             o_Bearing = Vec2<FontUnit>{
-                static_cast<FontUnit>(l),   // left edge in EM space
-                static_cast<FontUnit>(t)    // top edge in EM space (positive = above baseline)
+                static_cast<FontUnit>(l - padEm),   // bitmap left edge in EM space
+                static_cast<FontUnit>(t + padEm)    // bitmap top  edge in EM space (positive = above baseline)
             };
         
             return true;

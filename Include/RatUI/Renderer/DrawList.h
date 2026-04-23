@@ -141,10 +141,12 @@ namespace RatUI
 
         DrawList& AddText( const ShapedText& a_Shaped, TextRenderStyle a_Style, Rect<Unit> a_Rect )
 		{
-			const f32 baseSize = Atlas.GetConfig().BaseSize.ToFloat();
-            const f32 fontSizePx = ToPixel( a_Shaped.FontSize, m_DPIScale ).ToFloat();
-			EnsureMSDFBatch( baseSize > 0.f ? fontSizePx / baseSize : 1.f );
-			Batcher.EmitText( a_Shaped, a_Style, ToPixelRect( a_Rect ), Atlas );
+			const f32   baseSize   = Atlas.GetConfig().BaseSize.ToFloat();
+            const Pixel fontSizePx = ToPixel( a_Shaped.FontSize, m_DPIScale );
+            const f32   msdfScale  = baseSize > 0.f ? fontSizePx.ToFloat() / baseSize : 1.f;
+
+			EnsureMSDFBatch( msdfScale );
+			Batcher.EmitText( a_Shaped, a_Style, ToPixelRect( a_Rect ), Atlas, m_DPIScale );
             return *this;
         }
 
@@ -236,7 +238,7 @@ namespace RatUI
 
         void EnsureMSDFBatch( f32 a_Scale )
         {
-            m_CurrentTexture = Atlas.GetTexture(); // For Text TODO( Probably wont only be for text so we may need to update this )
+            m_CurrentTexture = Atlas.GetTexture();
 
             if ( m_HasActiveBatch )
             {
@@ -250,6 +252,7 @@ namespace RatUI
             FlushBatch();
             DrawBatch& batch = Batcher.BeginBatch( EBatchType::MSDF, GetClipRect(), m_CurrentTransform, m_CurrentTexture);
 
+            batch.MSDF.PixelRange = c_MsdfPxRange;
             batch.MSDF.Scale = a_Scale;
             m_HasActiveBatch = true;
         }

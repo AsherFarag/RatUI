@@ -17,6 +17,24 @@ namespace RatUI
     Unit       AlignCrossAxis( Unit a_ChildSize, Unit a_ParentPos,
                                Unit a_ParentSize, EAlignment a_Align, bool a_IsMainAxisHorizontal );
 
+    /**
+     * @brief Resolves the final arranged size of a child node, recomputing Percent dimensions
+     * from the now-known inner container size. Called during Arrange to get the authoritative
+     * size for children whose Percent base wasn't fully resolved during Measure (e.g. when the
+     * parent itself is Flex-sized and its true extent wasn't known until Arrange time).
+     */
+    inline Vec2<Unit> ResolveChildArrangeSize( const LayoutNode& a_Child, Vec2<Unit> a_InnerSize )
+    {
+        Vec2<Unit> size = a_Child.Layout.DesiredSize;
+
+        if ( a_Child.Style.WidthMode  == ESizingMode::Percent )
+            size[0] = a_Child.Style.PercentWidth  * a_InnerSize[0];
+        if ( a_Child.Style.HeightMode == ESizingMode::Percent )
+            size[1] = a_Child.Style.PercentHeight * a_InnerSize[1];
+
+        return size;
+    }
+
 
     // TODO: These functions are getting pretty fat, should consider making RatUI a static lib or doing something like stb lib
     // TODO: Currently uses recursion but will need to switch to an iterative approach with an explicit stack for deep hierarchies to avoid stack overflow
@@ -31,31 +49,41 @@ namespace RatUI
     
         const LayoutStyle& s = a_Node.Style;
         Vec2<Unit> desired( 0_u, 0_u );
-    
-        // Resolve width
+
         switch (s.WidthMode)
         {
-            case ESizingMode::Fixed:   desired[0] = s.FixedWidth; break;
-            case ESizingMode::Percent: desired[0] = s.PercentWidth * a_AvailableSize[0]; break;
+            case ESizingMode::Fixed:   desired[0] = s.FixedWidth;                         break;
+            case ESizingMode::Percent: desired[0] = s.PercentWidth  * a_AvailableSize[0]; break;
             case ESizingMode::Flex:
-            case ESizingMode::Content: desired[0] = a_Node.Layout.IntrinsicSize[0]; break;
+            case ESizingMode::Content: desired[0] = a_Node.Layout.IntrinsicSize[0];       break;
         }
     
-        // Resolve height
         switch (s.HeightMode)
         {
-            case ESizingMode::Fixed:   desired[1] = s.FixedHeight; break;
+            case ESizingMode::Fixed:   desired[1] = s.FixedHeight;                        break;
             case ESizingMode::Percent: desired[1] = s.PercentHeight * a_AvailableSize[1]; break;
             case ESizingMode::Flex:
-            case ESizingMode::Content: desired[1] = a_Node.Layout.IntrinsicSize[1]; break;
+            case ESizingMode::Content: desired[1] = a_Node.Layout.IntrinsicSize[1];       break;
         }
     
         // Accumulate children for content mode
         {
             const Vec2<Unit> padding = s.Padding.Total();
-            Vec2<Unit>       contentSize = a_Node.Layout.IntrinsicSize; // Start with intrinsic size, if any
-            Vec2<Unit>       childAvailSize( a_AvailableSize[0] - padding[0], a_AvailableSize[1] - padding[1] );
-            u32              numFlow = 0;
+
+			// For Fixed/Percent parents the inner size is already determined, 
+            // so we can use that to measure children with Percent sizing.
+            // For Content/Flex parents the inner size isn't known yet, so fall back to the
+            // outer available space minus padding.
+            Vec2<Unit> childAvailSize;
+            childAvailSize[0] = ( s.WidthMode  == ESizingMode::Fixed || s.WidthMode  == ESizingMode::Percent )
+                                ? std::max( 0_u, desired[0] - s.Padding.Horizontal() )
+                                : std::max( 0_u, a_AvailableSize[0] - s.Padding.Horizontal() );
+            childAvailSize[1] = ( s.HeightMode == ESizingMode::Fixed || s.HeightMode == ESizingMode::Percent )
+                                ? std::max( 0_u, desired[1] - s.Padding.Vertical() )
+                                : std::max( 0_u, a_AvailableSize[1] - s.Padding.Vertical() );
+
+            Vec2<Unit> contentSize = a_Node.Layout.IntrinsicSize; // Start with intrinsic size, if any
+            u32        numFlow = 0;
         
             a_Node.ForEachChild( [&]( LayoutNode& child )
             {
@@ -69,21 +97,30 @@ namespace RatUI
                 }
             
                 numFlow++;
-            
-                const Vec2<Unit> childDesired = MeasureLayoutNode( child, childAvailSize )
-                                             + Vec2<Unit>( child.Style.Margin.Horizontal(),
-                                                           child.Style.Margin.Vertical() );
+
+                // Percent children size themselves relative to the parent's full inner size, not relative to siblings. TODO: This is apparently how CSS does it but it doesnt feel right. Research 
+                // They must not inflate the parent's content size -
+                // otherwise a Content-sized parent would grow to accommodate both its fixed
+                // children and the full resolved Percent extent, double-counting the space.
+                // We still call Measure so DesiredSize is populated for the Arrange pass.
+                MeasureLayoutNode( child, childAvailSize );
+                const bool isPercentW = child.Style.WidthMode  == ESizingMode::Percent;
+                const bool isPercentH = child.Style.HeightMode == ESizingMode::Percent;
+                const Vec2<Unit> childDesired(
+                    isPercentW ? 0_u : child.Layout.DesiredSize[0] + child.Style.Margin.Horizontal(),
+                    isPercentH ? 0_u : child.Layout.DesiredSize[1] + child.Style.Margin.Vertical()
+                );
                                         
                 switch ( s.LayoutType )
                 {
                     case ELayoutType::Horizontal:
-                        contentSize[0] = contentSize[0] + childDesired[0] + s.Spacing;
-                        contentSize[1] = std::max( contentSize[1], childDesired[1] );
+                        contentSize[0] += childDesired[0] + s.Spacing;
+                        contentSize[1]  = std::max( contentSize[1], childDesired[1] );
                         break;
                 
                     case ELayoutType::Vertical:
-                        contentSize[0] = std::max( contentSize[0], childDesired[0] );
-                        contentSize[1] = contentSize[1] + childDesired[1] + s.Spacing;
+                        contentSize[0]  = std::max( contentSize[0], childDesired[0] );
+                        contentSize[1] += childDesired[1] + s.Spacing;
                         break;
                 
                     case ELayoutType::Overlay:
@@ -110,11 +147,11 @@ namespace RatUI
             // Remove trailing spacing added after last child
             if ( numFlow > 0 )
             {
-                if ( s.LayoutType == ELayoutType::Horizontal ) contentSize[0] = contentSize[0] - s.Spacing;
-                if ( s.LayoutType == ELayoutType::Vertical )   contentSize[1] = contentSize[1] - s.Spacing;
+                if ( s.LayoutType == ELayoutType::Horizontal ) contentSize[0] -= s.Spacing;
+                if ( s.LayoutType == ELayoutType::Vertical )   contentSize[1] -= s.Spacing;
             }
         
-            contentSize = Vec2<Unit>( contentSize[0] + padding[0], contentSize[1] + padding[1] );
+            contentSize = contentSize + padding; // Add padding after calculating content size
         
             // If node is sized to content, use the accumulated content size
             if ( s.WidthMode  == ESizingMode::Content ) desired[0] = contentSize[0];
@@ -152,7 +189,7 @@ namespace RatUI
         else if ( ( a_Align & EAlignment::Bottom ) == EAlignment::Bottom )
             offset[1] = a_Container.Size[1] - a_ContentSize[1];
 
-        return Rect<Unit>{ Vec2<Unit>( a_Container.Origin[0] + offset[0], a_Container.Origin[1] + offset[1] ), a_ContentSize };
+        return Rect{ .Origin = a_Container.Origin + offset, .Size = a_ContentSize };
     }
 
     /** Aligns a LayoutNode with an anchored position within a container. */
@@ -210,7 +247,8 @@ namespace RatUI
                 return;
             }
 
-            Vec2<Unit> childSize = child.Layout.DesiredSize;
+            // Re-resolve Percent dimensions now that the true inner size is known.
+            Vec2<Unit> childSize = ResolveChildArrangeSize( child, a_Inner.Size );
 
             // Flex children fill the entire overlay container on their flex axis,
             // consistent with the cross-axis stretch behaviour in ArrangeLinear.
@@ -250,22 +288,31 @@ namespace RatUI
                    ( !isHz && child.Style.HeightMode == ESizingMode::Flex );
         };
 
-        // Pass 1: sum fixed space and total grow weight
-        Unit totalFixed( 0_u );
+        // Pass 1: sum fixed space and total grow weight.
+        // Flex children are excluded because their size is determined by leftover space.
+        // Percent children are also excluded: their size is a fraction of the full parent
+        // inner size (UMG/Unity semantics), independent of siblings. Including them in
+        // totalFixed would shrink leftover and shift sibling positions incorrectly.
+        Unit totalFixed = 0_u;
         f32  totalGrow  = 0.f;
         u32  numFlow    = 0;
+
+        const auto isPercentMain = [&]( const LayoutNode& child ) -> bool
+        {
+            return ( isHz  && child.Style.WidthMode  == ESizingMode::Percent ) ||
+                   ( !isHz && child.Style.HeightMode == ESizingMode::Percent );
+        };
 
         a_Node.ForEachChild( [&]( const LayoutNode& child )
         {
             if ( child.Style.PositionMode == EPositioningMode::Anchored ) return;
             if ( !child.Layout.Visibility.AffectsLayout() )               return;
 
-            // Pure-stretch children are excluded from totalFixed, their size will be
-            // whatever space remains after all other children are allocated.
-            if ( !isPureStretchMain( child ) )
+            // Exclude Pure-stretch (Flex) and Percent children from totalFixed.
+            if ( !isPureStretchMain( child ) && !isPercentMain( child ) )
             {
-                totalFixed = totalFixed + ( isHz ? child.Layout.DesiredSize[0] + child.Style.Margin.Horizontal()
-                                                 : child.Layout.DesiredSize[1] + child.Style.Margin.Vertical() );
+                totalFixed += isHz ? child.Layout.DesiredSize[0] + child.Style.Margin.Horizontal()
+                                   : child.Layout.DesiredSize[1] + child.Style.Margin.Vertical();
             }
 
             totalGrow  += child.Style.FlexGrow;
@@ -305,7 +352,9 @@ namespace RatUI
             if ( !child.Layout.Visibility.AffectsLayout() )
                 return;
 
-            Vec2<Unit> childSize = child.Layout.DesiredSize;
+            // Re-resolve Percent dimensions against the real inner size before any
+            // Flex distribution - this is the authoritative size for Percent children.
+            Vec2<Unit> childSize = ResolveChildArrangeSize( child, a_Inner.Size );
 
             // Determine effective grow weight - explicit FlexGrow or implicit 1 for Flex children
             f32 growWeight = child.Style.FlexGrow;
@@ -317,7 +366,7 @@ namespace RatUI
                     growWeight = 1.f;
             }
 
-            // Distribute leftover space
+            // Distribute leftover space (Flex children only - Percent children do not flex)
             if ( growWeight > 0.f && totalGrow > 0.f )
             {
                 const Constraints& c     = child.Style.SizeConstraints;
@@ -361,17 +410,17 @@ namespace RatUI
             childRect.Size = childSize;
 
             // Apply margins
-            childRect.Origin[0] = childRect.Origin[0] + child.Style.Margin.Left;
-            childRect.Origin[1] = childRect.Origin[1] + child.Style.Margin.Top;
-            childRect.Size[0]   = childRect.Size[0]   - child.Style.Margin.Horizontal();
-            childRect.Size[1]   = childRect.Size[1]   - child.Style.Margin.Vertical();
+            childRect.Origin[0] += child.Style.Margin.Left;
+            childRect.Origin[1] += child.Style.Margin.Top;
+            childRect.Size[0]   -= child.Style.Margin.Horizontal();
+            childRect.Size[1]   -= child.Style.Margin.Vertical();
 
             childRect.Size[0] = std::max( 0_u, childRect.Size[0] );
             childRect.Size[1] = std::max( 0_u, childRect.Size[1] );
 
-            cursor = cursor + s.Spacing;
-            cursor = cursor + ( isHz ? childSize[0] + child.Style.Margin.Horizontal()
-                                     : childSize[1] + child.Style.Margin.Vertical() );
+            cursor += s.Spacing;
+            cursor += isHz ? childSize[0] + child.Style.Margin.Horizontal()
+                           : childSize[1] + child.Style.Margin.Vertical();
 
             ArrangeLayoutNode( child, childRect );
         } );

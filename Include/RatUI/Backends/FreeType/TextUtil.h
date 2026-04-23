@@ -50,8 +50,13 @@ namespace RatUI::FreeType::TextUtil
         if ( !positions || !infos || glyphCount == 0 )
             return 0_u;
 
-		const f32 unitsPerEM = static_cast<f32>( a_Font.GetFace()->units_per_EM );
+		const Unit fontSize = a_Style.Size;
 
+        // Same EM normalization as ShapeLine: HarfBuzz gives 26.6 fixed-point scaled-pixel
+        // values; divide by 64 (26.6 factor) then by ppem (pixels per EM) to get FontUnit.
+        // The fallback 4096.f = 64*64 matches the default ppem set in Font::LoadFromFace.
+        const f32 ppem      = static_cast<f32>( a_Font.GetFace()->size->metrics.y_ppem );
+        const f32 emNormDiv = ( ppem > 0.f ) ? ( 64.f * ppem ) : 4096.f;
 
         Unit width = 0_u;
 
@@ -59,14 +64,14 @@ namespace RatUI::FreeType::TextUtil
         u32 clusterCount      = 1;
         u32 spaceClusterCount = 0;
 
-		width += ToUnit( FontUnit{ static_cast<f32>( positions[0].x_advance ) }, unitsPerEM );
+		width += ToUnit( FontUnit{ static_cast<f32>( positions[0].x_advance ) / emNormDiv }, fontSize );
 
         if ( a_Style.WordSpacing != 0_u && Unicode::IsWhitespaceCluster( a_Line, infos[0].cluster ) )
             ++spaceClusterCount;
 
         for ( u32 i = 1; i < glyphCount; ++i )
         {
-            width += ToUnit( FontUnit{ static_cast<f32>( positions[i].x_advance ) }, unitsPerEM );
+            width += ToUnit( FontUnit{ static_cast<f32>( positions[i].x_advance ) / emNormDiv }, fontSize );
 
             if ( infos[i].cluster != prevCluster )
             {
@@ -103,94 +108,86 @@ namespace RatUI::FreeType::TextUtil
     }
 
     /**
-     * @brief Truncates a line so that (prefix + "...") fits within a_MaxWidth.
-     * @param a_Font           Font providing FTFace and advance cache.
-     * @param a_Line           The line to truncate (must be newline-free).
-     * @param a_Style          Text style (letter spacing).
-     * @param a_MaxWidth       Maximum allowed width of the final string.
-     * @param a_ForceEllipsis  When true, always appends "..." even if the line fits.
-     * @return The truncated string, or an empty string if even "..." does not fit.
+     * @brief Truncates a shaped line in-place and appends shaped ellipsis glyphs.
+     *
+     * @param io_Text        The shaped text to modify.
+     * @param a_LineIndex    Line index to truncate.
+     * @param a_MaxWidth     Maximum allowed width.
+     * @param a_Ellipsis     Pre-shaped ellipsis (same font + size).
+     *
+     * @return True if truncation occurred.
      */
-    inline String TruncateLineWithEllipsis(
-        Font&                  a_Font,
-        StringView             a_Line,
-        const TextLayoutStyle& a_Style,
-        Unit                   a_MaxWidth,
-        bool                   a_ForceEllipsis )
+    inline bool TruncateShapedLineWithEllipsis(
+        ShapedText&       o_Text,
+        u32               a_LineIndex,
+        Unit              a_MaxWidth,
+        const ShapedText& a_Ellipsis )
     {
-        FT_Face face = a_Font.GetFace();
+        if (a_LineIndex >= o_Text.LineCount())
+            return false;
 
-        if ( !a_ForceEllipsis && MeasureLineWidth( a_Font, a_Line, a_Style ) <= a_MaxWidth )
-            return String( Begin( a_Line ), End( a_Line ) );
+        ShapedLine& line = o_Text.Lines[a_LineIndex];
 
-        constexpr StringView c_Ellipsis = "...";
-        const Unit ellipsisWidth = MeasureLineWidth( a_Font, c_Ellipsis, a_Style );
-        if ( ellipsisWidth > a_MaxWidth )
-            return {};
+        // Already fits
+        if (line.Width <= a_MaxWidth)
+            return false;
 
-        const u32 dotGlyphIdx = FT_Get_Char_Index( face, U'.' );
-		const f32 unitsPerEM = static_cast<f32>( face->units_per_EM );
+        if (Empty(a_Ellipsis.Glyphs) || Empty(a_Ellipsis.Lines))
+            return false;
 
-        size_t bestPrefixByteCount = 0;
-        Unit   prefixWidth         = 0_u;
-        u32    prevGlyphIdx        = 0;
-        bool   hasPrev             = false;
+        const Unit ellipsisWidth = a_Ellipsis.Lines[0].Width;
 
-        UTF8Range range{ a_Line };
-		for ( auto it = range.begin(); it != range.end(); ++it )
+        // Even "..." cannot fit
+        if (ellipsisWidth > a_MaxWidth)
         {
-			const c32 cp = *it;
-            const u32 glyphIdx = FT_Get_Char_Index( face, cp );
-            const f32 advance = 1; // TODO
-
-            if ( hasPrev )
-            {
-                if ( FT_HAS_KERNING( face ) )
-                {
-                    FT_Vector kerning;
-                    if ( FT_Get_Kerning( face, prevGlyphIdx, glyphIdx, FT_KERNING_DEFAULT, &kerning ) == 0 )
-						prefixWidth += ToUnit( FontUnit{ static_cast<f32>( kerning.x ) }, unitsPerEM );
-                }
-                prefixWidth += a_Style.LetterSpacing;
-            }
-
-            prefixWidth  += ToUnit( FontUnit{ advance }, unitsPerEM );
-            prevGlyphIdx  = glyphIdx;
-            hasPrev       = true;
-
-            // Candidate = prefix + LetterSpacing + crossKerning(last, '.') + "..."
-            Unit crossKerning = 0_u;
-            if ( FT_HAS_KERNING( face ) )
-            {
-                FT_Vector kerning;
-                if ( FT_Get_Kerning( face, prevGlyphIdx, dotGlyphIdx, FT_KERNING_DEFAULT, &kerning ) == 0 )
-					crossKerning = ToUnit( FontUnit{ static_cast<f32>( kerning.x ) }, unitsPerEM );
-            }
-            
-            const Unit candidateWidth = prefixWidth + a_Style.LetterSpacing + crossKerning + ellipsisWidth;
-
-            if ( candidateWidth <= a_MaxWidth ) 
-            {
-                // This prefix fits with the ellipsis, so save it as the best candidate so far and keep trying to fit more.
-                bestPrefixByteCount = it.ByteIndex() + it.SequenceByteLength();
-            }
-            else
-            {
-                break; // Widths are non-decreasing - no longer prefix can fit.
-            }
+            line.End   = line.Start;
+            line.Width = 0_u;
+            return true;
         }
 
-        String result;
-        Resize( result, bestPrefixByteCount );
-        Reserve( result, bestPrefixByteCount + Size( c_Ellipsis ) );
+        const Unit prefixBudget = a_MaxWidth - ellipsisWidth;
 
-        if ( bestPrefixByteCount > 0 )
-            std::memcpy( Data( result ), Data( a_Line ), bestPrefixByteCount );
+        Unit accumulated = 0_u;
+        u32  newEnd      = line.Start;
 
-        for ( const char c : c_Ellipsis )
-            PushBack( result, c );
+        for (u32 i = line.Start; i < line.End; ++i)
+        {
+            const ShapedGlyph& g = o_Text.Glyphs[i];
 
-        return result;
+            const Unit adv = ToUnit(g.XAdvance, o_Text.FontSize);
+
+            if (accumulated + adv > prefixBudget)
+                break;
+
+            accumulated += adv;
+            ++newEnd;
+        }
+
+        // Adjust line range
+        line.End   = newEnd;
+        line.Width = accumulated + ellipsisWidth;
+
+        // Append ellipsis glyphs to global glyph buffer
+        const u32 insertPos = line.End;
+        const u32 ellipsisCount = static_cast<u32>(Size(a_Ellipsis.Glyphs));
+
+        Insert(
+            o_Text.Glyphs,
+            Begin( o_Text.Glyphs ) + insertPos,
+            Begin(a_Ellipsis.Glyphs),
+            End(a_Ellipsis.Glyphs)
+        );
+
+        line.End += ellipsisCount;
+
+        // Shift subsequent lines forward
+        for (u32 i = a_LineIndex + 1; i < o_Text.LineCount(); ++i)
+        {
+            o_Text.Lines[i].Start += ellipsisCount;
+            o_Text.Lines[i].End   += ellipsisCount;
+        }
+
+        return true;
     }
 
 } // namespace RatUI::FreeType::TextUtil

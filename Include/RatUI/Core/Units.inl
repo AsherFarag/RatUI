@@ -71,16 +71,15 @@ namespace RatUI {
     // - Unit Conversion chain:
     //      FontUnit --(font metrics)--> Unit --(DPI/UI scale)--> Pixel
 
-    /** @brief Converts a FontUnit to Unit space using the font's unitsPerEM metric. */
-    inline constexpr FontUnit ToFontUnit( Unit a_Unit, f32 a_UnitsPerEM )
+    inline constexpr FontUnit ToFontUnit( Unit a_Unit, Unit a_FontSize )
     {
-        return FontUnit{ a_Unit.ToFloat() * a_UnitsPerEM };
+		return FontUnit{ a_Unit.ToFloat() / a_FontSize.ToFloat() };
     }
 
     /** @brief Converts a FontUnit to Unit space using the font's unitsPerEM metric. */
-    inline constexpr Unit ToUnit( FontUnit a_FontUnit, f32 a_UnitsPerEM )
+    inline constexpr Unit ToUnit( FontUnit a_FontUnit, Unit a_FontSize )
     {
-        return Unit{ a_FontUnit.ToFloat() / a_UnitsPerEM };
+        return Unit{ a_FontUnit.ToFloat() * a_FontSize.ToFloat() };
     }
 
     /** @brief Converts a Pixel back to Unit space using the specified DPI scale. */
@@ -94,6 +93,11 @@ namespace RatUI {
     {
         return Pixel{ a_Unit.ToFloat() * a_DPIScale };
     }
+
+    inline constexpr Pixel ToPixel( FontUnit a_FontUnit, Unit a_FontSize, f32 a_DPIScale )
+    {
+        return ToPixel( ToUnit( a_FontUnit, a_FontSize ), a_DPIScale );
+	}
 
     template<typename T>
     struct Degrees;
