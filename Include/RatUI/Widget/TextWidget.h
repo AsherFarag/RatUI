@@ -93,12 +93,6 @@ namespace RatUI
                 
             maxWidth = std::max( maxWidth, 0_u );
 
-            if ( !IsApproxEqual( maxWidth.ToFloat(), m_LastAvailableWidth.ToFloat() ) )
-            {
-                m_LastAvailableWidth = maxWidth;
-                InvalidateShaped();
-            }
-
             // Re-shape only when prepared text changes or when available width changes (Expensive).
             if ( !m_ShapedText || !IsApproxEqual( maxWidth.ToFloat(), m_ShapedWidth.ToFloat() ) )
             {
@@ -174,7 +168,6 @@ namespace RatUI
         Optional<PreparedText> m_PreparedText; ///< Cached prepared text (segments + normalized string). Rebuilt when text or style changes.
         Optional<ShapedText>   m_ShapedText;   ///< Cached shaped text (glyph atlas indices + line metadata). Rebuilt when prepared text or width changes.
         Unit m_ShapedWidth       { -1_u };      ///< The maxWidth used for the last Shape() call; used to detect when re-shaping is needed.
-        Unit m_LastAvailableWidth{ -1_u };      ///< The last effective width constraint used during layout; used to invalidate stale shaped text.
     };
 
 } // namespace RatUI

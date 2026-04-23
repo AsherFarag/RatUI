@@ -252,7 +252,7 @@ namespace RatUI::FreeType
             return success ? &insertIt->second : nullptr;
         }
 
-        void Evict( FontHandle a_Handle, u32 a_PixelSize )
+        void Evict( FontHandle a_Handle )
         {
 			Erase( m_Cache, a_Handle );
         }

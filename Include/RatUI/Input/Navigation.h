@@ -59,29 +59,29 @@ namespace RatUI
         const Vec2<Unit> startCenter = a_Start->Layout.FinalRect.Center();
 
     	const LayoutNode* best = nullptr;
-        //Unit bestScore = Limits<Unit>::max();
-        //
-        //for ( const LayoutNode* candidate : a_Nodes )
-        //{
-        //    if ( candidate == a_Start ) continue;
-        //
-    	//	const Vec2<f32> candidateCenter = candidate->Layout.FinalRect.Center();
-        //    const Vec2<f32> delta = candidateCenter - startCenter;
-        //
-    	//	// Reject candidates not in the movement direction
-        //    const f32 forward{ Math::Sq( Math::Dot( delta, dir ).ToFloat() ) };
-        //    if ( forward <= 0_u ) continue;
-        //
-    	//	// Score candidates based on a combination of forward distance and lateral deviation
-        //    Unit lateral = Math::LengthSq( delta - dir * forward );
-        //    Unit score   = forward + lateral * a_LateralPenaltyWeight;
-        //
-        //    if ( score < bestScore ) 
-        //    { 
-        //        bestScore = score;
-        //        best = candidate; 
-        //    }
-        //}
+        Unit bestScore = Limits<Unit>::max();
+        
+        for ( const LayoutNode* candidate : a_Nodes )
+        {
+            if ( candidate == a_Start ) continue;
+        
+    		const Vec2<Unit> candidateCenter = candidate->Layout.FinalRect.Center();
+            const Vec2<Unit> delta = candidateCenter - startCenter;
+        
+    		// Reject candidates not in the movement direction
+            const Unit forward = Math::Dot( delta, dir );
+            if ( forward <= 0_u ) continue;
+        
+    		// Score candidates based on a combination of forward distance and lateral deviation
+            Unit lateral = Math::LengthSq( delta - dir * forward );
+            Unit score   = forward + lateral * a_LateralPenaltyWeight;
+        
+            if ( score < bestScore ) 
+            { 
+                bestScore = score;
+                best = candidate; 
+            }
+        }
 
         return best;
     }
