@@ -228,12 +228,7 @@ namespace RatUI
                 DrawBatch& b = Back( Batcher.Batches );
 
                 if ( IsBatchStateCompatible( b, EBatchType::MSDF ) &&
-                     b.MSDF.Scale == a_Scale &&
-                     b.MSDF.ShadowOffset == a_Style.ShadowOffset &&
-                     b.MSDF.ShadowSoftness == a_Style.ShadowSoftness &&
-                     b.MSDF.ShadowColor == a_Style.ShadowColor &&
-                     b.MSDF.OutlineWidth == a_Style.OutlineWidth &&
-                     b.MSDF.OutlineColor == a_Style.OutlineColor )
+                     b.MSDF.Scale == a_Scale )
                     return;
             }
 
@@ -242,11 +237,6 @@ namespace RatUI
 
             batch.MSDF.PixelRange = c_MsdfPxRange;
             batch.MSDF.Scale = a_Scale;
-            batch.MSDF.ShadowOffset = a_Style.ShadowOffset;
-            batch.MSDF.ShadowSoftness = a_Style.ShadowSoftness;
-            batch.MSDF.ShadowColor = a_Style.ShadowColor;
-            batch.MSDF.OutlineWidth = a_Style.OutlineWidth;
-            batch.MSDF.OutlineColor = a_Style.OutlineColor;
             m_HasActiveBatch = true;
         }
     };
