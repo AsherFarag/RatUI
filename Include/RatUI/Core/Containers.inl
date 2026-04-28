@@ -137,6 +137,11 @@
             {
                 return a_Container.size();
             }
+
+            static constexpr SizeType Capacity(const Type& a_Container)
+            {
+                return a_Container.capacity();
+            }
         
             static constexpr bool Empty(const Type& a_Container)
             {
@@ -702,6 +707,12 @@ namespace RatUI
     constexpr decltype(auto) Size(const Container& a_Container)
     {
         return CoreTraits<Container>::Size(a_Container);
+    }
+
+    template<typename Container>
+    constexpr decltype(auto) Capacity(const Container& a_Container)
+    {
+        return CoreTraits<Container>::Capacity(a_Container);
     }
 
     template<typename Container>

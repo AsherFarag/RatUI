@@ -21,44 +21,28 @@ namespace RatUI
             , m_DPIScale( a_DPIScale )
         {}
 
-        void Clear()
-        {
-            ::RatUI::Clear( m_ClipStack );
-            ::RatUI::Clear( m_TransformStack );
-
-            m_CurrentClip.reset();
-            m_CurrentTransform = c_Identity<Mat3f>;
-            m_CurrentTexture = TextureID::Null();
-            m_HasActiveBatch = false;
-        }
-
         // ========================
         // Transform Stack
         // ========================
 
         const Mat3f& GetCurrentTransform() const
         {
-            return Empty( m_TransformStack )
-                ? c_Identity<Mat3f>
-                : Back( m_TransformStack );
+            return m_TransformStackSize == 0 ? c_Identity<Mat3f> : m_TransformStack[m_TransformStackSize - 1];
         }
 
         DrawList& PushTransform( const Mat3f& a_Transform )
         {
-            PushBack( m_TransformStack, Empty( m_TransformStack ) ? a_Transform : Back( m_TransformStack ) * a_Transform );
-            m_CurrentTransform = Back( m_TransformStack );
+            RATUI_ASSERT( m_TransformStackSize < Size(m_TransformStack), "Exceeded maximum transform stack depth." );
+            const Mat3f transform = GetCurrentTransform() * a_Transform;
+            m_TransformStack[m_TransformStackSize++] = transform;
             UpdateBatchState();
             return *this;
         }
 
         DrawList& PopTransform()
         {
-            RATUI_USER_ASSERT( !Empty( m_TransformStack ),
-                "PopTransform called too many times." );
-
-            PopBack( m_TransformStack );
-            m_CurrentTransform = GetCurrentTransform();
-
+            RATUI_USER_ASSERT( m_TransformStackSize > 0, "PopTransform called too many times." );
+            --m_TransformStackSize;
             UpdateBatchState();
             return *this;
         }
@@ -67,28 +51,26 @@ namespace RatUI
         // Clip Stack
         // ========================
 
+        Optional<Rect<Unit>> GetCurrentClip() const
+        {
+            return m_ClipStackSize == 0 ? NullOpt : Optional<Rect<Unit>>{ m_ClipStack[m_ClipStackSize - 1] };
+        }
+
         DrawList& PushClipRect( Rect<Unit> a_Rect )
         {
-            if ( !Empty( m_ClipStack ) )
-                a_Rect = a_Rect.Intersection( Back( m_ClipStack ) );
+            RATUI_ASSERT( m_ClipStackSize < Size(m_ClipStack), "Exceeded maximum clip stack depth." );
+            if ( Optional<Rect<Unit>> currentClip = GetCurrentClip() )
+                a_Rect = a_Rect.Intersection( *currentClip );
 
-            PushBack( m_ClipStack, a_Rect );
-            m_CurrentClip = a_Rect;
-
+            m_ClipStack[m_ClipStackSize++] = a_Rect;
             UpdateBatchState();
             return *this;
         }
 
         DrawList& PopClipRect()
         {
-            RATUI_USER_ASSERT( !Empty( m_ClipStack ),
-                "PopClipRect called too many times." );
-
-            PopBack( m_ClipStack );
-
-            if ( Empty( m_ClipStack ) ) m_CurrentClip.reset();
-            else                        m_CurrentClip = Back( m_ClipStack );
-
+            RATUI_USER_ASSERT( m_ClipStackSize > 0, "PopClipRect called too many times." );
+            --m_ClipStackSize;
             UpdateBatchState();
             return *this;
         }
@@ -145,7 +127,7 @@ namespace RatUI
             const Pixel fontSizePx = ToPixel( a_Shaped.FontSize, m_DPIScale );
             const f32   msdfScale  = baseSize > 0.f ? fontSizePx.ToFloat() / baseSize : 1.f;
 
-			EnsureMSDFBatch( msdfScale );
+			EnsureMSDFBatch( msdfScale, a_Style );
 			Batcher.EmitText( a_Shaped, a_Style, ToPixelRect( a_Rect ), Atlas, m_DPIScale );
             return *this;
         }
@@ -156,11 +138,12 @@ namespace RatUI
         }
 
     private:
-        Array<Rect<Unit>> m_ClipStack;
-        Array<Mat3f>      m_TransformStack;
+        static constexpr size  c_MaxStackDepth = 64; 
+        FixedArray<Rect<Unit>, c_MaxStackDepth> m_ClipStack;
+        FixedArray<Mat3f,      c_MaxStackDepth> m_TransformStack;
+        size                 m_ClipStackSize{ 0 };
+        size                 m_TransformStackSize{ 0 };
 
-        Optional<Rect<Unit>> m_CurrentClip;
-        Mat3f                m_CurrentTransform{ c_Identity<Mat3f> };
         TextureID            m_CurrentTexture{ TextureID::Null() };
         bool                 m_HasActiveBatch{ false };
         f32                  m_DPIScale{ 1.f };
@@ -183,10 +166,10 @@ namespace RatUI
 
         Optional<Rectu16> GetClipRect() const
         {
-            if ( !m_CurrentClip )
+            if ( m_ClipStackSize == 0 )
                 return NullOpt;
 
-			Rect<Pixel> pixelRect = ToPixelRect( *m_CurrentClip );
+			Rect<Pixel> pixelRect = ToPixelRect( m_ClipStack[m_ClipStackSize - 1 ] );
             return Rectu16{
                 Vec2<u16>{ static_cast<u16>( pixelRect.Left().ToFloat() ), static_cast<u16>( pixelRect.Top().ToFloat() ) },
                 Vec2<u16>{ static_cast<u16>( pixelRect.Width().ToFloat() ), static_cast<u16>( pixelRect.Height().ToFloat() ) }
@@ -206,7 +189,7 @@ namespace RatUI
         {
             return a_Batch.Type   == a_Type &&
                 a_Batch.ClipRect  == GetClipRect() &&
-                a_Batch.Transform == m_CurrentTransform &&
+                a_Batch.Transform == GetCurrentTransform() &&
                 a_Batch.Texture   == m_CurrentTexture;
         }
 
@@ -232,11 +215,11 @@ namespace RatUI
                 return; // Current batch is already compatible.
 
             FlushBatch();
-            Batcher.BeginBatch( EBatchType::Geometry, GetClipRect(), m_CurrentTransform, m_CurrentTexture);
+            Batcher.BeginBatch( EBatchType::Geometry, GetClipRect(), GetCurrentTransform(), m_CurrentTexture);
             m_HasActiveBatch = true;
         }
 
-        void EnsureMSDFBatch( f32 a_Scale )
+        void EnsureMSDFBatch( f32 a_Scale, const TextRenderStyle& a_Style )
         {
             m_CurrentTexture = Atlas.GetTexture();
 
@@ -245,15 +228,25 @@ namespace RatUI
                 DrawBatch& b = Back( Batcher.Batches );
 
                 if ( IsBatchStateCompatible( b, EBatchType::MSDF ) &&
-                     b.MSDF.Scale == a_Scale )
+                     b.MSDF.Scale == a_Scale &&
+                     b.MSDF.ShadowOffset == a_Style.ShadowOffset &&
+                     b.MSDF.ShadowSoftness == a_Style.ShadowSoftness &&
+                     b.MSDF.ShadowColor == a_Style.ShadowColor &&
+                     b.MSDF.OutlineWidth == a_Style.OutlineWidth &&
+                     b.MSDF.OutlineColor == a_Style.OutlineColor )
                     return;
             }
 
             FlushBatch();
-            DrawBatch& batch = Batcher.BeginBatch( EBatchType::MSDF, GetClipRect(), m_CurrentTransform, m_CurrentTexture);
+            DrawBatch& batch = Batcher.BeginBatch( EBatchType::MSDF, GetClipRect(), GetCurrentTransform(), m_CurrentTexture);
 
             batch.MSDF.PixelRange = c_MsdfPxRange;
             batch.MSDF.Scale = a_Scale;
+            batch.MSDF.ShadowOffset = a_Style.ShadowOffset;
+            batch.MSDF.ShadowSoftness = a_Style.ShadowSoftness;
+            batch.MSDF.ShadowColor = a_Style.ShadowColor;
+            batch.MSDF.OutlineWidth = a_Style.OutlineWidth;
+            batch.MSDF.OutlineColor = a_Style.OutlineColor;
             m_HasActiveBatch = true;
         }
     };
