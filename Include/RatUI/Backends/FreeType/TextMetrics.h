@@ -192,7 +192,7 @@ namespace RatUI::FreeType
         }
 
         bool RasterizeGlyph(
-            FontHandle a_Font, u32 a_GlyphIndex, u32 a_SdfPixelSize,
+            FontHandle a_Font, codepoint a_Codepoint, u32 a_SdfPixelSize,
             const Coloru8*& o_Pixels, u32& o_Width, u32& o_Height,
             Vec2<FontUnit>& o_Bearing, FontUnit& o_XAdvance
         ) override
@@ -222,7 +222,7 @@ namespace RatUI::FreeType
             if (!msdfgen::loadGlyph(
                     shape,
                     msdfFont,
-                    msdfgen::GlyphIndex(a_GlyphIndex),
+                    msdfgen::GlyphIndex(a_Codepoint),
                     msdfgen::FONT_SCALING_EM_NORMALIZED,
                     &advance
                 ))

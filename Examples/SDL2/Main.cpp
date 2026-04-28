@@ -1,5 +1,4 @@
 #include "SDL2Application.h"
-#include <RatUI/Backends/SDL2/SDL2Renderer.h>
 #include <RatUI/Backends/FreeType/TextMetrics.h>
 #include <RatUI/Widget/TextWidget.h>
 #include <iostream>

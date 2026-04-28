@@ -25,8 +25,10 @@ namespace RatUI
     using iptr = std::intptr_t;
     using uptr = std::uintptr_t;
 
-    /** @brief Type for representing a Unicode code point. 
-     *  This is a 32-bit type that can represent any Unicode code point, including those outside the Basic Multilingual Plane (BMP). 
+    /** 
+     * @brief Type for representing a Unicode code point. 
+     * This is a 32-bit type that can represent any Unicode code point, 
+     * including those outside the Basic Multilingual Plane (BMP). 
      */
     using codepoint = c32;
 

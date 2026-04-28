@@ -301,7 +301,7 @@ namespace RatUI::FreeType
             /*features=*/nullptr, /*num_features=*/0
         );
  
-        unsigned int glyphCount = 0;
+        u32 glyphCount = 0;
  
         hb_glyph_info_t* infos =
             hb_buffer_get_glyph_infos( buf, &glyphCount );
@@ -318,9 +318,10 @@ namespace RatUI::FreeType
         //   / ppem          -> EM-normalised [0, 1] FontUnit
         // The combined divisor is 64 * ppem.
         const f32 ppem      = static_cast<f32>( a_Font.GetFace()->size->metrics.y_ppem );
-        RATUI_ASSERT( ppem > 0.f, "Invalid font metrics: y_ppem must be > 0." );
         const f32 emNormDiv = 64.f * ppem;
 		const Unit fontSize = a_Layout.Size;
+
+        RATUI_ASSERT( ppem > 0.f, "Invalid font metrics: y_ppem must be > 0." );
  
         // Letter and word spacing arrive as Unit (display-space). Convert to EM-normalised
         // FontUnit so they can be added directly to the HB advances after normalisation.
@@ -334,7 +335,7 @@ namespace RatUI::FreeType
         constexpr u32 c_NoCluster = Limits<u32>::max();
         u32 lastWordSpacingCluster = c_NoCluster;
  
-        for ( unsigned i = 0; i < glyphCount; ++i )
+        for ( u32 i = 0; i < glyphCount; ++i )
         {
             // Convert HarfBuzz 26.6 scaled-pixel positions to EM-normalised FontUnit.
             // Multiplying by fontSizePx at render time then yields correct screen pixels.
@@ -357,7 +358,7 @@ namespace RatUI::FreeType
  
             EmplaceBack(
                 o_Glyphs,
-                /* GlyphID   */ infos[i].codepoint,
+                /* Codepoint */ infos[i].codepoint,
                 /* XAdvance  */ xAdvance,
                 /* YAdvance  */ yAdvance,
                 /* XOffset   */ xOffset,

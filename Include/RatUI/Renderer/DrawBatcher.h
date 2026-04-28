@@ -463,16 +463,38 @@ namespace RatUI
                 return static_cast<u8>( std::clamp( alpha, 0.0f, 255.0f ) );
             };
 
-            // Vertical start position, adjusted for baseline alignment.
-            Pixel startY = a_LayoutRect.Origin[1];
+            // Compute baseline position
+            Pixel baselineY = a_LayoutRect.Origin[1];
+
             switch ( a_Style.Baseline )
             {
-                case ETextBaseline::Middle: startY += ( a_LayoutRect.Size[1] - textHeight ) * 0.5f;  break;
-                case ETextBaseline::Bottom: startY +=   a_LayoutRect.Size[1] - textHeight;           break;
-                default: break;
+                case ETextBaseline::Top:
+                    // Top of text box aligned to layout top
+                    baselineY += ascender;
+                    break;
+            
+                case ETextBaseline::Middle:
+                    baselineY += ( a_LayoutRect.Size[1] - textHeight ) * 0.5f;
+                    baselineY += ascender;
+                    break;
+            
+                case ETextBaseline::Bottom:
+                    baselineY += a_LayoutRect.Size[1] - textHeight;
+                    baselineY += ascender;
+                    break;
+            
+                case ETextBaseline::Hanging:
+                    // Ascender line aligned to layout top
+                    baselineY += ascender;
+                    break;
+            
+                case ETextBaseline::Alphabetic:
+                default:
+                    // Baseline aligned directly to layout top
+                    break;
             }
 
-			Pixel penY = startY + ascender;
+            Pixel penY = baselineY;
 
             for ( u32 lineIdx = 0; lineIdx < a_Text.LineCount(); ++lineIdx )
             {
@@ -482,9 +504,13 @@ namespace RatUI
                 Pixel lineX = a_LayoutRect.Origin[0];
                 switch ( a_Style.Align )
                 {
-                    case ETextAlign::Center: lineX += ( a_LayoutRect.Size[0] - ToPixel( line.Width, a_DpiScale ) ) * 0.5f; break;
-					case ETextAlign::Right:  lineX +=   a_LayoutRect.Size[0] - ToPixel( line.Width, a_DpiScale );          break;
-                    default: break;
+                    case ETextAlign::Center:  lineX += ( a_LayoutRect.Size[0] - ToPixel( line.Width, a_DpiScale ) ) * 0.5f; break;
+					case ETextAlign::Right:   lineX +=   a_LayoutRect.Size[0] - ToPixel( line.Width, a_DpiScale );          break;
+					case ETextAlign::Justify: // TODO: Distribute extra space between words for justified text. Requires word boundary information in ShapedLine.
+                        break;
+                    case ETextAlign::Left:   
+                    default: 
+                        break;
                 }
 
                 Pixel penX = lineX;
@@ -494,7 +520,7 @@ namespace RatUI
                     const ShapedGlyph& sg = a_Text.Glyphs[ g ];
 
                     // Get the glyph in the atlas.
-                    Optional<GlyphMetrics> gr = a_Atlas.GetOrRasterizeGlyph( a_Text.Font, sg.GlyphID );
+                    Optional<GlyphMetrics> gr = a_Atlas.GetOrRasterizeGlyph( a_Text.Font, sg.Codepoint );
 
                     if ( gr && gr->AtlasRect.Size[0] > 0 && gr->AtlasRect.Size[1] > 0 )
                     {
