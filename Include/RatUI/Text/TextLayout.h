@@ -392,8 +392,9 @@ namespace RatUI::TextLayout
                 lineW = newW;
                 paintLineW = newW; // Text is always painted.
 
-                // CJK-to-CJK (or CJK-to-end) boundaries are implicit break
-                // opportunities subject to line-break prohibition rules.
+                // Record break opportunities for both CJK and non-CJK characters.
+                // CJK characters respect line-break prohibition rules.
+                // Non-CJK characters (including WrapChar mode) can always break after fitting segments.
                 if ( seg.IsCJKChar )
                 {
                     const c32  thisCp = segmentFirstCP( i );
@@ -405,6 +406,18 @@ namespace RatUI::TextLayout
                     {
                         pendingBreakSeg = i + 1;
                         pendingBreakPaintW = paintLineW; // after including this CJK char
+                    }
+                }
+                else
+                {
+                    // Non-CJK text segment: record break opportunity unless
+                    // the next segment is forbidden to start a line.
+                    const bool nextForbidden = ( i + 1 < segCount ) &&
+                        isLineStartForbidden( i + 1 );
+                    if ( !nextForbidden )
+                    {
+                        pendingBreakSeg = i + 1;
+                        pendingBreakPaintW = paintLineW;
                     }
                 }
 
