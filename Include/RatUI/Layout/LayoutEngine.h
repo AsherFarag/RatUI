@@ -282,63 +282,67 @@ namespace RatUI
         const LayoutStyle& s    = a_Node.Style;
         const bool         isHz = s.LayoutType == ELayoutType::Horizontal;
 
-        const auto isPureStretchMain = [&]( const LayoutNode& child ) -> bool
-        {
-            return ( isHz  && child.Style.WidthMode  == ESizingMode::Flex ) ||
-                   ( !isHz && child.Style.HeightMode == ESizingMode::Flex );
-        };
+        Unit totalFixed      = 0_u;
+        Unit flexMarginSpace = 0_u;
+        f32  totalGrow       = 0.f;
+        u32  numFlow         = 0;
 
-        // Pass 1: sum fixed space and total grow weight.
-        // Flex children are excluded because their size is determined by leftover space.
-        // Percent children are also excluded: their size is a fraction of the full parent
-        // inner size (UMG/Unity semantics), independent of siblings. Including them in
-        // totalFixed would shrink leftover and shift sibling positions incorrectly.
-        Unit totalFixed = 0_u;
-        f32  totalGrow  = 0.f;
-        u32  numFlow    = 0;
-
-        const auto isPercentMain = [&]( const LayoutNode& child ) -> bool
-        {
-            return ( isHz  && child.Style.WidthMode  == ESizingMode::Percent ) ||
-                   ( !isHz && child.Style.HeightMode == ESizingMode::Percent );
-        };
+        // -------------------------
+        // Pass 1: Gather metrics
+        // -------------------------
 
         a_Node.ForEachChild( [&]( const LayoutNode& child )
         {
             if ( child.Style.PositionMode == EPositioningMode::Anchored ) return;
             if ( !child.Layout.Visibility.AffectsLayout() )               return;
 
-            // Exclude Pure-stretch (Flex) and Percent children from totalFixed.
-            if ( !isPureStretchMain( child ) && !isPercentMain( child ) )
+            const bool isFlexMain =
+                ( isHz  && child.Style.WidthMode  == ESizingMode::Flex ) ||
+                ( !isHz && child.Style.HeightMode == ESizingMode::Flex );
+
+            const bool isPercentMain =
+                ( isHz  && child.Style.WidthMode  == ESizingMode::Percent ) ||
+                ( !isHz && child.Style.HeightMode == ESizingMode::Percent );
+
+            const Unit marginMain =
+                isHz ? child.Style.Margin.Horizontal()
+                     : child.Style.Margin.Vertical();
+
+            // Fixed space (exclude flex + percent)
+            if ( !isFlexMain && !isPercentMain )
             {
-                totalFixed += isHz ? child.Layout.DesiredSize[0] + child.Style.Margin.Horizontal()
-                                   : child.Layout.DesiredSize[1] + child.Style.Margin.Vertical();
+                totalFixed += ( isHz ? child.Layout.DesiredSize[0]
+                                     : child.Layout.DesiredSize[1] )
+                            + marginMain;
             }
 
-            totalGrow  += child.Style.FlexGrow;
+            // Flex margin space (flex only, percent excluded)
+            if ( isFlexMain && !isPercentMain )
+                flexMarginSpace += marginMain;
+
+            // Grow weight (explicit or implicit)
+            if ( child.Style.FlexGrow > 0.f )
+            {
+                totalGrow += child.Style.FlexGrow;
+            }
+            else if ( isFlexMain )
+            {
+                totalGrow += 1.f; // implicit grow
+            }
+
             numFlow++;
         } );
 
-        Unit available = ( isHz ? a_Inner.Size[0] : a_Inner.Size[1] )
-                       - s.Spacing * static_cast<f32>( std::max( 0u, numFlow - 1 ) );
-        Unit leftover  = std::max( 0_u, available - totalFixed );
+        Unit available =
+            ( isHz ? a_Inner.Size[0] : a_Inner.Size[1] )
+            - s.Spacing * static_cast<f32>( std::max( 0u, numFlow - 1 ) );
 
-        // Add implicit grow weight for WidthMode::Flex children that carry no explicit FlexGrow.
-        // Children with FlexGrow > 0 already contributed to totalGrow in pass 1; they are skipped.
-        a_Node.ForEachChild( [&]( const LayoutNode& child )
-        {
-            if ( child.Style.PositionMode == EPositioningMode::Anchored ) return;
-            if ( !child.Layout.Visibility.AffectsLayout() )               return;
-            if ( child.Style.FlexGrow > 0.f )                             return;
+        Unit leftover = std::max( 0_u, available - totalFixed - flexMarginSpace );
 
-            bool wantsFillW = child.Style.WidthMode  == ESizingMode::Flex && isHz;
-            bool wantsFillH = child.Style.HeightMode == ESizingMode::Flex && !isHz;
+        // -------------------------
+        // Pass 2: Arrange
+        // -------------------------
 
-            if ( wantsFillW || wantsFillH )
-                totalGrow += 1.f; // implicit grow weight for Flex children with no explicit FlexGrow
-        } );
-
-        // Pass 2: assign rects
         Unit cursor = isHz ? a_Inner.Origin[0] : a_Inner.Origin[1];
 
         a_Node.ForEachChild( [&]( LayoutNode& child )
@@ -352,61 +356,59 @@ namespace RatUI
             if ( !child.Layout.Visibility.AffectsLayout() )
                 return;
 
-            // Re-resolve Percent dimensions against the real inner size before any
-            // Flex distribution - this is the authoritative size for Percent children.
-            Vec2<Unit> childSize = ResolveChildArrangeSize( child, a_Inner.Size );
+            Vec2<Unit> childSize =
+                ResolveChildArrangeSize( child, a_Inner.Size );
 
-            // Determine effective grow weight - explicit FlexGrow or implicit 1 for Flex children
+            const bool isFlexMain =
+                ( isHz  && child.Style.WidthMode  == ESizingMode::Flex ) ||
+                ( !isHz && child.Style.HeightMode == ESizingMode::Flex );
+
             f32 growWeight = child.Style.FlexGrow;
-            if ( growWeight == 0.f )
-            {
-                bool wantsFillW = child.Style.WidthMode  == ESizingMode::Flex && isHz;
-                bool wantsFillH = child.Style.HeightMode == ESizingMode::Flex && !isHz;
-                if ( wantsFillW || wantsFillH )
-                    growWeight = 1.f;
-            }
+            if ( growWeight == 0.f && isFlexMain )
+                growWeight = 1.f;
 
-            // Distribute leftover space (Flex children only - Percent children do not flex)
+            // Flex distribution (percent never flexes)
             if ( growWeight > 0.f && totalGrow > 0.f )
             {
-                const Constraints& c     = child.Style.SizeConstraints;
-                Unit               share = leftover * ( growWeight / totalGrow );
+                const Constraints& c = child.Style.SizeConstraints;
+                Unit share = leftover * ( growWeight / totalGrow );
 
-                // Pure stretch flex children receive exactly their share of the remaining space
-                // (their DesiredSize is not used as a flex basis to avoid inflated measurements
-                // from a prior pass propagating into the final layout).
-                // TODO: Iterative clamped distribution - if a child hits MaxSize, remaining
-                // leftover should redistribute to uncapped siblings. Not worth doing until needed.
                 if ( isHz )
-                    childSize[0] = std::clamp( isPureStretchMain( child ) ? share : childSize[0] + share, c.MinSize[0], c.MaxSize[0] );
+                    childSize[0] = std::clamp( isFlexMain ? share : childSize[0] + share,
+                                               c.MinSize[0], c.MaxSize[0] );
                 else
-                    childSize[1] = std::clamp( isPureStretchMain( child ) ? share : childSize[1] + share, c.MinSize[1], c.MaxSize[1] );
+                    childSize[1] = std::clamp( isFlexMain ? share : childSize[1] + share,
+                                               c.MinSize[1], c.MaxSize[1] );
             }
 
-            // Fill on the cross axis - always expand regardless of grow
+            // Cross-axis stretch
             EAlignment align = ResolveAlign( child, a_Node );
-            if (  isHz && ( align & EAlignment::VStretch ) == EAlignment::VStretch ) childSize[1] = a_Inner.Size[1];
-            if ( !isHz && ( align & EAlignment::HStretch ) == EAlignment::HStretch ) childSize[0] = a_Inner.Size[0];
 
-            // Fallback for children that want to Flex but had to be measured as Content due to circular dependency - expand them fully on the main axis
-            if ( isHz && child.Style.HeightMode == ESizingMode::Flex )
+            if (  isHz && ( align & EAlignment::VStretch ) ) childSize[1] = a_Inner.Size[1];
+            if ( !isHz && ( align & EAlignment::HStretch ) ) childSize[0] = a_Inner.Size[0];
+
+            // Circular fallback
+            if (  isHz && child.Style.HeightMode == ESizingMode::Flex )
                 childSize[1] = a_Inner.Size[1];
 
             if ( !isHz && child.Style.WidthMode == ESizingMode::Flex )
                 childSize[0] = a_Inner.Size[0];
 
-            // Position on main axis, align on cross axis
             Rect<Unit> childRect;
+
             if ( isHz )
             {
                 childRect.Origin[0] = cursor;
-                childRect.Origin[1] = AlignCrossAxis( childSize[1], a_Inner.Origin[1], a_Inner.Size[1], align, isHz );
+                childRect.Origin[1] =
+                    AlignCrossAxis( childSize[1], a_Inner.Origin[1], a_Inner.Size[1], align, isHz );
             }
             else
             {
-                childRect.Origin[0] = AlignCrossAxis( childSize[0], a_Inner.Origin[0], a_Inner.Size[0], align, isHz );
+                childRect.Origin[0] =
+                    AlignCrossAxis( childSize[0], a_Inner.Origin[0], a_Inner.Size[0], align, isHz );
                 childRect.Origin[1] = cursor;
             }
+
             childRect.Size = childSize;
 
             // Apply margins
@@ -415,12 +417,13 @@ namespace RatUI
             childRect.Size[0]   -= child.Style.Margin.Horizontal();
             childRect.Size[1]   -= child.Style.Margin.Vertical();
 
-            childRect.Size[0] = std::max( 0_u, childRect.Size[0] );
-            childRect.Size[1] = std::max( 0_u, childRect.Size[1] );
+            childRect.Size[0]    = std::max( 0_u, childRect.Size[0] );
+            childRect.Size[1]    = std::max( 0_u, childRect.Size[1] );
 
-            cursor += s.Spacing;
-            cursor += isHz ? childSize[0] + child.Style.Margin.Horizontal()
-                           : childSize[1] + child.Style.Margin.Vertical();
+            const Unit advance = isHz ? childSize[0] + child.Style.Margin.Horizontal()
+                                      : childSize[1] + child.Style.Margin.Vertical();
+
+            cursor += advance + s.Spacing;
 
             ArrangeLayoutNode( child, childRect );
         } );
