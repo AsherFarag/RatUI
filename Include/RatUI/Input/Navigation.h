@@ -59,7 +59,7 @@ namespace RatUI
         const Vec2<Unit> startCenter = a_Start->Layout.FinalRect.Center();
 
     	const LayoutNode* best = nullptr;
-        Unit bestScore = Limits<Unit>::max();
+        f32 bestScore = Limits<f32>::max();
         
         for ( const LayoutNode* candidate : a_Nodes )
         {
@@ -73,8 +73,9 @@ namespace RatUI
             if ( forward <= 0_u ) continue;
         
     		// Score candidates based on a combination of forward distance and lateral deviation
-            Unit lateral = Math::LengthSq( delta - dir * forward );
-            Unit score   = forward + lateral * a_LateralPenaltyWeight;
+            const Vec2<Unit> lateralVec = delta - dir * forward;
+            const f32 lateral = Math::Length( Vec2f{ lateralVec[0].ToFloat(), lateralVec[1].ToFloat() } );
+            const f32 score   = forward.ToFloat() + lateral * a_LateralPenaltyWeight;
         
             if ( score < bestScore ) 
             { 

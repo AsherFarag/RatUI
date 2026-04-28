@@ -384,8 +384,8 @@ namespace RatUI
             // Cross-axis stretch
             EAlignment align = ResolveAlign( child, a_Node );
 
-            if (  isHz && ( align & EAlignment::VStretch ) ) childSize[1] = a_Inner.Size[1];
-            if ( !isHz && ( align & EAlignment::HStretch ) ) childSize[0] = a_Inner.Size[0];
+            if (  isHz && ( align & EAlignment::VStretch ) == EAlignment::VStretch ) childSize[1] = a_Inner.Size[1];
+            if ( !isHz && ( align & EAlignment::HStretch ) == EAlignment::HStretch ) childSize[0] = a_Inner.Size[0];
 
             // Circular fallback
             if (  isHz && child.Style.HeightMode == ESizingMode::Flex )

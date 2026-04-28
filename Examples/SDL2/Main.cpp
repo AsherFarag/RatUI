@@ -33,14 +33,14 @@ protected:
     FreeType::TextMetrics m_TextMetrics{};
 
     std::unique_ptr<IDemoScene> m_Scene;
-    WidgetID green;
+
+	f32 m_UIScale{ 1.f };
 
     bool OnInitialize() override
     {
         const FontHandle fontHandle = { 1 };
         m_FontCache.RegisterFontHandle( fontHandle, "Resources/Fonts/Roboto-Medium.ttf" );
 		m_TextMetrics.SetFontCache( &m_FontCache );
-		//m_Renderer->SetFontCache( &m_FontCache );
 
         m_Scene = std::make_unique<DynamicTextScene>( fontHandle, &m_TextMetrics );
         m_Scene->Init();
@@ -57,6 +57,8 @@ protected:
         const f32 deltaTime = ( currTime - prevTime ) / 1000.f;
         prevTime = currTime;
 
+		m_UIScale = 1.f + 0.5f * std::sin( currTime / 1000.f ); // Oscillate UI scale between  and 1.5 over time.
+
         if ( !m_Scene )
         {
             return;
@@ -67,7 +69,12 @@ protected:
         // Update the layout with the current window size as the available space.
         i32 windowWidth, windowHeight;
         SDL_GetWindowSize( GetWindow(), &windowWidth, &windowHeight );
-        m_Scene->GetScene().UpdateLayout( Vec2<Unit>{ Unit{ static_cast<f32>( windowWidth ) }, Unit{ static_cast<f32>( windowHeight ) } } );
+        Vec2<Unit> windowSize{ Unit{ static_cast<f32>( windowWidth ) }, Unit{ static_cast<f32>( windowHeight ) } };
+
+		windowSize[0] /= m_UIScale;
+		windowSize[1] /= m_UIScale;
+
+        m_Scene->GetScene().UpdateLayout( windowSize );
     }
 
     void OnRender( IRenderer& a_Renderer ) override
@@ -79,8 +86,13 @@ protected:
 
 		m_DrawBatcher.Clear();
 
-        DrawList drawList{ m_DrawBatcher, *m_Atlas };
-        m_Scene->Render( drawList );
+		// Get dpi scale for current window (for correct text rendering on high-DPI displays)
+        f32 dpiscale = 1.f;
+        SDL_GetDisplayDPI( SDL_GetWindowDisplayIndex( GetWindow() ), nullptr, &dpiscale, nullptr );
+		dpiscale /= 96.f; // Convert from DPI to scale factor (assuming 96 DPI is the baseline)
+
+        DrawList drawList{ m_DrawBatcher, *m_Atlas, dpiscale * m_UIScale };
+		m_Scene->Render( drawList );
         drawList.Finish();
 
         a_Renderer.Execute( m_DrawBatcher );
