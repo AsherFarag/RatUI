@@ -25,15 +25,15 @@ namespace RatUI
         // Transform Stack
         // ========================
 
-        const Mat3f& GetCurrentTransform() const
+        const Mat3<Unit>& GetCurrentTransform() const
         {
-            return m_TransformStackSize == 0 ? c_Identity<Mat3f> : m_TransformStack[m_TransformStackSize - 1];
+            return m_TransformStackSize == 0 ? c_Identity<Mat3<Unit>> : m_TransformStack[m_TransformStackSize - 1];
         }
 
-        DrawList& PushTransform( const Mat3f& a_Transform )
+        DrawList& PushTransform( const Mat3<Unit>& a_Transform )
         {
             RATUI_ASSERT( m_TransformStackSize < Size(m_TransformStack), "Exceeded maximum transform stack depth." );
-            const Mat3f transform = GetCurrentTransform() * a_Transform;
+            const Mat3<Unit> transform = GetCurrentTransform() * a_Transform;
             m_TransformStack[m_TransformStackSize++] = transform;
             UpdateBatchState();
             return *this;
@@ -140,9 +140,9 @@ namespace RatUI
     private:
         static constexpr size  c_MaxStackDepth = 64; 
         FixedArray<Rect<Unit>, c_MaxStackDepth> m_ClipStack;
-        FixedArray<Mat3f,      c_MaxStackDepth> m_TransformStack;
-        size                 m_ClipStackSize{ 0 };
-        size                 m_TransformStackSize{ 0 };
+        FixedArray<Mat3<Unit>, c_MaxStackDepth> m_TransformStack;
+        size                                    m_ClipStackSize{ 0 };
+        size                                    m_TransformStackSize{ 0 };
 
         TextureID            m_CurrentTexture{ TextureID::Null() };
         bool                 m_HasActiveBatch{ false };
@@ -164,7 +164,21 @@ namespace RatUI
             };
         }
 
-        Optional<Rectu16> GetClipRect() const
+        Mat3f GetPixelTransform() const 
+        {
+            if ( m_TransformStackSize == 0 )
+                return c_Identity<Mat3f>;
+
+            const Mat3<Unit>& currentTransform = m_TransformStack[m_TransformStackSize - 1];
+            Mat3f pixelTransform;
+            for ( size i = 0; i < 3; ++i )
+                for ( size j = 0; j < 3; ++j )
+                    pixelTransform[i][j] = ToPixel( currentTransform[i][j], m_DPIScale ).ToFloat();
+
+            return pixelTransform;
+        }
+
+        Optional<Rectu16> GetPixelClipRect() const
         {
             if ( m_ClipStackSize == 0 )
                 return NullOpt;
@@ -188,8 +202,8 @@ namespace RatUI
         bool IsBatchStateCompatible( const DrawBatch& a_Batch, EBatchType a_Type ) const
         {
             return a_Batch.Type   == a_Type &&
-                a_Batch.ClipRect  == GetClipRect() &&
-                a_Batch.Transform == GetCurrentTransform() &&
+                a_Batch.ClipRect  == GetPixelClipRect() &&
+                a_Batch.Transform == GetPixelTransform() &&
                 a_Batch.Texture   == m_CurrentTexture;
         }
 
@@ -215,7 +229,7 @@ namespace RatUI
                 return; // Current batch is already compatible.
 
             FlushBatch();
-            Batcher.BeginBatch( EBatchType::Geometry, GetClipRect(), GetCurrentTransform(), m_CurrentTexture);
+            Batcher.BeginBatch( EBatchType::Geometry, GetPixelClipRect(), GetPixelTransform(), m_CurrentTexture);
             m_HasActiveBatch = true;
         }
 
@@ -233,7 +247,7 @@ namespace RatUI
             }
 
             FlushBatch();
-            DrawBatch& batch = Batcher.BeginBatch( EBatchType::MSDF, GetClipRect(), GetCurrentTransform(), m_CurrentTexture);
+            DrawBatch& batch = Batcher.BeginBatch( EBatchType::MSDF, GetPixelClipRect(), GetPixelTransform(), m_CurrentTexture);
 
             batch.MSDF.PixelRange = c_MsdfPxRange;
             batch.MSDF.Scale = a_Scale;

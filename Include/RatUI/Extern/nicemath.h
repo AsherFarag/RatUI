@@ -1394,7 +1394,7 @@ constexpr mat<S, N> operator*(const mat<S, N> &lhs, const mat<S, N> &rhs) {
   mat<S, N> result;
   for (unsigned c = 0; c < N; ++c) {
     for (unsigned r = 0; r < N; ++r) {
-      result.column[c].data[r] = 0.0f;
+      result.column[c].data[r] = static_cast<S>( 0.0 );
       for (unsigned i = 0; i < N; ++i) {
         result.column[c].data[r] +=
           (lhs.column[i].data[r]) * (rhs.column[c].data[i]);

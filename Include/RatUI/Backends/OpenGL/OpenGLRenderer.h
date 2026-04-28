@@ -50,14 +50,14 @@ namespace RatUI::OpenGL
             layout(location = 1) in vec4  a_Color;
             layout(location = 2) in vec2  a_UV;
             
-            uniform mat4 u_Projection;
+            uniform mat4 u_PVM;
             
             out vec4 v_Color;
             out vec2 v_UV;
             
             void main()
             {
-                gl_Position = u_Projection * vec4(a_Pos, 0.0, 1.0);
+                gl_Position = u_PVM * vec4(a_Pos, 0.0, 1.0);
                 v_Color     = a_Color;
                 v_UV        = a_UV;
             }
@@ -180,6 +180,31 @@ namespace RatUI::OpenGL
             return prog;
         }
 
+        static void ToMat4( const Mat3f& a_Mat, f32 o_Result[16] )
+        {
+            // Column-major (OpenGL expects column-major when transpose = GL_FALSE)
+
+            o_Result[0] = a_Mat[0][0];
+            o_Result[1] = a_Mat[0][1];
+            o_Result[2] = 0.f;
+            o_Result[3] = 0.f;
+
+            o_Result[4] = a_Mat[1][0];
+            o_Result[5] = a_Mat[1][1];
+            o_Result[6] = 0.f;
+            o_Result[7] = 0.f;
+
+            o_Result[8]  = 0.f;
+            o_Result[9]  = 0.f;
+            o_Result[10] = 1.f;
+            o_Result[11] = 0.f;
+
+            o_Result[12] = a_Mat[2][0];
+            o_Result[13] = a_Mat[2][1];
+            o_Result[14] = 0.f;
+            o_Result[15] = 1.f;
+        }
+
     } // namespace Detail
 
     // =========================================================================
@@ -211,11 +236,11 @@ namespace RatUI::OpenGL
             m_MSDFProgram = Detail::LinkProgram( Detail::c_VertSrc, Detail::c_MSDFFragSrc );
 
             // Cache uniform locations.
-            m_GeomLoc_Projection  = glGetUniformLocation( m_GeomProgram, "u_Projection"  );
+            m_GeomLoc_Projection  = glGetUniformLocation( m_GeomProgram, "u_PVM"         );
             m_GeomLoc_Texture     = glGetUniformLocation( m_GeomProgram, "u_Texture"     );
             m_GeomLoc_UseTexture  = glGetUniformLocation( m_GeomProgram, "u_UseTexture"  );
 
-            m_MSDFLoc_Projection  = glGetUniformLocation( m_MSDFProgram, "u_Projection"  );
+            m_MSDFLoc_Projection  = glGetUniformLocation( m_MSDFProgram, "u_PVM"         );
             m_MSDFLoc_Texture     = glGetUniformLocation( m_MSDFProgram, "u_Texture"     );
             m_MSDFLoc_PxRange     = glGetUniformLocation( m_MSDFProgram, "u_PxRange"     );
             m_MSDFLoc_Scale       = glGetUniformLocation( m_MSDFProgram, "u_Scale"       );
@@ -331,11 +356,14 @@ namespace RatUI::OpenGL
                     glBindTexture( GL_TEXTURE_2D, glTex );
                 }
 
+				f32 pvm[16];
+				Detail::ToMat4( m_Projection * batch.Transform, pvm );
+
                 // Select program and set uniforms.
                 if ( batch.Type == EBatchType::MSDF )
                 {
                     glUseProgram( m_MSDFProgram );
-                    glUniformMatrix4fv( m_MSDFLoc_Projection, 1, GL_FALSE, m_Projection );
+					glUniformMatrix4fv( m_MSDFLoc_Projection, 1, GL_FALSE, pvm );
                     glUniform1i( m_MSDFLoc_Texture,  0 );
                     glUniform1f( m_MSDFLoc_PxRange,  batch.MSDF.PixelRange );
                     glUniform1f( m_MSDFLoc_Scale,    batch.MSDF.Scale );
@@ -343,7 +371,7 @@ namespace RatUI::OpenGL
                 else
                 {
                     glUseProgram( m_GeomProgram );
-                    glUniformMatrix4fv( m_GeomLoc_Projection, 1, GL_FALSE, m_Projection );
+                    glUniformMatrix4fv( m_GeomLoc_Projection, 1, GL_FALSE, pvm );
                     glUniform1i( m_GeomLoc_Texture,    0 );
                     glUniform1i( m_GeomLoc_UseTexture, glTex != 0 ? GL_TRUE : GL_FALSE );
                 }
@@ -465,32 +493,22 @@ namespace RatUI::OpenGL
         }
 
         /** @brief Builds a column-major 4x4 orthographic projection (OpenGL convention). */
-        void BuildOrthoProjection( int a_Width, int a_Height )
+        void BuildOrthoProjection( int width, int height )
         {
-            // Map [0, w] -> [-1, 1], [0, h] -> [1, -1] (Y-down -> NDC).
-            const float L = 0.f, R = static_cast<float>( a_Width );
-            const float T = 0.f, B = static_cast<float>( a_Height );
-            const float N = -1.f, F = 1.f;
+            const float w = static_cast<float>( width );
+            const float h = static_cast<float>( height );
 
-            m_Projection[ 0] =  2.f / ( R - L );
-            m_Projection[ 1] =  0.f;
-            m_Projection[ 2] =  0.f;
-            m_Projection[ 3] =  0.f;
+            m_Projection[0u][0] = 2.0f / w;
+            m_Projection[0u][1] = 0.0f;
+            m_Projection[0u][2] = 0.0f;
 
-            m_Projection[ 4] =  0.f;
-            m_Projection[ 5] =  2.f / ( T - B ); // T - B is negative -> flips Y
-            m_Projection[ 6] =  0.f;
-            m_Projection[ 7] =  0.f;
+            m_Projection[1u][0] = 0.0f;
+            m_Projection[1u][1] = -2.0f / h;
+            m_Projection[1u][2] = 0.0f;
 
-            m_Projection[ 8] =  0.f;
-            m_Projection[ 9] =  0.f;
-            m_Projection[10] = -2.f / ( F - N );
-            m_Projection[11] =  0.f;
-
-            m_Projection[12] = -( R + L ) / ( R - L );
-            m_Projection[13] = -( T + B ) / ( T - B );
-            m_Projection[14] = -( F + N ) / ( F - N );
-            m_Projection[15] =  1.f;
+            m_Projection[2u][0] = -1.0f;
+            m_Projection[2u][1] = 1.0f;
+            m_Projection[2u][2] = 1.0f;
         }
 
         GLuint m_VAO{ 0 }, m_VBO{ 0 }, m_IBO{ 0 };
@@ -509,9 +527,9 @@ namespace RatUI::OpenGL
         GLint m_MSDFLoc_PxRange   { -1 };
         GLint m_MSDFLoc_Scale     { -1 };
 
-        float m_Projection[16]{ };
-        int   m_ViewportWidth { 800 };
-        int   m_ViewportHeight{ 600 };
+		Mat3f m_Projection{};
+        i32   m_ViewportWidth { 800 };
+        i32   m_ViewportHeight{ 600 };
     };
 
 } // namespace RatUI::OpenGL

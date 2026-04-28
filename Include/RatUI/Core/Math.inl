@@ -47,7 +47,7 @@
 namespace RatUI
 {
     template<typename T>
-    inline constexpr T Pi = std::numbers::pi_v<T>;
+    inline constexpr T Pi = T{ 3.141592653589793 };
 
     template<typename T>
     constexpr T DegToRad( T a_Degrees ) { return a_Degrees * ( Pi<T> / static_cast<T>( 180 ) ); }

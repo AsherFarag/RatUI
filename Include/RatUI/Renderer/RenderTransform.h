@@ -11,11 +11,11 @@ namespace RatUI
      */
     struct RenderTransform
     {
-        Vec2f    Translation{ 0.f, 0.f };    ///< The amount to translate the rendered content by. In pixels.
-        Vec2f    Scale{ 1.f, 1.f };          ///< The amount to scale the rendered content by. 1x means no scaling, 2x means double size, etc.
-        Vec2f    Pivot{ 0.5f, 0.5f };        ///< The pivot point around which to apply the transformations. (0, 0) Top-left corner, (1, 1) bottom-right corner, etc.
-        Radiansf SkewX{ 0.f }, SkewY{ 0.f }; ///< The amount to shear the rendered content by along the X and Y axes, respectively. In radians.
-        Radiansf Angle{ 0.f };               ///< The angle to rotate the rendered content by. In radians and clockwise direction.
+        Vec2<Unit>    Translation{ 0_u, 0_u };    ///< The amount to translate the rendered content by. In pixels.
+        Vec2<Unit>    Scale{ 1_u, 1_u };          ///< The amount to scale the rendered content by. 1x means no scaling, 2x means double size, etc.
+        Vec2<Unit>    Pivot{ 0.5_u, 0.5_u };      ///< The pivot point around which to apply the transformations. (0, 0) Top-left corner, (1, 1) bottom-right corner, etc.
+        Radians<Unit> SkewX{ 0_u }, SkewY{ 0_u }; ///< The amount to shear the rendered content by along the X and Y axes, respectively.
+        Radians<Unit> Angle{ 0_u };               ///< The angle to rotate the rendered content by. Clockwise direction.
 
         constexpr bool operator==( const RenderTransform& ) const = default;
 
@@ -26,9 +26,9 @@ namespace RatUI
         constexpr bool IsIdentity() const { return *this == Identity(); }
 
         /** @brief Resolves the pivot point to an absolute position based on a given rectangle. */
-        constexpr Vec2f ResolvePivot( Rectf a_Rect ) const
+        constexpr Vec2<Unit> ResolvePivot( Rect<Unit> a_Rect ) const
         {
-            return Vec2f{
+            return Vec2<Unit>{
                 a_Rect.Left() + a_Rect.Width() * Pivot[0],
                 a_Rect.Top() + a_Rect.Height() * Pivot[1]
             };
@@ -39,61 +39,61 @@ namespace RatUI
          * @param a_Rect The rectangle representing the area to which the transformation will be applied, used for resolving the pivot point.
          * @return A 3x3 matrix representing the combined transformation.
          */
-        Mat3f ToMatrix( Rectf rect ) const
+        Mat3<Unit> ToMatrix( Rect<Unit> a_Rect ) const
         {
-            if (IsIdentity()) // Optimization for the common case of no transformation, to avoid unnecessary calculations.
-                return c_Identity<Mat3f>;
+            if ( IsIdentity() )
+                return c_Identity<Mat3<Unit>>;
 
-            const Vec2f pivot = ResolvePivot(rect);
-
-            const f32 c = std::cos(Angle.Value);
-            const f32 s = std::sin(Angle.Value);
-
-            const f32 sx = Scale[0];
-            const f32 sy = Scale[1];
-
-            const f32 kx = std::tan(SkewX.Value);
-            const f32 ky = std::tan(SkewY.Value);
-
-            // ---- Build linear 2x2 part ----
-            // Rotation (clockwise, Y-down):
-            //
-            // [  c   -s ]
-            // [  s    c ]
-            //
-            // Then scale
-            // Then skew
-            //
-            // Final derived linear matrix:
-
-            const f32 m00 =  sx * ( c + kx * s );
-            const f32 m01 =  sy * ( kx * c - s );
-            const f32 m10 =  sx * ( s + ky * c );
-            const f32 m11 =  sy * ( ky * s + c );
-
-            // ---- Pivot compensation ----
-            //
-            // We applied linear transform around origin.
-            // To rotate/scale around pivot:
-            //
-            // finalTranslation =
-            //   Translation
-            // + pivot
-            // - M * pivot
-
-            const Vec2f transformedPivot{
-                m00 * pivot[0] + m01 * pivot[1],
-                m10 * pivot[0] + m11 * pivot[1]
-            };
-
-            const Vec2f finalTranslation = Translation + pivot - transformedPivot;
-
-            // TODO: Need to check if the math lib is row or column major and adjust the matrix construction accordingly. Assuming column major for now.
-            return Mat3f::from_columns(
-                Vec3f{ m00, m10, 0.f },
-                Vec3f{ m01, m11, 0.f },
-                Vec3f{ finalTranslation[0], finalTranslation[1], 1.f }
+            // --- Translation ---
+            const Mat3<Unit> trans = Mat3<Unit>::from_columns(
+                Vec3<Unit>{ 1_u, 0_u, 0_u },
+                Vec3<Unit>{ 0_u, 1_u, 0_u },
+                Vec3<Unit>{ Translation[0], Translation[1], 1_u }
             );
+
+            // --- Pivot translate ---
+            const Vec2<Unit> pivot = ResolvePivot( a_Rect );
+            const Mat3<Unit> transPiv = Mat3<Unit>::from_columns(
+                Vec3<Unit>{ 1_u, 0_u, 0_u },
+                Vec3<Unit>{ 0_u, 1_u, 0_u },
+                Vec3<Unit>{ pivot[0], pivot[1], 1_u }
+            );
+
+            const Mat3<Unit> transNegPiv = Mat3<Unit>::from_columns(
+                Vec3<Unit>{ 1_u, 0_u, 0_u },
+                Vec3<Unit>{ 0_u, 1_u, 0_u },
+                Vec3<Unit>{ -pivot[0], -pivot[1], 1_u }
+            );
+
+            // --- Scale ---
+            const Unit sx = Scale[0];
+            const Unit sy = Scale[1];
+            const Mat3<Unit> scale = Mat3<Unit>::from_columns(
+                Vec3<Unit>{ sx, 0_u, 0_u },
+                Vec3<Unit>{ 0_u, sy, 0_u },
+                Vec3<Unit>{ 0_u, 0_u, 1_u }
+            );
+
+            // --- Rotation (clockwise, Y-down) ---
+            const Unit c{ std::cos( Angle.Value.ToFloat() ) };
+            const Unit s{ std::sin( Angle.Value.ToFloat() ) };
+            const Mat3<Unit> rot = Mat3<Unit>::from_columns(
+                Vec3<Unit>{  c, s, 0_u },
+                Vec3<Unit>{ -s, c, 0_u },
+                Vec3<Unit>{ 0_u, 0_u, 1_u }
+            );
+
+            // --- Skew ---
+            const Unit kx{ std::tan( SkewX.Value.ToFloat() ) };
+            const Unit ky{ std::tan( SkewY.Value.ToFloat() ) };
+            const Mat3<Unit> skew = Mat3<Unit>::from_columns(
+                Vec3<Unit>{ 1_u, ky, 0_u },
+                Vec3<Unit>{ kx, 1_u, 0_u },
+                Vec3<Unit>{ 0_u, 0_u, 1_u }
+            );
+
+            // Compose (column-major)
+            return trans * transPiv * rot * skew * scale * transNegPiv;
         }
     };
 
