@@ -62,7 +62,6 @@ public:
             mainContentNode->Style.WidthMode = ESizingMode::Flex;
             mainContentNode->Style.HeightMode = ESizingMode::Flex;
             mainContentNode->Style.FlexGrow = 1.f;
-            mainContentNode->Style.PercentWidth = 0.5f;
             mainContentNode->Style.Margin = Edges::Uniform( 10_u );
 
             TextLayoutStyle layStyle;
@@ -129,7 +128,6 @@ public:
             
             secondaryNode->Style.WidthMode = ESizingMode::Flex;
             secondaryNode->Style.HeightMode = ESizingMode::Flex;
-            secondaryNode->Style.PercentWidth = 0.5f;
             secondaryNode->Style.FlexGrow = 1.f;
 
             // Long wrapping Text
