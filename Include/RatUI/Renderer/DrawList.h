@@ -251,6 +251,36 @@ namespace RatUI
 
             batch.MSDF.PixelRange = c_MsdfPxRange;
             batch.MSDF.Scale = a_Scale;
+
+            batch.MSDF.OutlineEnable = a_Style.Outline;
+            if ( a_Style.Outline )
+            {
+                batch.MSDF.OutlineColor = a_Style.OutlineColor;
+                batch.MSDF.OutlineWidth = a_Style.OutlineWidth;
+                batch.MSDF.OutlineSoftness = a_Style.OutlineSoftness;
+            }
+
+            batch.MSDF.ShadowEnable = a_Style.Shadow;
+            if ( a_Style.Shadow )
+            {
+                batch.MSDF.ShadowColor = a_Style.ShadowColor;
+                batch.MSDF.ShadowSoftness = a_Style.ShadowSoftness;
+                batch.MSDF.ShadowSpread = a_Style.ShadowSpread;
+
+                batch.MSDF.ShadowOffsetUV = Vec2f{
+                    a_Style.ShadowOffset[0] / static_cast<f32>( Atlas.GetConfig().AtlasWidth ),
+                    a_Style.ShadowOffset[1] / static_cast<f32>( Atlas.GetConfig().AtlasHeight )
+                };
+            }
+
+            batch.MSDF.GlowEnable = a_Style.Glow;
+            if ( a_Style.Glow )
+            {
+                batch.MSDF.GlowColor = a_Style.GlowColor;
+                batch.MSDF.GlowSpread = a_Style.GlowSpread;
+                batch.MSDF.GlowPower = a_Style.GlowPower;
+            }
+
             m_HasActiveBatch = true;
         }
     };

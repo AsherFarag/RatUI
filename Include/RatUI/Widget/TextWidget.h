@@ -154,6 +154,21 @@ namespace RatUI
                 ? m_RenderStyle.FadePercentage
                 : 0.f;
 
+                effectiveStyle.Outline = false;
+                effectiveStyle.OutlineColor = Colorsu8::AccentRose;
+                effectiveStyle.OutlineWidth = 0.1f;
+                effectiveStyle.OutlineSoftness= 0.1f;
+
+                effectiveStyle.Shadow = true;
+                effectiveStyle.ShadowColor = Colorsu8::Red;
+				effectiveStyle.ShadowOffset = Vec2f{ 4.f, 4.f };
+				effectiveStyle.ShadowSoftness = 1.f;
+                //effectiveStyle.ShadowOffset = Vec2f{ 0.1f, -0.2f };
+                //effectiveStyle.ShadowSoftness = 0.5f;
+
+                effectiveStyle.Glow = false;
+                effectiveStyle.GlowColor = Colorsu8::White;
+
             switch ( m_LayoutStyle.Overflow )
             {
                 case ETextOverflow::Clip:

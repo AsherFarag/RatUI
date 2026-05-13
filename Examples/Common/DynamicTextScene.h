@@ -58,7 +58,7 @@ private:
         TextStyle s;
         s.Layout.Font    = m_Font;
         s.Layout.Size    = sz;
-        s.Render.Color   = Colorsu8::TextPrimary;
+        s.Render.FillColor   = Colorsu8::TextPrimary;
         s.Layout.Wrap    = TextWrap::NoWrap();
         s.Layout.Overflow = ETextOverflow::Clip;
         return s;
@@ -67,7 +67,7 @@ private:
     TextStyle SectionHeadingStyle() const
     {
         TextStyle s = MakeStyle( 9_u );
-        s.Render.Color      = Colorsu8::TextSecondary;
+        s.Render.FillColor      = Colorsu8::TextSecondary;
         s.Layout.Transform  = ETextTransform::Uppercase;
         return s;
     }
@@ -75,7 +75,7 @@ private:
     TextStyle RowLabelStyle() const
     {
         TextStyle s = MakeStyle( 10_u );
-        s.Render.Color = Colorsu8::TextDisabled;
+        s.Render.FillColor = Colorsu8::TextDisabled;
         return s;
     }
 
@@ -240,7 +240,7 @@ private:
         for ( auto& e : kCols )
         {
             TextStyle ts = MakeStyle( 14_u );
-            ts.Render.Color = e.col;
+            ts.Render.FillColor = e.col;
             AddRow( card, e.label, "Aa  The quick brown fox", ts );
         }
     }
@@ -305,7 +305,7 @@ private:
         }
 
         TextStyle ts = MakeStyle( 14_u );
-        ts.Render.Color    = Colorsu8::AccentSky;
+        ts.Render.FillColor    = Colorsu8::AccentSky;
         ts.Render.FadePercentage = 0.0f;
         ts.Layout.Wrap     = TextWrap::NoWrap();
         ts.Layout.Overflow = ETextOverflow::Clip;
@@ -482,7 +482,7 @@ private:
         // Violet underline + WrapWord
         {
             TextStyle ts             = MakeStyle( 14_u );
-            ts.Render.Color          = Colorsu8::AccentViolet;
+            ts.Render.FillColor       = Colorsu8::AccentViolet;
             ts.Render.Underline      = true;
             ts.Render.FadePercentage = 0.5f; // 50% faded underline
             ts.Layout.Wrap           = TextWrap::NoWrap();
@@ -492,7 +492,7 @@ private:
         // Rose strikethrough + uppercase + WrapWord
         {
             TextStyle ts             = MakeStyle( 14_u );
-            ts.Render.Color          = Colorsu8::AccentRose;
+            ts.Render.FillColor       = Colorsu8::AccentRose;
             ts.Render.Strikethrough  = true;
             ts.Layout.Transform      = ETextTransform::Uppercase;
             ts.Layout.Wrap           = TextWrap::NoWrap();
@@ -503,7 +503,7 @@ private:
         // Amber wide spacing + capitalize + ellipsis
         {
             TextStyle ts            = MakeStyle( 13_u );
-            ts.Render.Color         = Colorsu8::AccentAmber;
+            ts.Render.FillColor      = Colorsu8::AccentAmber;
             ts.Layout.LetterSpacing = 3_u;
             ts.Layout.Transform     = ETextTransform::Capitalize;
             ts.Layout.Wrap          = TextWrap::NoWrap();
@@ -513,7 +513,7 @@ private:
         // Sky center-aligned large display
         {
             TextStyle ts         = MakeStyle( 22_u );
-            ts.Render.Color      = Colorsu8::AccentSky;
+            ts.Render.FillColor   = Colorsu8::AccentSky;
             ts.Render.Align      = ETextAlign::Center;
             ts.Layout.Wrap       = TextWrap::WrapWord();
             ts.Layout.LineHeight = 30_u;
@@ -576,7 +576,7 @@ private:
         
 
         TextStyle ts       = MakeStyle( 13_u );
-        ts.Render.Color    = Colorsu8::AccentBlue;
+        ts.Render.FillColor    = Colorsu8::AccentBlue;
         ts.Layout.Wrap     = TextWrap::NoWrap();
         ts.Layout.Overflow = ETextOverflow::Ellipsis;
 
@@ -595,7 +595,7 @@ private:
         }
         
         {
-            ts.Render.Color    = Colorsu8::AccentEmerald;
+            ts.Render.FillColor    = Colorsu8::AccentEmerald;
             WidgetID txt = m_Scene.CreateWidget<TextWidget>(
             m_AnimContainer,
             "Amazingly few discotheques provide jukeboxes.",
@@ -643,12 +643,12 @@ public:
 
             {
                 TextStyle ts = MakeStyle( 22_u );
-                ts.Render.Color = Colorsu8::TextPrimary;
+                ts.Render.FillColor = Colorsu8::TextPrimary;
                 AddText( bar, "Text Feature Showcase", ts, ESizingMode::Flex );
             }
             {
                 TextStyle ts = MakeStyle( 11_u );
-                ts.Render.Color   = Colorsu8::TextSecondary;
+                ts.Render.FillColor   = Colorsu8::TextSecondary;
                 ts.Layout.Wrap = TextWrap::NoWrap();
                 ts.Layout.Overflow = ETextOverflow::Clip;
                 AddText( bar,

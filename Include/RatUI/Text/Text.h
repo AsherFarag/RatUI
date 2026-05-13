@@ -170,15 +170,42 @@ namespace RatUI
      */
     struct TextRenderStyle
     {
-		Coloru8       Color{ Colorsu8::White };              ///< The default color of the text. Default is white.
         f32           FadePercentage{ 0.25f };               ///< The percentage of the text width to use for the fade-out zone when ETextOverflow::Fade is selected. 
                                                              ///< Default is 0.25 (25% of the text width).
 		ETextAlign    Align{ ETextAlign::Left };             ///< The horizontal alignment of the text within its layout box. Default is left-aligned.
 		ETextBaseline Baseline{ ETextBaseline::Top };        ///< The vertical alignment of the text relative to its layout box. Default is alphabetic baseline.
                                                              ///< This only affects the text's position if the layout box isn't content sized.
 
-        bool          Underline     : 1 = false; ///< Whether the text should be rendered with an underline decoration. Default is false.
-        bool          Strikethrough : 1 = false; ///< Whether the text should be rendered with a strikethrough decoration. Default is false.
+        bool Underline     : 1 = false; ///< Draws an underline decoration. Default is false.
+        bool Strikethrough : 1 = false; ///< Draws a strikethrough decoration. Default is false.
+        bool Shadow        : 1 = false; ///< Draws a shadow using the specified TextShadowStyle. Default is false.
+        bool Outline       : 1 = false; ///< Draws an outline using the specified TextOutlineStyle. Default is false.
+        bool Glow          : 1 = false; ///< Draws a glow using the specified TextGlowStyle. Default is false.
+
+		// - Fill properties
+
+		Coloru8 FillColor{ Colorsu8::White }; ///< The color used for filling the text glyphs. Default is white.
+		f32     FillSoftness{ 0.5f };         ///< Edge anti-alias softness for the fill, in SDF units [0, 0.5].
+		f32     FillThreshold{ 0.5f };        ///< The threshold for determining the filled area of the text, in SDF units [0, 1], typically 0.5.
+
+		// - Outline properties
+
+		Coloru8 OutlineColor{ Colorsu8::White }; ///< The color used for the text outline. Default is white.
+		f32     OutlineWidth{ 0.1f };            ///< The width of the text outline, in SDF units [0, 0.5], typically 0.05-0.2.
+		f32     OutlineSoftness{ 0.05f };        ///< Edge anti-alias softness for the outline, in SDF units [0, 0.5].
+
+		// - Shadow properties
+
+		Coloru8 ShadowColor{ Colorsu8::Black };  ///< The color used for the text shadow. Default is black.
+        Vec2f   ShadowOffset{ 2.f, 2.f };       ///<
+		f32     ShadowSoftness{ 0.1f };          ///< Edge anti-alias softness for the shadow, in SDF units [0, 0.5], typically 0.1-0.4.
+		f32     ShadowSpread{ 0.05f };           ///< The expansion of the shadow's SDF threshold, in SDF units [0, 0.5], typically 0.05-0.2.
+
+		// - Glow properties
+
+		Coloru8 GlowColor{ Colorsu8::White }; ///< The color used for the text glow. Default is white.
+		f32     GlowSpread{ 0.05f };          ///< How far glow extends beyond outline (0.0-0.5).
+		f32     GlowPower{ 2.0f };            ///< The falloff curve of the glow. Higher values create a tighter and brighter core, while lower values create a softer glow. Typically in the range of 1.0 to 4.0.
 
 		constexpr bool operator==( const TextRenderStyle& ) const = default;
     };

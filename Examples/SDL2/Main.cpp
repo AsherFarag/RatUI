@@ -7,7 +7,6 @@
 
 #include "../Common/FeatureSandboxScene.h"
 #include "../Common/DynamicTextScene.h"
-#include "../Common/IDemoScene.h"
 
 using namespace RatUI;
 using namespace RatUI::Literals;
@@ -57,7 +56,7 @@ protected:
         const f32 deltaTime = ( currTime - prevTime ) / 1000.f;
         prevTime = currTime;
 
-		m_UIScale = 1.f + 0.5f * std::sin( currTime / 1000.f ); // Oscillate UI scale between  and 1.5 over time.
+		//m_UIScale = 1.f + 0.5f * std::sin( currTime / 1000.f ); // Oscillate UI scale between  and 1.5 over time.
 
         if ( !m_Scene )
         {

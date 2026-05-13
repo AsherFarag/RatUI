@@ -71,6 +71,36 @@ namespace RatUI
         {
             f32 PixelRange{ c_MsdfPxRange };
             f32 Scale{ 1.f };
+
+            bool OutlineEnable : 1 = false;
+            bool ShadowEnable  : 1 = false;
+            bool GlowEnable    : 1 = false;
+            bool InnerGlowEnable : 1 = false;
+
+            // - Fill properties
+
+            Coloru8 FillColor{ Colorsu8::White }; ///< The color used for filling the text glyphs. Default is white.
+            f32     FillSoftness{ 0.5f };         ///< Edge anti-alias softness for the fill, in SDF units [0, 0.5].
+            f32     FillThreshold{ 0.5f };        ///< The threshold for determining the filled area of the text, in SDF units [0, 1], typically 0.5.
+
+            // - Outline properties
+
+            Coloru8 OutlineColor{ Colorsu8::Transparent }; ///< The color used for the text outline. Default is white.
+            f32     OutlineWidth{ 0.f };            ///< The width of the text outline, in SDF units [0, 0.5], typically 0.05-0.2.
+            f32     OutlineSoftness{ 0.f };        ///< Edge anti-alias softness for the outline, in SDF units [0, 0.5].
+
+            // - Shadow properties
+
+            Coloru8 ShadowColor   { Colorsu8::Transparent }; ///< The color used for the text shadow. Default is black.
+            Vec2f   ShadowOffsetUV{ 0.f, 0.f }; ///< Precomputed UV offset for drop shadow (atlas UV space).
+            f32     ShadowSoftness{ 0.f };      ///< Edge anti-alias softness for the shadow, in SDF units [0, 0.5], typically 0.1-0.4.
+            f32     ShadowSpread  { 0.f };      ///< The expansion of the shadow's SDF threshold, in SDF units [0, 0.5], typically 0.05-0.2.
+
+            // - Glow properties
+
+            Coloru8 GlowColor { Colorsu8::Transparent }; ///< The color used for the text glow. Default is white.
+            f32     GlowSpread{ 0.f };          ///< How far glow extends beyond outline (0.0-0.5).
+            f32     GlowPower { 0.0f };            ///< The falloff curve of the glow. Higher values create a tighter and brighter core, while lower values create a softer glow. Typically in the range of 1.0 to 4.0.
         } MSDF;
 
         // TODO: Add custom draw callbacks.
@@ -453,12 +483,12 @@ namespace RatUI
 
             auto computeFadeAlpha = [&]( Pixel x ) -> u8
             {
-                if ( fadePct <= 0.f )  return a_Style.Color[3];
-                if ( x <= fadeStartX ) return a_Style.Color[3];
+                if ( fadePct <= 0.f )  return a_Style.FillColor[3];
+                if ( x <= fadeStartX ) return a_Style.FillColor[3];
                 if ( x >= fadeEndX )   return 0;
             
                 const f32 t = ( x - fadeStartX ).ToFloat() / ( fadeEndX - fadeStartX ).ToFloat();
-                const f32 alpha = ( 1.0f - t ) * a_Style.Color[3];
+                const f32 alpha = ( 1.0f - t ) * a_Style.FillColor[3];
             
                 return static_cast<u8>( std::clamp( alpha, 0.0f, 255.0f ) );
             };
@@ -542,8 +572,8 @@ namespace RatUI
 
                         // If the glyph is in the fade region, we need to lerp the fade color based on the distance to the fade edge. 
                         // This creates a smooth fade-out effect for glyphs that are partially outside the layout rect.
-                        const Coloru8 colorA = { a_Style.Color[0], a_Style.Color[1], a_Style.Color[2], computeFadeAlpha( gx ) };
-                        const Coloru8 colorB = { a_Style.Color[0], a_Style.Color[1], a_Style.Color[2], computeFadeAlpha( gx + gw ) };
+                        const Coloru8 colorA = { a_Style.FillColor[0], a_Style.FillColor[1], a_Style.FillColor[2], computeFadeAlpha( gx ) };
+                        const Coloru8 colorB = { a_Style.FillColor[0], a_Style.FillColor[1], a_Style.FillColor[2], computeFadeAlpha( gx + gw ) };
 
                         const u32 vertexOffset = static_cast<u32>( Size( Vertices ) );
                         auto verts = ReserveVertices( 4 );
@@ -561,74 +591,6 @@ namespace RatUI
                     // sg.XAdvance is EM-normalised; multiply by fontSizePx to get pixels.
 					penX += ToPixel( sg.XAdvance, fontSize, a_DpiScale );
                 }
-
-                // TODO: Can I add underlines and strikethrough without requiring a different draw batch for the lines?
-                //// Text decorations (underline / strikethrough)
-                //if ( a_Style.Underline || a_Style.Strikethrough )
-                //{
-                //    const Pixel lineWidthPx = ToPixel( line.Width, a_DpiScale );
-                //    if ( lineWidthPx <= Pixel{ 0 } )
-                //        continue;
-                //
-                //    const Pixel lineStartX = lineX;
-                //    const Pixel lineEndX   = lineX + lineWidthPx;
-                //
-                //    // Thickness in pixels (you should ideally get this from font metrics)
-                //    const Pixel thickness = ToPixel( a_Text.UnderlineThickness, a_DpiScale );
-                //    const Pixel halfT     = thickness * 0.5f;
-                //
-                //    auto emitLine = [&]( Pixel yCenter )
-                //    {
-                //        const Pixel y0 = yCenter - halfT;
-                //        const Pixel y1 = yCenter + halfT;
-                //    
-                //        const Coloru8 colorA =
-                //        {
-                //            a_Style.Color[0],
-                //            a_Style.Color[1],
-                //            a_Style.Color[2],
-                //            computeFadeAlpha( lineStartX )
-                //        };
-                //    
-                //        const Coloru8 colorB =
-                //        {
-                //            a_Style.Color[0],
-                //            a_Style.Color[1],
-                //            a_Style.Color[2],
-                //            computeFadeAlpha( lineEndX )
-                //        };
-                //    
-                //        const u32 vertexOffset = static_cast<u32>( Size( Vertices ) );
-                //        auto verts = ReserveVertices( 4 );
-                //    
-                //        verts[0] = Vertex{ Vec2<Pixel>{ lineStartX, y0 }, colorA, Vec2f{ 0.f, 0.f } };
-                //        verts[1] = Vertex{ Vec2<Pixel>{ lineEndX,   y0 }, colorB, Vec2f{ 0.f, 0.f } };
-                //        verts[2] = Vertex{ Vec2<Pixel>{ lineStartX, y1 }, colorA, Vec2f{ 0.f, 0.f } };
-                //        verts[3] = Vertex{ Vec2<Pixel>{ lineEndX,   y1 }, colorB, Vec2f{ 0.f, 0.f } };
-                //    
-                //        auto idx = ReserveIndices( 6 );
-                //        idx[0] = vertexOffset + 0; idx[1] = vertexOffset + 1; idx[2] = vertexOffset + 2;
-                //        idx[3] = vertexOffset + 1; idx[4] = vertexOffset + 3; idx[5] = vertexOffset + 2;
-                //    };
-                //
-                //    // Underline position is relative to baseline
-                //    if ( a_Style.Underline )
-                //    {
-                //        const Pixel underlineY =
-                //            penY + ToPixel( a_Text.UnderlinePosition, a_DpiScale );
-                //    
-                //        emitLine( underlineY );
-                //    }
-                //
-                //    // Strikethrough - typically around mid ascender
-                //    if ( a_Style.Strikethrough )
-                //    {
-                //        const Pixel strikeY =
-                //            penY - ( ascender * 0.35f );
-                //    
-                //        emitLine( strikeY );
-                //    }
-                //}
 
                 // Advance to the next line.
 				penY += ToPixel( a_Text.LineHeight, a_DpiScale );

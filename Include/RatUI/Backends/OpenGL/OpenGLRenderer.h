@@ -96,40 +96,203 @@ namespace RatUI::OpenGL
          * display size.
          */
         inline constexpr const char* c_MSDFFragSrc = R"(
-            #version 330 core
-            in  vec4 v_Color;
-            in  vec2 v_UV;
-            
-            uniform sampler2D u_Texture;
-            /** SDF search radius in output pixels (matches atlas pxRange). */
-            uniform float     u_PxRange;
-            /** Visual scale = FontSize / sdf_base_size. */
-            uniform float     u_Scale;
-            
-            out vec4 FragColor;
-            
-            float median(float r, float g, float b)
-            {
-                return max(min(r, g), min(max(r, g), b));
-            }
-            
-            void main()
-            {
-                // MTSDF: RGB = multi-channel SDF, A = TODO
-                vec4  mtsdf = texture(u_Texture, v_UV);
-                float dist  = median(mtsdf.r, mtsdf.g, mtsdf.b);
+#version 330 core
 
-                // Reference formula from msdfgen
-                vec2  texSize       = vec2(textureSize(u_Texture, 0));
-                vec2  unitRange     = vec2(u_PxRange) / texSize;
-                vec2  screenTexSize = vec2(1.0) / fwidth(v_UV);
-                float screenPxRange = max(0.5 * dot(unitRange, screenTexSize), 1.0);
-            
-                float smoothW = 0.5 / screenPxRange;
-                float alpha   = smoothstep(0.5 - smoothW, 0.5 + smoothW, dist);
-            
-                FragColor = vec4(v_Color.rgb, v_Color.a * alpha);
-            }
+in vec2 v_UV;
+out vec4 FragColor;
+
+// - Atlas
+uniform sampler2D u_Atlas;          // MTSDF atlas (RGBA, linear filtering)
+uniform float     u_PxRange;        // msdfgen pxrange (e.g. 4.0)
+uniform float     u_Scale;          // Glyph scale (from batch)
+uniform vec2      u_TextureSize;    // Atlas dimensions in texels (e.g. 1024, 512)
+
+// - Fill
+uniform vec4  u_FillColor;    
+uniform float u_FillSoftness; 
+uniform float u_FillThreshold;
+
+// - Outline
+uniform vec4  u_OutlineColor;
+uniform float u_OutlineWidth;
+uniform float u_OutlineSoftness;
+
+// - Shadow
+uniform vec4  u_ShadowColor;
+uniform vec2  u_ShadowOffset;  
+uniform float u_ShadowSoftness;
+uniform float u_ShadowSpread;  
+
+// - Glow
+uniform vec4  u_GlowColor;
+uniform float u_GlowSpread;
+uniform float u_GlowPower; 
+
+// - Inner Glow
+uniform vec4  u_InnerGlowColor;
+uniform float u_InnerGlowRange;
+uniform float u_InnerGlowSoftness;
+
+float Median(float a_Red, float a_Green, float a_Blue) 
+{
+    return max(min(a_Red, a_Green), min(max(a_Red, a_Green), a_Blue));
+}
+
+//  Helper: screen-space derivative scale -> converts SDF units to pixels.
+//
+//  The MTSDF encodes distance in the range [0, 1] across `u_PxRange`
+//  screen pixels. We use fwidth to measure one texel in screen-pixel space
+//  and multiply by pixel_range to get the correct conversion factor.
+//
+//  distancePerPixel > 1 -> glyph too small (texels larger than pixels, blurry)
+//  distancePerPixel < 1 -> glyph large enough for crisp rendering
+float ScreenPxRange(vec2 a_UV) 
+{
+    vec2 unitRange = vec2(u_PxRange) / u_TextureSize;
+    vec2 screenTexSize = vec2(1.0) / fwidth(a_UV);
+    return max(0.5 * dot(unitRange, screenTexSize), 1.0);
+}
+
+//  Sample MTSDF at a given UV and return the signed distance value in [0,1].
+//
+//  MTSDF atlas stores:  R = SDF channel 1
+//                       G = SDF channel 2
+//                       B = SDF channel 3
+//                       A = true SDF (optional, for small sizes)
+//
+//  The multi-channel median gives sharp corners; blending with A (true SDF)
+//  improves robustness at very small sizes. We take max(msdf, tsdf * weight).
+float SampleMTSDF(vec2 a_UV) 
+{
+    vec4  s    = texture(u_Atlas, a_UV);
+    float msdf = Median(s.r, s.g, s.b);
+    float tsdf = s.a;
+    // Blend: at very small sizes TSDF is more reliable; blend linearly.
+    float pxRange = ScreenPxRange(a_UV);
+    float weight  = clamp(1.0 - (pxRange - 1.0) / 4.0, 0.0, 1.0);
+    return mix(msdf, max(msdf, tsdf), weight);
+}
+
+// Helper: convert SDF distance to alpha with smoothstep edge.
+//
+//  threshold = 0.5           -> glyph fill edge
+//  threshold < 0.5           -> expanded region (outline outer edge, glow, shadow)
+//  threshold > 0.5           -> contracted region (inner glow)
+//
+//  a_Softness is in user-facing pixel units. Adding 0.5 guarantees a minimum
+//  half-pixel AA transition even at softness=0, preventing hard aliasing.
+//  The combined value is then divided by pxRange to convert into SDF units.
+float SDFAlpha(float a_Dist, float a_Threshold, float a_Softness, float a_PxRange) 
+{
+    float sdfSoft = (a_Softness + 0.5) / a_PxRange;
+    return smoothstep(a_Threshold - sdfSoft, a_Threshold + sdfSoft, a_Dist);
+}
+
+//  Shadow: sample the atlas at an offset UV with a Gaussian-approximated blur.
+//
+//  Taps are spread along the normalised shadow offset direction so the blur
+//  feathers the shadow's leading edge — the visually dominant edge for a
+//  directional shadow. The blur radius is expressed as a fraction of the
+//  shadow offset length so it scales naturally with the shadow distance:
+//  a tight shadow has tight blur; a far-cast shadow has proportionally wider blur.
+//  u_ShadowSoftness acts as a 0..1 multiplier on that radius, giving the
+//  artist a stable, intuitive range regardless of offset magnitude.
+#define SHADOW_TAPS 5
+
+float ShadowAlpha(vec2 a_UV, float a_Threshold, float a_Softness, float a_PxRange) 
+{
+    // Gaussian kernel weights (sum = 1.0)
+    const float W[SHADOW_TAPS] = float[](0.0625, 0.25, 0.375, 0.25, 0.0625);
+
+    // Spread taps along the shadow offset direction.
+    // Fallback to x-axis when offset is zero (pure spread shadow, no direction).
+    float offsetLen = length(u_ShadowOffset);
+    vec2  blurDir   = offsetLen > 1e-5
+                        ? (u_ShadowOffset / offsetLen)
+                        : vec2(1.0, 0.0);
+
+    // Blur radius scales with offset length so it is proportional to shadow
+    // distance. u_ShadowSoftness (0..1) lets the artist scale it down to zero.
+    float blurRadiusUV = offsetLen * a_Softness;
+
+    float alpha = 0.0;
+    for (int i = 0; i < SHADOW_TAPS; i++)
+    {
+        float t     = float(i) / float(SHADOW_TAPS - 1) - 0.5; // -0.5 .. +0.5
+        vec2  tapUV = a_UV + blurDir * t * blurRadiusUV;
+        float d     = SampleMTSDF(tapUV);
+        alpha      += W[i] * SDFAlpha(d, a_Threshold, a_Softness, a_PxRange);
+    }
+    return clamp(alpha, 0.0, 1.0);
+}
+
+// =============================================================================
+//  Main
+// =============================================================================
+void main() 
+{
+    float pxRange = ScreenPxRange(v_UV);
+    float dist    = SampleMTSDF(v_UV);
+
+    // - Working colour accumulator (back to front)
+    vec4 color = vec4(0.0);
+
+    // - 1. Outer Glow
+    //   Expands beyond the outline's outer edge, fading outward.
+    if (u_GlowColor.a > 0.0)
+    {
+        float glowThresh = 0.5 - u_OutlineWidth - u_GlowSpread;
+        float glowAlpha  = SDFAlpha(dist, glowThresh, u_GlowPower, pxRange);
+
+        // Mask out the outline+fill interior so the glow only shows outside.
+        // Using the outline's outer edge (0.5 - OutlineWidth) rather than the
+        // fill edge means no gap appears between the outline and glow when
+        // OutlineWidth > 0.
+        float interiorAlpha = SDFAlpha(dist, 0.5 - u_OutlineWidth, u_OutlineSoftness, pxRange);
+        glowAlpha = clamp(glowAlpha - interiorAlpha, 0.0, 1.0);
+
+        color = mix(color, u_GlowColor, glowAlpha * u_GlowColor.a);
+    }
+
+    // - 2. Drop Shadow
+    //   Sample at offset UV; sits between glow and outline.
+    if (u_ShadowColor.a > 0.0)
+    {
+        vec2  shadowUV    = v_UV - u_ShadowOffset;
+        float shadowThresh = 0.5 - u_ShadowSpread;
+        float sAlpha      = ShadowAlpha(shadowUV, shadowThresh, u_ShadowSoftness, pxRange);
+        color = mix(color, u_ShadowColor, sAlpha * u_ShadowColor.a);
+    }
+
+    // - 3. Outline
+    //   Expand the SDF threshold outward by outline width.
+    if (u_OutlineColor.a > 0.0)
+    {
+        float outlineThresh = 0.5 - u_OutlineWidth;
+        float outlineAlpha  = SDFAlpha(dist, outlineThresh, u_OutlineSoftness, pxRange);
+        color = mix(color, u_OutlineColor, outlineAlpha * u_OutlineColor.a);
+    }
+
+    // - 4. Fill
+    float fillAlpha = SDFAlpha(dist, u_FillThreshold, u_FillSoftness, pxRange);
+    color = mix(color, u_FillColor, fillAlpha * u_FillColor.a);
+
+    // - 5. Inner Glow
+    //   Fades inward from the fill edge toward the glyph centre.
+    if (u_InnerGlowColor.a > 0.0) 
+    {
+        // Threshold is relative to u_FillThreshold so it respects fill dilation.
+        // Without this, shifting FillThreshold away from 0.5 would visually
+        // detach the inner glow from the fill edge it is supposed to hug.
+        float innerThresh = u_FillThreshold + u_InnerGlowRange;
+        float innerAlpha  = SDFAlpha(dist, innerThresh, u_InnerGlowSoftness, pxRange);
+        // Clip to fill region — prevents bleed at soft/feathered fill edges.
+        innerAlpha *= fillAlpha;
+        color = mix(color, u_InnerGlowColor, innerAlpha * u_InnerGlowColor.a);
+    }
+
+    FragColor = color;
+}
         )";
 
         // -----------------------------------------------------------------
@@ -235,15 +398,37 @@ namespace RatUI::OpenGL
             m_GeomProgram = Detail::LinkProgram( Detail::c_VertSrc, Detail::c_GeomFragSrc );
             m_MSDFProgram = Detail::LinkProgram( Detail::c_VertSrc, Detail::c_MSDFFragSrc );
 
-            // Cache uniform locations.
-            m_GeomLoc_Projection  = glGetUniformLocation( m_GeomProgram, "u_PVM"         );
-            m_GeomLoc_Texture     = glGetUniformLocation( m_GeomProgram, "u_Texture"     );
-            m_GeomLoc_UseTexture  = glGetUniformLocation( m_GeomProgram, "u_UseTexture"  );
+            // Cache all uniform locations in one shared array.
+            m_UniformLocs[EUniform::GeomPVM]         = glGetUniformLocation( m_GeomProgram, "u_PVM" );
+            m_UniformLocs[EUniform::GeomTexture]     = glGetUniformLocation( m_GeomProgram, "u_Texture" );
+            m_UniformLocs[EUniform::GeomUseTexture]  = glGetUniformLocation( m_GeomProgram, "u_UseTexture" );
 
-            m_MSDFLoc_Projection  = glGetUniformLocation( m_MSDFProgram, "u_PVM"         );
-            m_MSDFLoc_Texture     = glGetUniformLocation( m_MSDFProgram, "u_Texture"     );
-            m_MSDFLoc_PxRange     = glGetUniformLocation( m_MSDFProgram, "u_PxRange"     );
-            m_MSDFLoc_Scale       = glGetUniformLocation( m_MSDFProgram, "u_Scale"       );
+            m_UniformLocs[EUniform::MsdfPVM]              = glGetUniformLocation( m_MSDFProgram, "u_PVM" );
+            m_UniformLocs[EUniform::MsdfAtlas]            = glGetUniformLocation( m_MSDFProgram, "u_Atlas" );
+            m_UniformLocs[EUniform::MsdfPxRange]          = glGetUniformLocation( m_MSDFProgram, "u_PxRange" );
+            m_UniformLocs[EUniform::MsdfScale]            = glGetUniformLocation( m_MSDFProgram, "u_Scale" );
+            m_UniformLocs[EUniform::MsdfTextureSize]      = glGetUniformLocation( m_MSDFProgram, "u_TextureSize" );
+
+            m_UniformLocs[EUniform::MsdfFillColor]        = glGetUniformLocation( m_MSDFProgram, "u_FillColor" );
+            m_UniformLocs[EUniform::MsdfFillSoftness]     = glGetUniformLocation( m_MSDFProgram, "u_FillSoftness" );
+            m_UniformLocs[EUniform::MsdfFillThreshold]    = glGetUniformLocation( m_MSDFProgram, "u_FillThreshold" );
+
+            m_UniformLocs[EUniform::MsdfOutlineColor]     = glGetUniformLocation( m_MSDFProgram, "u_OutlineColor" );
+            m_UniformLocs[EUniform::MsdfOutlineWidth]     = glGetUniformLocation( m_MSDFProgram, "u_OutlineWidth" );
+            m_UniformLocs[EUniform::MsdfOutlineSoftness]  = glGetUniformLocation( m_MSDFProgram, "u_OutlineSoftness" );
+
+            m_UniformLocs[EUniform::MsdfShadowColor]      = glGetUniformLocation( m_MSDFProgram, "u_ShadowColor" );
+            m_UniformLocs[EUniform::MsdfShadowOffset]     = glGetUniformLocation( m_MSDFProgram, "u_ShadowOffset" );
+            m_UniformLocs[EUniform::MsdfShadowSoftness]   = glGetUniformLocation( m_MSDFProgram, "u_ShadowSoftness" );
+            m_UniformLocs[EUniform::MsdfShadowSpread]     = glGetUniformLocation( m_MSDFProgram, "u_ShadowSpread" );
+
+            m_UniformLocs[EUniform::MsdfGlowColor]        = glGetUniformLocation( m_MSDFProgram, "u_GlowColor" );
+            m_UniformLocs[EUniform::MsdfGlowSpread]       = glGetUniformLocation( m_MSDFProgram, "u_GlowSpread" );
+            m_UniformLocs[EUniform::MsdfGlowPower]        = glGetUniformLocation( m_MSDFProgram, "u_GlowPower" );
+
+            m_UniformLocs[EUniform::MsdfInnerGlowColor]   = glGetUniformLocation( m_MSDFProgram, "u_InnerGlowColor" );
+            m_UniformLocs[EUniform::MsdfInnerGlowRange]   = glGetUniformLocation( m_MSDFProgram, "u_InnerGlowRange" );
+            m_UniformLocs[EUniform::MsdfInnerGlowSoftness]= glGetUniformLocation( m_MSDFProgram, "u_InnerGlowSoftness" );
 
             // ----- GPU buffers ---------------------------------------------
             glGenVertexArrays( 1, &m_VAO );
@@ -363,17 +548,88 @@ namespace RatUI::OpenGL
                 if ( batch.Type == EBatchType::MSDF )
                 {
                     glUseProgram( m_MSDFProgram );
-					glUniformMatrix4fv( m_MSDFLoc_Projection, 1, GL_FALSE, pvm );
-                    glUniform1i( m_MSDFLoc_Texture,  0 );
-                    glUniform1f( m_MSDFLoc_PxRange,  batch.MSDF.PixelRange );
-                    glUniform1f( m_MSDFLoc_Scale,    batch.MSDF.Scale );
+                    glUniformMatrix4fv( m_UniformLocs[EUniform::MsdfPVM], 1, GL_FALSE, pvm );
+                    glUniform1i( m_UniformLocs[EUniform::MsdfAtlas], 0 );
+                    glUniform1f( m_UniformLocs[EUniform::MsdfPxRange], batch.MSDF.PixelRange );
+                    glUniform1f( m_UniformLocs[EUniform::MsdfScale], batch.MSDF.Scale );
+
+                    // Fill: keep white so per-vertex tint defines color
+                    glUniform4f( m_UniformLocs[EUniform::MsdfFillColor], 1.f, 1.f, 1.f, 1.f );
+                    glUniform1f( m_UniformLocs[EUniform::MsdfFillSoftness], 0.5f );
+                    glUniform1f( m_UniformLocs[EUniform::MsdfFillThreshold], 0.5f );
+
+                    // Provide atlas texture size (needed by blur/tap calculations)
+                    if ( glTex != 0 && m_UniformLocs[EUniform::MsdfTextureSize] != -1 )
+                    {
+                        GLint texW = 1, texH = 1;
+                        glBindTexture( GL_TEXTURE_2D, glTex );
+                        glGetTexLevelParameteriv( GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH,  &texW );
+                        glGetTexLevelParameteriv( GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &texH );
+                        glUniform2f( m_UniformLocs[EUniform::MsdfTextureSize], static_cast<float>( texW ), static_cast<float>( texH ) );
+                    }
+
+                    // Shadow
+                    if ( batch.MSDF.ShadowEnable )
+                    {
+                        glUniform4f( m_UniformLocs[EUniform::MsdfShadowColor],
+                                    batch.MSDF.ShadowColor[0] / 255.f,
+                                    batch.MSDF.ShadowColor[1] / 255.f,
+                                    batch.MSDF.ShadowColor[2] / 255.f,
+                                    batch.MSDF.ShadowColor[3] / 255.f );
+                        glUniform2f( m_UniformLocs[EUniform::MsdfShadowOffset],
+                                     batch.MSDF.ShadowOffsetUV[0],
+                                     batch.MSDF.ShadowOffsetUV[1] );
+                        glUniform1f( m_UniformLocs[EUniform::MsdfShadowSoftness], batch.MSDF.ShadowSoftness );
+						glUniform1f( m_UniformLocs[EUniform::MsdfShadowSpread], batch.MSDF.ShadowSpread );
+                    }
+                    else
+                    {
+                        glUniform4f( m_UniformLocs[EUniform::MsdfShadowColor], 0.f, 0.f, 0.f, 0.f );
+                    }
+
+                    // Outline
+                    if ( batch.MSDF.OutlineEnable )
+                    {
+                        glUniform4f( m_UniformLocs[EUniform::MsdfOutlineColor],
+                                    batch.MSDF.OutlineColor[0] / 255.f,
+                                    batch.MSDF.OutlineColor[1] / 255.f,
+                                    batch.MSDF.OutlineColor[2] / 255.f,
+                                    batch.MSDF.OutlineColor[3] / 255.f );
+                        glUniform1f( m_UniformLocs[EUniform::MsdfOutlineWidth], batch.MSDF.OutlineWidth );
+                        glUniform1f( m_UniformLocs[EUniform::MsdfOutlineSoftness], batch.MSDF.OutlineSoftness );
+                    }
+                    else
+                    {
+                        glUniform4f( m_UniformLocs[EUniform::MsdfOutlineColor], 0.f, 0.f, 0.f, 0.f );
+                    }
+
+                    // Glow
+                    if ( batch.MSDF.GlowEnable )
+                    {
+                        glUniform4f( m_UniformLocs[EUniform::MsdfGlowColor],
+                                    batch.MSDF.GlowColor[0] / 255.f,
+                                    batch.MSDF.GlowColor[1] / 255.f,
+                                    batch.MSDF.GlowColor[2] / 255.f,
+                                    batch.MSDF.GlowColor[3] / 255.f );
+                        glUniform1f( m_UniformLocs[EUniform::MsdfGlowSpread], batch.MSDF.GlowSpread );
+                        glUniform1f( m_UniformLocs[EUniform::MsdfGlowPower], batch.MSDF.GlowPower );
+                    }
+                    else
+                    {
+                        glUniform4f( m_UniformLocs[EUniform::MsdfGlowColor], 0.f, 0.f, 0.f, 0.f );
+                    }
+
+                    // TODO: Doesnt look good
+                    glUniform4f( m_UniformLocs[EUniform::MsdfInnerGlowColor], 0.f, 0.f, 0.f, 0.f );
+                    glUniform1f( m_UniformLocs[EUniform::MsdfInnerGlowRange], 0.f );
+                    glUniform1f( m_UniformLocs[EUniform::MsdfInnerGlowSoftness], 0.f );
                 }
-                else
+                else 
                 {
                     glUseProgram( m_GeomProgram );
-                    glUniformMatrix4fv( m_GeomLoc_Projection, 1, GL_FALSE, pvm );
-                    glUniform1i( m_GeomLoc_Texture,    0 );
-                    glUniform1i( m_GeomLoc_UseTexture, glTex != 0 ? GL_TRUE : GL_FALSE );
+                    glUniformMatrix4fv( m_UniformLocs[EUniform::GeomPVM], 1, GL_FALSE, pvm );
+                    glUniform1i( m_UniformLocs[EUniform::GeomTexture], 0 );
+                    glUniform1i( m_UniformLocs[EUniform::GeomUseTexture], glTex != 0 ? GL_TRUE : GL_FALSE );
                 }
 
                 // Draw.
@@ -516,16 +772,47 @@ namespace RatUI::OpenGL
         GLuint m_GeomProgram{ 0 };
         GLuint m_MSDFProgram{ 0 };
 
-        // Geometry program uniform locations.
-        GLint m_GeomLoc_Projection{ -1 };
-        GLint m_GeomLoc_Texture   { -1 };
-        GLint m_GeomLoc_UseTexture{ -1 };
+        // Uniform locations for all shader programs.
+        enum EUniform : int
+        {
+            GeomPVM = 0,
+            GeomTexture,
+            GeomUseTexture,
 
-        // MSDF program uniform locations.
-        GLint m_MSDFLoc_Projection{ -1 };
-        GLint m_MSDFLoc_Texture   { -1 };
-        GLint m_MSDFLoc_PxRange   { -1 };
-        GLint m_MSDFLoc_Scale     { -1 };
+            MsdfPVM,
+            MsdfAtlas,
+            MsdfPxRange,
+            MsdfScale,
+            MsdfTextureSize,
+
+            MsdfFillColor,
+            MsdfFillSoftness,
+            MsdfFillThreshold,
+
+            MsdfOutlineColor,
+            MsdfOutlineWidth,
+            MsdfOutlineSoftness,
+
+            MsdfShadowEnable,
+            MsdfShadowColor,
+            MsdfShadowOffset,
+            MsdfShadowSoftness,
+            MsdfShadowSpread,
+
+            MsdfGlowEnable,
+            MsdfGlowColor,
+            MsdfGlowSpread,
+            MsdfGlowPower,
+
+            MsdfInnerGlowEnable,
+            MsdfInnerGlowColor,
+            MsdfInnerGlowRange,
+            MsdfInnerGlowSoftness,
+
+            UniformCount
+        };
+
+        GLint m_UniformLocs[UniformCount]{};
 
 		Mat3f m_Projection{};
         i32   m_ViewportWidth { 800 };

@@ -71,7 +71,7 @@ public:
             layStyle.Overflow = ETextOverflow::Ellipsis;
 
             TextRenderStyle textStyle;
-            textStyle.Color = Colorsu8::AccentRose;
+            textStyle.FillColor = Colorsu8::AccentRose;
 
             // Add some text to the footer bar
             WidgetID footerText = m_Scene.CreateWidget<TextWidget>( MainContentArea, 
