@@ -181,12 +181,16 @@ namespace RatUI::FreeType
             if ( Empty( result.Lines ) )
                 return NullOpt;
 
-            // SDF padding in display units.
-            const f32 sdfPadDisplay = static_cast<f32>( c_MsdfPxRange );
+            // Convert SDF padding from atlas pixels to display units.
+            // At baseSize pixels per EM, the padding in EM space is pxRange/baseSize.
+            // Multiplying by fontSize gives display units.
+            const f32 baseSize      = static_cast<f32>( c_MsdfPxRange * 2 ); // or your atlas BaseSize
+            const f32 sdfPadEm      = static_cast<f32>( c_MsdfPxRange ) / baseSize;
+            const f32 sdfPadDisplay = sdfPadEm * a_Style.Size.ToFloat();
 
-            result.Ascender += Unit{ sdfPadDisplay }; // shifts penY down -> headroom above caps
-			result.TotalHeight = result.LineHeight * result.LineCount()
-                + Unit{ std::abs( result.Descender.ToFloat() ) + sdfPadDisplay };   // extra depth below descenders
+            result.Ascender += Unit{ sdfPadDisplay };
+            result.TotalHeight = result.LineHeight * result.LineCount()
+                + Unit{ std::abs( result.Descender.ToFloat() ) + sdfPadDisplay };
 
             return result;
         }
