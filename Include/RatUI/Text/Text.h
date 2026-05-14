@@ -170,43 +170,53 @@ namespace RatUI
      */
     struct TextRenderStyle
     {
-        f32           FadePercentage{ 0.25f };               ///< The percentage of the text width to use for the fade-out zone when ETextOverflow::Fade is selected. 
+        f32           FadePercentage{ 0.25f };               ///< The percentage of the text width to use for the fade-out zone when ETextOverflow::Fade is selected.
                                                              ///< Default is 0.25 (25% of the text width).
 		ETextAlign    Align{ ETextAlign::Left };             ///< The horizontal alignment of the text within its layout box. Default is left-aligned.
-		ETextBaseline Baseline{ ETextBaseline::Top };        ///< The vertical alignment of the text relative to its layout box. Default is alphabetic baseline.
+		ETextBaseline Baseline{ ETextBaseline::Top };        ///< The vertical alignment of the text relative to its layout box. Default is Top.
                                                              ///< This only affects the text's position if the layout box isn't content sized.
-
+ 
         bool Underline     : 1 = false; ///< Draws an underline decoration. Default is false.
         bool Strikethrough : 1 = false; ///< Draws a strikethrough decoration. Default is false.
-        bool Shadow        : 1 = false; ///< Draws a shadow using the specified TextShadowStyle. Default is false.
-        bool Outline       : 1 = false; ///< Draws an outline using the specified TextOutlineStyle. Default is false.
-        bool Glow          : 1 = false; ///< Draws a glow using the specified TextGlowStyle. Default is false.
-
+        bool Shadow        : 1 = false; ///< Enables the drop shadow. Uses the Shadow* properties below. Default is false.
+        bool Outline       : 1 = false; ///< Enables the outline. Uses the Outline* properties below. Default is false.
+        bool Glow          : 1 = false; ///< Enables the outer glow. Uses the Glow* properties below. Default is false.
+ 
 		// - Fill properties
-
-		Color FillColor     { Colors::White }; ///< The color used for filling the text glyphs. Default is white.
-		f32   FillSoftness  { 0.5f };          ///< Edge anti-alias softness for the fill, in SDF units [0, 0.5].
-		f32   FillThreshold { 0.5f };          ///< The threshold for determining the filled area of the text, in SDF units [0, 1], typically 0.5.
-
+ 
+		Color FillColor     { Colors::White }; ///< RGBA color of the glyph interior. Default is white.
+		f32   FillSoftness  { 0.5f };          ///< Extra feathering added to the fill edge, in screen pixels. 0 = hard 1px AA edge. Default is 0.5.
+		f32   FillThreshold { 0.5f };          ///< SDF threshold for the fill edge [0, 1]. 0.5 is the true glyph outline.
+		                                       ///< Values below 0.5 dilate (thicken) the fill; values above 0.5 erode (thin) it.
+ 
 		// - Outline properties
-
-		Color OutlineColor    { Colors::White }; ///< The color used for the text outline. Default is white.
-		f32   OutlineWidth    { 0.1f };          ///< The width of the text outline, in SDF units [0, 0.5], typically 0.05-0.2.
-		f32   OutlineSoftness { 0.05f };         ///< Edge anti-alias softness for the outline, in SDF units [0, 0.5].
-
+ 
+		Color OutlineColor    { Colors::White }; ///< RGBA color of the outline. Default is white.
+		f32   OutlineWidth    { 0.1f };          ///< Thickness of the outline in SDF units [0, 0.5]. Larger values produce a thicker outline.
+		                                         ///< The maximum useful value is 0.5, at which point the outline fills the entire glyph.
+		                                         ///< Typical range is 0.05-0.2. Default is 0.1.
+		f32   OutlineSoftness { 0.1f };          ///< Extra feathering on the outline's outer edge, in screen pixels. 0 = hard edge. Default is 0.1.
+ 
 		// - Shadow properties
-
-		Color ShadowColor    { Colors::Black }; ///< The color used for the text shadow. Default is black.
-        Vec2f ShadowOffset   { 2.f, 2.f };      ///<
-		f32   ShadowSoftness { 0.1f };          ///< Edge anti-alias softness for the shadow, in SDF units [0, 0.5], typically 0.1-0.4.
-		f32   ShadowSpread   { 0.05f };         ///< The expansion of the shadow's SDF threshold, in SDF units [0, 0.5], typically 0.05-0.2.
-
+ 
+		Color ShadowColor    { Colors::Black }; ///< RGBA color of the drop shadow. Default is black.
+        Vec2f ShadowOffset   { 4.f, 4.f };      ///< Shadow displacement in atlas pixels (X right, Y down). Converted to UV space
+		                                        ///< automatically. Larger values move the shadow further from the glyph. Default is (4, 4).
+		f32   ShadowSoftness { 1.0f };          ///< Blur radius of the shadow edge, in screen pixels. 0 = hard shadow. Default is 1.0.
+		f32   ShadowSpread   { 0.05f };         ///< Dilates the shadow shape before blurring, in SDF units [0, 0.5].
+		                                        ///< Positive values make the shadow larger than the glyph. Default is 0.05.
+ 
 		// - Glow properties
 
-		Color GlowColor  { Colors::White }; ///< The color used for the text glow. Default is white.
-		f32   GlowSpread { 0.05f };         ///< How far glow extends beyond outline (0.0-0.5).
-		f32   GlowPower  { 2.0f };          ///< The falloff curve of the glow. Higher values create a tighter and brighter core, while lower values create a softer glow. Typically in the range of 1.0 to 4.0.
-
+		Color GlowColor  { Colors::White }; ///< RGBA color of the outer glow. Default is white.
+		f32   GlowSpread { 1.f };           ///< Width of the glow band in SDF units. The glow extends outward from the outline edge
+		                                    ///< (or fill edge if no outline) by this amount. Clamped internally to the usable SDF
+		                                    ///< range - increase c_MsdfPxRange for wider glows. Default is 1.0.
+		f32   GlowPower  { 1.5f };          ///< Falloff exponent for the glow intensity across the band.
+		                                    ///< 1.0 = linear fade from the glyph edge outward.
+		                                    ///< >1.0 = intensity concentrated near the glyph edge, faster falloff.
+		                                    ///< <1.0 = wide flat halo with a gradual outer tail. Default is 1.5.
+ 
 		constexpr bool operator==( const TextRenderStyle& ) const = default;
     };
 

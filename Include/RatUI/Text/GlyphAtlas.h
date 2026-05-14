@@ -5,7 +5,7 @@
 namespace RatUI
 {
     // TODO: This should be configurable
-    inline constexpr f64 c_MsdfPxRange = 4.0;
+    inline constexpr f64 c_MsdfPxRange = 16.0;
 
     /**
      * @brief Metrics describing the position of a rasterized glyph within the atlas texture and how to position it relative to the baseline when rendering.

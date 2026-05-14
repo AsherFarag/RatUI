@@ -96,203 +96,172 @@ namespace RatUI::OpenGL
          * display size.
          */
         inline constexpr const char* c_MSDFFragSrc = R"(
-#version 330 core
+        #version 330 core
 
-in vec2 v_UV;
-out vec4 FragColor;
+        in vec2 v_UV;
+        out vec4 FragColor;
 
-// - Atlas
-uniform sampler2D u_Atlas;          // MTSDF atlas (RGBA, linear filtering)
-uniform float     u_PxRange;        // msdfgen pxrange (e.g. 4.0)
-uniform float     u_Scale;          // Glyph scale (from batch)
-uniform vec2      u_TextureSize;    // Atlas dimensions in texels (e.g. 1024, 512)
+        // - Atlas
+        uniform sampler2D u_Atlas;          // MTSDF atlas (RGBA, linear filtering)
+        uniform float     u_PxRange;        // msdfgen pxrange (e.g. 4.0)
+        uniform float     u_Scale;          // Glyph scale (from batch)
 
-// - Fill
-uniform vec4  u_FillColor;    
-uniform float u_FillSoftness; 
-uniform float u_FillThreshold;
+        // - Fill
+        uniform vec4  u_FillColor;    
+        uniform float u_FillSoftness; 
+        uniform float u_FillThreshold;
 
-// - Outline
-uniform vec4  u_OutlineColor;
-uniform float u_OutlineWidth;
-uniform float u_OutlineSoftness;
+        // - Outline
+        uniform vec4  u_OutlineColor;
+        uniform float u_OutlineWidth;
+        uniform float u_OutlineSoftness;
 
-// - Shadow
-uniform vec4  u_ShadowColor;
-uniform vec2  u_ShadowOffset;  
-uniform float u_ShadowSoftness;
-uniform float u_ShadowSpread;  
+        // - Shadow
+        uniform vec4  u_ShadowColor;
+        uniform vec2  u_ShadowOffset;  
+        uniform float u_ShadowSoftness;
+        uniform float u_ShadowSpread;  
 
-// - Glow
-uniform vec4  u_GlowColor;
-uniform float u_GlowSpread;
-uniform float u_GlowPower; 
+        // - Glow
+        uniform vec4  u_GlowColor;
+        uniform float u_GlowSpread;
+        uniform float u_GlowPower; 
 
-// - Inner Glow
-uniform vec4  u_InnerGlowColor;
-uniform float u_InnerGlowRange;
-uniform float u_InnerGlowSoftness;
+        // - Inner Glow
+        uniform vec4  u_InnerGlowColor;
+        uniform float u_InnerGlowRange;
+        uniform float u_InnerGlowSoftness;
 
-float Median(float a_Red, float a_Green, float a_Blue) 
-{
-    return max(min(a_Red, a_Green), min(max(a_Red, a_Green), a_Blue));
-}
+        float Median(float a_Red, float a_Green, float a_Blue) 
+        {
+            return max(min(a_Red, a_Green), min(max(a_Red, a_Green), a_Blue));
+        }
 
-//  Helper: screen-space derivative scale -> converts SDF units to pixels.
-//
-//  The MTSDF encodes distance in the range [0, 1] across `u_PxRange`
-//  screen pixels. We use fwidth to measure one texel in screen-pixel space
-//  and multiply by pixel_range to get the correct conversion factor.
-//
-//  distancePerPixel > 1 -> glyph too small (texels larger than pixels, blurry)
-//  distancePerPixel < 1 -> glyph large enough for crisp rendering
-float ScreenPxRange(vec2 a_UV) 
-{
-    vec2 unitRange = vec2(u_PxRange) / u_TextureSize;
-    vec2 screenTexSize = vec2(1.0) / fwidth(a_UV);
-    return max(0.5 * dot(unitRange, screenTexSize), 1.0);
-}
+        //  Helper: screen-space derivative scale -> converts SDF units to pixels.
+        float ScreenPxRange(vec2 a_UV ) 
+        {
+            vec2 unitRange = vec2(u_PxRange) / textureSize(u_Atlas, 0).xy;
+            vec2 screenTexSize = vec2(1.0) / fwidth(a_UV);
+            return max(0.5 * dot(unitRange, screenTexSize), 1.0);
+        }
 
-//  Sample MTSDF at a given UV and return the signed distance value in [0,1].
-//
-//  MTSDF atlas stores:  R = SDF channel 1
-//                       G = SDF channel 2
-//                       B = SDF channel 3
-//                       A = true SDF (optional, for small sizes)
-//
-//  The multi-channel median gives sharp corners; blending with A (true SDF)
-//  improves robustness at very small sizes. We take max(msdf, tsdf * weight).
-float SampleMTSDF(vec2 a_UV) 
-{
-    vec4  s    = texture(u_Atlas, a_UV);
-    float msdf = Median(s.r, s.g, s.b);
-    float tsdf = s.a;
-    // Blend: at very small sizes TSDF is more reliable; blend linearly.
-    float pxRange = ScreenPxRange(a_UV);
-    float weight  = clamp(1.0 - (pxRange - 1.0) / 4.0, 0.0, 1.0);
-    return mix(msdf, max(msdf, tsdf), weight);
-}
+        //  Sample MTSDF at a given UV and return the signed distance value in [0,1].
+        float SampleMTSDF(vec2 a_UV) 
+        {
+            vec4  s    = texture(u_Atlas, a_UV);
+            float msdf = Median(s.r, s.g, s.b);
+            float tsdf = s.a;
+            float pxRange = ScreenPxRange(a_UV);
+            float weight  = clamp(1.0 - (pxRange - 1.0) / 4.0, 0.0, 1.0);
+            return mix(msdf, max(msdf, tsdf), weight);
+        }
 
-// Helper: convert SDF distance to alpha with smoothstep edge.
-//
-//  threshold = 0.5           -> glyph fill edge
-//  threshold < 0.5           -> expanded region (outline outer edge, glow, shadow)
-//  threshold > 0.5           -> contracted region (inner glow)
-//
-//  a_Softness is in user-facing pixel units. Adding 0.5 guarantees a minimum
-//  half-pixel AA transition even at softness=0, preventing hard aliasing.
-//  The combined value is then divided by pxRange to convert into SDF units.
-float SDFAlpha(float a_Dist, float a_Threshold, float a_Softness, float a_PxRange) 
-{
-    float sdfSoft = (a_Softness + 0.5) / a_PxRange;
-    return smoothstep(a_Threshold - sdfSoft, a_Threshold + sdfSoft, a_Dist);
-}
+        // Helper: convert SDF distance to alpha with smoothstep edge.
+        //  a_Softness is in user-facing pixel units. Adding 0.5 guarantees a minimum
+        //  half-pixel AA transition even at softness=0, preventing hard aliasing.
+        //  The combined value is then divided by pxRange to convert into SDF units.
+        float SDFAlpha(float a_Dist, float a_Threshold, float a_Softness, float a_PxRange) 
+        {
+            float sdfSoft = (a_Softness + 0.5) / a_PxRange;
+            return smoothstep(a_Threshold - sdfSoft, a_Threshold + sdfSoft, a_Dist);
+        }
 
-//  Shadow: sample the atlas at an offset UV with a Gaussian-approximated blur.
-//
-//  Taps are spread along the normalised shadow offset direction so the blur
-//  feathers the shadow's leading edge — the visually dominant edge for a
-//  directional shadow. The blur radius is expressed as a fraction of the
-//  shadow offset length so it scales naturally with the shadow distance:
-//  a tight shadow has tight blur; a far-cast shadow has proportionally wider blur.
-//  u_ShadowSoftness acts as a 0..1 multiplier on that radius, giving the
-//  artist a stable, intuitive range regardless of offset magnitude.
-#define SHADOW_TAPS 5
+        //  Shadow: multi-tap Gaussian-approximated blur along the shadow offset direction.
+        //  Blur radius is clamped to the SDF gradient band to prevent out-of-tile sampling.
+        const int c_ShadowTaps = 5;
 
-float ShadowAlpha(vec2 a_UV, float a_Threshold, float a_Softness, float a_PxRange) 
-{
-    // Gaussian kernel weights (sum = 1.0)
-    const float W[SHADOW_TAPS] = float[](0.0625, 0.25, 0.375, 0.25, 0.0625);
+        float ShadowAlpha(vec2 a_UV, float a_Threshold, float a_Softness, float a_PxRange) 
+        {
+            // Precomputed Gaussian weights for 5 taps, normalized so their sum is 1.
+            // WARNING: Update these if you change c_ShadowTaps!
+            const float W[c_ShadowTaps] = float[](0.0625, 0.25, 0.375, 0.25, 0.0625);
 
-    // Spread taps along the shadow offset direction.
-    // Fallback to x-axis when offset is zero (pure spread shadow, no direction).
-    float offsetLen = length(u_ShadowOffset);
-    vec2  blurDir   = offsetLen > 1e-5
-                        ? (u_ShadowOffset / offsetLen)
-                        : vec2(1.0, 0.0);
+            float offsetLen = length(u_ShadowOffset);
+            vec2  blurDir   = offsetLen > 1e-5
+                                ? (u_ShadowOffset / offsetLen)
+                                : vec2(1.0, 0.0);
 
-    // Blur radius scales with offset length so it is proportional to shadow
-    // distance. u_ShadowSoftness (0..1) lets the artist scale it down to zero.
-    float blurRadiusUV = offsetLen * a_Softness;
+            // Radius in SDF units, clamped so taps stay within the SDF gradient band
+            // and cannot wander into neighbouring atlas tiles or empty atlas space.
+            vec2  atlasSize    = vec2(textureSize(u_Atlas, 0)); 
+            float blurSDF      = clamp(a_Softness, 0.0, u_PxRange * 0.5);
+            float blurRadiusUV = (blurSDF / u_PxRange) / min(atlasSize.x, atlasSize.y);
 
-    float alpha = 0.0;
-    for (int i = 0; i < SHADOW_TAPS; i++)
-    {
-        float t     = float(i) / float(SHADOW_TAPS - 1) - 0.5; // -0.5 .. +0.5
-        vec2  tapUV = a_UV + blurDir * t * blurRadiusUV;
-        float d     = SampleMTSDF(tapUV);
-        alpha      += W[i] * SDFAlpha(d, a_Threshold, a_Softness, a_PxRange);
-    }
-    return clamp(alpha, 0.0, 1.0);
-}
+            float alpha = 0.0;
+            for (int i = 0; i < c_ShadowTaps; i++)
+            {
+                float t     = float(i) / float(c_ShadowTaps - 1) - 0.5;
+                vec2  tapUV = a_UV + blurDir * t * blurRadiusUV;
+                float d     = SampleMTSDF(tapUV);
+                // Use the pxRange from the original UV — derivatives at offset UVs
+                // are invalid inside a loop and would produce incorrect softness.
+                alpha      += W[i] * SDFAlpha(d, a_Threshold, a_Softness, a_PxRange);
+            }
+            return clamp(alpha, 0.0, 1.0);
+        }
 
-// =============================================================================
-//  Main
-// =============================================================================
-void main() 
-{
-    float pxRange = ScreenPxRange(v_UV);
-    float dist    = SampleMTSDF(v_UV);
+        // Main:
+        // Renders text with up to 4 layers of effects, composited in this order:
+        //  1. Drop shadow (beneath everything)
+        //  2. Outer glow (Additively blended with shadow, but under the outline)
+        //  3. Outline (overrides glow and fill at edges)
+        //  4. Fill (overrides glow at edges, but under the outline)
+        void main() 
+        {
+            float pxRange = ScreenPxRange(v_UV);
+            float dist    = SampleMTSDF(v_UV);
 
-    // - Working colour accumulator (back to front)
-    vec4 color = vec4(0.0);
+            vec4 color = vec4(0.0);
 
-    // - 1. Outer Glow
-    //   Expands beyond the outline's outer edge, fading outward.
-    if (u_GlowColor.a > 0.0)
-    {
-        float glowThresh = 0.5 - u_OutlineWidth - u_GlowSpread;
-        float glowAlpha  = SDFAlpha(dist, glowThresh, u_GlowPower, pxRange);
+            // - 1. Drop Shadow
+            //   Sampled first so it appears beneath all other effects, even when shadow and glow overlap.
+            if (u_ShadowColor.a > 0.0)
+            {
+                vec2  shadowUV     = v_UV - u_ShadowOffset;
+                float shadowThresh = 0.5 - u_ShadowSpread;
+                float sAlpha       = ShadowAlpha(shadowUV, shadowThresh, u_ShadowSoftness, pxRange);
+                color = mix(color, u_ShadowColor, sAlpha * u_ShadowColor.a);
+            }
 
-        // Mask out the outline+fill interior so the glow only shows outside.
-        // Using the outline's outer edge (0.5 - OutlineWidth) rather than the
-        // fill edge means no gap appears between the outline and glow when
-        // OutlineWidth > 0.
-        float interiorAlpha = SDFAlpha(dist, 0.5 - u_OutlineWidth, u_OutlineSoftness, pxRange);
-        glowAlpha = clamp(glowAlpha - interiorAlpha, 0.0, 1.0);
+            // - 2. Outer Glow
+            //   Sampled before the outline so it appears beneath the outline, and can glow both inside and outside the glyph edges.
+            if (u_GlowColor.a > 0.0 && u_GlowSpread > 0.0)
+            {
+                float innerEdge = 0.5 - u_OutlineWidth;
+                float outerEdge = max(innerEdge - u_GlowSpread, 0.0);
+                float bandWidth = innerEdge - outerEdge;
 
-        color = mix(color, u_GlowColor, glowAlpha * u_GlowColor.a);
-    }
+                if (bandWidth > 0.0)
+                {
+                    // Hard clip at both edges with minimum half-pixel AA.
+                    float outerClip = SDFAlpha(dist, outerEdge, 0.0, pxRange);
+                    float innerClip = SDFAlpha(dist, innerEdge, 0.0, pxRange);
 
-    // - 2. Drop Shadow
-    //   Sample at offset UV; sits between glow and outline.
-    if (u_ShadowColor.a > 0.0)
-    {
-        vec2  shadowUV    = v_UV - u_ShadowOffset;
-        float shadowThresh = 0.5 - u_ShadowSpread;
-        float sAlpha      = ShadowAlpha(shadowUV, shadowThresh, u_ShadowSoftness, pxRange);
-        color = mix(color, u_ShadowColor, sAlpha * u_ShadowColor.a);
-    }
+                    // Remap dist to [0,1] within the band: 0 at outerEdge, 1 at innerEdge.
+                    float bandT     = clamp((dist - outerEdge) / bandWidth, 0.0, 1.0);
+                    float glowAlpha = pow(bandT, u_GlowPower);
 
-    // - 3. Outline
-    //   Expand the SDF threshold outward by outline width.
-    if (u_OutlineColor.a > 0.0)
-    {
-        float outlineThresh = 0.5 - u_OutlineWidth;
-        float outlineAlpha  = SDFAlpha(dist, outlineThresh, u_OutlineSoftness, pxRange);
-        color = mix(color, u_OutlineColor, outlineAlpha * u_OutlineColor.a);
-    }
+                    glowAlpha *= outerClip * (1.0 - innerClip);
 
-    // - 4. Fill
-    float fillAlpha = SDFAlpha(dist, u_FillThreshold, u_FillSoftness, pxRange);
-    color = mix(color, u_FillColor, fillAlpha * u_FillColor.a);
+                    color = mix(color, u_GlowColor, glowAlpha * u_GlowColor.a);
+                }
+            }
 
-    // - 5. Inner Glow
-    //   Fades inward from the fill edge toward the glyph centre.
-    if (u_InnerGlowColor.a > 0.0) 
-    {
-        // Threshold is relative to u_FillThreshold so it respects fill dilation.
-        // Without this, shifting FillThreshold away from 0.5 would visually
-        // detach the inner glow from the fill edge it is supposed to hug.
-        float innerThresh = u_FillThreshold + u_InnerGlowRange;
-        float innerAlpha  = SDFAlpha(dist, innerThresh, u_InnerGlowSoftness, pxRange);
-        // Clip to fill region — prevents bleed at soft/feathered fill edges.
-        innerAlpha *= fillAlpha;
-        color = mix(color, u_InnerGlowColor, innerAlpha * u_InnerGlowColor.a);
-    }
+            // - 3. Outline
+            //   Overrides the glow and fill at the edges, so it appears crisp even with a soft glow.  Sampled after the glow so it can overlap the glow on the inside of the glyph if u_OutlineWidth < u_GlowSpread.
+            if (u_OutlineColor.a > 0.0)
+            {
+                float outlineThresh = 0.5 - u_OutlineWidth;
+                float outlineAlpha  = SDFAlpha(dist, outlineThresh, u_OutlineSoftness, pxRange);
+                color = mix(color, u_OutlineColor, outlineAlpha * u_OutlineColor.a);
+            }
 
-    FragColor = color;
-}
+            // - 4. Fill
+            float fillAlpha = SDFAlpha(dist, u_FillThreshold, u_FillSoftness, pxRange);
+            color = mix(color, u_FillColor, fillAlpha * u_FillColor.a);
+
+            FragColor = color;
+        }
         )";
 
         // -----------------------------------------------------------------
@@ -407,7 +376,6 @@ void main()
             m_UniformLocs[EUniform::MsdfAtlas]            = glGetUniformLocation( m_MSDFProgram, "u_Atlas" );
             m_UniformLocs[EUniform::MsdfPxRange]          = glGetUniformLocation( m_MSDFProgram, "u_PxRange" );
             m_UniformLocs[EUniform::MsdfScale]            = glGetUniformLocation( m_MSDFProgram, "u_Scale" );
-            m_UniformLocs[EUniform::MsdfTextureSize]      = glGetUniformLocation( m_MSDFProgram, "u_TextureSize" );
 
             m_UniformLocs[EUniform::MsdfFillColor]        = glGetUniformLocation( m_MSDFProgram, "u_FillColor" );
             m_UniformLocs[EUniform::MsdfFillSoftness]     = glGetUniformLocation( m_MSDFProgram, "u_FillSoftness" );
@@ -560,16 +528,6 @@ void main()
                                 batch.MSDF.FillColor[3] / 255.f );
                     glUniform1f( m_UniformLocs[EUniform::MsdfFillSoftness], batch.MSDF.FillSoftness );
                     glUniform1f( m_UniformLocs[EUniform::MsdfFillThreshold], batch.MSDF.FillThreshold );
-
-                    // Provide atlas texture size (needed by blur/tap calculations)
-                    if ( glTex != 0 && m_UniformLocs[EUniform::MsdfTextureSize] != -1 )
-                    {
-                        GLint texW = 1, texH = 1;
-                        glBindTexture( GL_TEXTURE_2D, glTex );
-                        glGetTexLevelParameteriv( GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH,  &texW );
-                        glGetTexLevelParameteriv( GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &texH );
-                        glUniform2f( m_UniformLocs[EUniform::MsdfTextureSize], static_cast<float>( texW ), static_cast<float>( texH ) );
-                    }
 
                     // Shadow
                     if ( batch.MSDF.ShadowEnable )
@@ -786,7 +744,6 @@ void main()
             MsdfAtlas,
             MsdfPxRange,
             MsdfScale,
-            MsdfTextureSize,
 
             MsdfFillColor,
             MsdfFillSoftness,
