@@ -572,8 +572,8 @@ namespace RatUI
 
                         // If the glyph is in the fade region, we need to lerp the fade color based on the distance to the fade edge. 
                         // This creates a smooth fade-out effect for glyphs that are partially outside the layout rect.
-                        const Color colorA = { a_Style.FillColor[0], a_Style.FillColor[1], a_Style.FillColor[2], computeFadeAlpha( gx ) };
-                        const Color colorB = { a_Style.FillColor[0], a_Style.FillColor[1], a_Style.FillColor[2], computeFadeAlpha( gx + gw ) };
+                        const Color colorA = { 255, 255, 255, computeFadeAlpha( gx ) };
+                        const Color colorB = { 255, 255, 255, computeFadeAlpha( gx + gw ) };
 
                         const u32 vertexOffset = static_cast<u32>( Size( Vertices ) );
                         auto verts = ReserveVertices( 4 );

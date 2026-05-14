@@ -252,6 +252,10 @@ namespace RatUI
             batch.MSDF.PixelRange = c_MsdfPxRange;
             batch.MSDF.Scale = a_Scale;
 
+            batch.MSDF.FillColor = a_Style.FillColor;
+            batch.MSDF.FillSoftness = a_Style.FillSoftness;
+            batch.MSDF.FillThreshold = a_Style.FillThreshold;
+
             batch.MSDF.OutlineEnable = a_Style.Outline;
             if ( a_Style.Outline )
             {

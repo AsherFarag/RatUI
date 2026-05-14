@@ -185,9 +185,9 @@ namespace RatUI
 		// - Fill properties
  
 		Color FillColor     { Colors::White }; ///< RGBA color of the glyph interior. Default is white.
-		f32   FillSoftness  { 0.5f };          ///< Extra feathering added to the fill edge, in screen pixels. 0 = hard 1px AA edge. Default is 0.5.
-		f32   FillThreshold { 0.5f };          ///< SDF threshold for the fill edge [0, 1]. 0.5 is the true glyph outline.
-		                                       ///< Values below 0.5 dilate (thicken) the fill; values above 0.5 erode (thin) it.
+		f32   FillSoftness  { 0.4f };          ///< Extra feathering added to the fill edge, in screen pixels. 0 = hard 1px AA edge. Default is 0.4.
+		f32   FillThreshold { 0.445f };        ///< Threshold the SDF value must be greater than to be considered fully filled.
+                                               ///< Lower values make the text bolder, higher values make it thinner. True default is 0.5, but 0.445 looks better for smaller text sizes.
  
 		// - Outline properties
  

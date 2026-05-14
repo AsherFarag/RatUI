@@ -676,7 +676,7 @@ public:
             auto [l, m, r] = MakeCols( content );
             BuildFontSizes( l );
             BuildColors( m );
-            BuildAlignment( r );
+            BuildLineHeight( r );
         }
         {
             auto [l, m, r] = MakeCols( content );
@@ -687,13 +687,13 @@ public:
         {
             auto [l, m, r] = MakeCols( content );
             BuildLetterSpacing( l );
-            BuildLineHeight( m );
+            BuildAlignment( m );
+            BuildAnimated( m );
             BuildDecoration( r );
         }
         {
             auto [l, m, r] = MakeCols( content );
             BuildCombined( l );
-            BuildAnimated( m );
             (void)r;
         }
     }

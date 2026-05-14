@@ -99,6 +99,7 @@ namespace RatUI::OpenGL
         #version 330 core
 
         in vec2 v_UV;
+        in vec4 v_Color;
         out vec4 FragColor;
 
         // - Atlas
@@ -260,6 +261,7 @@ namespace RatUI::OpenGL
             float fillAlpha = SDFAlpha(dist, u_FillThreshold, u_FillSoftness, pxRange);
             color = mix(color, u_FillColor, fillAlpha * u_FillColor.a);
 
+            color.a *= v_Color.a; // Apply vertex alpha at the end so it affects all layers.
             FragColor = color;
         }
         )";
@@ -521,7 +523,6 @@ namespace RatUI::OpenGL
                     glUniform1f( m_UniformLocs[EUniform::MsdfPxRange], batch.MSDF.PixelRange );
                     glUniform1f( m_UniformLocs[EUniform::MsdfScale], batch.MSDF.Scale );
 
-                    // Fill: keep white so per-vertex tint defines color
                     glUniform4f( m_UniformLocs[EUniform::MsdfFillColor], batch.MSDF.FillColor[0] / 255.f,
                                 batch.MSDF.FillColor[1] / 255.f,
                                 batch.MSDF.FillColor[2] / 255.f,
