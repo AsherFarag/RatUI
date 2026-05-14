@@ -147,12 +147,11 @@ namespace RatUI::OpenGL
         }
 
         //  Sample MTSDF at a given UV and return the signed distance value in [0,1].
-        float SampleMTSDF(vec2 a_UV) 
+        float SampleMTSDF(vec4 a_MTSDF)
         {
-            vec4  s    = texture(u_Atlas, a_UV);
-            float msdf = Median(s.r, s.g, s.b);
-            float tsdf = s.a;
-            float pxRange = ScreenPxRange(a_UV);
+            float msdf = Median(a_MTSDF.r, a_MTSDF.g, a_MTSDF.b);
+            float tsdf = a_MTSDF.a;
+            float pxRange = ScreenPxRange(v_UV);
             float weight  = clamp(1.0 - (pxRange - 1.0) / 4.0, 0.0, 1.0);
             return mix(msdf, max(msdf, tsdf), weight);
         }
@@ -193,7 +192,7 @@ namespace RatUI::OpenGL
             {
                 float t     = float(i) / float(c_ShadowTaps - 1) - 0.5;
                 vec2  tapUV = a_UV + blurDir * t * blurRadiusUV;
-                float d     = SampleMTSDF(tapUV);
+                float d     = SampleMTSDF(texture(u_Atlas, tapUV));
                 // Use the pxRange from the original UV — derivatives at offset UVs
                 // are invalid inside a loop and would produce incorrect softness.
                 alpha      += W[i] * SDFAlpha(d, a_Threshold, a_Softness, a_PxRange);
@@ -204,13 +203,17 @@ namespace RatUI::OpenGL
         // Main:
         // Renders text with up to 4 layers of effects, composited in this order:
         //  1. Drop shadow (beneath everything)
-        //  2. Outer glow (Additively blended with shadow, but under the outline)
+        //  2. Outer glow (above shadow but beneath outline and fill, so it can glow both inside and outside the glyph edges)
         //  3. Outline (overrides glow and fill at edges)
         //  4. Fill (overrides glow at edges, but under the outline)
         void main() 
         {
             float pxRange = ScreenPxRange(v_UV);
-            float dist    = SampleMTSDF(v_UV);
+            vec4  mtsdf   = texture(u_Atlas, v_UV);
+            float dist    = SampleMTSDF(mtsdf);
+
+            // TODO: Should maybe add a roundness factor that blends between MSDF and TSDF?
+            float tsdf    = mtsdf.a; // Single channel SDF for soft effects like glow that require accurate distance values, stored in alpha channel of MTSDF atlas.
 
             vec4 color = vec4(0.0);
 
@@ -235,11 +238,11 @@ namespace RatUI::OpenGL
                 if (bandWidth > 0.0)
                 {
                     // Hard clip at both edges with minimum half-pixel AA.
-                    float outerClip = SDFAlpha(dist, outerEdge, 0.0, pxRange);
-                    float innerClip = SDFAlpha(dist, innerEdge, 0.0, pxRange);
+                    float outerClip = SDFAlpha(tsdf, outerEdge, 0.0, pxRange);
+                    float innerClip = SDFAlpha(tsdf, innerEdge, 0.0, pxRange);
 
                     // Remap dist to [0,1] within the band: 0 at outerEdge, 1 at innerEdge.
-                    float bandT     = clamp((dist - outerEdge) / bandWidth, 0.0, 1.0);
+                    float bandT     = clamp((tsdf - outerEdge) / bandWidth, 0.0, 1.0);
                     float glowAlpha = pow(bandT, u_GlowPower);
 
                     glowAlpha *= outerClip * (1.0 - innerClip);
@@ -547,6 +550,9 @@ namespace RatUI::OpenGL
                     else
                     {
                         glUniform4f( m_UniformLocs[EUniform::MsdfShadowColor], 0.f, 0.f, 0.f, 0.f );
+                        glUniform2f( m_UniformLocs[EUniform::MsdfShadowOffset], 0.f, 0.f );
+                        glUniform1f( m_UniformLocs[EUniform::MsdfShadowSoftness], 0.f );
+                        glUniform1f( m_UniformLocs[EUniform::MsdfShadowSpread], 0.f );
                     }
 
                     // Outline
@@ -563,6 +569,8 @@ namespace RatUI::OpenGL
                     else
                     {
                         glUniform4f( m_UniformLocs[EUniform::MsdfOutlineColor], 0.f, 0.f, 0.f, 0.f );
+                        glUniform1f( m_UniformLocs[EUniform::MsdfOutlineWidth], 0.f );
+                        glUniform1f( m_UniformLocs[EUniform::MsdfOutlineSoftness], 0.f );
                     }
 
                     // Glow
@@ -579,6 +587,8 @@ namespace RatUI::OpenGL
                     else
                     {
                         glUniform4f( m_UniformLocs[EUniform::MsdfGlowColor], 0.f, 0.f, 0.f, 0.f );
+                        glUniform1f( m_UniformLocs[EUniform::MsdfGlowSpread], 0.f );
+                        glUniform1f( m_UniformLocs[EUniform::MsdfGlowPower], 0.f );
                     }
 
                     // TODO: Doesnt look good

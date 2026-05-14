@@ -521,6 +521,59 @@ private:
         }
     }
 
+    void BuildRenderStyles( WidgetID parent )
+    {
+        WidgetID card = BeginCard( parent, "Render Styles" );
+        const Unit fontSize = 48_u;
+        auto text = "I am fancy!";
+
+        // Outline
+        {
+            TextStyle ts = MakeStyle( fontSize );
+            ts.Render.Outline = true;
+            ts.Render.OutlineWidth = 0.3f;
+            ts.Render.OutlineColor = Colors::White;
+            ts.Render.FillColor = Colors::Black;
+            AddRow( card, "Outline", text, ts );
+        }
+
+        // Glow
+        {
+            TextStyle ts = MakeStyle( fontSize );
+            ts.Render.Glow = true;
+            ts.Render.GlowColor = Colors::White;
+            ts.Render.FillColor = Colors::Black;
+            AddRow( card, "Glow", text, ts );
+        }
+
+        // Shadow
+        {
+            TextStyle ts = MakeStyle( fontSize );
+            ts.Render.Shadow = true;
+            ts.Render.ShadowColor = Colors::White;
+            ts.Render.ShadowSoftness = 5.f;
+            ts.Render.FillColor = Colors::Black;
+            AddRow( card, "Shadow", text, ts );
+        }
+
+        // Combined: outline + glow + shadow
+        {
+            TextStyle ts = MakeStyle( fontSize );
+
+            ts.Render.Outline = true;
+            ts.Render.OutlineColor = Colors::Red;
+
+            ts.Render.Glow = true;
+            ts.Render.GlowColor = Colors::Green;
+
+            ts.Render.Shadow = true;
+            ts.Render.ShadowColor = Colors::Blue;
+            ts.Render.ShadowOffset = Vec2f{ 8, 8 };
+
+            AddRow( card, "Outline, Glow, Shadow", text, ts );
+        }
+    }
+
     void BuildAnimated( WidgetID parent )
     {
         WidgetID card = BeginCard(
@@ -671,30 +724,27 @@ public:
             n->Style.HeightMode = ESizingMode::Content;
         }
 
-        // Layout: 3-column grid
+        // Layout: single 3-column grid
         {
             auto [l, m, r] = MakeCols( content );
+            
+            // Left column
             BuildFontSizes( l );
-            BuildColors( m );
-            BuildLineHeight( r );
-        }
-        {
-            auto [l, m, r] = MakeCols( content );
             BuildWrapping( l );
-            BuildOverflow( m );
-            BuildTransform( r );
-        }
-        {
-            auto [l, m, r] = MakeCols( content );
             BuildLetterSpacing( l );
-            BuildAlignment( m );
-            BuildAnimated( m );
-            BuildDecoration( r );
-        }
-        {
-            auto [l, m, r] = MakeCols( content );
             BuildCombined( l );
-            (void)r;
+            
+            // Middle column
+            BuildColors( m );
+            BuildOverflow( m );
+            BuildRenderStyles( m );
+            
+            // Right column
+            BuildLineHeight( r );
+            BuildTransform( r );
+            BuildDecoration( r );
+            BuildAlignment( r );
+            BuildAnimated( r );
         }
     }
 
