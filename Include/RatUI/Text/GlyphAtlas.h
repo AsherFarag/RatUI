@@ -85,7 +85,7 @@ namespace RatUI
             if ( !m_Texture.IsValid() )
                 return NullOpt; // Can't upload if texture is invalid.
 
-            const Coloru8* pixels = nullptr; // In RGBA8 format
+            const Color* pixels = nullptr; // In RGBA8 format
             u32            width  = 0, height = 0;
             Vec2<FontUnit> bearing{};
             FontUnit       xAdvance{};
@@ -111,7 +111,7 @@ namespace RatUI
             // Upload the glyph bitmap to the atlas texture.
             if ( auto region = AllocateRegion( static_cast<u16>( width ), static_cast<u16>( height ) ) )
             {
-                const size dataSizeBytes = static_cast<size>( width ) * height * sizeof( Coloru8 );
+                const size dataSizeBytes = static_cast<size>( width ) * height * sizeof( Color );
                 m_Renderer.UpdateTexture( m_Texture, 0, region->Cast<u32>(), pixels, dataSizeBytes );
 
                 GlyphMetrics rect { .Bearing   = bearing,

@@ -123,54 +123,35 @@ namespace RatUI
 
     // === Color ===
 
-    using Colorf = /* TODO: RATUI_COLOR_IMPL */ Vec4f;
-    using Coloru8 = /* TODO: RATUI_COLOR_IMPL */ Vec4<u8>;
+    using Color = /* TODO: RATUI_COLOR_IMPL */ Vec4<u8>;
 
     /** @brief Creates a color from f32 RGBA components in the range [0, 1]. */
-    template<typename ColorType>
-    constexpr ColorType MakeColorF32( f32 a_Red, f32 a_Green, f32 a_Blue, f32 a_Alpha = 1.f )
+    constexpr Color FromColorF32( f32 a_Red, f32 a_Green, f32 a_Blue, f32 a_Alpha = 1.f )
     {
-        if constexpr ( std::is_same_v<ColorType, Colorf> )
-        {
-            return ColorType{ a_Red, a_Green, a_Blue, a_Alpha };
-        }
-        else if constexpr ( std::is_same_v<ColorType, Coloru8> )
-        {
-            return ColorType{
-                static_cast<u8>( a_Red * 255.f ),
-                static_cast<u8>( a_Green * 255.f ),
-                static_cast<u8>( a_Blue * 255.f ),
-                static_cast<u8>( a_Alpha * 255.f )
-            };
-        }
-        else
-        {
-            static_assert( AlwaysFalse<void>, "Unsupported color type" );
-        }
+        return Color{
+            static_cast<u8>( a_Red   * 255.f ),
+            static_cast<u8>( a_Green * 255.f ),
+            static_cast<u8>( a_Blue  * 255.f ),
+            static_cast<u8>( a_Alpha * 255.f )
+        };
     }
 
-    /** @brief Creates a color from u8 RGBA components in the range [0, 255]. */
-    template<typename ColorType>
-    constexpr ColorType MakeColorU8( u8 a_Red, u8 a_Green, u8 a_Blue, u8 a_Alpha = 255 )
+	/** @brief Creates a color from a Vec4f RGBA color, where each component is in the range [0, 1]. */
+    constexpr Color FromColorF32( Vec4f a_Color )
     {
-        if constexpr ( std::is_same_v<ColorType, Colorf> )
-        {
-            return ColorType{
-                static_cast<f32>( a_Red ) / 255.f,
-                static_cast<f32>( a_Green ) / 255.f,
-                static_cast<f32>( a_Blue ) / 255.f,
-                static_cast<f32>( a_Alpha ) / 255.f
-            };
-        }
-        else if constexpr ( std::is_same_v<ColorType, Coloru8> )
-        {
-            return ColorType{ a_Red, a_Green, a_Blue, a_Alpha };
-        }
-        else
-        {
-            static_assert( AlwaysFalse<void>, "Unsupported color type" );
-        }
-    }
+        return FromColorF32( a_Color[ 0 ], a_Color[ 1 ], a_Color[ 2 ], a_Color[ 3 ] );
+	}
+
+	/** @brief Converts a Color to a Vec4f with RGBA components in the range [0, 1]. */
+    constexpr Vec4f ToColorF32( Color a_Color )
+    {
+        return Vec4f{
+            static_cast<f32>( a_Color[ 0 ] ) / 255.f,
+            static_cast<f32>( a_Color[ 1 ] ) / 255.f,
+            static_cast<f32>( a_Color[ 2 ] ) / 255.f,
+            static_cast<f32>( a_Color[ 3 ] ) / 255.f
+        };
+	}
 
     // === Rectangles ===
 
@@ -328,110 +309,83 @@ namespace RatUI
 
 	} // namespace Math
 
-	template<typename ColorType>
-    struct Colors
+    namespace Colors
     {
-		using Color = ColorType;
-
-        static constexpr Color Make( f32 a_Red, f32 a_Green, f32 a_Blue, f32 a_Alpha = 1.f )
-        {
-            if constexpr ( std::is_same_v<Color, Colorf> )
-            {
-				return Color{ a_Red, a_Green, a_Blue, a_Alpha };
-            }
-            else if constexpr ( std::is_same_v<Color, Coloru8> )
-            {
-                return Color{
-                    static_cast<u8>( a_Red * 255.f ),
-                    static_cast<u8>( a_Green * 255.f ),
-                    static_cast<u8>( a_Blue * 255.f ),
-                    static_cast<u8>( a_Alpha * 255.f )
-                };
-            }
-            else
-            {
-                static_assert( AlwaysFalse<void>, "Unsupported color type" );
-            }
-        } 
-
         // - Common Colors
 
-        static constexpr Color Red         = Make( 1.f, 0.f, 0.f );          // #FF0000
-        static constexpr Color Yellow      = Make( 1.f, 1.f, 0.f );          // #FFFF00
-        static constexpr Color Green       = Make( 0.f, 1.f, 0.f );          // #00FF00
-        static constexpr Color Cyan        = Make( 0.f, 1.f, 1.f );          // #00FFFF
-        static constexpr Color Blue        = Make( 0.f, 0.f, 1.f );          // #0000FF
-        static constexpr Color Magenta     = Make( 1.f, 0.f, 1.f );          // #FF00FF
-        static constexpr Color White       = Make( 1.f, 1.f, 1.f );          // #FFFFFF
-        static constexpr Color Gray        = Make( 0.5f, 0.5f, 0.5f );       // #808080
-        static constexpr Color Black       = Make( 0.f, 0.f, 0.f );          // #000000
-        static constexpr Color Transparent = Make( 0.f, 0.f, 0.f, 0.f );     // #00000000
+        static constexpr Color Red         = FromColorF32( 1.f, 0.f, 0.f );          // #FF0000
+        static constexpr Color Yellow      = FromColorF32( 1.f, 1.f, 0.f );          // #FFFF00
+        static constexpr Color Green       = FromColorF32( 0.f, 1.f, 0.f );          // #00FF00
+        static constexpr Color Cyan        = FromColorF32( 0.f, 1.f, 1.f );          // #00FFFF
+        static constexpr Color Blue        = FromColorF32( 0.f, 0.f, 1.f );          // #0000FF
+        static constexpr Color Magenta     = FromColorF32( 1.f, 0.f, 1.f );          // #FF00FF
+        static constexpr Color White       = FromColorF32( 1.f, 1.f, 1.f );          // #FFFFFF
+        static constexpr Color Gray        = FromColorF32( 0.5f, 0.5f, 0.5f );       // #808080
+        static constexpr Color Black       = FromColorF32( 0.f, 0.f, 0.f );          // #000000
+        static constexpr Color Transparent = FromColorF32( 0.f, 0.f, 0.f, 0.f );     // #00000000
 
         // - Light Colors
 
-        static constexpr Color LightRed     = Make( 1.f, 0.5f, 0.5f );    // #FF8080
-        static constexpr Color LightYellow  = Make( 1.f, 1.f, 0.5f );     // #FFFF80
-        static constexpr Color LightGreen   = Make( 0.5f, 1.f, 0.5f );    // #80FF80
-        static constexpr Color LightCyan    = Make( 0.5f, 1.f, 1.f );     // #80FFFF
-        static constexpr Color LightBlue    = Make( 0.5f, 0.5f, 1.f );    // #8080FF
-        static constexpr Color LightMagenta = Make( 1.f, 0.5f, 1.f );     // #FF80FF
-        static constexpr Color LightGray    = Make( 0.75f, 0.75f, 0.75f );// #BFBFBF
+        static constexpr Color LightRed     = FromColorF32( 1.f, 0.5f, 0.5f );    // #FF8080
+        static constexpr Color LightYellow  = FromColorF32( 1.f, 1.f, 0.5f );     // #FFFF80
+        static constexpr Color LightGreen   = FromColorF32( 0.5f, 1.f, 0.5f );    // #80FF80
+        static constexpr Color LightCyan    = FromColorF32( 0.5f, 1.f, 1.f );     // #80FFFF
+        static constexpr Color LightBlue    = FromColorF32( 0.5f, 0.5f, 1.f );    // #8080FF
+        static constexpr Color LightMagenta = FromColorF32( 1.f, 0.5f, 1.f );     // #FF80FF
+        static constexpr Color LightGray    = FromColorF32( 0.75f, 0.75f, 0.75f );// #BFBFBF
 
         // - Dark Colors
 
-        static constexpr Color DarkRed     = Make( 0.5f, 0.f, 0.f );      // #800000
-        static constexpr Color DarkYellow  = Make( 0.5f, 0.5f, 0.f );     // #808000
-        static constexpr Color DarkGreen   = Make( 0.f, 0.5f, 0.f );      // #008000
-        static constexpr Color DarkCyan    = Make( 0.f, 0.5f, 0.5f );     // #008080
-        static constexpr Color DarkBlue    = Make( 0.f, 0.f, 0.5f );      // #000080
-        static constexpr Color DarkMagenta = Make( 0.5f, 0.f, 0.5f );     // #800080
-        static constexpr Color DarkGray    = Make( 0.25f, 0.25f, 0.25f ); // #404040
+        static constexpr Color DarkRed     = FromColorF32( 0.5f, 0.f, 0.f );      // #800000
+        static constexpr Color DarkYellow  = FromColorF32( 0.5f, 0.5f, 0.f );     // #808000
+        static constexpr Color DarkGreen   = FromColorF32( 0.f, 0.5f, 0.f );      // #008000
+        static constexpr Color DarkCyan    = FromColorF32( 0.f, 0.5f, 0.5f );     // #008080
+        static constexpr Color DarkBlue    = FromColorF32( 0.f, 0.f, 0.5f );      // #000080
+        static constexpr Color DarkMagenta = FromColorF32( 0.5f, 0.f, 0.5f );     // #800080
+        static constexpr Color DarkGray    = FromColorF32( 0.25f, 0.25f, 0.25f ); // #404040
 
         // - Pretty Colors
 
-        static constexpr Color Orange    = Make( 1.f, 0.65f, 0.f );     // #FFA500
-        static constexpr Color Pink      = Make( 1.f, 0.75f, 0.8f );    // #FFC0CB
-        static constexpr Color Purple    = Make( 0.5f, 0.f, 0.5f );     // #800080
-        static constexpr Color Teal      = Make( 0.f, 0.5f, 0.5f );     // #008080
-        static constexpr Color Lime      = Make( 0.75f, 1.f, 0.f );     // #32CD32
-        static constexpr Color Indigo    = Make( 0.29f, 0.f, 0.51f );   // #4B0082
-        static constexpr Color Violet    = Make( 0.93f, 0.51f, 0.93f ); // #DDA0DD
-        static constexpr Color Brown     = Make( 0.65f, 0.16f, 0.16f ); // #A52A2A
-        static constexpr Color Maroon    = Make( 0.5f, 0.f, 0.f );      // #800000
-        static constexpr Color Olive     = Make( 0.5f, 0.5f, 0.f );     // #808000
-        static constexpr Color Navy      = Make( 0.f, 0.f, 0.5f );      // #000080
-        static constexpr Color Silver    = Make( 0.75f, 0.75f, 0.75f ); // #C0C0C0
-        static constexpr Color Gold      = Make( 1.f, 0.84f, 0.f );     // #FFD700
-        static constexpr Color Salmon    = Make( 0.98f, 0.5f, 0.45f );  // #FA8072
-        static constexpr Color Coral     = Make( 1.f, 0.5f, 0.31f );    // #FF7F50
-        static constexpr Color Turquoise = Make( 0.25f, 0.88f, 0.82f ); // #40E0D0
-        static constexpr Color PowderBlue= Make( 0.69f, 0.88f, 0.9f );  // #B0E0E6
-        static constexpr Color LightPink = Make( 1.f, 0.71f, 0.76f );   // #FADADD
+        static constexpr Color Orange    = FromColorF32( 1.f, 0.65f, 0.f );     // #FFA500
+        static constexpr Color Pink      = FromColorF32( 1.f, 0.75f, 0.8f );    // #FFC0CB
+        static constexpr Color Purple    = FromColorF32( 0.5f, 0.f, 0.5f );     // #800080
+        static constexpr Color Teal      = FromColorF32( 0.f, 0.5f, 0.5f );     // #008080
+        static constexpr Color Lime      = FromColorF32( 0.75f, 1.f, 0.f );     // #32CD32
+        static constexpr Color Indigo    = FromColorF32( 0.29f, 0.f, 0.51f );   // #4B0082
+        static constexpr Color Violet    = FromColorF32( 0.93f, 0.51f, 0.93f ); // #DDA0DD
+        static constexpr Color Brown     = FromColorF32( 0.65f, 0.16f, 0.16f ); // #A52A2A
+        static constexpr Color Maroon    = FromColorF32( 0.5f, 0.f, 0.f );      // #800000
+        static constexpr Color Olive     = FromColorF32( 0.5f, 0.5f, 0.f );     // #808000
+        static constexpr Color Navy      = FromColorF32( 0.f, 0.f, 0.5f );      // #000080
+        static constexpr Color Silver    = FromColorF32( 0.75f, 0.75f, 0.75f ); // #C0C0C0
+        static constexpr Color Gold      = FromColorF32( 1.f, 0.84f, 0.f );     // #FFD700
+        static constexpr Color Salmon    = FromColorF32( 0.98f, 0.5f, 0.45f );  // #FA8072
+        static constexpr Color Coral     = FromColorF32( 1.f, 0.5f, 0.31f );    // #FF7F50
+        static constexpr Color Turquoise = FromColorF32( 0.25f, 0.88f, 0.82f ); // #40E0D0
+        static constexpr Color PowderBlue= FromColorF32( 0.69f, 0.88f, 0.9f );  // #B0E0E6
+        static constexpr Color LightPink = FromColorF32( 1.f, 0.71f, 0.76f );   // #FADADD
 
         // - UI Surface Colors (dark theme base)
-        static constexpr Color Surface900   = Make( 0.067f, 0.067f, 0.078f ); // #111113 - deepest bg
-        static constexpr Color Surface800   = Make( 0.110f, 0.110f, 0.133f ); // #1C1C22 - panel bg
-        static constexpr Color Surface700   = Make( 0.157f, 0.157f, 0.188f ); // #282830 - card bg
-        static constexpr Color Surface600   = Make( 0.208f, 0.208f, 0.247f ); // #35353F - elevated card
-        static constexpr Color Surface500   = Make( 0.275f, 0.275f, 0.322f ); // #464652 - border/divider
+        static constexpr Color Surface900   = FromColorF32( 0.067f, 0.067f, 0.078f ); // #111113 - deepest bg
+        static constexpr Color Surface800   = FromColorF32( 0.110f, 0.110f, 0.133f ); // #1C1C22 - panel bg
+        static constexpr Color Surface700   = FromColorF32( 0.157f, 0.157f, 0.188f ); // #282830 - card bg
+        static constexpr Color Surface600   = FromColorF32( 0.208f, 0.208f, 0.247f ); // #35353F - elevated card
+        static constexpr Color Surface500   = FromColorF32( 0.275f, 0.275f, 0.322f ); // #464652 - border/divider
 
         // - UI Accent Colors
-        static constexpr Color AccentBlue       = Make( 0.239f, 0.510f, 1.000f ); // #3D82FF - primary action
-        static constexpr Color AccentBlueDim    = Make( 0.149f, 0.337f, 0.714f ); // #2656B6 - hover state
-        static constexpr Color AccentPurple     = Make( 0.498f, 0.357f, 1.000f ); // #7F5BFF - secondary accent
-        static constexpr Color AccentViolet     = Make( 0.686f, 0.404f, 1.000f ); // #AF67FF - highlight
-        static constexpr Color AccentEmerald    = Make( 0.098f, 0.780f, 0.522f ); // #19C785 - success
-        static constexpr Color AccentAmber      = Make( 1.000f, 0.718f, 0.137f ); // #FFB723 - warning
-        static constexpr Color AccentRose       = Make( 1.000f, 0.294f, 0.404f ); // #FF4B67 - error/danger
-        static constexpr Color AccentSky        = Make( 0.220f, 0.780f, 1.000f ); // #38C7FF - info
+        static constexpr Color AccentBlue       = FromColorF32( 0.239f, 0.510f, 1.000f ); // #3D82FF - primary action
+        static constexpr Color AccentBlueDim    = FromColorF32( 0.149f, 0.337f, 0.714f ); // #2656B6 - hover state
+        static constexpr Color AccentPurple     = FromColorF32( 0.498f, 0.357f, 1.000f ); // #7F5BFF - secondary accent
+        static constexpr Color AccentViolet     = FromColorF32( 0.686f, 0.404f, 1.000f ); // #AF67FF - highlight
+        static constexpr Color AccentEmerald    = FromColorF32( 0.098f, 0.780f, 0.522f ); // #19C785 - success
+        static constexpr Color AccentAmber      = FromColorF32( 1.000f, 0.718f, 0.137f ); // #FFB723 - warning
+        static constexpr Color AccentRose       = FromColorF32( 1.000f, 0.294f, 0.404f ); // #FF4B67 - error/danger
+        static constexpr Color AccentSky        = FromColorF32( 0.220f, 0.780f, 1.000f ); // #38C7FF - info
 
         // - UI Text Colors
-        static constexpr Color TextPrimary      = Make( 0.929f, 0.929f, 0.961f ); // #EDECF5 - primary text
-        static constexpr Color TextSecondary    = Make( 0.588f, 0.588f, 0.647f ); // #9696A5 - muted text
-        static constexpr Color TextDisabled     = Make( 0.357f, 0.357f, 0.400f ); // #5B5B66 - disabled text
+        static constexpr Color TextPrimary      = FromColorF32( 0.929f, 0.929f, 0.961f ); // #EDECF5 - primary text
+        static constexpr Color TextSecondary    = FromColorF32( 0.588f, 0.588f, 0.647f ); // #9696A5 - muted text
+        static constexpr Color TextDisabled     = FromColorF32( 0.357f, 0.357f, 0.400f ); // #5B5B66 - disabled text
     };
-
-    using Colorsf = Colors<Colorf>;
-    using Colorsu8 = Colors<Coloru8>;
 
 } // namespace RatUI

@@ -21,7 +21,7 @@ class SandboxApp : public SDL2Application
 {
 public:
     SandboxApp()
-        : SDL2Application( { "RatUI Sandbox", Colorsf::Surface900, 1280, 720 } )
+        : SDL2Application( { "RatUI Sandbox", ToColorF32( Colors::Surface900 ), 1280, 720 } )
     {}
 
 protected:

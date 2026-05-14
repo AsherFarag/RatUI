@@ -58,7 +58,7 @@ private:
         TextStyle s;
         s.Layout.Font    = m_Font;
         s.Layout.Size    = sz;
-        s.Render.FillColor   = Colorsu8::TextPrimary;
+        s.Render.FillColor   = Colors::TextPrimary;
         s.Layout.Wrap    = TextWrap::NoWrap();
         s.Layout.Overflow = ETextOverflow::Clip;
         return s;
@@ -67,7 +67,7 @@ private:
     TextStyle SectionHeadingStyle() const
     {
         TextStyle s = MakeStyle( 9_u );
-        s.Render.FillColor      = Colorsu8::TextSecondary;
+        s.Render.FillColor      = Colors::TextSecondary;
         s.Layout.Transform  = ETextTransform::Uppercase;
         return s;
     }
@@ -75,7 +75,7 @@ private:
     TextStyle RowLabelStyle() const
     {
         TextStyle s = MakeStyle( 10_u );
-        s.Render.FillColor = Colorsu8::TextDisabled;
+        s.Render.FillColor = Colors::TextDisabled;
         return s;
     }
 
@@ -103,7 +103,7 @@ private:
     WidgetID BeginCard( WidgetID parent, const char* title )
     {
         WidgetID card = m_Scene.CreateWidget<RectWidget>(
-            parent, Colorsu8::Surface700, "Card",
+            parent, Colors::Surface700, "Card",
             CornerRounding::Uniform( 6_deg )
         );
         {
@@ -118,7 +118,7 @@ private:
         AddText( card, title, SectionHeadingStyle(), ESizingMode::Flex );
 
         WidgetID div = m_Scene.CreateWidget<RectWidget>(
-            card, Colorsu8::Surface500, "Div", CornerRounding::None()
+            card, Colors::Surface500, "Div", CornerRounding::None()
         );
         {
             auto* n = Node( div );
@@ -141,7 +141,7 @@ private:
     ColumnSet3 MakeCols( WidgetID parent )
     {
         WidgetID row = m_Scene.CreateWidget<RectWidget>(
-            parent, Colorsu8::Surface900, "ColRow"
+            parent, Colors::Surface900, "ColRow"
         );
         {
             auto* n = Node( row );
@@ -153,7 +153,7 @@ private:
 
         auto MakeCol = [&]() -> WidgetID
         {
-            WidgetID c = m_Scene.CreateWidget<RectWidget>( row, Colorsu8::Surface900, "Col" );
+            WidgetID c = m_Scene.CreateWidget<RectWidget>( row, Colors::Surface900, "Col" );
             auto* n = Node( c );
             n->Style.LayoutType = ELayoutType::Vertical;
             n->Style.Spacing    = 12_u;
@@ -176,7 +176,7 @@ private:
         Unit        textFixedW = 0_u )
     {
         WidgetID row = m_Scene.CreateWidget<RectWidget>(
-            card, Colorsu8::Surface800, "Row"
+            card, Colors::Surface800, "Row"
         );
         {
             auto* n = Node( row );
@@ -225,17 +225,17 @@ private:
     {
         WidgetID card = BeginCard( parent, "Text Colours" );
 
-        constexpr struct { Coloru8 col; const char* label; } kCols[] = {
-            { Colorsu8::TextPrimary,   "Primary"   },
-            { Colorsu8::TextSecondary, "Secondary" },
-            { Colorsu8::TextDisabled,  "Disabled"  },
-            { Colorsu8::AccentBlue,    "Blue"      },
-            { Colorsu8::AccentEmerald, "Emerald"   },
-            { Colorsu8::AccentRose,    "Rose"      },
-            { Colorsu8::AccentAmber,   "Amber"     },
-            { Colorsu8::AccentViolet,  "Violet"    },
-            { Colorsu8::AccentSky,     "Sky"       },
-            { Colorsu8::AccentPurple,  "Purple"    },
+        constexpr struct { Color col; const char* label; } kCols[] = {
+            { Colors::TextPrimary,   "Primary"   },
+            { Colors::TextSecondary, "Secondary" },
+            { Colors::TextDisabled,  "Disabled"  },
+            { Colors::AccentBlue,    "Blue"      },
+            { Colors::AccentEmerald, "Emerald"   },
+            { Colors::AccentRose,    "Rose"      },
+            { Colors::AccentAmber,   "Amber"     },
+            { Colors::AccentViolet,  "Violet"    },
+            { Colors::AccentSky,     "Sky"       },
+            { Colors::AccentPurple,  "Purple"    },
         };
         for ( auto& e : kCols )
         {
@@ -272,7 +272,7 @@ private:
             { ETextBaseline::Hanging,    "Hanging"    },
         };
 
-        WidgetID row = m_Scene.CreateWidget<RectWidget>( card, Colorsu8::Surface800, "BaselineRow" );
+        WidgetID row = m_Scene.CreateWidget<RectWidget>( card, Colors::Surface800, "BaselineRow" );
         {
             auto* n = Node( row );
             n->Style.LayoutType = ELayoutType::Horizontal;
@@ -292,7 +292,7 @@ private:
         }
 
         WidgetID box = m_Scene.CreateWidget<RectWidget>(
-            row, Colorsu8::Transparent, "BaselineBox", CornerRounding::Uniform( 4_deg )
+            row, Colors::Transparent, "BaselineBox", CornerRounding::Uniform( 4_deg )
         );
         {
             auto* n = Node( box );
@@ -305,7 +305,7 @@ private:
         }
 
         TextStyle ts = MakeStyle( 14_u );
-        ts.Render.FillColor    = Colorsu8::AccentSky;
+        ts.Render.FillColor    = Colors::AccentSky;
         ts.Render.FadePercentage = 0.0f;
         ts.Layout.Wrap     = TextWrap::NoWrap();
         ts.Layout.Overflow = ETextOverflow::Clip;
@@ -482,7 +482,7 @@ private:
         // Violet underline + WrapWord
         {
             TextStyle ts             = MakeStyle( 14_u );
-            ts.Render.FillColor       = Colorsu8::AccentViolet;
+            ts.Render.FillColor       = Colors::AccentViolet;
             ts.Render.Underline      = true;
             ts.Render.FadePercentage = 0.5f; // 50% faded underline
             ts.Layout.Wrap           = TextWrap::NoWrap();
@@ -492,7 +492,7 @@ private:
         // Rose strikethrough + uppercase + WrapWord
         {
             TextStyle ts             = MakeStyle( 14_u );
-            ts.Render.FillColor       = Colorsu8::AccentRose;
+            ts.Render.FillColor       = Colors::AccentRose;
             ts.Render.Strikethrough  = true;
             ts.Layout.Transform      = ETextTransform::Uppercase;
             ts.Layout.Wrap           = TextWrap::NoWrap();
@@ -503,7 +503,7 @@ private:
         // Amber wide spacing + capitalize + ellipsis
         {
             TextStyle ts            = MakeStyle( 13_u );
-            ts.Render.FillColor      = Colorsu8::AccentAmber;
+            ts.Render.FillColor      = Colors::AccentAmber;
             ts.Layout.LetterSpacing = 3_u;
             ts.Layout.Transform     = ETextTransform::Capitalize;
             ts.Layout.Wrap          = TextWrap::NoWrap();
@@ -513,7 +513,7 @@ private:
         // Sky center-aligned large display
         {
             TextStyle ts         = MakeStyle( 22_u );
-            ts.Render.FillColor   = Colorsu8::AccentSky;
+            ts.Render.FillColor   = Colors::AccentSky;
             ts.Render.Align      = ETextAlign::Center;
             ts.Layout.Wrap       = TextWrap::WrapWord();
             ts.Layout.LineHeight = 30_u;
@@ -529,7 +529,7 @@ private:
         );
 
         // Row container
-        WidgetID row = m_Scene.CreateWidget<RectWidget>( card, Colorsu8::Surface800, "ARow" );
+        WidgetID row = m_Scene.CreateWidget<RectWidget>( card, Colors::Surface800, "ARow" );
         {
             auto* n = Node( row );
             n->Style.LayoutType = ELayoutType::Horizontal;
@@ -553,7 +553,7 @@ private:
         {
             // We wrap the animated container in a flex parent because percent widths are based on the parent's content width, not the available width.
 
-            WidgetID container = m_Scene.CreateWidget<RectWidget>( row, Colorsu8::Transparent, "ARow" );
+            WidgetID container = m_Scene.CreateWidget<RectWidget>( row, Colors::Transparent, "ARow" );
             {
                 auto* n = Node( container );
                 n->Style.WidthMode  = ESizingMode::Flex;
@@ -561,7 +561,7 @@ private:
             }
 
             m_AnimContainer = m_Scene.CreateWidget<RectWidget>(
-                container, Colorsu8::Surface600, "AnimBox",
+                container, Colors::Surface600, "AnimBox",
                 CornerRounding::Uniform( 6_deg )
             );
             {
@@ -576,7 +576,7 @@ private:
         
 
         TextStyle ts       = MakeStyle( 13_u );
-        ts.Render.FillColor    = Colorsu8::AccentBlue;
+        ts.Render.FillColor    = Colors::AccentBlue;
         ts.Layout.Wrap     = TextWrap::NoWrap();
         ts.Layout.Overflow = ETextOverflow::Ellipsis;
 
@@ -595,7 +595,7 @@ private:
         }
         
         {
-            ts.Render.FillColor    = Colorsu8::AccentEmerald;
+            ts.Render.FillColor    = Colors::AccentEmerald;
             WidgetID txt = m_Scene.CreateWidget<TextWidget>(
             m_AnimContainer,
             "Amazingly few discotheques provide jukeboxes.",
@@ -618,7 +618,7 @@ public:
     {
         // Root
         WidgetID root = m_Scene.CreateRootWidget<RectWidget>(
-            Colorsu8::Surface900, "Root", CornerRounding::None()
+            Colors::Surface900, "Root", CornerRounding::None()
         );
         {
             auto* n = Node( root );
@@ -632,7 +632,7 @@ public:
         // Title bar
         {
             WidgetID bar = m_Scene.CreateWidget<RectWidget>(
-                root, Colorsu8::Surface800, "TitleBar", CornerRounding::None()
+                root, Colors::Surface800, "TitleBar", CornerRounding::None()
             );
             auto* n = Node( bar );
             n->Style.LayoutType = ELayoutType::Vertical;
@@ -643,12 +643,12 @@ public:
 
             {
                 TextStyle ts = MakeStyle( 22_u );
-                ts.Render.FillColor = Colorsu8::TextPrimary;
+                ts.Render.FillColor = Colors::TextPrimary;
                 AddText( bar, "Text Feature Showcase", ts, ESizingMode::Flex );
             }
             {
                 TextStyle ts = MakeStyle( 11_u );
-                ts.Render.FillColor   = Colorsu8::TextSecondary;
+                ts.Render.FillColor   = Colors::TextSecondary;
                 ts.Layout.Wrap = TextWrap::NoWrap();
                 ts.Layout.Overflow = ETextOverflow::Clip;
                 AddText( bar,
@@ -660,7 +660,7 @@ public:
 
         // Scrollable / content column
         WidgetID content = m_Scene.CreateWidget<RectWidget>(
-            root, Colorsu8::Surface900, "Content"
+            root, Colors::Surface900, "Content"
         );
         {
             auto* n = Node( content );

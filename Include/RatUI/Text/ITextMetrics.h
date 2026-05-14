@@ -41,7 +41,7 @@ namespace RatUI
          */
         virtual bool RasterizeGlyph(
             FontHandle a_Font, codepoint a_Codepoint, u32 a_FontSize,
-            const Coloru8*& o_Pixels, u32& o_Width, u32& o_Height,
+            const Color*& o_Pixels, u32& o_Width, u32& o_Height,
             Vec2<FontUnit>& o_Bearing, FontUnit& o_XAdvance
         ) = 0;
 

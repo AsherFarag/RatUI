@@ -43,7 +43,7 @@ namespace RatUI
     struct Vertex
     {
         Vec2<Pixel> Position;
-        Coloru8     Color;
+        Color       Color;
         Vec2f       UV;
     };
 
@@ -79,28 +79,28 @@ namespace RatUI
 
             // - Fill properties
 
-            Coloru8 FillColor{ Colorsu8::White }; ///< The color used for filling the text glyphs. Default is white.
-            f32     FillSoftness{ 0.5f };         ///< Edge anti-alias softness for the fill, in SDF units [0, 0.5].
-            f32     FillThreshold{ 0.5f };        ///< The threshold for determining the filled area of the text, in SDF units [0, 1], typically 0.5.
+            Color FillColor    { Colors::White }; ///< The color used for filling the text glyphs. Default is white.
+            f32   FillSoftness { 0.5f };          ///< Edge anti-alias softness for the fill, in SDF units [0, 0.5].
+            f32   FillThreshold{ 0.5f };          ///< The threshold for determining the filled area of the text, in SDF units [0, 1], typically 0.5.
 
             // - Outline properties
 
-            Coloru8 OutlineColor{ Colorsu8::Transparent }; ///< The color used for the text outline. Default is white.
-            f32     OutlineWidth{ 0.f };            ///< The width of the text outline, in SDF units [0, 0.5], typically 0.05-0.2.
-            f32     OutlineSoftness{ 0.f };        ///< Edge anti-alias softness for the outline, in SDF units [0, 0.5].
+            Color OutlineColor   { Colors::Transparent }; ///< The color used for the text outline. Default is white.
+            f32   OutlineWidth   { 0.f };                 ///< The width of the text outline, in SDF units [0, 0.5], typically 0.05-0.2.
+            f32   OutlineSoftness{ 0.f };                 ///< Edge anti-alias softness for the outline, in SDF units [0, 0.5].
 
             // - Shadow properties
 
-            Coloru8 ShadowColor   { Colorsu8::Transparent }; ///< The color used for the text shadow. Default is black.
-            Vec2f   ShadowOffsetUV{ 0.f, 0.f }; ///< Precomputed UV offset for drop shadow (atlas UV space).
-            f32     ShadowSoftness{ 0.f };      ///< Edge anti-alias softness for the shadow, in SDF units [0, 0.5], typically 0.1-0.4.
-            f32     ShadowSpread  { 0.f };      ///< The expansion of the shadow's SDF threshold, in SDF units [0, 0.5], typically 0.05-0.2.
+            Color ShadowColor   { Colors::Transparent }; ///< The color used for the text shadow. Default is black.
+            Vec2f ShadowOffsetUV{ 0.f, 0.f }; ///< Precomputed UV offset for drop shadow (atlas UV space).
+            f32   ShadowSoftness{ 0.f };      ///< Edge anti-alias softness for the shadow, in SDF units [0, 0.5], typically 0.1-0.4.
+            f32   ShadowSpread  { 0.f };      ///< The expansion of the shadow's SDF threshold, in SDF units [0, 0.5], typically 0.05-0.2.
 
             // - Glow properties
 
-            Coloru8 GlowColor { Colorsu8::Transparent }; ///< The color used for the text glow. Default is white.
-            f32     GlowSpread{ 0.f };          ///< How far glow extends beyond outline (0.0-0.5).
-            f32     GlowPower { 0.0f };            ///< The falloff curve of the glow. Higher values create a tighter and brighter core, while lower values create a softer glow. Typically in the range of 1.0 to 4.0.
+            Color GlowColor { Colors::Transparent }; ///< The color used for the text glow. Default is white.
+            f32   GlowSpread{ 0.f };                 ///< How far glow extends beyond outline (0.0-0.5).
+            f32   GlowPower { 0.0f };                ///< The falloff curve of the glow. Higher values create a tighter and brighter core, while lower values create a softer glow. Typically in the range of 1.0 to 4.0.
         } MSDF;
 
         // TODO: Add custom draw callbacks.
@@ -160,7 +160,7 @@ namespace RatUI
          * @param a_Rect The rectangle to render, defined by its origin and size.
          * @param a_Color The color to use for the rectangle.
          */
-        void EmitRect( const Rect<Pixel>& a_Rect, Coloru8 a_Color )
+        void EmitRect( const Rect<Pixel>& a_Rect, Color a_Color )
         {
             const u32 vertexOffset = static_cast<u32>( Size( Vertices ) );
 
@@ -182,7 +182,7 @@ namespace RatUI
          * @param a_Color The color to use for the border.
          * @param a_Thickness The thickness of the border in pixels.
          */
-        void EmitRectBorder( const Rect<Pixel>& a_Rect, f32 a_Radius, Coloru8 a_Color, f32 a_Thickness )
+        void EmitRectBorder( const Rect<Pixel>& a_Rect, f32 a_Radius, Color a_Color, f32 a_Thickness )
         {
             if ( a_Thickness <= 0.f )
                 return;
@@ -213,7 +213,7 @@ namespace RatUI
          * @param a_Rounding The rounding values for each corner of the rectangle.
          * @param a_Color The color to use for the rectangle.
          */
-        void EmitRoundedRect( const Rect<Pixel>& a_Rect, CornerRounding a_Rounding, Coloru8 a_Color )
+        void EmitRoundedRect( const Rect<Pixel>& a_Rect, CornerRounding a_Rounding, Color a_Color )
         {
             // TODO: Add UV's
 
@@ -342,7 +342,7 @@ namespace RatUI
          * @param a_Color The color to use for the border.
          * @param a_Thickness The thickness of the border in pixels.
          */
-        void EmitRoundedRectBorder( const Rect<Pixel>& a_Rect, CornerRounding a_Rounding, Coloru8 a_Color, f32 a_Thickness )
+        void EmitRoundedRectBorder( const Rect<Pixel>& a_Rect, CornerRounding a_Rounding, Color a_Color, f32 a_Thickness )
         {
             // TODO
         }
@@ -354,7 +354,7 @@ namespace RatUI
          * @param a_Radius The radius of the circle.
          * @param a_Color The color to use for the circle.
          */
-        void EmitCircle( const Vec2<Pixel>& a_Center, f32 a_Radius, Coloru8 a_Color )
+        void EmitCircle( const Vec2<Pixel>& a_Center, f32 a_Radius, Color a_Color )
         {
             constexpr u32 c_Segments   = 32;
             constexpr u32 c_MaxVerts   = 1 + c_Segments;
@@ -401,7 +401,7 @@ namespace RatUI
          * @param a_Color The color to use for the circle border.
          * @param a_Thickness The thickness of the border in pixels.
          */
-        void EmitCircleBorder( const Vec2<Pixel>& a_Center, f32 a_Radius, Coloru8 a_Color, f32 a_Thickness )
+        void EmitCircleBorder( const Vec2<Pixel>& a_Center, f32 a_Radius, Color a_Color, f32 a_Thickness )
         {
             constexpr u32 c_Segments   = 32;
             constexpr u32 c_MaxVerts   = c_Segments * 2;
@@ -572,8 +572,8 @@ namespace RatUI
 
                         // If the glyph is in the fade region, we need to lerp the fade color based on the distance to the fade edge. 
                         // This creates a smooth fade-out effect for glyphs that are partially outside the layout rect.
-                        const Coloru8 colorA = { a_Style.FillColor[0], a_Style.FillColor[1], a_Style.FillColor[2], computeFadeAlpha( gx ) };
-                        const Coloru8 colorB = { a_Style.FillColor[0], a_Style.FillColor[1], a_Style.FillColor[2], computeFadeAlpha( gx + gw ) };
+                        const Color colorA = { a_Style.FillColor[0], a_Style.FillColor[1], a_Style.FillColor[2], computeFadeAlpha( gx ) };
+                        const Color colorB = { a_Style.FillColor[0], a_Style.FillColor[1], a_Style.FillColor[2], computeFadeAlpha( gx + gw ) };
 
                         const u32 vertexOffset = static_cast<u32>( Size( Vertices ) );
                         auto verts = ReserveVertices( 4 );

@@ -79,42 +79,42 @@ namespace RatUI
         // Drawing
         // ========================
 
-        DrawList& AddRect( Coloru8 a_Color, const Rect<Unit>& a_Rect )
+        DrawList& AddRect( Color a_Color, const Rect<Unit>& a_Rect )
         {
             EnsureGeoBatch();
             Batcher.EmitRect( ToPixelRect( a_Rect ), a_Color );
             return *this;
         }
 
-        DrawList& AddRect( Coloru8 a_Color, const Rect<Unit>& a_Rect, CornerRounding a_Rounding )
+        DrawList& AddRect( Color a_Color, const Rect<Unit>& a_Rect, CornerRounding a_Rounding )
         {
             EnsureGeoBatch();
             Batcher.EmitRoundedRect( ToPixelRect( a_Rect ), a_Rounding, a_Color );
             return *this;
         }
 
-        DrawList& AddRectBorder( Coloru8 a_Color, const Rect<Unit>& a_Rect, Unit a_Thickness = 1_u )
+        DrawList& AddRectBorder( Color a_Color, const Rect<Unit>& a_Rect, Unit a_Thickness = 1_u )
         {
             EnsureGeoBatch();
             Batcher.EmitRectBorder( ToPixelRect( a_Rect ), 0.f, a_Color, ToPixel( a_Thickness, m_DPIScale ).ToFloat() );
             return *this;
         }
 
-        DrawList& AddRectBorder( Coloru8 a_Color, const Rect<Unit>& a_Rect, CornerRounding a_Rounding, Unit a_Thickness = 1_u )
+        DrawList& AddRectBorder( Color a_Color, const Rect<Unit>& a_Rect, CornerRounding a_Rounding, Unit a_Thickness = 1_u )
         {
             EnsureGeoBatch();
             Batcher.EmitRoundedRectBorder( ToPixelRect( a_Rect ), a_Rounding, a_Color, ToPixel( a_Thickness, m_DPIScale ).ToFloat() );
             return *this;
         }
 
-        DrawList& AddCircle( Coloru8 a_Color, Vec2<Unit> a_Center, Unit a_Radius )
+        DrawList& AddCircle( Color a_Color, Vec2<Unit> a_Center, Unit a_Radius )
         {
             EnsureGeoBatch();
             Batcher.EmitCircle( ToPixelVec2( a_Center ), ToPixel( a_Radius, m_DPIScale ).ToFloat(), a_Color );
             return *this;
         }
 
-        DrawList& AddCircleBorder( Coloru8 a_Color, Vec2<Unit> a_Center, Unit a_Radius, Unit a_Thickness = 1_u )
+        DrawList& AddCircleBorder( Color a_Color, Vec2<Unit> a_Center, Unit a_Radius, Unit a_Thickness = 1_u )
         {
             EnsureGeoBatch();
             Batcher.EmitCircleBorder( ToPixelVec2( a_Center ), ToPixel( a_Radius, m_DPIScale ).ToFloat(), a_Color, ToPixel( a_Thickness, m_DPIScale ).ToFloat() );

@@ -37,7 +37,7 @@ static EButtonID SDLKeyboardToRatUIButtonID( SDL_Keycode a_Keycode )
 struct SDL2AppConfig
 {
     std::string Title  = "RatUI Application";
-    Colorf      ClearColor{ 0.f, 0.f, 0.f, 1.f };
+    Vec4f       ClearColor{ 0.f, 0.f, 0.f, 1.f };
     int         Width  = 1280;
     int         Height = 720;
 };

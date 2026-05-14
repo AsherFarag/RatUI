@@ -193,7 +193,7 @@ namespace RatUI::FreeType
 
         bool RasterizeGlyph(
             FontHandle a_Font, codepoint a_Codepoint, u32 a_SdfPixelSize,
-            const Coloru8*& o_Pixels, u32& o_Width, u32& o_Height,
+            const Color*& o_Pixels, u32& o_Width, u32& o_Height,
             Vec2<FontUnit>& o_Bearing, FontUnit& o_XAdvance
         ) override
         {
@@ -306,7 +306,7 @@ namespace RatUI::FreeType
                         const size idx = static_cast<size>(y) * w + x;
                         auto px = mtsdf( x, h - 1 - y );
 
-                        RawAt( m_RasterBuffer, idx ) = Coloru8{
+                        RawAt( m_RasterBuffer, idx ) = Color{
                             toU8( px[0] ),
                             toU8( px[1] ),
                             toU8( px[2] ),
@@ -345,7 +345,7 @@ namespace RatUI::FreeType
 
     protected:
         FontCache* m_FontCache{ nullptr };
-        Array<Coloru8> m_RasterBuffer; ///< Persistent buffer for the last rasterized glyph's RGBA8 pixel data.
+        Array<Color> m_RasterBuffer; ///< Persistent buffer for the last rasterized glyph's RGBA8 pixel data.
     };
 
 } // namespace RatUI::FreeType

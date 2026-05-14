@@ -554,9 +554,12 @@ void main()
                     glUniform1f( m_UniformLocs[EUniform::MsdfScale], batch.MSDF.Scale );
 
                     // Fill: keep white so per-vertex tint defines color
-                    glUniform4f( m_UniformLocs[EUniform::MsdfFillColor], 1.f, 1.f, 1.f, 1.f );
-                    glUniform1f( m_UniformLocs[EUniform::MsdfFillSoftness], 0.5f );
-                    glUniform1f( m_UniformLocs[EUniform::MsdfFillThreshold], 0.5f );
+                    glUniform4f( m_UniformLocs[EUniform::MsdfFillColor], batch.MSDF.FillColor[0] / 255.f,
+                                batch.MSDF.FillColor[1] / 255.f,
+                                batch.MSDF.FillColor[2] / 255.f,
+                                batch.MSDF.FillColor[3] / 255.f );
+                    glUniform1f( m_UniformLocs[EUniform::MsdfFillSoftness], batch.MSDF.FillSoftness );
+                    glUniform1f( m_UniformLocs[EUniform::MsdfFillThreshold], batch.MSDF.FillThreshold );
 
                     // Provide atlas texture size (needed by blur/tap calculations)
                     if ( glTex != 0 && m_UniformLocs[EUniform::MsdfTextureSize] != -1 )

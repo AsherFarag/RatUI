@@ -29,14 +29,14 @@ protected:
 class RectWidget : public IWidget
 {
 public:
-	RectWidget( Coloru8 a_Color, StringView a_Name, CornerRounding a_Rounding = CornerRounding::Uniform( 10_deg ) )
+	RectWidget( Color a_Color, StringView a_Name, CornerRounding a_Rounding = CornerRounding::Uniform( 10_deg ) )
 		: Color( a_Color )
 		, Name( a_Name )
         , Rounding( a_Rounding )
     {}
 
 	StringView     Name;
-    Coloru8         Color;
+    Color          Color;
     CornerRounding Rounding;
 
 	void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
@@ -48,7 +48,7 @@ public:
         const Rect<Unit>& rect = node->Layout.FinalRect;
 
 		if ( a_Scene.GetFocusedWidget() == GetID() )
-			a_DrawList.AddRect( Colorsu8::White, rect.Expanded( 4_u ), Rounding + 4_deg );
+			a_DrawList.AddRect( Colors::White, rect.Expanded( 4_u ), Rounding + 4_deg );
 
 		a_DrawList.AddRect( Color, rect, Rounding );
 
@@ -70,13 +70,13 @@ class CircleWidget : public IWidget
 {
 public:
 
-    Unit    Radius;
-    Coloru8 Color;
-    bool    IsFilled;
+    Unit  Radius;
+    Color FillColor;
+    bool  IsFilled;
 
-    CircleWidget( Unit a_Radius, Coloru8 a_Color, bool a_Filled = true )
+    CircleWidget( Unit a_Radius, Color a_Color, bool a_Filled = true )
         : Radius( a_Radius )
-        , Color( a_Color )
+        , FillColor( a_Color )
         , IsFilled( a_Filled )
     {}
 
@@ -92,17 +92,17 @@ public:
         if ( IsFilled )
         {
             if ( a_Scene.GetFocusedWidget() == GetID() )
-			    a_DrawList.AddCircle( Colorsu8::LightYellow, center, Radius + 4_u );
+			    a_DrawList.AddCircle( Colors::LightYellow, center, Radius + 4_u );
 
-            a_DrawList.AddCircle( Color, center, Radius );
+            a_DrawList.AddCircle( FillColor, center, Radius );
         }
         else
         {
             const Unit borderThickness = 4_u;
             if ( a_Scene.GetFocusedWidget() == GetID() )
-                a_DrawList.AddCircleBorder( Colorsu8::LightYellow, center, Radius + 4_u, borderThickness + 2_u );
+                a_DrawList.AddCircleBorder( Colors::LightYellow, center, Radius + 4_u, borderThickness + 2_u );
 
-            a_DrawList.AddCircleBorder( Color, center, Radius, borderThickness );
+            a_DrawList.AddCircleBorder( FillColor, center, Radius, borderThickness );
         }
     }
 

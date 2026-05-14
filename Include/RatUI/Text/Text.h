@@ -184,28 +184,28 @@ namespace RatUI
 
 		// - Fill properties
 
-		Coloru8 FillColor{ Colorsu8::White }; ///< The color used for filling the text glyphs. Default is white.
-		f32     FillSoftness{ 0.5f };         ///< Edge anti-alias softness for the fill, in SDF units [0, 0.5].
-		f32     FillThreshold{ 0.5f };        ///< The threshold for determining the filled area of the text, in SDF units [0, 1], typically 0.5.
+		Color FillColor     { Colors::White }; ///< The color used for filling the text glyphs. Default is white.
+		f32   FillSoftness  { 0.5f };          ///< Edge anti-alias softness for the fill, in SDF units [0, 0.5].
+		f32   FillThreshold { 0.5f };          ///< The threshold for determining the filled area of the text, in SDF units [0, 1], typically 0.5.
 
 		// - Outline properties
 
-		Coloru8 OutlineColor{ Colorsu8::White }; ///< The color used for the text outline. Default is white.
-		f32     OutlineWidth{ 0.1f };            ///< The width of the text outline, in SDF units [0, 0.5], typically 0.05-0.2.
-		f32     OutlineSoftness{ 0.05f };        ///< Edge anti-alias softness for the outline, in SDF units [0, 0.5].
+		Color OutlineColor    { Colors::White }; ///< The color used for the text outline. Default is white.
+		f32   OutlineWidth    { 0.1f };          ///< The width of the text outline, in SDF units [0, 0.5], typically 0.05-0.2.
+		f32   OutlineSoftness { 0.05f };         ///< Edge anti-alias softness for the outline, in SDF units [0, 0.5].
 
 		// - Shadow properties
 
-		Coloru8 ShadowColor{ Colorsu8::Black };  ///< The color used for the text shadow. Default is black.
-        Vec2f   ShadowOffset{ 2.f, 2.f };       ///<
-		f32     ShadowSoftness{ 0.1f };          ///< Edge anti-alias softness for the shadow, in SDF units [0, 0.5], typically 0.1-0.4.
-		f32     ShadowSpread{ 0.05f };           ///< The expansion of the shadow's SDF threshold, in SDF units [0, 0.5], typically 0.05-0.2.
+		Color ShadowColor    { Colors::Black }; ///< The color used for the text shadow. Default is black.
+        Vec2f ShadowOffset   { 2.f, 2.f };      ///<
+		f32   ShadowSoftness { 0.1f };          ///< Edge anti-alias softness for the shadow, in SDF units [0, 0.5], typically 0.1-0.4.
+		f32   ShadowSpread   { 0.05f };         ///< The expansion of the shadow's SDF threshold, in SDF units [0, 0.5], typically 0.05-0.2.
 
 		// - Glow properties
 
-		Coloru8 GlowColor{ Colorsu8::White }; ///< The color used for the text glow. Default is white.
-		f32     GlowSpread{ 0.05f };          ///< How far glow extends beyond outline (0.0-0.5).
-		f32     GlowPower{ 2.0f };            ///< The falloff curve of the glow. Higher values create a tighter and brighter core, while lower values create a softer glow. Typically in the range of 1.0 to 4.0.
+		Color GlowColor  { Colors::White }; ///< The color used for the text glow. Default is white.
+		f32   GlowSpread { 0.05f };         ///< How far glow extends beyond outline (0.0-0.5).
+		f32   GlowPower  { 2.0f };          ///< The falloff curve of the glow. Higher values create a tighter and brighter core, while lower values create a softer glow. Typically in the range of 1.0 to 4.0.
 
 		constexpr bool operator==( const TextRenderStyle& ) const = default;
     };
