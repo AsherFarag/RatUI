@@ -41,7 +41,7 @@ namespace RatUI
 
         /**
          * @brief Replaces the render style.
-         * Does NOT invalidate layout caches – render style only affects drawing.
+         * Does NOT invalidate layout caches - render style only affects drawing.
          */
         void SetRenderStyle( const TextRenderStyle& a_RenderStyle )
         {
@@ -75,7 +75,7 @@ namespace RatUI
             }
             else if ( m_LayoutStyle != m_LastLayoutStyle )
             {
-                // Layout style changed since last prepare – full redo.
+                // Layout style changed since last prepare - full redo.
                 m_PreparedText = metrics->Prepare( m_Text, m_LayoutStyle );
                 if ( !m_PreparedText )
                     return;
@@ -98,10 +98,10 @@ namespace RatUI
             else if ( a_Node.Style.WidthMode == ESizingMode::Flex )
             {
                 // Two-pass approach:
-                //   Pass 1: FinalRect is zero – shape at available width as a best-effort
+                //   Pass 1: FinalRect is zero - shape at available width as a best-effort
                 //           measure.  The resulting intrinsic size triggers a second layout
                 //           pass in Scene::UpdateLayout.
-                //   Pass 2: FinalRect is populated from the first arrange – shape at the
+                //   Pass 2: FinalRect is populated from the first arrange - shape at the
                 //           real allocated width.
                 if ( a_Node.Layout.FinalRect.Size[0] > 0_u )
                     maxWidth = a_Node.Layout.FinalRect.Size[0] - a_Node.Style.Padding.Horizontal();

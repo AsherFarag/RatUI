@@ -7,7 +7,7 @@
  *        the CSS Text Module Level 3.
  *
  * Unicode version coverage note: CJK block detection covers through
- * Extension H (Unicode 15.1, U+31350–U+323AF). If targeting a later Unicode
+ * Extension H (Unicode 15.1, U+31350-U+323AF). If targeting a later Unicode
  * version, audit IsCJK() for newly assigned Extension blocks.
  *
  * UTF-8 error handling: ill-formed byte sequences emit one U+FFFD replacement
@@ -18,7 +18,7 @@
 namespace RatUI::Unicode
 {
     /** 
-     * @brief Returns true if @p a_CP is an ASCII codepoint (U+0000–U+007F).
+     * @brief Returns true if @p a_CP is an ASCII codepoint (U+0000-U+007F).
      */
     constexpr inline bool IsASCII( codepoint a_CP )
     {
@@ -37,7 +37,7 @@ namespace RatUI::Unicode
      * @brief Returns true if @p a_CP is any Unicode whitespace codepoint, 
      * including ASCII whitespace and the additional non-ASCII whitespace characters defined in Unicode.
      * This includes U+0085 NEXT LINE, U+00A0 NO-BREAK SPACE, U+1680 OGHAM SPACE MARK,
-     *               U+2000–U+200A EN QUAD through HAIR SPACE, U+2028 LINE SEPARATOR,
+     *               U+2000-U+200A EN QUAD through HAIR SPACE, U+2028 LINE SEPARATOR,
      *               U+2029 PARAGRAPH SEPARATOR, and U+202F NARROW NO-BREAK SPACE.
      */
     constexpr inline bool IsWhitespace( codepoint a_CP )
@@ -52,7 +52,7 @@ namespace RatUI::Unicode
      * @brief Returns true if @p a_CP is a CJK (or CJK-adjacent) codepoint that
      *        allows a line-break opportunity between consecutive characters.
      *
-     * Covers Unified Ideographs, Extensions A–H (Unicode 15.1),
+     * Covers Unified Ideographs, Extensions A-H (Unicode 15.1),
      * Compatibility Ideographs, CJK Symbols & Punctuation, Hiragana,
      * Katakana, Hangul Syllables, and the Halfwidth/Fullwidth Forms block.
      *
@@ -487,7 +487,7 @@ namespace RatUI::Unicode
                     {
                         const codepoint cp = static_cast<codepoint>(
                             ( ( b0 & 0x0F ) << 12 ) | ( ( s[1] & 0x3F ) << 6 ) | ( s[2] & 0x3F ) );
-                        // Reject overlong (< 0x800) and surrogates (0xD800–0xDFFF)
+                        // Reject overlong (< 0x800) and surrogates (0xD800-0xDFFF)
                         if ( cp >= 0x800 && !( cp >= 0xD800 && cp <= 0xDFFF ) )
                         {
                             a_CP  = cp;
@@ -542,7 +542,7 @@ namespace RatUI::Unicode
                 return;
             }
 
-            // Unexpected continuation byte or invalid lead byte (0xF8–0xFF):
+            // Unexpected continuation byte or invalid lead byte (0xF8-0xFF):
             // maximal subpart = 1 byte.
             a_CP  = 0xFFFD;
             a_Len = 1;
@@ -586,7 +586,7 @@ namespace RatUI::Unicode
 
     /**
      * @brief Applies the specified ASCII text transformation to @p a_Text.
-     *        Only ASCII codepoints (U+0000–U+007F) are transformed; non-ASCII
+     *        Only ASCII codepoints (U+0000-U+007F) are transformed; non-ASCII
      *        codepoints are left unchanged.
      * @param a_Text      The text to transform (UTF-8 or ASCII).
      * @param a_Transform The text transformation to apply.

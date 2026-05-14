@@ -8,9 +8,9 @@
  * @brief Text layout utilities for wrapping and measuring text, based on https://github.com/chenglou/pretext.
  *
  * The design follows a two-phase model:
- *   1. Prepare()   – one-time, potentially expensive: normalise whitespace, segment the
+ *   1. Prepare()   - one-time, potentially expensive: normalise whitespace, segment the
  *                    text into atomic units, measure each segment.  The result is cached.
- *   2. WalkLines() – the fast hot-path: pure arithmetic over pre-computed widths.  Safe
+ *   2. WalkLines() - the fast hot-path: pure arithmetic over pre-computed widths.  Safe
  *                    to call every frame or on every resize without re-measuring.
  */
 

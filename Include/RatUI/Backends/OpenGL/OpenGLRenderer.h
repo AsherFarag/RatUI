@@ -192,7 +192,7 @@ namespace RatUI::OpenGL
             {
                 float t     = float(i) / float(c_ShadowTaps - 1) - 0.5;
                 vec2  tapUV = a_UV + blurDir * t * blurRadiusUV;
-                float d     = SampleMTSDF(texture(u_Atlas, tapUV));
+                float d     = texture(u_Atlas, tapUV).a;
                 // Use the pxRange from the original UV — derivatives at offset UVs
                 // are invalid inside a loop and would produce incorrect softness.
                 alpha      += W[i] * SDFAlpha(d, a_Threshold, a_Softness, a_PxRange);
@@ -237,16 +237,10 @@ namespace RatUI::OpenGL
 
                 if (bandWidth > 0.0)
                 {
-                    // Hard clip at both edges with minimum half-pixel AA.
-                    float outerClip = SDFAlpha(tsdf, outerEdge, 0.0, pxRange);
-                    float innerClip = SDFAlpha(tsdf, innerEdge, 0.0, pxRange);
-
                     // Remap dist to [0,1] within the band: 0 at outerEdge, 1 at innerEdge.
                     float bandT     = clamp((tsdf - outerEdge) / bandWidth, 0.0, 1.0);
                     float glowAlpha = pow(bandT, u_GlowPower);
-
-                    glowAlpha *= outerClip * (1.0 - innerClip);
-
+                    
                     color = mix(color, u_GlowColor, glowAlpha * u_GlowColor.a);
                 }
             }
