@@ -208,3 +208,83 @@ TEST_CASE( "WalkLines emits separate lines around hard breaks", "[text][layout]"
     REQUIRE( std::get<1>( lines[1] ) == 3 );
     REQUIRE( std::get<2>( lines[1] ) == 1_u );
 }
+
+TEST_CASE( "Prepare NoWrap returns empty result for whitespace-only input", "[text][prepare][edge]" )
+{
+    const PreparedText prepared = TextLayout::Prepare( " \t\n\r\f ", TextWrap::NoWrap(), MeasureByCodepoint );
+
+    REQUIRE( prepared.NormalizedText.empty() );
+    REQUIRE( prepared.HyphenWidth == 0_u );
+    REQUIRE( prepared.Segments.empty() );
+}
+
+TEST_CASE( "Prepare with collapsed newlines does not emit hard-break segments", "[text][prepare][edge]" )
+{
+    TextWrap wrap = TextWrap::WrapWord();
+    wrap.Newline = ENewline::Collapse;
+
+    const PreparedText prepared = TextLayout::Prepare( "a\r\nb", wrap, MeasureByCodepoint );
+
+    REQUIRE( prepared.NormalizedText == "a b" );
+    REQUIRE( Size( prepared.Segments ) == 3 );
+    REQUIRE( prepared.Segments[0].Kind == ESegmentKind::Text );
+    REQUIRE( prepared.Segments[1].Kind == ESegmentKind::Space );
+    REQUIRE( prepared.Segments[2].Kind == ESegmentKind::Text );
+}
+
+TEST_CASE( "WalkLines skips leading space segments at the start of a line", "[text][layout][edge]" )
+{
+    const PreparedText prepared = TextLayout::Prepare( "   a", TextWrap::PreWrap(), MeasureByCodepoint );
+    REQUIRE( Size( prepared.Segments ) == 2 );
+    REQUIRE( prepared.Segments[0].Kind == ESegmentKind::Space );
+    REQUIRE( prepared.Segments[1].Kind == ESegmentKind::Text );
+
+    std::vector<std::tuple<u32, u32, Unit>> lines;
+    const u32 lineCount = TextLayout::WalkLines( prepared, 10_u, 0,
+        [&]( u32 a_Start, u32 a_End, Unit a_PaintWidth )
+        {
+            lines.emplace_back( a_Start, a_End, a_PaintWidth );
+        } );
+
+    REQUIRE( lineCount == 1 );
+    REQUIRE( lines.size() == 1 );
+    REQUIRE( std::get<0>( lines[0] ) == 1 );
+    REQUIRE( std::get<1>( lines[0] ) == 2 );
+    REQUIRE( std::get<2>( lines[0] ) == 1_u );
+}
+
+TEST_CASE( "WalkLines returns zero lines for empty prepared text", "[text][layout][edge]" )
+{
+    const PreparedText prepared = TextLayout::Prepare( "", TextWrap::WrapWord(), MeasureByCodepoint );
+
+    u32 callbackCount = 0;
+    const u32 lineCount = TextLayout::WalkLines( prepared, 5_u, 0,
+        [&]( u32, u32, Unit )
+        {
+            ++callbackCount;
+        } );
+
+    REQUIRE( lineCount == 0 );
+    REQUIRE( callbackCount == 0 );
+}
+
+TEST_CASE( "WalkLines with zero width emits one wrap-char segment per line", "[text][layout][edge]" )
+{
+    const PreparedText prepared = TextLayout::Prepare( "ab", TextWrap::WrapChar(), MeasureByCodepoint );
+
+    std::vector<std::tuple<u32, u32, Unit>> lines;
+    const u32 lineCount = TextLayout::WalkLines( prepared, 0_u, 0,
+        [&]( u32 a_Start, u32 a_End, Unit a_PaintWidth )
+        {
+            lines.emplace_back( a_Start, a_End, a_PaintWidth );
+        } );
+
+    REQUIRE( lineCount == 2 );
+    REQUIRE( lines.size() == 2 );
+    REQUIRE( std::get<0>( lines[0] ) == 0 );
+    REQUIRE( std::get<1>( lines[0] ) == 1 );
+    REQUIRE( std::get<2>( lines[0] ) == 1_u );
+    REQUIRE( std::get<0>( lines[1] ) == 1 );
+    REQUIRE( std::get<1>( lines[1] ) == 2 );
+    REQUIRE( std::get<2>( lines[1] ) == 1_u );
+}
