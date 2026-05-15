@@ -237,11 +237,11 @@ namespace std
 	using RatUI::UnitBase;
 
     template<typename _Tag>
-    class std::numeric_limits<UnitBase<_Tag>>
+    class numeric_limits<UnitBase<_Tag>>
     {
     public:
         using UnitType = UnitBase<_Tag>;
-        using Limit    = std::numeric_limits<typename UnitType::ValueType>;
+        using Limit    = numeric_limits<typename UnitType::ValueType>;
 
 		RATUI_NODISCARD static constexpr UnitType min() noexcept { return UnitType{ Limit::min() }; }
                                                   
