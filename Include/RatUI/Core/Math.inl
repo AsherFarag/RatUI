@@ -286,23 +286,23 @@ namespace RatUI
             return a_Start + ( a_End - a_Start ) * a_T;
         }
 
-		template<typename Scalar, size Dim>
+		template<typename Scalar, auto Dim>
         constexpr Scalar Dot( const Vec<Scalar, Dim>& a_Left, const Vec<Scalar, Dim>& a_Right )
         {
             Scalar result = static_cast<Scalar>( 0 );
-            for ( size i = 0; i < Dim; ++i )
+            for ( auto i = 0; i < Dim; ++i )
                 result += a_Left[ i ] * a_Right[ i ];
             return result;
 		}
 
-		template<typename Scalar, size Dim>
+		template<typename Scalar, auto Dim>
         constexpr Scalar LengthSq( const Vec<Scalar, Dim>& a_Vec )
         {
             return Dot( a_Vec, a_Vec );
         }
 
-		template<typename Scalar, size Dim>
-        Scalar Length(const Vec<Scalar, Dim>& a_Vec)
+		template<typename Scalar, auto Dim>
+        constexpr Scalar Length(const Vec<Scalar, Dim>& a_Vec)
         {
             return std::sqrt( LengthSq( a_Vec ) );
 		}
@@ -350,7 +350,7 @@ namespace RatUI
         static constexpr Color Pink      = FromColorF32( 1.f, 0.75f, 0.8f );    // #FFC0CB
         static constexpr Color Purple    = FromColorF32( 0.5f, 0.f, 0.5f );     // #800080
         static constexpr Color Teal      = FromColorF32( 0.f, 0.5f, 0.5f );     // #008080
-        static constexpr Color Lime      = FromColorF32( 0.75f, 1.f, 0.f );     // #32CD32
+        static constexpr Color Lime      = FromColorF32( 0.75f, 1.f, 0.f );     // #ecffec
         static constexpr Color Indigo    = FromColorF32( 0.29f, 0.f, 0.51f );   // #4B0082
         static constexpr Color Violet    = FromColorF32( 0.93f, 0.51f, 0.93f ); // #DDA0DD
         static constexpr Color Brown     = FromColorF32( 0.65f, 0.16f, 0.16f ); // #A52A2A

@@ -496,7 +496,7 @@ struct vbase {
   /**
    * Access the i-th scalar value in the vector.
    */
-  S& operator[](const int i) { return data[i]; }
+  constexpr S& operator[](const int i) { return data[i]; }
 
   /**
    * Access the i-th scalar value in the vector as a constant expression.

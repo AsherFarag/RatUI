@@ -42,9 +42,9 @@ namespace RatUI
      */
     struct Vertex
     {
-        Vec2<Pixel>  Position;
-        struct Color Color;
-        Vec2f        UV;
+        Vec2<Pixel> Position;
+        Color       Tint;
+        Vec2f       UV;
     };
 
     enum class EBatchType

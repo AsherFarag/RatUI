@@ -419,7 +419,7 @@ namespace RatUI::OpenGL
 
             glEnableVertexAttribArray( 1 );
             glVertexAttribPointer( 1, 4, GL_UNSIGNED_BYTE, GL_TRUE,  sizeof( Vertex ),
-                                   reinterpret_cast<const void*>( offsetof( Vertex, Color ) ) );
+                                   reinterpret_cast<const void*>( offsetof( Vertex, Tint ) ) );
 
             glEnableVertexAttribArray( 2 );
             glVertexAttribPointer( 2, 2, GL_FLOAT,         GL_FALSE, sizeof( Vertex ),
