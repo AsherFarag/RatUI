@@ -198,8 +198,8 @@ TEST_CASE( "UpdateLayout assigns a non-zero FinalRect to the root when root is f
     REQUIRE( rootNode != nullptr );
     rootNode->Style.WidthMode   = ESizingMode::Fixed;
     rootNode->Style.HeightMode  = ESizingMode::Fixed;
-    rootNode->Style.FixedWidth  = 800.0f;
-    rootNode->Style.FixedHeight = 600.0f;
+    rootNode->Style.FixedWidth  = Unit{ 800.0f };
+    rootNode->Style.FixedHeight = Unit{ 600.0f };
 
     scene.UpdateLayout( Vec2f{ 800.0f, 600.0f } );
 
@@ -219,20 +219,20 @@ TEST_CASE( "UpdateLayout positions child widgets in a horizontal layout", "[scen
     rootNode->Style.LayoutType  = ELayoutType::Horizontal;
     rootNode->Style.WidthMode   = ESizingMode::Fixed;
     rootNode->Style.HeightMode  = ESizingMode::Fixed;
-    rootNode->Style.FixedWidth  = 200.0f;
-    rootNode->Style.FixedHeight = 100.0f;
+    rootNode->Style.FixedWidth  = Unit{ 200.0f };
+    rootNode->Style.FixedHeight = Unit{ 100.0f };
 
     LayoutNode* child1Node = scene.Layouts.Get( scene.GetWidget( childID1 )->GetLayoutID() );
     child1Node->Style.WidthMode   = ESizingMode::Fixed;
     child1Node->Style.HeightMode  = ESizingMode::Fixed;
-    child1Node->Style.FixedWidth  = 80.0f;
-    child1Node->Style.FixedHeight = 60.0f;
+    child1Node->Style.FixedWidth  = Unit{ 80.0f };
+    child1Node->Style.FixedHeight = Unit{ 60.0f };
 
     LayoutNode* child2Node = scene.Layouts.Get( scene.GetWidget( childID2 )->GetLayoutID() );
     child2Node->Style.WidthMode   = ESizingMode::Fixed;
     child2Node->Style.HeightMode  = ESizingMode::Fixed;
-    child2Node->Style.FixedWidth  = 60.0f;
-    child2Node->Style.FixedHeight = 40.0f;
+    child2Node->Style.FixedWidth  = Unit{ 60.0f };
+    child2Node->Style.FixedHeight = Unit{ 40.0f };
 
     scene.UpdateLayout( Vec2f{ 200.0f, 100.0f } );
 
@@ -331,8 +331,8 @@ TEST_CASE( "DispatchInputEvent pointer over root triggers OnPointerEnter", "[sce
     LayoutNode* node = scene.Layouts.Get( scene.GetWidget( rootID )->GetLayoutID() );
     node->Style.WidthMode   = ESizingMode::Fixed;
     node->Style.HeightMode  = ESizingMode::Fixed;
-    node->Style.FixedWidth  = 200.0f;
-    node->Style.FixedHeight = 200.0f;
+    node->Style.FixedWidth  = Unit{ 200.0f };
+    node->Style.FixedHeight = Unit{ 200.0f };
     scene.UpdateLayout( Vec2f{ 200.0f, 200.0f } );
 
     scene.DispatchInputEvent( MakeMouseMove( Vec2f{ 50.0f, 50.0f } ) );
@@ -350,8 +350,8 @@ TEST_CASE( "DispatchInputEvent pointer leaving widget triggers OnPointerExit", "
     LayoutNode* node = scene.Layouts.Get( scene.GetWidget( rootID )->GetLayoutID() );
     node->Style.WidthMode   = ESizingMode::Fixed;
     node->Style.HeightMode  = ESizingMode::Fixed;
-    node->Style.FixedWidth  = 100.0f;
-    node->Style.FixedHeight = 100.0f;
+    node->Style.FixedWidth  = Unit{ 100.0f };
+    node->Style.FixedHeight = Unit{ 100.0f };
     // UpdateLayout allocates the root the full available rect {0,0,100,100}
     scene.UpdateLayout( Vec2f{ 100.0f, 100.0f } );
 
@@ -372,8 +372,8 @@ TEST_CASE( "DispatchInputEvent button press dispatches to hovered widget", "[sce
     LayoutNode* node = scene.Layouts.Get( scene.GetWidget( rootID )->GetLayoutID() );
     node->Style.WidthMode   = ESizingMode::Fixed;
     node->Style.HeightMode  = ESizingMode::Fixed;
-    node->Style.FixedWidth  = 200.0f;
-    node->Style.FixedHeight = 200.0f;
+    node->Style.FixedWidth  = Unit{ 200.0f };
+    node->Style.FixedHeight = Unit{ 200.0f };
     scene.UpdateLayout( Vec2f{ 200.0f, 200.0f } );
 
     // Hover over root
@@ -480,20 +480,20 @@ TEST_CASE( "Navigate MoveRight advances focus from first to second sibling", "[s
     rootNode->Style.LayoutType  = ELayoutType::Horizontal;
     rootNode->Style.WidthMode   = ESizingMode::Fixed;
     rootNode->Style.HeightMode  = ESizingMode::Fixed;
-    rootNode->Style.FixedWidth  = 200.0f;
-    rootNode->Style.FixedHeight = 50.0f;
+    rootNode->Style.FixedWidth  = Unit{ 200.0f };
+    rootNode->Style.FixedHeight = Unit{ 50.0f };
 
     LayoutNode* node1 = scene.Layouts.Get( scene.GetWidget( childID1 )->GetLayoutID() );
     node1->Style.WidthMode  = ESizingMode::Fixed;
     node1->Style.HeightMode = ESizingMode::Fixed;
-    node1->Style.FixedWidth  = 80.0f;
-    node1->Style.FixedHeight = 50.0f;
+    node1->Style.FixedWidth  = Unit{ 80.0f };
+    node1->Style.FixedHeight = Unit{ 50.0f };
 
     LayoutNode* node2 = scene.Layouts.Get( scene.GetWidget( childID2 )->GetLayoutID() );
     node2->Style.WidthMode  = ESizingMode::Fixed;
     node2->Style.HeightMode = ESizingMode::Fixed;
-    node2->Style.FixedWidth  = 80.0f;
-    node2->Style.FixedHeight = 50.0f;
+    node2->Style.FixedWidth  = Unit{ 80.0f };
+    node2->Style.FixedHeight = Unit{ 50.0f };
 
     scene.UpdateLayout( Vec2f{ 200.0f, 50.0f } );
 
