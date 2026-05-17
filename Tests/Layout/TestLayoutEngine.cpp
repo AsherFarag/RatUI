@@ -74,7 +74,7 @@ TEST_CASE( "MeasureLayoutNode clamps Fixed size to SizeConstraints min", "[Layou
     w.Style.HeightMode  = ESizingMode::Fixed;
     w.Style.FixedWidth  = Unit{ 10.0f };
     w.Style.FixedHeight = Unit{ 10.0f };
-    w.Style.SizeConstraints = Constraints::AtLeast( Vec2f( 50.0f, 50.0f ) );
+    w.Style.SizeConstraints = Constraints::AtLeast( ToUnitVec2( Vec2f( 50.0f, 50.0f  ) ) );
 
     Vec2f result = MeasureLayoutNode( w, Vec2f( 1000.0f, 1000.0f ) );
     RequireApproxEqual( result, Vec2f( 50.0f, 50.0f ) );
@@ -87,7 +87,7 @@ TEST_CASE( "MeasureLayoutNode clamps Fixed size to SizeConstraints max", "[Layou
     w.Style.HeightMode  = ESizingMode::Fixed;
     w.Style.FixedWidth  = Unit{ 500.0f };
     w.Style.FixedHeight = Unit{ 500.0f };
-    w.Style.SizeConstraints = Constraints::AtMost( Vec2f( 100.0f, 100.0f ) );
+    w.Style.SizeConstraints = Constraints::AtMost( ToUnitVec2( Vec2f( 100.0f, 100.0f  ) ) );
 
     Vec2f result = MeasureLayoutNode( w, Vec2f( 1000.0f, 1000.0f ) );
     RequireApproxEqual( result, Vec2f( 100.0f, 100.0f ) );
@@ -101,7 +101,7 @@ TEST_CASE( "MeasureLayoutNode Fixed constraints keep size unchanged when within 
     w.Style.HeightMode  = ESizingMode::Fixed;
     w.Style.FixedWidth  = Unit{ 80.0f };
     w.Style.FixedHeight = Unit{ 60.0f };
-    w.Style.SizeConstraints = Constraints::Fixed( Vec2f( 80.0f, 60.0f ) );
+    w.Style.SizeConstraints = Constraints::Fixed( ToUnitVec2( Vec2f( 80.0f, 60.0f  ) ) );
 
     Vec2f result = MeasureLayoutNode( w, Vec2f( 1000.0f, 1000.0f ) );
     RequireApproxEqual( result, Vec2f( 80.0f, 60.0f ) );
@@ -517,7 +517,7 @@ TEST_CASE( "MeasureLayoutNode SizeConstraints clamps Content-mode desired size t
     parent.Style.LayoutType     = ELayoutType::Horizontal;
     parent.Style.WidthMode      = ESizingMode::Content;
     parent.Style.HeightMode     = ESizingMode::Content;
-    parent.Style.SizeConstraints = Constraints::AtMost( Vec2f( 50.0f, 30.0f ) );
+    parent.Style.SizeConstraints = Constraints::AtMost( ToUnitVec2( Vec2f( 50.0f, 30.0f  ) ) );
 
     LayoutNode child{}; child.Style.WidthMode = ESizingMode::Fixed; child.Style.HeightMode = ESizingMode::Fixed;
     child.Style.FixedWidth = Unit{ 200.0f }; child.Style.FixedHeight = Unit{ 100.0f };
@@ -535,7 +535,7 @@ TEST_CASE( "MeasureLayoutNode SizeConstraints clamps Content-mode desired size t
     parent.Style.LayoutType     = ELayoutType::Overlay;
     parent.Style.WidthMode      = ESizingMode::Content;
     parent.Style.HeightMode     = ESizingMode::Content;
-    parent.Style.SizeConstraints = Constraints::AtLeast( Vec2f( 100.0f, 80.0f ) );
+    parent.Style.SizeConstraints = Constraints::AtLeast( ToUnitVec2( Vec2f( 100.0f, 80.0f  ) ) );
 
     // No children → content = 0×0, but min constraint forces 100×80
     Vec2f result = MeasureLayoutNode( parent, Vec2f( 1000.0f, 1000.0f ) );

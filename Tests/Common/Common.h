@@ -8,6 +8,7 @@
 #include <RatUI/RatUI.h>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
+#include <format>
 
 // Approximate float comparison tolerance used throughout the test suite.
 inline constexpr float k_FloatEpsilon = 1e-5f;
@@ -35,6 +36,26 @@ inline RatUI::Rectf ToFloatRect( const RatUI::Rect<RatUI::Unit>& a_Value )
     return { ToFloatVec2( a_Value.Origin ), ToFloatVec2( a_Value.Size ) };
 }
 
+inline RatUI::Vec2f MeasureLayoutNode( RatUI::LayoutNode& a_Node, RatUI::Vec2f a_AvailableSize )
+{
+    return ToFloatVec2( RatUI::MeasureLayoutNode( a_Node, ToUnitVec2( a_AvailableSize ) ) );
+}
+
+inline void ArrangeLayoutNode( RatUI::LayoutNode& a_Node, RatUI::Rectf a_AllocatedRect )
+{
+    RatUI::ArrangeLayoutNode( a_Node, ToUnitRect( a_AllocatedRect ) );
+}
+
+inline RatUI::Rectf AlignRect( RatUI::Vec2f a_ContentSize, RatUI::Rectf a_Container, RatUI::EAlignment a_Align )
+{
+    return ToFloatRect( RatUI::AlignRect( ToUnitVec2( a_ContentSize ), ToUnitRect( a_Container ), a_Align ) );
+}
+
+inline float AlignCrossAxis( float a_ChildSize, float a_ParentPos, float a_ParentSize, RatUI::EAlignment a_Align, bool a_IsMainAxisHorizontal )
+{
+    return RatUI::AlignCrossAxis( ToUnit( a_ChildSize ), ToUnit( a_ParentPos ), ToUnit( a_ParentSize ), a_Align, a_IsMainAxisHorizontal ).ToFloat();
+}
+
 /** @brief Checks that two Vec2f values are approximately equal component-wise. */
 inline void RequireApproxEqual( const RatUI::Vec2f& a_Lhs, const RatUI::Vec2f& a_Rhs )
 {
@@ -60,22 +81,22 @@ inline void RequireApproxEqual( const RatUI::Vec3f& a_Lhs, const RatUI::Vec3f& a
     REQUIRE( a_Lhs[ 2 ] == Catch::Approx( a_Rhs[ 2 ] ).epsilon( k_FloatEpsilon ) );
 }
 
-inline bool operator==( RatUI::Unit a_Lhs, float a_Rhs )
+namespace RatUI
 {
-    return a_Lhs.ToFloat() == a_Rhs;
+    inline bool operator==( Unit a_Lhs, float a_Rhs ) { return a_Lhs.ToFloat() == a_Rhs; }
+    inline bool operator==( float a_Lhs, Unit a_Rhs ) { return a_Lhs == a_Rhs.ToFloat(); }
+    inline bool operator==( Unit a_Lhs, const Catch::Approx& a_Rhs ) { return a_Rhs == a_Lhs.ToFloat(); }
+    inline bool operator==( const Catch::Approx& a_Lhs, Unit a_Rhs ) { return a_Lhs == a_Rhs.ToFloat(); }
 }
 
-inline bool operator==( float a_Lhs, RatUI::Unit a_Rhs )
+namespace std
 {
-    return a_Lhs == a_Rhs.ToFloat();
-}
-
-inline bool operator==( RatUI::Unit a_Lhs, const Catch::Approx& a_Rhs )
-{
-    return a_Rhs == a_Lhs.ToFloat();
-}
-
-inline bool operator==( const Catch::Approx& a_Lhs, RatUI::Unit a_Rhs )
-{
-    return a_Lhs == a_Rhs.ToFloat();
+    template<typename _Tag>
+    struct formatter<RatUI::UnitBase<_Tag>, char> : formatter<float, char>
+    {
+        auto format( RatUI::UnitBase<_Tag> a_Value, format_context& a_Ctx ) const
+        {
+            return formatter<float, char>::format( a_Value.ToFloat(), a_Ctx );
+        }
+    };
 }

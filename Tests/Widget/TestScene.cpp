@@ -51,7 +51,7 @@ static InputEvent MakeMouseMove( Vec2f a_Pos )
 {
     return InputEvent{
         .Device  = EDeviceID::Mouse,
-        .Payload = PointerEvent{ .Position = a_Pos, .Type = EPointerType::Mouse }
+        .Payload = PointerEvent{ .Position = ToUnitVec2( a_Pos ), .Type = EPointerType::Mouse }
     };
 }
 
@@ -201,9 +201,9 @@ TEST_CASE( "UpdateLayout assigns a non-zero FinalRect to the root when root is f
     rootNode->Style.FixedWidth  = Unit{ 800.0f };
     rootNode->Style.FixedHeight = Unit{ 600.0f };
 
-    scene.UpdateLayout( Vec2f{ 800.0f, 600.0f } );
+    scene.UpdateLayout( ToUnitVec2( Vec2f{ 800.0f, 600.0f  } ) );
 
-    const Rectf& rect = rootNode->Layout.FinalRect;
+    Rectf rect = ToFloatRect( rootNode->Layout.FinalRect );
     REQUIRE( rect.Size[ 0 ] == Catch::Approx( 800.0f ).epsilon( 1e-5f ) );
     REQUIRE( rect.Size[ 1 ] == Catch::Approx( 600.0f ).epsilon( 1e-5f ) );
 }
@@ -234,7 +234,7 @@ TEST_CASE( "UpdateLayout positions child widgets in a horizontal layout", "[scen
     child2Node->Style.FixedWidth  = Unit{ 60.0f };
     child2Node->Style.FixedHeight = Unit{ 40.0f };
 
-    scene.UpdateLayout( Vec2f{ 200.0f, 100.0f } );
+    scene.UpdateLayout( ToUnitVec2( Vec2f{ 200.0f, 100.0f  } ) );
 
     // First child starts at origin
     REQUIRE( child1Node->Layout.FinalRect.Origin[ 0 ] == Catch::Approx( 0.0f ).epsilon( 1e-5f ) );
@@ -248,7 +248,7 @@ TEST_CASE( "UpdateLayout positions child widgets in a horizontal layout", "[scen
 TEST_CASE( "UpdateLayout with no root widget is a no-op", "[scene]" )
 {
     Scene scene;
-    scene.UpdateLayout( Vec2f{ 800.0f, 600.0f } ); // should not crash
+    scene.UpdateLayout( ToUnitVec2( Vec2f{ 800.0f, 600.0f  } ) ); // should not crash
 }
 
 // =============================================================================
@@ -333,7 +333,7 @@ TEST_CASE( "DispatchInputEvent pointer over root triggers OnPointerEnter", "[sce
     node->Style.HeightMode  = ESizingMode::Fixed;
     node->Style.FixedWidth  = Unit{ 200.0f };
     node->Style.FixedHeight = Unit{ 200.0f };
-    scene.UpdateLayout( Vec2f{ 200.0f, 200.0f } );
+    scene.UpdateLayout( ToUnitVec2( Vec2f{ 200.0f, 200.0f  } ) );
 
     scene.DispatchInputEvent( MakeMouseMove( Vec2f{ 50.0f, 50.0f } ) );
 
@@ -353,7 +353,7 @@ TEST_CASE( "DispatchInputEvent pointer leaving widget triggers OnPointerExit", "
     node->Style.FixedWidth  = Unit{ 100.0f };
     node->Style.FixedHeight = Unit{ 100.0f };
     // UpdateLayout allocates the root the full available rect {0,0,100,100}
-    scene.UpdateLayout( Vec2f{ 100.0f, 100.0f } );
+    scene.UpdateLayout( ToUnitVec2( Vec2f{ 100.0f, 100.0f  } ) );
 
     // Move inside the 100x100 viewport
     scene.DispatchInputEvent( MakeMouseMove( Vec2f{ 50.0f, 50.0f } ) );
@@ -374,7 +374,7 @@ TEST_CASE( "DispatchInputEvent button press dispatches to hovered widget", "[sce
     node->Style.HeightMode  = ESizingMode::Fixed;
     node->Style.FixedWidth  = Unit{ 200.0f };
     node->Style.FixedHeight = Unit{ 200.0f };
-    scene.UpdateLayout( Vec2f{ 200.0f, 200.0f } );
+    scene.UpdateLayout( ToUnitVec2( Vec2f{ 200.0f, 200.0f  } ) );
 
     // Hover over root
     scene.DispatchInputEvent( MakeMouseMove( Vec2f{ 50.0f, 50.0f } ) );
@@ -495,7 +495,7 @@ TEST_CASE( "Navigate MoveRight advances focus from first to second sibling", "[s
     node2->Style.FixedWidth  = Unit{ 80.0f };
     node2->Style.FixedHeight = Unit{ 50.0f };
 
-    scene.UpdateLayout( Vec2f{ 200.0f, 50.0f } );
+    scene.UpdateLayout( ToUnitVec2( Vec2f{ 200.0f, 50.0f  } ) );
 
     scene.SetFocus( childID1 );
     scene.Navigate( ENavAction::MoveRight );

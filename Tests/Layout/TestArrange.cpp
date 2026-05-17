@@ -34,30 +34,6 @@ static void RequireRect( const Rect<Unit>& a_Rect, Vec2f a_Origin, Vec2f a_Size 
     RequireRect( ToFloatRect( a_Rect ), a_Origin, a_Size );
 }
 
-/** Float-friendly wrapper around Unit-based AlignRect. */
-static Rectf AlignRect( Vec2f a_ContentSize, Rectf a_Container, EAlignment a_Align )
-{
-    return ToFloatRect( RatUI::AlignRect( ToUnitVec2( a_ContentSize ), ToUnitRect( a_Container ), a_Align ) );
-}
-
-/** Float-friendly wrapper around Unit-based AlignCrossAxis. */
-static f32 AlignCrossAxis( f32 a_ChildSize, f32 a_ParentPos, f32 a_ParentSize, EAlignment a_Align, bool a_IsMainAxisHorizontal )
-{
-    return RatUI::AlignCrossAxis( ToUnit( a_ChildSize ), ToUnit( a_ParentPos ), ToUnit( a_ParentSize ), a_Align, a_IsMainAxisHorizontal ).ToFloat();
-}
-
-/** Float-friendly wrapper around Unit-based MeasureLayoutNode. */
-static Vec2f MeasureLayoutNode( LayoutNode& a_Node, Vec2f a_AvailableSize )
-{
-    return ToFloatVec2( RatUI::MeasureLayoutNode( a_Node, ToUnitVec2( a_AvailableSize ) ) );
-}
-
-/** Float-friendly wrapper around Unit-based ArrangeLayoutNode. */
-static void ArrangeLayoutNode( LayoutNode& a_Node, Rectf a_AllocatedRect )
-{
-    RatUI::ArrangeLayoutNode( a_Node, ToUnitRect( a_AllocatedRect ) );
-}
-
 static Anchor MakeAnchor( Vec2f a_Min, Vec2f a_Max, Vec2f a_Pivot, Vec2f a_Offset )
 {
     Anchor anchor{};
@@ -696,7 +672,7 @@ TEST_CASE( "FlexGrow is clamped by SizeConstraints max", "[arrange][flex]" )
     child.Style.FixedWidth  = Unit{ 0.0f };
     child.Style.FixedHeight = Unit{ 50.0f };
     child.Style.FlexGrow    = 1.0f;
-    child.Style.SizeConstraints = Constraints::AtMost( { 100.0f, 100.0f } );
+    child.Style.SizeConstraints = Constraints::AtMost( ToUnitVec2( Vec2f{ 100.0f, 100.0f  } ) );
 
     parent.PushBackChild( child );
 
