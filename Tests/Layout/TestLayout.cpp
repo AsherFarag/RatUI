@@ -53,14 +53,14 @@ TEST_CASE( "Constraints::Unbounded has zero min and max float max", "[layout][co
 
 TEST_CASE( "Constraints::Fixed sets min and max to the same size", "[layout][constraints]" )
 {
-    Constraints c = Constraints::Fixed( Vec2f( 100.0f, 200.0f ) );
+    Constraints c = Constraints::Fixed( ToUnitVec2( Vec2f( 100.0f, 200.0f ) ) );
     RequireApproxEqual( c.MinSize, Vec2f( 100.0f, 200.0f ) );
     RequireApproxEqual( c.MaxSize, Vec2f( 100.0f, 200.0f ) );
 }
 
 TEST_CASE( "Constraints::AtLeast sets min and leaves max unbounded", "[layout][constraints]" )
 {
-    Constraints c = Constraints::AtLeast( Vec2f( 50.0f, 75.0f ) );
+    Constraints c = Constraints::AtLeast( ToUnitVec2( Vec2f( 50.0f, 75.0f ) ) );
     RequireApproxEqual( c.MinSize, Vec2f( 50.0f, 75.0f ) );
     REQUIRE( c.MaxSize[ 0 ] == std::numeric_limits<f32>::max() );
     REQUIRE( c.MaxSize[ 1 ] == std::numeric_limits<f32>::max() );
@@ -68,7 +68,7 @@ TEST_CASE( "Constraints::AtLeast sets min and leaves max unbounded", "[layout][c
 
 TEST_CASE( "Constraints::AtMost leaves min at zero and sets max", "[layout][constraints]" )
 {
-    Constraints c = Constraints::AtMost( Vec2f( 300.0f, 400.0f ) );
+    Constraints c = Constraints::AtMost( ToUnitVec2( Vec2f( 300.0f, 400.0f ) ) );
     RequireApproxEqual( c.MinSize, Vec2f( 0.0f, 0.0f ) );
     RequireApproxEqual( c.MaxSize, Vec2f( 300.0f, 400.0f ) );
 }
@@ -118,7 +118,7 @@ TEST_CASE( "Edges default construction produces all-zero edges", "[layout][edges
 
 TEST_CASE( "Edges::Uniform sets all edges to the same value", "[layout][edges]" )
 {
-    Edges e = Edges::Uniform( 10.0f );
+    Edges e = Edges::Uniform( Unit{ 10.0f } );
     REQUIRE( e.Top    == 10.0f );
     REQUIRE( e.Right  == 10.0f );
     REQUIRE( e.Bottom == 10.0f );
@@ -127,7 +127,7 @@ TEST_CASE( "Edges::Uniform sets all edges to the same value", "[layout][edges]" 
 
 TEST_CASE( "Edges::Symmetric sets horizontal and vertical edges", "[layout][edges]" )
 {
-    Edges e = Edges::Symmetric( 8.0f, 4.0f );
+    Edges e = Edges::Symmetric( Unit{ 8.0f }, Unit{ 4.0f } );
     REQUIRE( e.Left   == 8.0f );
     REQUIRE( e.Right  == 8.0f );
     REQUIRE( e.Top    == 4.0f );
@@ -136,7 +136,7 @@ TEST_CASE( "Edges::Symmetric sets horizontal and vertical edges", "[layout][edge
 
 TEST_CASE( "Edges::Asymmetric sets each edge individually", "[layout][edges]" )
 {
-    Edges e = Edges::Asymmetric( 1.0f, 2.0f, 3.0f, 4.0f );
+    Edges e = Edges::Asymmetric( Unit{ 1.0f }, Unit{ 2.0f }, Unit{ 3.0f }, Unit{ 4.0f } );
     REQUIRE( e.Top    == 1.0f );
     REQUIRE( e.Right  == 2.0f );
     REQUIRE( e.Bottom == 3.0f );
@@ -145,27 +145,27 @@ TEST_CASE( "Edges::Asymmetric sets each edge individually", "[layout][edges]" )
 
 TEST_CASE( "Edges::Horizontal() returns left plus right", "[layout][edges]" )
 {
-    Edges e = Edges::Asymmetric( 1.0f, 6.0f, 3.0f, 4.0f );
+    Edges e = Edges::Asymmetric( Unit{ 1.0f }, Unit{ 6.0f }, Unit{ 3.0f }, Unit{ 4.0f } );
     REQUIRE( e.Horizontal() == Catch::Approx( 10.0f ) );
 }
 
 TEST_CASE( "Edges::Vertical() returns top plus bottom", "[layout][edges]" )
 {
-    Edges e = Edges::Asymmetric( 2.0f, 6.0f, 8.0f, 4.0f );
+    Edges e = Edges::Asymmetric( Unit{ 2.0f }, Unit{ 6.0f }, Unit{ 8.0f }, Unit{ 4.0f } );
     REQUIRE( e.Vertical() == Catch::Approx( 10.0f ) );
 }
 
 TEST_CASE( "Edges::Total() returns horizontal and vertical as Vec2f", "[layout][edges]" )
 {
-    Edges e = Edges::Symmetric( 5.0f, 3.0f );
+    Edges e = Edges::Symmetric( Unit{ 5.0f }, Unit{ 3.0f } );
     RequireApproxEqual( e.Total(), Vec2f( 10.0f, 6.0f ) );
 }
 
 TEST_CASE( "Edges::Apply() shrinks rect by insets", "[layout][edges]" )
 {
     Rectf r    = Rectf::FromMinMax( Vec2f( 0.0f, 0.0f ), Vec2f( 100.0f, 80.0f ) );
-    Edges e    = Edges::Asymmetric( 5.0f, 10.0f, 15.0f, 20.0f );
-    Rectf inset = e.Apply( r );
+    Edges e    = Edges::Asymmetric( Unit{ 5.0f }, Unit{ 10.0f }, Unit{ 15.0f }, Unit{ 20.0f } );
+    Rectf inset = ToFloatRect( e.Apply( ToUnitRect( r ) ) );
     REQUIRE( inset.Left()   == Catch::Approx( 20.0f ) );
     REQUIRE( inset.Top()    == Catch::Approx( 5.0f  ) );
     REQUIRE( inset.Right()  == Catch::Approx( 90.0f ) );
@@ -175,8 +175,8 @@ TEST_CASE( "Edges::Apply() shrinks rect by insets", "[layout][edges]" )
 TEST_CASE( "Edges::Apply() with zero edges leaves rect unchanged", "[layout][edges]" )
 {
     Rectf r     = Rectf::FromMinMax( Vec2f( 10.0f, 20.0f ), Vec2f( 110.0f, 120.0f ) );
-    Edges e     = Edges::Uniform( 0.0f );
-    Rectf result = e.Apply( r );
+    Edges e     = Edges::Uniform( Unit{ 0.0f } );
+    Rectf result = ToFloatRect( e.Apply( ToUnitRect( r ) ) );
     RequireApproxEqual( result.Min(), r.Min() );
     RequireApproxEqual( result.Max(), r.Max() );
 }
@@ -366,8 +366,8 @@ TEST_CASE( "LayoutResult defaults to Visible visibility", "[layout][result]" )
 
 TEST_CASE( "Edges operator+ combines two edges element-wise", "[layout][edges]" )
 {
-    Edges a = Edges::Asymmetric( 1.0f, 2.0f, 3.0f, 4.0f );
-    Edges b = Edges::Asymmetric( 10.0f, 20.0f, 30.0f, 40.0f );
+    Edges a = Edges::Asymmetric( Unit{ 1.0f }, Unit{ 2.0f }, Unit{ 3.0f }, Unit{ 4.0f } );
+    Edges b = Edges::Asymmetric( Unit{ 10.0f }, Unit{ 20.0f }, Unit{ 30.0f }, Unit{ 40.0f } );
     Edges result = a + b;
     REQUIRE( result.Top    == Catch::Approx( 11.0f ) );
     REQUIRE( result.Right  == Catch::Approx( 22.0f ) );
@@ -377,7 +377,7 @@ TEST_CASE( "Edges operator+ combines two edges element-wise", "[layout][edges]" 
 
 TEST_CASE( "Edges operator* scales each edge by a scalar factor", "[layout][edges]" )
 {
-    Edges e = Edges::Asymmetric( 2.0f, 4.0f, 6.0f, 8.0f );
+    Edges e = Edges::Asymmetric( Unit{ 2.0f }, Unit{ 4.0f }, Unit{ 6.0f }, Unit{ 8.0f } );
     Edges result = e * 2.5f;
     REQUIRE( result.Top    == Catch::Approx( 5.0f  ) );
     REQUIRE( result.Right  == Catch::Approx( 10.0f ) );
@@ -387,7 +387,7 @@ TEST_CASE( "Edges operator* scales each edge by a scalar factor", "[layout][edge
 
 TEST_CASE( "Edges operator/ divides each edge by a scalar factor", "[layout][edges]" )
 {
-    Edges e = Edges::Uniform( 10.0f );
+    Edges e = Edges::Uniform( Unit{ 10.0f } );
     Edges result = e / 4.0f;
     REQUIRE( result.Top    == Catch::Approx( 2.5f ) );
     REQUIRE( result.Right  == Catch::Approx( 2.5f ) );

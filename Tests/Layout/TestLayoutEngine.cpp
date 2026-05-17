@@ -16,8 +16,8 @@ TEST_CASE( "MeasureLayoutNode Fixed width and height returns exactly FixedWidth/
     LayoutNode w{};
     w.Style.WidthMode   = ESizingMode::Fixed;
     w.Style.HeightMode  = ESizingMode::Fixed;
-    w.Style.FixedWidth  = 120.0f;
-    w.Style.FixedHeight = 80.0f;
+    w.Style.FixedWidth  = Unit{ 120.0f };
+    w.Style.FixedHeight = Unit{ 80.0f };
 
     Vec2f result = MeasureLayoutNode( w, Vec2f( 1000.0f, 1000.0f ) );
     RequireApproxEqual( result, Vec2f( 120.0f, 80.0f ) );
@@ -51,7 +51,7 @@ TEST_CASE( "MeasureLayoutNode Content mode with no children but padding returns 
     LayoutNode w{};
     w.Style.WidthMode  = ESizingMode::Content;
     w.Style.HeightMode = ESizingMode::Content;
-    w.Style.Padding    = Edges::Symmetric( 10.0f, 5.0f ); // H=10 each side, V=5 each side
+    w.Style.Padding    = Edges::Symmetric( Unit{ 10.0f }, Unit{ 5.0f } ); // H=10 each side, V=5 each side
 
     Vec2f result = MeasureLayoutNode( w, Vec2f( 500.0f, 500.0f ) );
     RequireApproxEqual( result, Vec2f( 20.0f, 10.0f ) );
@@ -72,9 +72,9 @@ TEST_CASE( "MeasureLayoutNode clamps Fixed size to SizeConstraints min", "[Layou
     LayoutNode w{};
     w.Style.WidthMode   = ESizingMode::Fixed;
     w.Style.HeightMode  = ESizingMode::Fixed;
-    w.Style.FixedWidth  = 10.0f;
-    w.Style.FixedHeight = 10.0f;
-    w.Style.SizeConstraints = Constraints::AtLeast( Vec2f( 50.0f, 50.0f ) );
+    w.Style.FixedWidth  = Unit{ 10.0f };
+    w.Style.FixedHeight = Unit{ 10.0f };
+    w.Style.SizeConstraints = Constraints::AtLeast( ToUnitVec2( Vec2f( 50.0f, 50.0f ) ) );
 
     Vec2f result = MeasureLayoutNode( w, Vec2f( 1000.0f, 1000.0f ) );
     RequireApproxEqual( result, Vec2f( 50.0f, 50.0f ) );
@@ -85,9 +85,9 @@ TEST_CASE( "MeasureLayoutNode clamps Fixed size to SizeConstraints max", "[Layou
     LayoutNode w{};
     w.Style.WidthMode   = ESizingMode::Fixed;
     w.Style.HeightMode  = ESizingMode::Fixed;
-    w.Style.FixedWidth  = 500.0f;
-    w.Style.FixedHeight = 500.0f;
-    w.Style.SizeConstraints = Constraints::AtMost( Vec2f( 100.0f, 100.0f ) );
+    w.Style.FixedWidth  = Unit{ 500.0f };
+    w.Style.FixedHeight = Unit{ 500.0f };
+    w.Style.SizeConstraints = Constraints::AtMost( ToUnitVec2( Vec2f( 100.0f, 100.0f ) ) );
 
     Vec2f result = MeasureLayoutNode( w, Vec2f( 1000.0f, 1000.0f ) );
     RequireApproxEqual( result, Vec2f( 100.0f, 100.0f ) );
@@ -99,9 +99,9 @@ TEST_CASE( "MeasureLayoutNode Fixed constraints keep size unchanged when within 
     LayoutNode w{};
     w.Style.WidthMode   = ESizingMode::Fixed;
     w.Style.HeightMode  = ESizingMode::Fixed;
-    w.Style.FixedWidth  = 80.0f;
-    w.Style.FixedHeight = 60.0f;
-    w.Style.SizeConstraints = Constraints::Fixed( Vec2f( 80.0f, 60.0f ) );
+    w.Style.FixedWidth  = Unit{ 80.0f };
+    w.Style.FixedHeight = Unit{ 60.0f };
+    w.Style.SizeConstraints = Constraints::Fixed( ToUnitVec2( Vec2f( 80.0f, 60.0f ) ) );
 
     Vec2f result = MeasureLayoutNode( w, Vec2f( 1000.0f, 1000.0f ) );
     RequireApproxEqual( result, Vec2f( 80.0f, 60.0f ) );
@@ -129,7 +129,7 @@ TEST_CASE( "MeasureLayoutNode mixed sizing modes: Fixed width, Percent height", 
     LayoutNode w{};
     w.Style.WidthMode     = ESizingMode::Fixed;
     w.Style.HeightMode    = ESizingMode::Percent;
-    w.Style.FixedWidth    = 80.0f;
+    w.Style.FixedWidth    = Unit{ 80.0f };
     w.Style.PercentHeight = 0.5f;
 
     Vec2f result = MeasureLayoutNode( w, Vec2f( 200.0f, 100.0f ) );
@@ -148,10 +148,10 @@ TEST_CASE( "MeasureLayoutNode Horizontal layout sums child widths", "[LayoutNode
     parent.Style.HeightMode = ESizingMode::Content;
 
     LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
-    c1.Style.FixedWidth = 30.0f; c1.Style.FixedHeight = 20.0f;
+    c1.Style.FixedWidth = Unit{ 30.0f }; c1.Style.FixedHeight = Unit{ 20.0f };
 
     LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
-    c2.Style.FixedWidth = 50.0f; c2.Style.FixedHeight = 10.0f;
+    c2.Style.FixedWidth = Unit{ 50.0f }; c2.Style.FixedHeight = Unit{ 10.0f };
 
     parent.PushBackChild( c1 );
     parent.PushBackChild( c2 );
@@ -167,13 +167,13 @@ TEST_CASE( "MeasureLayoutNode Horizontal layout adds spacing between children", 
     parent.Style.LayoutType = ELayoutType::Horizontal;
     parent.Style.WidthMode  = ESizingMode::Content;
     parent.Style.HeightMode = ESizingMode::Content;
-    parent.Style.Spacing    = 10.0f;
+    parent.Style.Spacing    = Unit{ 10.0f };
 
     LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
-    c1.Style.FixedWidth = 40.0f; c1.Style.FixedHeight = 20.0f;
+    c1.Style.FixedWidth = Unit{ 40.0f }; c1.Style.FixedHeight = Unit{ 20.0f };
 
     LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
-    c2.Style.FixedWidth = 60.0f; c2.Style.FixedHeight = 15.0f;
+    c2.Style.FixedWidth = Unit{ 60.0f }; c2.Style.FixedHeight = Unit{ 15.0f };
 
     parent.PushBackChild( c1 );
     parent.PushBackChild( c2 );
@@ -189,16 +189,16 @@ TEST_CASE( "MeasureLayoutNode Horizontal layout with three children and spacing"
     parent.Style.LayoutType = ELayoutType::Horizontal;
     parent.Style.WidthMode  = ESizingMode::Content;
     parent.Style.HeightMode = ESizingMode::Content;
-    parent.Style.Spacing    = 5.0f;
+    parent.Style.Spacing    = Unit{ 5.0f };
 
     LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
-    c1.Style.FixedWidth = 10.0f; c1.Style.FixedHeight = 10.0f;
+    c1.Style.FixedWidth = Unit{ 10.0f }; c1.Style.FixedHeight = Unit{ 10.0f };
 
     LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
-    c2.Style.FixedWidth = 20.0f; c2.Style.FixedHeight = 30.0f;
+    c2.Style.FixedWidth = Unit{ 20.0f }; c2.Style.FixedHeight = Unit{ 30.0f };
 
     LayoutNode c3{}; c3.Style.WidthMode = ESizingMode::Fixed; c3.Style.HeightMode = ESizingMode::Fixed;
-    c3.Style.FixedWidth = 15.0f; c3.Style.FixedHeight = 20.0f;
+    c3.Style.FixedWidth = Unit{ 15.0f }; c3.Style.FixedHeight = Unit{ 20.0f };
 
     parent.PushBackChild( c1 );
     parent.PushBackChild( c2 );
@@ -221,10 +221,10 @@ TEST_CASE( "MeasureLayoutNode Vertical layout sums child heights", "[LayoutNode]
     parent.Style.HeightMode = ESizingMode::Content;
 
     LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
-    c1.Style.FixedWidth = 40.0f; c1.Style.FixedHeight = 20.0f;
+    c1.Style.FixedWidth = Unit{ 40.0f }; c1.Style.FixedHeight = Unit{ 20.0f };
 
     LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
-    c2.Style.FixedWidth = 60.0f; c2.Style.FixedHeight = 30.0f;
+    c2.Style.FixedWidth = Unit{ 60.0f }; c2.Style.FixedHeight = Unit{ 30.0f };
 
     parent.PushBackChild( c1 );
     parent.PushBackChild( c2 );
@@ -240,13 +240,13 @@ TEST_CASE( "MeasureLayoutNode Vertical layout adds spacing between children", "[
     parent.Style.LayoutType = ELayoutType::Vertical;
     parent.Style.WidthMode  = ESizingMode::Content;
     parent.Style.HeightMode = ESizingMode::Content;
-    parent.Style.Spacing    = 8.0f;
+    parent.Style.Spacing    = Unit{ 8.0f };
 
     LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
-    c1.Style.FixedWidth = 50.0f; c1.Style.FixedHeight = 20.0f;
+    c1.Style.FixedWidth = Unit{ 50.0f }; c1.Style.FixedHeight = Unit{ 20.0f };
 
     LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
-    c2.Style.FixedWidth = 30.0f; c2.Style.FixedHeight = 40.0f;
+    c2.Style.FixedWidth = Unit{ 30.0f }; c2.Style.FixedHeight = Unit{ 40.0f };
 
     parent.PushBackChild( c1 );
     parent.PushBackChild( c2 );
@@ -268,10 +268,10 @@ TEST_CASE( "MeasureLayoutNode Overlay layout uses max of child sizes", "[LayoutN
     parent.Style.HeightMode = ESizingMode::Content;
 
     LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
-    c1.Style.FixedWidth = 100.0f; c1.Style.FixedHeight = 50.0f;
+    c1.Style.FixedWidth = Unit{ 100.0f }; c1.Style.FixedHeight = Unit{ 50.0f };
 
     LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
-    c2.Style.FixedWidth = 60.0f; c2.Style.FixedHeight = 80.0f;
+    c2.Style.FixedWidth = Unit{ 60.0f }; c2.Style.FixedHeight = Unit{ 80.0f };
 
     parent.PushBackChild( c1 );
     parent.PushBackChild( c2 );
@@ -291,10 +291,10 @@ TEST_CASE( "MeasureLayoutNode Horizontal layout adds padding around content", "[
     parent.Style.LayoutType = ELayoutType::Horizontal;
     parent.Style.WidthMode  = ESizingMode::Content;
     parent.Style.HeightMode = ESizingMode::Content;
-    parent.Style.Padding    = Edges::Uniform( 10.0f );
+    parent.Style.Padding    = Edges::Uniform( Unit{ 10.0f } );
 
     LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
-    c1.Style.FixedWidth = 50.0f; c1.Style.FixedHeight = 30.0f;
+    c1.Style.FixedWidth = Unit{ 50.0f }; c1.Style.FixedHeight = Unit{ 30.0f };
 
     parent.PushBackChild( c1 );
 
@@ -309,10 +309,10 @@ TEST_CASE( "MeasureLayoutNode Vertical layout adds asymmetric padding around con
     parent.Style.LayoutType = ELayoutType::Vertical;
     parent.Style.WidthMode  = ESizingMode::Content;
     parent.Style.HeightMode = ESizingMode::Content;
-    parent.Style.Padding    = Edges::Asymmetric( 4.0f, 8.0f, 4.0f, 8.0f ); // top=4, right=8, bottom=4, left=8
+    parent.Style.Padding    = Edges::Asymmetric( Unit{ 4.0f }, Unit{ 8.0f }, Unit{ 4.0f }, Unit{ 8.0f } ); // top=4, right=8, bottom=4, left=8
 
     LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
-    c1.Style.FixedWidth = 40.0f; c1.Style.FixedHeight = 20.0f;
+    c1.Style.FixedWidth = Unit{ 40.0f }; c1.Style.FixedHeight = Unit{ 20.0f };
 
     parent.PushBackChild( c1 );
 
@@ -344,8 +344,8 @@ TEST_CASE( "MeasureLayoutNode recursively measures child LayoutNodes", "[LayoutN
     LayoutNode grandchild{};
     grandchild.Style.WidthMode   = ESizingMode::Fixed;
     grandchild.Style.HeightMode  = ESizingMode::Fixed;
-    grandchild.Style.FixedWidth  = 70.0f;
-    grandchild.Style.FixedHeight = 40.0f;
+    grandchild.Style.FixedWidth  = Unit{ 70.0f };
+    grandchild.Style.FixedHeight = Unit{ 40.0f };
 
     child.PushBackChild( grandchild );
     parent.PushBackChild( child );
@@ -364,8 +364,8 @@ TEST_CASE( "MeasureLayoutNode child DesiredSize is populated during parent measu
     LayoutNode child{};
     child.Style.WidthMode   = ESizingMode::Fixed;
     child.Style.HeightMode  = ESizingMode::Fixed;
-    child.Style.FixedWidth  = 55.0f;
-    child.Style.FixedHeight = 35.0f;
+    child.Style.FixedWidth  = Unit{ 55.0f };
+    child.Style.FixedHeight = Unit{ 35.0f };
 
     parent.PushBackChild( child );
 
@@ -430,10 +430,10 @@ TEST_CASE( "MeasureLayoutNode Horizontal single child with spacing has no traili
     parent.Style.LayoutType = ELayoutType::Horizontal;
     parent.Style.WidthMode  = ESizingMode::Content;
     parent.Style.HeightMode = ESizingMode::Content;
-    parent.Style.Spacing    = 10.0f;
+    parent.Style.Spacing    = Unit{ 10.0f };
 
     LayoutNode child{}; child.Style.WidthMode = ESizingMode::Fixed; child.Style.HeightMode = ESizingMode::Fixed;
-    child.Style.FixedWidth = 50.0f; child.Style.FixedHeight = 20.0f;
+    child.Style.FixedWidth = Unit{ 50.0f }; child.Style.FixedHeight = Unit{ 20.0f };
 
     parent.PushBackChild( child );
 
@@ -448,10 +448,10 @@ TEST_CASE( "MeasureLayoutNode Vertical single child with spacing has no trailing
     parent.Style.LayoutType = ELayoutType::Vertical;
     parent.Style.WidthMode  = ESizingMode::Content;
     parent.Style.HeightMode = ESizingMode::Content;
-    parent.Style.Spacing    = 15.0f;
+    parent.Style.Spacing    = Unit{ 15.0f };
 
     LayoutNode child{}; child.Style.WidthMode = ESizingMode::Fixed; child.Style.HeightMode = ESizingMode::Fixed;
-    child.Style.FixedWidth = 40.0f; child.Style.FixedHeight = 30.0f;
+    child.Style.FixedWidth = Unit{ 40.0f }; child.Style.FixedHeight = Unit{ 30.0f };
 
     parent.PushBackChild( child );
 
@@ -471,10 +471,10 @@ TEST_CASE( "MeasureLayoutNode Collapsed child contributes nothing to Content par
     parent.Style.HeightMode = ESizingMode::Content;
 
     LayoutNode visible{}; visible.Style.WidthMode = ESizingMode::Fixed; visible.Style.HeightMode = ESizingMode::Fixed;
-    visible.Style.FixedWidth = 60.0f; visible.Style.FixedHeight = 40.0f;
+    visible.Style.FixedWidth = Unit{ 60.0f }; visible.Style.FixedHeight = Unit{ 40.0f };
 
     LayoutNode collapsed{}; collapsed.Style.WidthMode = ESizingMode::Fixed; collapsed.Style.HeightMode = ESizingMode::Fixed;
-    collapsed.Style.FixedWidth = 200.0f; collapsed.Style.FixedHeight = 200.0f;
+    collapsed.Style.FixedWidth = Unit{ 200.0f }; collapsed.Style.FixedHeight = Unit{ 200.0f };
     collapsed.Layout.Visibility = { Visibility::Collapsed };
 
     parent.PushBackChild( visible );
@@ -493,11 +493,11 @@ TEST_CASE( "MeasureLayoutNode all children Collapsed gives Content parent zero d
     parent.Style.HeightMode = ESizingMode::Content;
 
     LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
-    c1.Style.FixedWidth = 100.0f; c1.Style.FixedHeight = 50.0f;
+    c1.Style.FixedWidth = Unit{ 100.0f }; c1.Style.FixedHeight = Unit{ 50.0f };
     c1.Layout.Visibility = { Visibility::Collapsed };
 
     LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
-    c2.Style.FixedWidth = 80.0f; c2.Style.FixedHeight = 60.0f;
+    c2.Style.FixedWidth = Unit{ 80.0f }; c2.Style.FixedHeight = Unit{ 60.0f };
     c2.Layout.Visibility = { Visibility::Collapsed };
 
     parent.PushBackChild( c1 );
@@ -517,10 +517,10 @@ TEST_CASE( "MeasureLayoutNode SizeConstraints clamps Content-mode desired size t
     parent.Style.LayoutType     = ELayoutType::Horizontal;
     parent.Style.WidthMode      = ESizingMode::Content;
     parent.Style.HeightMode     = ESizingMode::Content;
-    parent.Style.SizeConstraints = Constraints::AtMost( Vec2f( 50.0f, 30.0f ) );
+    parent.Style.SizeConstraints = Constraints::AtMost( ToUnitVec2( Vec2f( 50.0f, 30.0f ) ) );
 
     LayoutNode child{}; child.Style.WidthMode = ESizingMode::Fixed; child.Style.HeightMode = ESizingMode::Fixed;
-    child.Style.FixedWidth = 200.0f; child.Style.FixedHeight = 100.0f;
+    child.Style.FixedWidth = Unit{ 200.0f }; child.Style.FixedHeight = Unit{ 100.0f };
 
     parent.PushBackChild( child );
 
@@ -535,7 +535,7 @@ TEST_CASE( "MeasureLayoutNode SizeConstraints clamps Content-mode desired size t
     parent.Style.LayoutType     = ELayoutType::Overlay;
     parent.Style.WidthMode      = ESizingMode::Content;
     parent.Style.HeightMode     = ESizingMode::Content;
-    parent.Style.SizeConstraints = Constraints::AtLeast( Vec2f( 100.0f, 80.0f ) );
+    parent.Style.SizeConstraints = Constraints::AtLeast( ToUnitVec2( Vec2f( 100.0f, 80.0f ) ) );
 
     // No children → content = 0×0, but min constraint forces 100×80
     Vec2f result = MeasureLayoutNode( parent, Vec2f( 1000.0f, 1000.0f ) );
