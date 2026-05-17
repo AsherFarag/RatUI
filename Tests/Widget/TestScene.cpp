@@ -97,8 +97,8 @@ TEST_CASE( "CreateWidget attaches child to parent layout node", "[scene]" )
     REQUIRE( rootNode  != nullptr );
     REQUIRE( childNode != nullptr );
 
-    REQUIRE( rootNode->FirstChild  == childNode );
-    REQUIRE( childNode->Parent     == rootNode );
+    REQUIRE( rootNode->FirstChild() == childNode );
+    REQUIRE( childNode->Parent()    == rootNode );
     REQUIRE( rootNode->NumChildren == 1 );
 }
 

@@ -1,6 +1,8 @@
 #pragma once
 #include <RatUI/RatUI.h>
 #include <RatUI/Widget/TextWidget.h>
+#include <RatUI/Widget/ButtonWidget.h>
+#include <RatUI/Widget/PanelWidget.h>
 
 using namespace RatUI;
 

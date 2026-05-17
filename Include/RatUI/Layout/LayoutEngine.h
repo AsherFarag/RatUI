@@ -439,7 +439,7 @@ namespace RatUI
         const LayoutStyle& s = a_Node.Style;
         a_Node.Layout.FinalRect = a_AllocatedRect;
 
-        if (!a_Node.FirstChild)
+        if ( !a_Node.FirstChild() )
             return; // No need to arrange children if there are none
 
         

@@ -28,7 +28,7 @@ namespace RatUI
 
             LayoutChildIterator& operator++()
             {
-                Current = Current ? Current->NextSibling : nullptr;
+                Current = Current ? Current->NextSibling() : nullptr;
                 return *this;
             }
 
@@ -271,7 +271,7 @@ namespace RatUI
             if ( !scopeNode ) return;
 
             // Walk children in layout order, find first focusable
-            for ( LayoutNode* child = scopeNode->FirstChild; child; child = child->NextSibling )
+            for ( LayoutNode* child = scopeNode->FirstChild(); child; child = child->NextSibling() )
             {
                 IWidget* w = GetWidget( child->WidgetID );
                 if ( w && w->IsFocusable( *this ) )
@@ -326,7 +326,7 @@ namespace RatUI
             return;
         }
 
-        auto focusableNodes = Detail::LayoutChildRange{ scopeNode->FirstChild }
+        auto focusableNodes = Detail::LayoutChildRange{ scopeNode->FirstChild() }
             | std::views::filter( [&]( LayoutNode* node ) -> bool
             {
                 if ( !node ) return false;

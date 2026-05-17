@@ -218,6 +218,29 @@ public:
             swatchNode->Style.HeightMode = ESizingMode::Fixed;
             swatchNode->Style.FixedHeight = radius * 2.f;
         }
+
+        // Add a button at the bottom
+		Callback<Scene&, WidgetID> buttonCallback = +[]( Scene& a_Scene, WidgetID a_WidgetID )
+		{
+			std::cout << "Button Pressed! WidgetID: " << std::endl;
+		};
+        WidgetID button = m_Scene.CreateWidget<ButtonWidget>( root, buttonCallback );
+        auto* buttonNode = m_Scene.Layouts.Get( m_Scene.GetWidget( button )->GetLayoutID() );
+
+        buttonNode->Style.WidthMode = ESizingMode::Fixed;
+        buttonNode->Style.FixedWidth = 300_u;
+        buttonNode->Style.HeightMode = ESizingMode::Fixed;
+        buttonNode->Style.FixedHeight = 40_u;
+        buttonNode->Style.ChildAlign = EAlignment::Center;
+
+        TextLayoutStyle btnTextStyle;
+        btnTextStyle.Font = DefaultFont;
+        btnTextStyle.Size = 16_u;
+        WidgetID buttonText = m_Scene.CreateWidget<TextWidget>( button, "Press Me", btnTextStyle );
+        auto* buttonTextNode = m_Scene.Layouts.Get( m_Scene.GetWidget( buttonText )->GetLayoutID() );
+        buttonTextNode->Style.WidthMode = ESizingMode::Content;
+        buttonTextNode->Style.HeightMode = ESizingMode::Content;
+        
     }
 
     void OnInputEvent( const InputEvent& a_Event ) override

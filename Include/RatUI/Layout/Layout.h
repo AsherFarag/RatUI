@@ -312,17 +312,18 @@ namespace RatUI
         LayoutStyle Style{};   ///< The layout style properties that define how this widget should be sized and positioned.
         LayoutResult Layout{}; ///< The cached layout result for this widget computed during the layout process.
         u32 NumChildren{ 0 };
-        LayoutNode* Parent{ nullptr };
-        LayoutNode* FirstChild{ nullptr };
-        LayoutNode* LastChild{ nullptr };
-        LayoutNode* PrevSibling{ nullptr };
-        LayoutNode* NextSibling{ nullptr };
 
         union
         {
 			PoolID WidgetID;          ///< The ID of the widget associated with this layout node.
 			void* UserData = nullptr; ///< Incase LayoutNode is not being used with the IWidget system, this can store arbitrary user data.
         };
+
+        LayoutNode* Parent()      const { return m_Parent; }
+        LayoutNode* FirstChild()  const { return m_FirstChild; }
+        LayoutNode* LastChild()   const { return m_LastChild; }
+        LayoutNode* PrevSibling() const { return m_PrevSibling; }
+        LayoutNode* NextSibling() const { return m_NextSibling; }
 
         /** @brief Detaches this node from its parent, updating the linked list pointers of siblings and parent accordingly. */
         void DetachFromParent();
@@ -370,46 +371,53 @@ namespace RatUI
          */
         template<std::invocable<LayoutNode&> Func>
         void ForEachDescendant( Func&& a_Func );
+
+    private:
+        LayoutNode* m_Parent{ nullptr };
+        LayoutNode* m_FirstChild{ nullptr };
+        LayoutNode* m_LastChild{ nullptr };
+        LayoutNode* m_PrevSibling{ nullptr };
+        LayoutNode* m_NextSibling{ nullptr };
     };
 
     // === Inline Implementations ===
 
     inline void LayoutNode::DetachFromParent()
     {
-        if ( !Parent ) return; // Not attached to any parent
+        if ( !m_Parent ) return; // Not attached to any parent
 
         // Link siblings together, bypassing this node
-        if ( PrevSibling ) PrevSibling->NextSibling = NextSibling;
-        else               Parent->FirstChild = NextSibling;
+        if ( m_PrevSibling ) m_PrevSibling->m_NextSibling = m_NextSibling;
+        else                 m_Parent->m_FirstChild = m_NextSibling;
 
-        if ( NextSibling ) NextSibling->PrevSibling = PrevSibling;
-        else               Parent->LastChild = PrevSibling;
+        if ( m_NextSibling ) m_NextSibling->m_PrevSibling = m_PrevSibling;
+        else                 m_Parent->m_LastChild = m_PrevSibling;
 
-        Parent->NumChildren--;
-        Parent = nullptr;
-        PrevSibling = nullptr;
-        NextSibling = nullptr;
+        m_Parent->NumChildren--;
+        m_Parent = nullptr;
+        m_PrevSibling = nullptr;
+        m_NextSibling = nullptr;
     }
 
     inline void LayoutNode::PushBackChild( LayoutNode& a_Child )
     {
         a_Child.DetachFromParent(); // Ensure child is not currently attached to another parent
 
-        a_Child.Parent      = this;
-        a_Child.NextSibling = nullptr;
+        a_Child.m_Parent = this;
+        a_Child.m_NextSibling = nullptr;
 
-        if ( LastChild )
+        if ( m_LastChild )
         {
-            LastChild->NextSibling = &a_Child;
-            a_Child.PrevSibling = LastChild;
+            m_LastChild->m_NextSibling = &a_Child;
+            a_Child.m_PrevSibling = m_LastChild;
         }
         else
         {
-            FirstChild = &a_Child;
-            a_Child.PrevSibling = nullptr;
+            m_FirstChild = &a_Child;
+            a_Child.m_PrevSibling = nullptr;
         }
 
-        LastChild = &a_Child;
+        m_LastChild = &a_Child;
         ++NumChildren;
     }
 
@@ -417,27 +425,27 @@ namespace RatUI
     {
         a_Child.DetachFromParent(); // Ensure child is not currently attached to another parent
 
-        a_Child.Parent = this;
-        a_Child.PrevSibling = nullptr;
+        a_Child.m_Parent = this;
+        a_Child.m_PrevSibling = nullptr;
 
-        if ( FirstChild )
+        if ( m_FirstChild )
         {
-            FirstChild->PrevSibling = &a_Child;
-            a_Child.NextSibling = FirstChild;
+            m_FirstChild->m_PrevSibling = &a_Child;
+            a_Child.m_NextSibling = m_FirstChild;
         }
         else
         {
-            LastChild = &a_Child;
-            a_Child.NextSibling = nullptr;
+            m_LastChild = &a_Child;
+            a_Child.m_NextSibling = nullptr;
         }
 
-        FirstChild = &a_Child;
+        m_FirstChild = &a_Child;
         ++NumChildren;
     }
 
     inline void LayoutNode::InsertChildAfter( LayoutNode& a_Child, LayoutNode& a_Sibling )
     {
-        if ( !a_Sibling.Parent || a_Sibling.Parent != this )
+        if ( !a_Sibling.m_Parent || a_Sibling.m_Parent != this )
         {
             RATUI_USER_ASSERT( false, "Sibling node is not a child of this parent" );
             return;
@@ -445,22 +453,22 @@ namespace RatUI
 
         a_Child.DetachFromParent(); // Ensure child is not currently attached to another parent
 
-        a_Child.Parent = this;
-        a_Child.PrevSibling = &a_Sibling;
-        a_Child.NextSibling = a_Sibling.NextSibling;
+        a_Child.m_Parent = this;
+        a_Child.m_PrevSibling = &a_Sibling;
+        a_Child.m_NextSibling = a_Sibling.m_NextSibling;
 
-        if ( a_Sibling.NextSibling )
-            a_Sibling.NextSibling->PrevSibling = &a_Child;
+        if ( a_Sibling.m_NextSibling )
+            a_Sibling.m_NextSibling->m_PrevSibling = &a_Child;
         else
-            LastChild = &a_Child;
+            m_LastChild = &a_Child;
 
-        a_Sibling.NextSibling = &a_Child;
+        a_Sibling.m_NextSibling = &a_Child;
         ++NumChildren;
     }
 
     inline void LayoutNode::InsertChildBefore( LayoutNode& a_Child, LayoutNode& a_Sibling )
     {
-        if ( !a_Sibling.Parent || a_Sibling.Parent != this )
+        if ( !a_Sibling.m_Parent || a_Sibling.m_Parent != this )
         {
             RATUI_USER_ASSERT( false, "Sibling node is not a child of this parent" );
             return;
@@ -468,30 +476,30 @@ namespace RatUI
 
         a_Child.DetachFromParent(); // Ensure child is not currently attached to another parent
 
-        a_Child.Parent = this;
-        a_Child.NextSibling = &a_Sibling;
-        a_Child.PrevSibling = a_Sibling.PrevSibling;
+        a_Child.m_Parent = this;
+        a_Child.m_NextSibling = &a_Sibling;
+        a_Child.m_PrevSibling = a_Sibling.m_PrevSibling;
 
-        if ( a_Sibling.PrevSibling )
-            a_Sibling.PrevSibling->NextSibling = &a_Child;
+        if ( a_Sibling.m_PrevSibling )
+            a_Sibling.m_PrevSibling->m_NextSibling = &a_Child;
         else
-            FirstChild = &a_Child;
+            m_FirstChild = &a_Child;
 
-        a_Sibling.PrevSibling = &a_Child;
+        a_Sibling.m_PrevSibling = &a_Child;
         ++NumChildren;
     }
 
     template<std::invocable<LayoutNode&> Func>
     void LayoutNode::ForEachChild( Func&& a_Func )
     {
-        for (LayoutNode* child = FirstChild; child != nullptr; child = child->NextSibling)
+        for ( LayoutNode* child = m_FirstChild; child != nullptr; child = child->m_NextSibling )
             std::forward<Func>(a_Func)(*child);
     }
 
     template<std::invocable<const LayoutNode&> Func>
     void LayoutNode::ForEachChild( Func&& a_Func ) const
     {
-        for (const LayoutNode* child = FirstChild; child != nullptr; child = child->NextSibling)
+        for ( const LayoutNode* child = m_FirstChild; child != nullptr; child = child->m_NextSibling )
             std::forward<Func>(a_Func)(*child);
     }
 

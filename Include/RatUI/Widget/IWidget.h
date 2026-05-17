@@ -16,6 +16,11 @@ namespace RatUI
     class IWidget
     {
     public:
+        IWidget() = default;
+        IWidget( const IWidget& ) = delete;
+        IWidget& operator=( const IWidget& ) = delete;
+        IWidget( IWidget&& ) = default;
+        IWidget& operator=( IWidget&& ) = default;
         virtual ~IWidget() = default;
 
         /** @brief Returns the unique identifier for this widget. */
