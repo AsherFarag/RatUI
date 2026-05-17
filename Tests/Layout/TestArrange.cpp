@@ -16,7 +16,7 @@ static void DoLayout( LayoutNode& a_Root, Vec2f a_AvailSize )
 {
     const Vec2<Unit> availSize = ToUnitVec2( a_AvailSize );
     MeasureLayoutNode( a_Root, availSize );
-    ArrangeLayoutNode( a_Root, Rect<Unit>{ .Origin = { 0_u, 0_u }, .Size = availSize } );
+    ArrangeLayoutNode( a_Root, Rect<Unit>{ .Origin = { ToUnit( 0.0f ), ToUnit( 0.0f ) }, .Size = availSize } );
 }
 
 /** Checks Rectf origin and size. */
@@ -672,7 +672,7 @@ TEST_CASE( "FlexGrow is clamped by SizeConstraints max", "[arrange][flex]" )
     child.Style.FixedWidth  = Unit{ 0.0f };
     child.Style.FixedHeight = Unit{ 50.0f };
     child.Style.FlexGrow    = 1.0f;
-    child.Style.SizeConstraints = Constraints::AtMost( ToUnitVec2( Vec2f{ 100.0f, 100.0f  } ) );
+    child.Style.SizeConstraints = Constraints::AtMost( ToUnitVec2( Vec2f{ 100.0f, 100.0f } ) );
 
     parent.PushBackChild( child );
 
@@ -912,7 +912,7 @@ TEST_CASE( "ArrangeLinear Collapsed child is skipped and does not advance cursor
 
     // Measure first so DesiredSizes are set
     MeasureLayoutNode( parent, { 400.0f, 100.0f } );
-    ArrangeLayoutNode( parent, { .Origin = { 0.0f, 0.0f }, .Size = { 400.0f, 100.0f } } );
+    RatUI::ArrangeLayoutNode( parent, ToUnitRect( Rectf{ .Origin = { 0.0f, 0.0f }, .Size = { 400.0f, 100.0f } } ) );
 
     // c2 is collapsed, so c3 should start right after c1 (no gap for c2)
     REQUIRE( c1.Layout.FinalRect.Origin[0] .ToFloat() == Catch::Approx( 0.0f  ) );
@@ -940,7 +940,7 @@ TEST_CASE( "ArrangeLinear Hidden child still occupies space in layout", "[arrang
     parent.PushBackChild( c3 );
 
     MeasureLayoutNode( parent, { 400.0f, 100.0f } );
-    ArrangeLayoutNode( parent, { .Origin = { 0.0f, 0.0f }, .Size = { 400.0f, 100.0f } } );
+    RatUI::ArrangeLayoutNode( parent, ToUnitRect( Rectf{ .Origin = { 0.0f, 0.0f }, .Size = { 400.0f, 100.0f } } ) );
 
     // c1@0, c2@50, c3@110
     REQUIRE( c1.Layout.FinalRect.Origin[0] .ToFloat() == Catch::Approx( 0.0f   ) );

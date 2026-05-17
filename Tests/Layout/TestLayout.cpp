@@ -53,14 +53,14 @@ TEST_CASE( "Constraints::Unbounded has zero min and max float max", "[layout][co
 
 TEST_CASE( "Constraints::Fixed sets min and max to the same size", "[layout][constraints]" )
 {
-    Constraints c = Constraints::Fixed( ToUnitVec2( Vec2f( 100.0f, 200.0f  ) ) );
+    Constraints c = Constraints::Fixed( ToUnitVec2( Vec2f( 100.0f, 200.0f ) ) );
     RequireApproxEqual( c.MinSize, Vec2f( 100.0f, 200.0f ) );
     RequireApproxEqual( c.MaxSize, Vec2f( 100.0f, 200.0f ) );
 }
 
 TEST_CASE( "Constraints::AtLeast sets min and leaves max unbounded", "[layout][constraints]" )
 {
-    Constraints c = Constraints::AtLeast( ToUnitVec2( Vec2f( 50.0f, 75.0f  ) ) );
+    Constraints c = Constraints::AtLeast( ToUnitVec2( Vec2f( 50.0f, 75.0f ) ) );
     RequireApproxEqual( c.MinSize, Vec2f( 50.0f, 75.0f ) );
     REQUIRE( c.MaxSize[ 0 ] == std::numeric_limits<f32>::max() );
     REQUIRE( c.MaxSize[ 1 ] == std::numeric_limits<f32>::max() );
@@ -68,7 +68,7 @@ TEST_CASE( "Constraints::AtLeast sets min and leaves max unbounded", "[layout][c
 
 TEST_CASE( "Constraints::AtMost leaves min at zero and sets max", "[layout][constraints]" )
 {
-    Constraints c = Constraints::AtMost( ToUnitVec2( Vec2f( 300.0f, 400.0f  ) ) );
+    Constraints c = Constraints::AtMost( ToUnitVec2( Vec2f( 300.0f, 400.0f ) ) );
     RequireApproxEqual( c.MinSize, Vec2f( 0.0f, 0.0f ) );
     RequireApproxEqual( c.MaxSize, Vec2f( 300.0f, 400.0f ) );
 }

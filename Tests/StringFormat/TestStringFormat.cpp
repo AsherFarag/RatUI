@@ -98,7 +98,7 @@ TEST_CASE( "ELayoutType formats all values", "[format][direction]" )
 
 TEST_CASE( "Constraints::Fixed formats with matching min and max", "[format][constraints]" )
 {
-    Constraints c = Constraints::Fixed( ToUnitVec2( Vec2f( 100.0f, 200.0f  ) ) );
+    Constraints c = Constraints::Fixed( ToUnitVec2( Vec2f( 100.0f, 200.0f ) ) );
     std::string s = std::format( "{}", c );
     REQUIRE( s.find( "Constraints" ) != std::string::npos );
     REQUIRE( s.find( "Min"         ) != std::string::npos );
