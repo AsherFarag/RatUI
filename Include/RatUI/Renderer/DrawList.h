@@ -27,7 +27,8 @@ namespace RatUI
 
         const Mat3<Unit>& GetCurrentTransform() const
         {
-            return m_TransformStackSize == 0 ? c_Identity<Mat3<Unit>> : m_TransformStack[m_TransformStackSize - 1];
+            return m_TransformStackSize == 0 ? c_Identity<Mat3<Unit>> 
+                                             : m_TransformStack[m_TransformStackSize - 1];
         }
 
         DrawList& PushTransform( const Mat3<Unit>& a_Transform )
@@ -35,7 +36,6 @@ namespace RatUI
             RATUI_ASSERT( m_TransformStackSize < Size(m_TransformStack), "Exceeded maximum transform stack depth." );
             const Mat3<Unit> transform = GetCurrentTransform() * a_Transform;
             m_TransformStack[m_TransformStackSize++] = transform;
-            UpdateBatchState();
             return *this;
         }
 
@@ -43,7 +43,6 @@ namespace RatUI
         {
             RATUI_USER_ASSERT( m_TransformStackSize > 0, "PopTransform called too many times." );
             --m_TransformStackSize;
-            UpdateBatchState();
             return *this;
         }
 
@@ -63,7 +62,6 @@ namespace RatUI
                 a_Rect = a_Rect.Intersection( *currentClip );
 
             m_ClipStack[m_ClipStackSize++] = a_Rect;
-            UpdateBatchState();
             return *this;
         }
 
@@ -71,7 +69,6 @@ namespace RatUI
         {
             RATUI_USER_ASSERT( m_ClipStackSize > 0, "PopClipRect called too many times." );
             --m_ClipStackSize;
-            UpdateBatchState();
             return *this;
         }
 
@@ -81,60 +78,60 @@ namespace RatUI
 
         DrawList& AddRect( Color a_Color, const Rect<Unit>& a_Rect )
         {
-            EnsureGeoBatch();
+            Batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureID::Null() );
             Batcher.EmitRect( ToPixelRect( a_Rect ), a_Color );
             return *this;
         }
 
         DrawList& AddRect( Color a_Color, const Rect<Unit>& a_Rect, CornerRounding a_Rounding )
         {
-            EnsureGeoBatch();
+            Batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureID::Null() );
             Batcher.EmitRoundedRect( ToPixelRect( a_Rect ), a_Rounding, a_Color );
             return *this;
         }
 
         DrawList& AddRectBorder( Color a_Color, const Rect<Unit>& a_Rect, Unit a_Thickness = 1_u )
         {
-            EnsureGeoBatch();
-            Batcher.EmitRectBorder( ToPixelRect( a_Rect ), 0.f, a_Color, ToPixel( a_Thickness, m_DPIScale ).ToFloat() );
+            Batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureID::Null() );
+            Batcher.EmitRectBorder( ToPixelRect( a_Rect ), a_Color, ToPixel( a_Thickness, m_DPIScale ) );
             return *this;
         }
 
         DrawList& AddRectBorder( Color a_Color, const Rect<Unit>& a_Rect, CornerRounding a_Rounding, Unit a_Thickness = 1_u )
         {
-            EnsureGeoBatch();
-            Batcher.EmitRoundedRectBorder( ToPixelRect( a_Rect ), a_Rounding, a_Color, ToPixel( a_Thickness, m_DPIScale ).ToFloat() );
+            Batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureID::Null() );
+            Batcher.EmitRoundedRectBorder( ToPixelRect( a_Rect ), a_Rounding, a_Color, ToPixel( a_Thickness, m_DPIScale ) );
             return *this;
         }
 
         DrawList& AddCircle( Color a_Color, Vec2<Unit> a_Center, Unit a_Radius )
         {
-            EnsureGeoBatch();
-            Batcher.EmitCircle( ToPixelVec2( a_Center ), ToPixel( a_Radius, m_DPIScale ).ToFloat(), a_Color );
+            Batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureID::Null() );
+            Batcher.EmitCircle( ToPixelVec2( a_Center ), ToPixel( a_Radius, m_DPIScale ), a_Color );
             return *this;
         }
 
         DrawList& AddCircleBorder( Color a_Color, Vec2<Unit> a_Center, Unit a_Radius, Unit a_Thickness = 1_u )
         {
-            EnsureGeoBatch();
-            Batcher.EmitCircleBorder( ToPixelVec2( a_Center ), ToPixel( a_Radius, m_DPIScale ).ToFloat(), a_Color, ToPixel( a_Thickness, m_DPIScale ).ToFloat() );
+            Batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureID::Null() );
+            Batcher.EmitCircleBorder( ToPixelVec2( a_Center ), ToPixel( a_Radius, m_DPIScale ), a_Color, ToPixel( a_Thickness, m_DPIScale ) );
             return *this;
         }
 
-        DrawList& AddText( const ShapedText& a_Shaped, TextRenderStyle a_Style, Rect<Unit> a_Rect )
+        DrawList& AddText( const ShapedText& a_Shaped, const TextRenderStyle& a_Style, Rect<Unit> a_Rect )
 		{
 			const f32   baseSize   = Atlas.GetConfig().BaseSize.ToFloat();
             const Pixel fontSizePx = ToPixel( a_Shaped.FontSize, m_DPIScale );
             const f32   msdfScale  = baseSize > 0.f ? fontSizePx.ToFloat() / baseSize : 1.f;
 
-			EnsureMSDFBatch( msdfScale, a_Style );
+			Batcher.EnsureMSDFTextBatch( GetPixelClipRect(), GetPixelTransform(), MSDFTextDrawData::From( Atlas.GetTexture(), a_Style, msdfScale ) );
 			Batcher.EmitText( a_Shaped, a_Style, ToPixelRect( a_Rect ), Atlas, m_DPIScale );
             return *this;
         }
 
         void Finish()
         {
-            FlushBatch();
+            // Batches are finalized incrementally by DrawBatcher as commands are recorded.
         }
 
     private:
@@ -144,8 +141,6 @@ namespace RatUI
         size                                    m_ClipStackSize{ 0 };
         size                                    m_TransformStackSize{ 0 };
 
-        TextureID            m_CurrentTexture{ TextureID::Null() };
-        bool                 m_HasActiveBatch{ false };
         f32                  m_DPIScale{ 1.f };
 
         Vec2<Pixel> ToPixelVec2( const Vec2<Unit>& a_Vec ) const
@@ -163,6 +158,8 @@ namespace RatUI
                 ToPixelVec2( a_Rect.Size )
             };
         }
+
+        // TODO: We call these alot, should cache them
 
         Mat3f GetPixelTransform() const 
         {
@@ -188,104 +185,6 @@ namespace RatUI
                 Vec2<u16>{ static_cast<u16>( pixelRect.Left().ToFloat() ), static_cast<u16>( pixelRect.Top().ToFloat() ) },
                 Vec2<u16>{ static_cast<u16>( pixelRect.Width().ToFloat() ), static_cast<u16>( pixelRect.Height().ToFloat() ) }
 			};
-        }
-
-        void FlushBatch()
-        {
-            if ( m_HasActiveBatch )
-            {
-                Batcher.EndBatch();
-                m_HasActiveBatch = false;
-            }
-        }
-
-        bool IsBatchStateCompatible( const DrawBatch& a_Batch, EBatchType a_Type ) const
-        {
-            return a_Batch.Type   == a_Type &&
-                a_Batch.ClipRect  == GetPixelClipRect() &&
-                a_Batch.Transform == GetPixelTransform() &&
-                a_Batch.Texture   == m_CurrentTexture;
-        }
-
-        void UpdateBatchState()
-        {
-            if ( !m_HasActiveBatch )
-                return;
-
-            DrawBatch& currentBatch = Back( Batcher.Batches );
-            if ( IsBatchStateCompatible( currentBatch, currentBatch.Type ) )
-            {
-                return; // No change in batch state, no need to flush.
-            }
-
-            FlushBatch();
-        }
-
-        void EnsureGeoBatch( TextureID a_Texture = TextureID::Null() )
-        {
-            m_CurrentTexture = a_Texture;
-            
-            if ( m_HasActiveBatch && IsBatchStateCompatible( Back( Batcher.Batches ), EBatchType::Geometry ) )
-                return; // Current batch is already compatible.
-
-            FlushBatch();
-            Batcher.BeginBatch( EBatchType::Geometry, GetPixelClipRect(), GetPixelTransform(), m_CurrentTexture);
-            m_HasActiveBatch = true;
-        }
-
-        void EnsureMSDFBatch( f32 a_Scale, const TextRenderStyle& a_Style )
-        {
-            m_CurrentTexture = Atlas.GetTexture();
-
-            if ( m_HasActiveBatch )
-            {
-                DrawBatch& b = Back( Batcher.Batches );
-
-                if ( IsBatchStateCompatible( b, EBatchType::MSDF ) &&
-                     b.MSDF.Scale == a_Scale )
-                    return;
-            }
-
-            FlushBatch();
-            DrawBatch& batch = Batcher.BeginBatch( EBatchType::MSDF, GetPixelClipRect(), GetPixelTransform(), m_CurrentTexture);
-
-            batch.MSDF.PixelRange = c_MsdfPxRange;
-            batch.MSDF.Scale = a_Scale;
-
-            batch.MSDF.FillColor = a_Style.FillColor;
-            batch.MSDF.FillSoftness = a_Style.FillSoftness;
-            batch.MSDF.FillThreshold = a_Style.FillThreshold;
-
-            batch.MSDF.OutlineEnable = a_Style.Outline;
-            if ( a_Style.Outline )
-            {
-                batch.MSDF.OutlineColor = a_Style.OutlineColor;
-                batch.MSDF.OutlineWidth = a_Style.OutlineWidth;
-                batch.MSDF.OutlineSoftness = a_Style.OutlineSoftness;
-            }
-
-            batch.MSDF.ShadowEnable = a_Style.Shadow;
-            if ( a_Style.Shadow )
-            {
-                batch.MSDF.ShadowColor = a_Style.ShadowColor;
-                batch.MSDF.ShadowSoftness = a_Style.ShadowSoftness;
-                batch.MSDF.ShadowSpread = a_Style.ShadowSpread;
-
-                batch.MSDF.ShadowOffsetUV = Vec2f{
-                    a_Style.ShadowOffset[0] / static_cast<f32>( Atlas.GetConfig().AtlasWidth ),
-                    a_Style.ShadowOffset[1] / static_cast<f32>( Atlas.GetConfig().AtlasHeight )
-                };
-            }
-
-            batch.MSDF.GlowEnable = a_Style.Glow;
-            if ( a_Style.Glow )
-            {
-                batch.MSDF.GlowColor = a_Style.GlowColor;
-                batch.MSDF.GlowSpread = a_Style.GlowSpread;
-                batch.MSDF.GlowPower = a_Style.GlowPower;
-            }
-
-            m_HasActiveBatch = true;
         }
     };
 
