@@ -217,9 +217,9 @@ namespace RatUI::OpenGL
             glEnableVertexAttribArray( 1 );
             glEnableVertexAttribArray( 2 );
 
-            glVertexAttribPointer( 0, 2, GL_FLOAT,         GL_FALSE, sizeof( TextVertex ), (const void*)  0 );
-            glVertexAttribPointer( 1, 4, GL_UNSIGNED_BYTE, GL_TRUE,  sizeof( TextVertex ), (const void*)  8 );
-            glVertexAttribPointer( 2, 2, GL_FLOAT,         GL_FALSE, sizeof( TextVertex ), (const void*) 12 );
+            glVertexAttribPointer( 0, 2, GL_FLOAT, GL_FALSE, sizeof( TextVertex ), (const void*)  0 );
+            glVertexAttribPointer( 1, 1, GL_FLOAT, GL_FALSE, sizeof( TextVertex ), (const void*)( 8 ) );
+            glVertexAttribPointer( 2, 2, GL_FLOAT, GL_FALSE, sizeof( TextVertex ), (const void*) 12 );
 
             glBindVertexArray( 0 );
 
@@ -339,9 +339,9 @@ namespace RatUI::OpenGL
                     // Re-specify Text attrib pointers for this batch's vertex byte range.
                     glBindVertexArray( m_TextVAO );
                     const uintptr_t vo = static_cast<uintptr_t>( batch.VertexByteOffset );
-                    glVertexAttribPointer( 0, 2, GL_FLOAT,         GL_FALSE, sizeof( TextVertex ), (const void*)( vo +  0 ) );
-                    glVertexAttribPointer( 1, 4, GL_UNSIGNED_BYTE, GL_TRUE,  sizeof( TextVertex ), (const void*)( vo +  8 ) );
-                    glVertexAttribPointer( 2, 2, GL_FLOAT,         GL_FALSE, sizeof( TextVertex ), (const void*)( vo + 12 ) );
+                    glVertexAttribPointer( 0, 2, GL_FLOAT, GL_FALSE, sizeof( TextVertex ), (const void*)( vo +  0 ) );
+                    glVertexAttribPointer( 1, 1, GL_FLOAT, GL_FALSE, sizeof( TextVertex ), (const void*)( vo +  8 ) );
+                    glVertexAttribPointer( 2, 2, GL_FLOAT, GL_FALSE, sizeof( TextVertex ), (const void*)( vo + 12 ) );
 
                     glUseProgram( m_MSDFProgram );
                     glUniformMatrix4fv( m_TextUniforms[GLSL::ETextUniform_PVM], 1, GL_FALSE, pvm );

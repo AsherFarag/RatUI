@@ -43,7 +43,7 @@ namespace RatUI
     struct TextVertex
     {
         Vec2<Pixel> Position;
-        Color       Tint;
+        f32         Opacity;  ///< The opacity of the vertex, used for fading effects. Range [0, 1].
         Vec2f       UV;
     };
 
@@ -543,17 +543,17 @@ namespace RatUI
                     const f32 u1 = static_cast<f32>( gr->AtlasRect.Origin[0] + gr->AtlasRect.Size[0]  ) * rcpAtlasW;
                     const f32 v1 = static_cast<f32>( gr->AtlasRect.Origin[1] + gr->AtlasRect.Size[1]  ) * rcpAtlasH;
 
-                    const Color colorA = { 255, 255, 255, computeFadeAlpha( gx      ) };
-                    const Color colorB = { 255, 255, 255, computeFadeAlpha( gx + gw ) };
+                    const f32 opacityA = computeFadeAlpha( gx      ) / 255.0f;
+                    const f32 opacityB = computeFadeAlpha( gx + gw ) / 255.0f;
 
                     // Index base in terms of TextVertex count within the current batch.
                     const u32 vertexBase = ( static_cast<u32>( Size( Vertices ) ) - Back( Batches ).VertexByteOffset ) / sizeof( TextVertex );
 
                     auto verts = ReserveVertices<TextVertex>( 4 );
-                    verts[0] = TextVertex{ Vec2<Pixel>{ gx,      gy      }, colorA, Vec2f{ u0, v0 } };
-                    verts[1] = TextVertex{ Vec2<Pixel>{ gx + gw, gy      }, colorB, Vec2f{ u1, v0 } };
-                    verts[2] = TextVertex{ Vec2<Pixel>{ gx,      gy + gh }, colorA, Vec2f{ u0, v1 } };
-                    verts[3] = TextVertex{ Vec2<Pixel>{ gx + gw, gy + gh }, colorB, Vec2f{ u1, v1 } };
+                    verts[0] = TextVertex{ Vec2<Pixel>{ gx,      gy      }, opacityA, Vec2f{ u0, v0 } };
+                    verts[1] = TextVertex{ Vec2<Pixel>{ gx + gw, gy      }, opacityB, Vec2f{ u1, v0 } };
+                    verts[2] = TextVertex{ Vec2<Pixel>{ gx,      gy + gh }, opacityA, Vec2f{ u0, v1 } };
+                    verts[3] = TextVertex{ Vec2<Pixel>{ gx + gw, gy + gh }, opacityB, Vec2f{ u1, v1 } };
 
                     auto idx = ReserveIndices( 6 );
                     idx[0] = vertexBase + 0; idx[1] = vertexBase + 1; idx[2] = vertexBase + 2;

@@ -189,18 +189,18 @@ namespace RatUI::GLSL
     inline constexpr const char* c_TextVertSrc = R"(
     #version 330 core
     layout(location = 0) in vec2  a_Pos;
-    layout(location = 1) in vec4  a_Color;
+    layout(location = 1) in float a_Opacity;
     layout(location = 2) in vec2  a_UV;
     
     uniform mat4 u_PVM;
     
-    out vec4 v_Color;
+    out float v_Opacity;
     out vec2 v_UV;
     
     void main()
     {
         gl_Position = u_PVM * vec4(a_Pos, 0.0, 1.0);
-        v_Color     = a_Color;
+        v_Opacity   = a_Opacity;
         v_UV        = a_UV;
     }
     )";
@@ -217,7 +217,7 @@ namespace RatUI::GLSL
     #version 330 core
 
     in vec2 v_UV;
-    in vec4 v_Color;
+    in float v_Opacity;
     out vec4 FragColor;
 
     // - Atlas
@@ -376,7 +376,7 @@ namespace RatUI::GLSL
         float fillAlpha = SDFAlpha(dist, u_FillThreshold, u_FillSoftness, pxRange);
         color = mix(color, u_FillColor, fillAlpha * u_FillColor.a);
 
-        color.a *= v_Color.a; // Apply vertex alpha at the end so it affects all layers.
+        color.a *= v_Opacity; // Apply vertex alpha at the end so it affects all layers.
         FragColor = color;
     }
     )";
