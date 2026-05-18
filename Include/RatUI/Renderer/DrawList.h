@@ -76,46 +76,38 @@ namespace RatUI
         // Drawing
         // ========================
 
-        DrawList& AddRect( Color a_Color, const Rect<Unit>& a_Rect )
+        DrawList& AddRect( Color a_Color, const Rect<Unit>& a_Rect, CornerRounding a_Rounding, Unit a_BorderThickness = 0_u, Color a_BorderColor = Colors::Transparent )
         {
             Batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureID::Null() );
-            Batcher.EmitRect( ToPixelRect( a_Rect ), a_Color );
+            Batcher.EmitRect( ToPixelRect( a_Rect ), a_Color, ToPixel( a_BorderThickness, m_DPIScale ).ToFloat(), a_BorderColor, ToPixelRounding( a_Rounding ) );
             return *this;
         }
 
-        DrawList& AddRect( Color a_Color, const Rect<Unit>& a_Rect, CornerRounding a_Rounding )
+        DrawList& AddRect( Color a_Color, const Rect<Unit>& a_Rect, Unit a_BorderThickness = 0_u, Color a_BorderColor = Colors::Transparent )
         {
-            Batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureID::Null() );
-            Batcher.EmitRoundedRect( ToPixelRect( a_Rect ), a_Rounding, a_Color );
-            return *this;
+            return AddRect( a_Color, a_Rect, CornerRounding::None(), a_BorderThickness, a_BorderColor );
         }
 
         DrawList& AddRectBorder( Color a_Color, const Rect<Unit>& a_Rect, Unit a_Thickness = 1_u )
         {
-            Batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureID::Null() );
-            Batcher.EmitRectBorder( ToPixelRect( a_Rect ), a_Color, ToPixel( a_Thickness, m_DPIScale ) );
-            return *this;
+            return AddRect( Colors::Transparent, a_Rect, CornerRounding::None(), a_Thickness, a_Color );
         }
 
         DrawList& AddRectBorder( Color a_Color, const Rect<Unit>& a_Rect, CornerRounding a_Rounding, Unit a_Thickness = 1_u )
         {
-            Batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureID::Null() );
-            Batcher.EmitRoundedRectBorder( ToPixelRect( a_Rect ), a_Rounding, a_Color, ToPixel( a_Thickness, m_DPIScale ) );
-            return *this;
+            return AddRect( Colors::Transparent, a_Rect, a_Rounding, a_Thickness, a_Color );
         }
 
-        DrawList& AddCircle( Color a_Color, Vec2<Unit> a_Center, Unit a_Radius )
+        DrawList& AddCircle( Color a_Color, Vec2<Unit> a_Center, Unit a_Radius, Unit a_BorderThickness = 0_u, Color a_BorderColor = Colors::Transparent )
         {
             Batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureID::Null() );
-            Batcher.EmitCircle( ToPixelVec2( a_Center ), ToPixel( a_Radius, m_DPIScale ), a_Color );
+            Batcher.EmitCircle( ToPixelVec2( a_Center ), ToPixel( a_Radius, m_DPIScale ), a_Color, ToPixel( a_BorderThickness, m_DPIScale ), a_BorderColor );
             return *this;
         }
 
         DrawList& AddCircleBorder( Color a_Color, Vec2<Unit> a_Center, Unit a_Radius, Unit a_Thickness = 1_u )
         {
-            Batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureID::Null() );
-            Batcher.EmitCircleBorder( ToPixelVec2( a_Center ), ToPixel( a_Radius, m_DPIScale ), a_Color, ToPixel( a_Thickness, m_DPIScale ) );
-            return *this;
+            return AddCircle( Colors::Transparent, a_Center, a_Radius, a_Thickness, a_Color );
         }
 
         DrawList& AddText( const ShapedText& a_Shaped, const TextRenderStyle& a_Style, Rect<Unit> a_Rect )
@@ -156,6 +148,16 @@ namespace RatUI
             return Rect<Pixel>{
                 ToPixelVec2( a_Rect.Origin ),
                 ToPixelVec2( a_Rect.Size )
+            };
+        }
+
+        Vec4<Pixel> ToPixelRounding( const CornerRounding& a_Rounding ) const
+        {
+            return Vec4<Pixel>{
+                ToPixel( a_Rounding.TopLeft, m_DPIScale ),
+                ToPixel( a_Rounding.TopRight, m_DPIScale ),
+                ToPixel( a_Rounding.BottomLeft, m_DPIScale ),
+                ToPixel( a_Rounding.BottomRight, m_DPIScale )
             };
         }
 

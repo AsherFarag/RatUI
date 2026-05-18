@@ -31,7 +31,7 @@ protected:
 class RectWidget : public IWidget
 {
 public:
-	RectWidget( Color a_Color, StringView a_Name, CornerRounding a_Rounding = CornerRounding::Uniform( 10_deg ) )
+	RectWidget( Color a_Color, StringView a_Name, CornerRounding a_Rounding = CornerRounding::Uniform( 10_u ) )
 		: Color( a_Color )
 		, Name( a_Name )
         , Rounding( a_Rounding )
@@ -50,7 +50,7 @@ public:
         const Rect<Unit>& rect = node->Layout.FinalRect;
 
 		if ( a_Scene.GetFocusedWidget() == GetID() )
-			a_DrawList.AddRect( Colors::White, rect.Expanded( 4_u ), Rounding + 4_deg );
+			a_DrawList.AddRect( Colors::White, rect.Expanded( 4_u ), Rounding + 4_u );
 
 		a_DrawList.AddRect( Color, rect, Rounding );
 

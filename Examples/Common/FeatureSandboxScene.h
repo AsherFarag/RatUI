@@ -240,6 +240,7 @@ public:
         auto* buttonTextNode = m_Scene.Layouts.Get( m_Scene.GetWidget( buttonText )->GetLayoutID() );
         buttonTextNode->Style.WidthMode = ESizingMode::Content;
         buttonTextNode->Style.HeightMode = ESizingMode::Content;
+		buttonTextNode->Style.Visibility = EVisibility::HitTestInvisible;
         
     }
 

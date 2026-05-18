@@ -17,7 +17,7 @@ namespace RatUI
         Color          HoverColor{ Colors::Surface600 };
         Color          PressedColor{ Colors::Surface500 };
         Color          FocusOutlineColor{ Colors::White };
-        CornerRounding Rounding{ CornerRounding::Uniform( 8_deg ) };
+        CornerRounding Rounding{ CornerRounding::Uniform( 8_u ) };
         Unit           BorderThickness{ 1_u };
 
         ButtonWidget() = default;
@@ -70,7 +70,7 @@ namespace RatUI
             a_DrawList.AddRect( fill, rect, Rounding );
 
             if ( a_Scene.GetFocusedWidget() == GetID() )
-                a_DrawList.AddRectBorder( FocusOutlineColor, rect.Expanded( 2_u ), Rounding + 2_deg, 2_u );
+                a_DrawList.AddRectBorder( FocusOutlineColor, rect.Expanded( 2_u ), Rounding + 2_u, 2_u );
 
             a_DrawList.PushClipRect( rect );
             a_Scene.ForEachChildWidget( GetID(), [&]( IWidget& a_Child )

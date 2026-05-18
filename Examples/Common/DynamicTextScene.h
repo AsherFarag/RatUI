@@ -104,7 +104,7 @@ private:
     {
         WidgetID card = m_Scene.CreateWidget<RectWidget>(
             parent, Colors::Surface700, "Card",
-            CornerRounding::Uniform( 6_deg )
+            CornerRounding::Uniform( 6_u )
         );
         {
             auto* n = Node( card );
@@ -292,7 +292,7 @@ private:
         }
 
         WidgetID box = m_Scene.CreateWidget<RectWidget>(
-            row, Colors::Transparent, "BaselineBox", CornerRounding::Uniform( 4_deg )
+            row, Colors::Transparent, "BaselineBox", CornerRounding::Uniform( 4_u )
         );
         {
             auto* n = Node( box );
@@ -615,7 +615,7 @@ private:
 
             m_AnimContainer = m_Scene.CreateWidget<RectWidget>(
                 container, Colors::Surface600, "AnimBox",
-                CornerRounding::Uniform( 6_deg )
+                CornerRounding::Uniform( 6_u )
             );
             {
                 auto* n = Node( m_AnimContainer );

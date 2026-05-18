@@ -10,6 +10,7 @@ namespace RatUI {
     template<typename _Tag>
     struct UnitBase
     {
+        using TagType = _Tag;
         using ValueType = f32;
 
         ValueType Value;
@@ -99,6 +100,9 @@ namespace RatUI {
     {
         return ToPixel( ToUnit( a_FontUnit, a_FontSize ), a_DPIScale );
 	}
+
+    template<typename T>
+    concept UnitType = std::derived_from<T, UnitBase<typename T::TagType>>;
 
     template<typename T>
     struct Degrees;

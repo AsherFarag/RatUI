@@ -5,27 +5,60 @@
 namespace RatUI
 {
     /**
-     * @brief Represents the rounding of the corners of a rectangle. 
-     * Each corner can have its own rounding value, allowing for asymmetric designs.
+     * @brief Represents the radius of each corner of a rectangle, allowing for asymmetric rounding.
      */
     struct CornerRounding
     {
-        Degreesf TopLeft{ 0.f };
-        Degreesf TopRight{ 0.f };
-        Degreesf BottomLeft{ 0.f };
-        Degreesf BottomRight{ 0.f };
+        Unit TopLeft{};
+        Unit TopRight{};
+        Unit BottomLeft{};
+        Unit BottomRight{};
 
         static constexpr CornerRounding None() { return {}; }
-        static constexpr CornerRounding Uniform( Degreesf a_Radius ) { return { a_Radius, a_Radius, a_Radius, a_Radius }; }
-        static constexpr CornerRounding Symmetric( Degreesf a_Top, Degreesf a_Bottom ) { return { a_Top, a_Top, a_Bottom, a_Bottom }; }
+        static constexpr CornerRounding Uniform( Unit a_Value ) { return { a_Value, a_Value, a_Value, a_Value }; }
+        static constexpr CornerRounding Symmetric( Unit a_Top, Unit a_Bottom ) { return { a_Top, a_Top, a_Bottom, a_Bottom }; }
+        static constexpr CornerRounding Asymmetric( Unit a_TopLeft, Unit a_TopRight, Unit a_BottomLeft, Unit a_BottomRight ) 
+        { 
+            return { a_TopLeft, a_TopRight, a_BottomLeft, a_BottomRight }; 
+        }
 
-        constexpr CornerRounding operator+( Degreesf a_Amount ) const
+        constexpr CornerRounding operator+( Unit a_Amount ) const
         {
             return {
                 .TopLeft = TopLeft + a_Amount,
                 .TopRight = TopRight + a_Amount,
                 .BottomLeft = BottomLeft + a_Amount,
                 .BottomRight = BottomRight + a_Amount
+            };
+        }
+
+        constexpr CornerRounding operator-( Unit a_Amount ) const
+        {
+            return {
+                .TopLeft = TopLeft - a_Amount,
+                .TopRight = TopRight - a_Amount,
+                .BottomLeft = BottomLeft - a_Amount,
+                .BottomRight = BottomRight - a_Amount
+            };
+        }
+
+        constexpr CornerRounding operator*( Unit a_Scalar ) const
+        {
+            return {
+                .TopLeft = TopLeft * a_Scalar,
+                .TopRight = TopRight * a_Scalar,
+                .BottomLeft = BottomLeft * a_Scalar,
+                .BottomRight = BottomRight * a_Scalar
+            };
+        }
+
+        constexpr CornerRounding operator/( Unit a_Scalar ) const
+        {
+            return {
+                .TopLeft = TopLeft / a_Scalar,
+                .TopRight = TopRight / a_Scalar,
+                .BottomLeft = BottomLeft / a_Scalar,
+                .BottomRight = BottomRight / a_Scalar
             };
         }
     };
@@ -355,7 +388,7 @@ namespace RatUI
 
         void EmitRect( Rect<Pixel> a_Rect, Color a_FillColor,
                        f32 a_BorderThickness = 0.f, Color a_BorderColor = Colors::Transparent,
-                       CornerRounding a_Rounding = CornerRounding::None() )
+                       Vec4<Pixel> a_Rounding = {} )
         {
             const f32 w  = a_Rect.Size[0].ToFloat();
             const f32 h  = a_Rect.Size[1].ToFloat();
@@ -393,10 +426,10 @@ namespace RatUI
 
             // Each vertex carries its own corner radius so the fragment shader
             // can interpolate and select the correct value per corner.
-            verts[0] = makeVert( -1.f, -1.f, Pixel{ a_Rounding.TopLeft.Value     } );
-            verts[1] = makeVert(  1.f, -1.f, Pixel{ a_Rounding.TopRight.Value    } );
-            verts[2] = makeVert( -1.f,  1.f, Pixel{ a_Rounding.BottomLeft.Value  } );
-            verts[3] = makeVert(  1.f,  1.f, Pixel{ a_Rounding.BottomRight.Value } );
+            verts[0] = makeVert( -1.f, -1.f, a_Rounding[0] );
+            verts[1] = makeVert(  1.f, -1.f, a_Rounding[1] );
+            verts[2] = makeVert( -1.f,  1.f, a_Rounding[2] );
+            verts[3] = makeVert(  1.f,  1.f, a_Rounding[3] );
 
             auto idx = ReserveIndices( 6 );
             idx[0] = vertexBase + 0; idx[1] = vertexBase + 1; idx[2] = vertexBase + 2;
@@ -406,22 +439,7 @@ namespace RatUI
             TryFlatten();
         }
 
-        void EmitRoundedRect( const Rect<Pixel>& a_Rect, CornerRounding a_Rounding, Color a_Color )
-        {
-            EmitRect( a_Rect, a_Color, 0.f, Colors::Transparent, a_Rounding );
-        }
-
-        void EmitRectBorder( const Rect<Pixel>& a_Rect, Color a_Color, Pixel a_Thickness )
-        {
-            EmitRect( a_Rect, Colors::Transparent, a_Thickness.ToFloat(), a_Color, CornerRounding::None() );
-        }
-
-        void EmitRoundedRectBorder( const Rect<Pixel>& a_Rect, CornerRounding a_Rounding, Color a_Color, Pixel a_Thickness )
-        {
-            EmitRect( a_Rect, Colors::Transparent, a_Thickness.ToFloat(), a_Color, a_Rounding );
-        }
-
-        void EmitCircle( Vec2<Pixel> a_Center, Pixel a_Radius, Color a_Color )
+        void EmitCircle( Vec2<Pixel> a_Center, Pixel a_Radius, Color a_Color, Pixel a_BorderThickness = 0_px, Color a_BorderColor = Colors::Transparent )
         {
             // A circle is a rounded rect whose corner radius equals its half-size.
             const Rect<Pixel> rect{
@@ -429,19 +447,8 @@ namespace RatUI
                 Vec2<Pixel>{ a_Radius * 2.f, a_Radius * 2.f }
             };
 
-            EmitRect( rect, a_Color, 0.f, Colors::Transparent,
-                      CornerRounding::Uniform( Degreesf{ a_Radius.ToFloat() } ) );
-        }
-
-        void EmitCircleBorder( Vec2<Pixel> a_Center, Pixel a_Radius, Color a_Color, Pixel a_Thickness )
-        {
-            const Rect<Pixel> rect{
-                a_Center - Vec2<Pixel>{ a_Radius, a_Radius },
-                Vec2<Pixel>{ a_Radius * 2.f, a_Radius * 2.f }
-            };
-
-            EmitRect( rect, Colors::Transparent, a_Thickness.ToFloat(), a_Color,
-                      CornerRounding::Uniform( Degreesf{ a_Radius.ToFloat() } ) );
+            EmitRect( rect, a_Color, a_BorderThickness.ToFloat(), a_BorderColor,
+                      Vec4<Pixel>{ a_Radius, a_Radius, a_Radius, a_Radius } );
         }
 
         void EmitText(
