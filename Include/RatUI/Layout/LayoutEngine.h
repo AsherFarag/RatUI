@@ -4,6 +4,16 @@
 
 namespace RatUI
 {
+    inline EVisibility ResolveNodeVisibility( LayoutNode& a_Node )
+    {
+        if ( const LayoutNode* parent = a_Node.Parent() )
+            a_Node.Layout.Visibility = Visibility::Apply( parent->Layout.Visibility, a_Node.Style.Visibility );
+        else
+            a_Node.Layout.Visibility = a_Node.Style.Visibility;
+
+        return a_Node.Layout.Visibility;
+    }
+
     // Forward declarations of layout functions
     Vec2<Unit> MeasureLayoutNode   ( LayoutNode& a_Node, Vec2<Unit> a_AvailableSize );
     void       ArrangeLayoutNode   ( LayoutNode& a_Node, Rect<Unit> a_AllocatedRect );
@@ -40,6 +50,8 @@ namespace RatUI
     // TODO: Currently uses recursion but will need to switch to an iterative approach with an explicit stack for deep hierarchies to avoid stack overflow
     inline Vec2<Unit> MeasureLayoutNode( LayoutNode& a_Node, Vec2<Unit> a_AvailableSize )
     {
+        ResolveNodeVisibility( a_Node );
+
         // Collapsed LayoutNodes take no space
 		if ( !Visibility::AffectsLayout( a_Node.Layout.Visibility ) )
         {
@@ -87,6 +99,8 @@ namespace RatUI
         
             a_Node.ForEachChild( [&]( LayoutNode& child )
             {
+                ResolveNodeVisibility( child );
+
                 if ( !Visibility::AffectsLayout( child.Layout.Visibility ) )
                     return;
             
@@ -241,6 +255,11 @@ namespace RatUI
     {
         a_Node.ForEachChild( [&]( LayoutNode& child )
         {
+            ResolveNodeVisibility( child );
+
+            if ( !Visibility::AffectsLayout( child.Layout.Visibility ) )
+                return;
+
             if (child.Style.PositionMode == EPositioningMode::Anchored)
             {
                 ArrangeAnchored(child, a_Inner);
@@ -293,8 +312,10 @@ namespace RatUI
 
         a_Node.ForEachChild( [&]( const LayoutNode& child )
         {
+            const EVisibility childVisibility = Visibility::Apply( a_Node.Layout.Visibility, child.Style.Visibility );
+
             if ( child.Style.PositionMode == EPositioningMode::Anchored ) return;
-            if ( !Visibility::AffectsLayout( child.Layout.Visibility ) )  return;
+            if ( !Visibility::AffectsLayout( childVisibility ) )          return;
 
             const bool isFlexMain =
                 ( isHz  && child.Style.WidthMode  == ESizingMode::Flex ) ||
@@ -347,6 +368,8 @@ namespace RatUI
 
         a_Node.ForEachChild( [&]( LayoutNode& child )
         {
+            ResolveNodeVisibility( child );
+
             if ( child.Style.PositionMode == EPositioningMode::Anchored )
             {
                 ArrangeAnchored( child, a_Inner );
@@ -436,6 +459,8 @@ namespace RatUI
 
     inline void ArrangeLayoutNode( LayoutNode& a_Node, Rect<Unit> a_AllocatedRect )
     {
+        ResolveNodeVisibility( a_Node );
+
         const LayoutStyle& s = a_Node.Style;
         a_Node.Layout.FinalRect = a_AllocatedRect;
 

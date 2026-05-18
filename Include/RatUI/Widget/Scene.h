@@ -497,22 +497,32 @@ namespace RatUI
             return c_InvalidPoolID;
 
         LayoutNode* node = Layouts.Get( widget->GetLayoutID() );
-        if ( !node || !Visibility::IsHitTestable( node->Layout.Visibility ) ) 
+        if ( !node )
              return c_InvalidPoolID;
 
         if ( !node->Layout.FinalRect.Contains( a_LogicalPos ) ) 
             return c_InvalidPoolID;
 
-        // Check children first (front-to-back, last child wins)
-        WidgetID result = a_ID; // self is the fallback
-        node->ForEachChild( [&]( LayoutNode& child )
-        {
-            WidgetID childHit = HitTest( child.WidgetID, a_LogicalPos );
-            if ( childHit != c_InvalidPoolID )
-                result = childHit; // deepest child takes priority
-        });
+        WidgetID result = c_InvalidPoolID;
 
-        return result;
+        if ( Visibility::AreChildrenHitTestable( node->Layout.Visibility ) )
+        {
+            // Check children first (front-to-back, last child wins)
+            node->ForEachChild( [&]( LayoutNode& child )
+            {
+                WidgetID childHit = HitTest( child.WidgetID, a_LogicalPos );
+                if ( childHit != c_InvalidPoolID )
+                    result = childHit; // deepest child takes priority
+            } );
+
+            if ( result != c_InvalidPoolID )
+                return result;
+        }
+
+        if ( Visibility::IsHitTestable( node->Layout.Visibility ) )
+            return a_ID;
+
+        return c_InvalidPoolID;
     }
 
     inline bool Scene::ProcessPointerEvent( const PointerEvent& a_Event )
