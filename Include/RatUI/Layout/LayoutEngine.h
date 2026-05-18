@@ -41,7 +41,7 @@ namespace RatUI
     inline Vec2<Unit> MeasureLayoutNode( LayoutNode& a_Node, Vec2<Unit> a_AvailableSize )
     {
         // Collapsed LayoutNodes take no space
-        if (!a_Node.Layout.Visibility.AffectsLayout())
+		if ( !Visibility::AffectsLayout( a_Node.Layout.Visibility ) )
         {
             a_Node.Layout.DesiredSize = Vec2<Unit>( 0_u, 0_u );
             return Vec2<Unit>( 0_u, 0_u );
@@ -87,7 +87,7 @@ namespace RatUI
         
             a_Node.ForEachChild( [&]( LayoutNode& child )
             {
-                if ( !child.Layout.Visibility.AffectsLayout() )
+                if ( !Visibility::AffectsLayout( child.Layout.Visibility ) )
                     return;
             
                 if ( child.Style.PositionMode == EPositioningMode::Anchored )
@@ -294,7 +294,7 @@ namespace RatUI
         a_Node.ForEachChild( [&]( const LayoutNode& child )
         {
             if ( child.Style.PositionMode == EPositioningMode::Anchored ) return;
-            if ( !child.Layout.Visibility.AffectsLayout() )               return;
+            if ( !Visibility::AffectsLayout( child.Layout.Visibility ) )  return;
 
             const bool isFlexMain =
                 ( isHz  && child.Style.WidthMode  == ESizingMode::Flex ) ||
@@ -353,7 +353,7 @@ namespace RatUI
                 return;
             }
 
-            if ( !child.Layout.Visibility.AffectsLayout() )
+            if ( !Visibility::AffectsLayout( child.Layout.Visibility ) )
                 return;
 
             Vec2<Unit> childSize =
@@ -441,7 +441,6 @@ namespace RatUI
 
         if ( !a_Node.FirstChild() )
             return; // No need to arrange children if there are none
-
         
         const Rect<Unit> inner = s.Padding.Apply( a_AllocatedRect );
 

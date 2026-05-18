@@ -124,29 +124,101 @@ namespace RatUI
     };
 
     /**
-     * @brief Represents the visibility state of a UI element, which can affect both rendering and layout.
-     * @note Similar to Unreal Engine's EVisibility.
+	 * @brief Represents the visibility state of a UI element, defining how it is rendered, whether it participates in layout calculations, and whether it can be hit-tested for interactions.
      */
-    struct Visibility
+	enum class EVisibility : u8
     {
-        enum EType : u8
-        {
-            Visible,   ///< The element is visible and participates in layout.
-            Hidden,    ///< The element is not visible but still occupies space in the layout.
-            Collapsed, ///< The element is not visible and does not occupy any space in the layout.
-        };
+        None = 0,
+        Render = 1 << 0, ///< The element is rendered and visible.
+        Layout = 1 << 1, ///< The element participates in layout calculations and occupies space.
+        SelfHitTest = 1 << 2, ///< The element can be hit-tested (e.g., for mouse interactions) based on its own geometry.
+        ChildrenHitTest = 1 << 3, ///< The element's children can be hit-tested, even if the element itself is not (e.g., for invisible containers that still allow interaction with their children).
 
-        EType Value{ Visible };
+        /** @brief Visible and hit-testable. Participates in layout and rendering. */
+        Visible = Render | Layout | SelfHitTest | ChildrenHitTest,
 
+        /** @brief  Not visible or hit-testable, but still occupies space in the layout. */
+        Hidden = Layout,
+
+        /** @brief Not visible, not hit-testable, and does not occupy any space in the layout. */
+        Collapsed = None,
+
+        /** @brief Visible but not hit-testable (including children). */
+        HitTestInvisible = Render | Layout,
+
+        /** @brief Visible and hit-testable, but the element itself is not hit-testable (children can still be hit-tested). */
+        SelfHitTestInvisible = Render | Layout | ChildrenHitTest
+    };
+
+    /**
+	 * @brief Utility functions for working with EVisibility flags.
+     */
+    namespace Visibility         
+    {
         /** @brief Returns true if the element should be considered in layout calculations (i.e., it is not Collapsed). */
-        constexpr bool AffectsLayout() const { return Value != Collapsed; }
+        inline constexpr bool AffectsLayout( EVisibility a_Visibility )
+        {
+            return ( (u8)a_Visibility & (u8)EVisibility::Layout ) != (u8)EVisibility::None;
+        }
 
         /** @brief Returns true if the element should be rendered (i.e., it is Visible). */
-        constexpr bool IsRendered() const { return Value == Visible; }
+        constexpr bool IsRendered(EVisibility a_Visibility)
+        {
+            return ( (u8)a_Visibility & (u8)EVisibility::Render ) != (u8)EVisibility::None;
+        }
 
         /** @brief Returns true if the element should be hit-testable (i.e., it is Visible). */
-        constexpr bool IsHitTestable() const { return Value == Visible; }
-    };
+        constexpr bool IsHitTestable(EVisibility a_Visibility)
+        {
+            return ( (u8)a_Visibility & (u8)EVisibility::SelfHitTest ) != (u8)EVisibility::None;
+        }
+
+        /** @brief Returns true if the element's children should be hit-testable, even if the element itself is not. */
+        constexpr bool AreChildrenHitTestable(EVisibility a_Visibility)
+        {
+            return ( (u8)a_Visibility & (u8)EVisibility::ChildrenHitTest ) != (u8)EVisibility::None;
+        }
+
+        /**
+         * @brief Combines the visibility of a parent and child element to determine the effective visibility of the child.
+         * @param a_Parent The visibility of the parent element.
+         * @param a_Child The visibility of the child element.
+         * @return The effective visibility of the child element after applying the parent's visibility rules.
+         */
+        static constexpr EVisibility Apply( EVisibility a_Parent, EVisibility a_Child )
+        {
+            // If parent is fully collapsed, everything below is collapsed.
+            if ( !AffectsLayout( a_Parent ) &&
+                 !IsRendered( a_Parent ) &&
+                 !IsHitTestable( a_Parent ) &&
+                 !AreChildrenHitTestable( a_Parent ) )
+            {
+                return EVisibility::Collapsed;
+            }
+
+            u8 result = (u8)EVisibility::None;
+
+            // Layout propagation
+            if ( AffectsLayout( a_Parent ) && AffectsLayout( a_Child ) )
+                result |= (u8)EVisibility::Layout;
+
+            // Render propagation
+            if ( IsRendered( a_Parent ) && IsRendered( a_Child ) )
+                result |= (u8)EVisibility::Render;
+
+            // Self hit-test:
+            // Parent must allow children hit-test AND child must allow self hit-test
+            if ( AreChildrenHitTestable( a_Parent ) && IsHitTestable( a_Child ) )
+                result |= (u8)EVisibility::SelfHitTest;
+
+            // Children hit-test:
+            // Parent must allow children hit-test AND child must allow children hit-test
+            if ( AreChildrenHitTestable( a_Parent ) && AreChildrenHitTestable( a_Child ) )
+                result |= (u8)EVisibility::ChildrenHitTest;
+
+            return static_cast<EVisibility>( result );
+        }
+    }
 
     /**
      * @brief Represents the edge insets for a UI element, defining the spacing around its content or between it and other elements.
@@ -235,6 +307,7 @@ namespace RatUI
 
     /**
      * @brief Represents the input parameters for the layout process of a UI element.
+     * If any of these values change, the computed layout is invalid and must be recalculated.
      */
     struct LayoutStyle
     {
@@ -243,14 +316,16 @@ namespace RatUI
         ELayoutType LayoutType{ ELayoutType::Overlay }; ///< The layout type to use for arranging child elements (if this element is a container).
         EAlignment  ChildAlign{ EAlignment::TopLeft };  ///< Default alignment for child elements within this container.
         EWrapMode   WrapMode{ EWrapMode::NoWrap };      ///< The wrap mode to use when child elements exceed the available space in a container.
+		EVisibility Visibility{ EVisibility::Visible }; ///< The visibility state of the element, which can affect both rendering and layout.
+		bool        IsEnabled{ true };                  ///< Whether the element is enabled for interaction. Disabled elements may be rendered differently and do not receive input events.
 		bool        IsFocusScope{ false };              ///< Whether this element should be considered a focus scope for navigation.
 
         /**
          * @note For grid layouts, at least one of GridColumns or GridRows must be set to a non-zero value. 
          * The layout engine will auto-calculate the other dimension based on the number of children and the specified dimension.
          */
-        u16         GridColumns{ 0 };                   ///< For grid layouts, the number of columns to arrange child elements into. 0 will auto-calculate.
-        u16         GridRows{ 1 };                      ///< For grid layouts, the number of rows to arrange child elements into. 0 will auto-calculate.
+        u16 GridColumns{ 0 }; ///< For grid layouts, the number of columns to arrange child elements into. 0 will auto-calculate.
+        u16 GridRows{ 1 };    ///< For grid layouts, the number of rows to arrange child elements into. 0 will auto-calculate.
 
         // - Positioning properties
         Edges Padding{};        ///< The padding to apply around the content of the element, in pixels.
@@ -266,7 +341,9 @@ namespace RatUI
         ESizingMode HeightMode{ ESizingMode::Content }; ///< The sizing mode for the height of the element.
         Unit FixedWidth{ 0_u };  ///< The fixed width to use when WidthMode is set to Fixed.
         Unit FixedHeight{ 0_u }; ///< The fixed height to use when HeightMode is set to Fixed.
-        
+
+        // TODO: Not a fan of this api (flex and percent) and it can be confusing. Look into CSS more for ideas
+
         /**
          * @note PercentWidth/PercentHeight are only meaningful when the parent axis is Fixed or Flex.
          * Inside a Content-sized parent, Flex children fall back to Content (zero intrinsic size) and PercentWidth/Height is ignored.
@@ -291,9 +368,9 @@ namespace RatUI
         // Figure out a clean solution without coupling the layout engine to the widgets.
 		Vec2<Unit> IntrinsicSize{};      ///< The natural content size set by the user before layout. (e.g., the size of an image or text block).
 
-        struct Visibility Visibility {}; ///< The visibility state of the element, which can affect both rendering and layout.
-        bool IsDirty{ true };            ///< Whether the layout needs to be recalculated. Set to true when properties affecting layout are changed.
-		bool IsDescendantDirty{ true };  ///< Whether any descendant elements are dirty and require layout recalculation.
+        EVisibility Visibility{ EVisibility::Visible };       ///< The visibility state of the element, which can affect both rendering and layout.
+        bool        IsDirty{ true };            ///< Whether the layout needs to be recalculated. Set to true when properties affecting layout are changed.
+		bool        IsDescendantDirty{ true };  ///< Whether any descendant elements are dirty and require layout recalculation.
     };
 
     using WidgetID = PoolID;

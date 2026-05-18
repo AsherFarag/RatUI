@@ -138,7 +138,7 @@ namespace RatUI
         {
             LayoutNode* node = a_Scene.Layouts.Get( GetLayoutID() );
 
-            if ( !node || !node->Layout.Visibility.IsRendered() )
+            if ( !node || !Visibility::IsRendered( node->Layout.Visibility ) )
                 return;
                 
             if ( !m_ShapedText )

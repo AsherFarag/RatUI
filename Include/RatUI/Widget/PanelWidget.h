@@ -20,7 +20,7 @@ namespace RatUI
         void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
         {
             const LayoutNode* node = a_Scene.Layouts.Get( GetLayoutID() );
-            if ( !node || !node->Layout.Visibility.IsRendered() )
+            if ( !node || !Visibility::IsRendered( node->Layout.Visibility ) )
                 return;
 
             const Rect<Unit>& rect = node->Layout.FinalRect;

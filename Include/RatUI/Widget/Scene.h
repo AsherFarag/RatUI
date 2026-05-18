@@ -493,12 +493,15 @@ namespace RatUI
     inline WidgetID Scene::HitTest( WidgetID a_ID, Vec2<Unit> a_LogicalPos )
     {
         IWidget* widget = GetWidget( a_ID );
-        if ( !widget ) return c_InvalidPoolID;
+        if ( !widget )
+            return c_InvalidPoolID;
 
         LayoutNode* node = Layouts.Get( widget->GetLayoutID() );
-        if ( !node || !node->Layout.Visibility.IsHitTestable() ) return c_InvalidPoolID;
+        if ( !node || !Visibility::IsHitTestable( node->Layout.Visibility ) ) 
+             return c_InvalidPoolID;
 
-        if ( !node->Layout.FinalRect.Contains( a_LogicalPos ) ) return c_InvalidPoolID;
+        if ( !node->Layout.FinalRect.Contains( a_LogicalPos ) ) 
+            return c_InvalidPoolID;
 
         // Check children first (front-to-back, last child wins)
         WidgetID result = a_ID; // self is the fallback
