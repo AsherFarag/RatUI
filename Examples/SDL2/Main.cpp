@@ -8,8 +8,14 @@
 #include "../Common/FeatureSandboxScene.h"
 #include "../Common/DynamicTextScene.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "../Common/stb_image.h"
+#undef STB_IMAGE_IMPLEMENTATION
+
 using namespace RatUI;
 using namespace RatUI::Literals;
+
+static IRenderer* g_Renderer = nullptr;
 
 /**
  * @brief The RatUI Sandbox application.
@@ -37,6 +43,8 @@ protected:
 
     bool OnInitialize() override
     {
+        g_Renderer = GetRenderer();
+
         const FontHandle fontHandle = { 1 };
         m_FontCache.RegisterFontHandle( fontHandle, "Resources/Fonts/Roboto-Medium.ttf" );
 		m_TextMetrics.SetFontCache( &m_FontCache );
@@ -122,4 +130,23 @@ int main( int argc, char** argv )
 {
     SandboxApp app;
     return app.Run() ? 0 : 1;
+}
+
+TextureHandle LoadTexture( const char* a_FilePath )
+{
+    // Use stb_image to load the image file into memory, then create a GPU texture from it and return a handle to that texture.
+
+    int width, height, channels;
+    stbi_uc* data = stbi_load( a_FilePath, &width, &height, &channels, 4 ); // Force 4 channels (RGBA)
+    if ( !data )
+    {
+        std::cerr << "Failed to load texture: " << a_FilePath << "\n";
+        return TextureHandle::Null();
+    }
+
+
+    TextureHandle handle = g_Renderer->CreateTexture( static_cast<u32>( width ), static_cast<u32>( height ), ETextureFormat::RGBA8, data );
+
+    stbi_image_free( data );
+    return handle;
 }

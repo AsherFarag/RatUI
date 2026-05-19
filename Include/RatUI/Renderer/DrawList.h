@@ -96,11 +96,24 @@ namespace RatUI
         // Drawing
         // ========================
 
-        DrawList& AddRect( Color a_Color, const Rect<Unit>& a_Rect, CornerRounding a_Rounding, Unit a_BorderThickness = 0_u, Color a_BorderColor = Colors::Transparent )
+        DrawList& AddRect( Color a_Color, Rect<Unit> a_Rect, CornerRounding a_Rounding, Unit a_BorderThickness = 0_u, Color a_BorderColor = Colors::Transparent )
         {
             DrawBatcher& batcher = GetCurrentBatcher();
             batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureHandle::Null() );
             batcher.EmitRect( ToPixelRect( a_Rect ), a_Color, ToPixel( a_BorderThickness, m_DPIScale ).ToFloat(), a_BorderColor, ToPixelRounding( a_Rounding ) );
+            return *this;
+        }
+
+        DrawList& AddImage( TextureHandle a_Texture, 
+                            Rect<Unit> a_Rect, 
+                            Color a_Tint = Colors::White, 
+                            CornerRounding a_Rounding = CornerRounding::None(), 
+                            Unit a_BorderThickness = 0_u, 
+                            Color a_BorderColor = Colors::Transparent )
+        {
+            DrawBatcher& batcher = GetCurrentBatcher();
+            batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), std::move( a_Texture ) );
+            batcher.EmitRect( ToPixelRect( a_Rect ), a_Tint, ToPixel( a_BorderThickness, m_DPIScale ).ToFloat(), a_BorderColor, ToPixelRounding( a_Rounding ) );
             return *this;
         }
 

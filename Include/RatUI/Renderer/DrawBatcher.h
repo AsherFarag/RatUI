@@ -408,14 +408,14 @@ namespace RatUI
 
             auto verts = ReserveVertices<SDFVertex>( 4 );
 
-            auto makeVert = [&]( f32 xs, f32 ys, Pixel radius ) -> SDFVertex
+            auto makeVert = [&]( f32 xs, f32 ys, Vec2f uv, Pixel radius ) -> SDFVertex
             {
                 return SDFVertex{
                     .Position        = Vec2<Pixel>{ Pixel{ cx + xs * outerHalf[0] },
                                                     Pixel{ cy + ys * outerHalf[1] } },
                     .LocalPos        = Vec2<Pixel>{ Pixel{ xs * outerHalf[0] },
                                                     Pixel{ ys * outerHalf[1] } },
-                    .UV              = Vec2f{ 0.f, 0.f },
+                    .UV              = uv,
                     .FillColor       = a_FillColor,
                     .BorderColor     = a_BorderColor,
                     .BorderThickness = Pixel{ border },
@@ -426,10 +426,10 @@ namespace RatUI
 
             // Each vertex carries its own corner radius so the fragment shader
             // can interpolate and select the correct value per corner.
-            verts[0] = makeVert( -1.f, -1.f, a_Rounding[0] );
-            verts[1] = makeVert(  1.f, -1.f, a_Rounding[1] );
-            verts[2] = makeVert( -1.f,  1.f, a_Rounding[2] );
-            verts[3] = makeVert(  1.f,  1.f, a_Rounding[3] );
+            verts[0] = makeVert( -1.f, -1.f, { 0.f, 0.f }, a_Rounding[0] );
+            verts[1] = makeVert(  1.f, -1.f, { 1.f, 0.f }, a_Rounding[1] );
+            verts[2] = makeVert( -1.f,  1.f, { 0.f, 1.f }, a_Rounding[2] );
+            verts[3] = makeVert(  1.f,  1.f, { 1.f, 1.f }, a_Rounding[3] );
 
             auto idx = ReserveIndices( 6 );
             idx[0] = vertexBase + 0; idx[1] = vertexBase + 1; idx[2] = vertexBase + 2;

@@ -6,6 +6,8 @@
 
 using namespace RatUI;
 
+extern TextureHandle LoadTexture( const char* a_FilePath );
+
 /**
  * @brief Interface for demo scenes in the RatUI examples. 
  */
@@ -52,7 +54,9 @@ public:
 		if ( a_Scene.GetFocusedWidget() == GetID() )
 			a_DrawList.AddRect( Colors::White, rect.Expanded( 4_u ), Rounding + 4_u );
 
-		a_DrawList.AddRect( Color, rect, Rounding );
+        static TextureHandle checkerboardTexture = LoadTexture( "Resources/Textures/LargeSquarePattern.jpg" );
+
+		a_DrawList.AddImage( checkerboardTexture, rect, Color, Rounding );
 
         a_DrawList.PushClipRect( rect );
         a_Scene.ForEachChildWidget( GetID(), [&](IWidget& child)

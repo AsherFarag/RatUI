@@ -385,10 +385,22 @@ namespace RatUI::OpenGL
 
         void DispatchBatch( const SDFDrawData& a_Data, u32 a_VertexByteOffset, const f32 a_PVM[16] )
         {
+            glActiveTexture( GL_TEXTURE0 );
+
             if ( TextureID texID = a_Data.Texture.GetID(); IsValidTexture( texID ) )
             {
-                glActiveTexture( GL_TEXTURE0 );
                 glBindTexture( GL_TEXTURE_2D, static_cast<GLuint>( texID.ID ) );
+            }
+            else
+            {
+                if ( m_WhitePixelTexture.GetID() == TextureID::Null() )
+                {
+                    // Lazily create a 1x1 white texture if the batch has no texture.
+                    const u8 whitePixel[4] = { 255, 255, 255, 255 };
+                    m_WhitePixelTexture = CreateTexture( 1, 1, ETextureFormat::RGBA8, whitePixel );
+                }
+                
+                glBindTexture( GL_TEXTURE_2D, static_cast<GLuint>( m_WhitePixelTexture.GetID().ID ) );
             }
 
             // Re-specify attrib pointers for this batch's region of the shared VBO.
@@ -585,6 +597,8 @@ namespace RatUI::OpenGL
         Mat3f m_Projection    {};
         i32   m_ViewportWidth { 800 };
         i32   m_ViewportHeight{ 600 };
+
+        TextureHandle m_WhitePixelTexture; // TODO: Expose a default white texture for users to avoid creating their own
     };
 
 } // namespace RatUI::OpenGL

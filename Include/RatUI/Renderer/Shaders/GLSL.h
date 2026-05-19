@@ -5,12 +5,14 @@ namespace RatUI::GLSL
     enum ESDFUniform
     {
         ESDFUniform_PVM = 0,
+		ESDFUniform_Texture,
 
         ESDFUniform_UniformCount
     };
 
     inline constexpr const char* c_SDFUniformNames[] = {
-        "u_PVM"
+        "u_PVM",
+		"u_Texture"
     };
 
     enum ETextUniform
@@ -94,6 +96,7 @@ namespace RatUI::GLSL
     uniform mat4 u_PVM;
 
     out vec2  v_LocalPos;
+    out vec2  v_UV;
     out vec4  v_FillColor;
     out vec4  v_BorderColor;
     out float v_BorderThickness;
@@ -104,6 +107,7 @@ namespace RatUI::GLSL
     {
         gl_Position       = u_PVM * vec4(a_Pos, 0.0, 1.0);
         v_LocalPos        = a_LocalPos;
+        v_UV              = a_UV;
         v_FillColor       = a_FillColor;
         v_BorderColor     = a_BorderColor;
         v_BorderThickness = a_BorderThickness;
@@ -125,6 +129,7 @@ namespace RatUI::GLSL
     #version 330 core
 
     in vec2  v_LocalPos;
+    in vec2  v_UV;
     in vec4  v_FillColor;
     in vec4  v_BorderColor;
     in float v_BorderThickness;
@@ -135,6 +140,8 @@ namespace RatUI::GLSL
 
     const float c_FillSoftness   = 0.5;
     const float c_BorderSoftness = 0.5;
+
+    uniform sampler2D u_Texture;
 
     // Signed distance to a rounded rectangle.
     // a_LocalPos  = local position from the shape centre.
@@ -172,12 +179,17 @@ namespace RatUI::GLSL
             borderMask = clamp(outerMask - fillMask, 0.0, 1.0);
         }
 
+        vec4 tex = texture(u_Texture, v_UV);
+        
         // Composite fill "over" border using premultiplied alpha.
         float bAlpha    = borderMask * v_BorderColor.a;
         float fAlpha    = fillMask   * v_FillColor.a;
-        vec3  borderPre = v_BorderColor.rgb * bAlpha;
-        vec3  fillPre   = v_FillColor.rgb   * fAlpha;
-
+        
+        vec3 fillRGB    = v_FillColor.rgb * tex.rgb; // TEXTURE ONLY AFFECTS FILL
+        
+        vec3 borderPre  = v_BorderColor.rgb * bAlpha;
+        vec3 fillPre    = fillRGB * fAlpha;
+        
         float outA   = fAlpha + bAlpha * (1.0 - fAlpha);
         vec3  outRGB = fillPre + borderPre * (1.0 - fAlpha);
 
