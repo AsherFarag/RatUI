@@ -60,6 +60,9 @@ namespace RatUI
         /** @brief Called when a pointer (e.g., mouse cursor) exits the widget's bounds. */
         virtual void OnPointerExit( Scene& a_Scene, const PointerEvent& a_Event ) {}
 
+        /** @brief Called when a pointer scroll event occurs while this widget (or one of its descendants) is hovered. */
+        virtual bool OnPointerScroll( Scene& a_Scene, const PointerEvent& a_Event ) { return false; }
+
         /** @brief Called when an input button is pressed while this widget is focused. */
         virtual bool OnPressed( Scene& a_Scene, const ButtonEvent& a_Event ) { return false; }
 

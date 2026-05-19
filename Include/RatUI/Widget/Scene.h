@@ -532,18 +532,58 @@ namespace RatUI
         if ( !a_Event.IsMouse() ) 
 			return false; // TODO: Only process mouse events for now
 
-		m_LastPointerEvent = a_Event;
+        PointerEvent event = a_Event;
+        const bool hasScroll = !IsApproxEqual( event.ScrollDelta[0].ToFloat(), 0.f ) ||
+                               !IsApproxEqual( event.ScrollDelta[1].ToFloat(), 0.f );
 
-        WidgetID hovered = HitTest( RootWidget, a_Event.Position );
+        // Some backends emit wheel events without an explicit pointer position.
+        // Reuse the last known pointer position for consistent hover/scroll routing.
+        if ( hasScroll && IsApproxEqual( event.Position[0].ToFloat(), 0.f ) && IsApproxEqual( event.Position[1].ToFloat(), 0.f ) )
+            event.Position = m_LastPointerEvent.Position;
+
+		m_LastPointerEvent = event;
+
+        WidgetID hovered = HitTest( RootWidget, event.Position );
         if ( hovered != m_HoveredWidget )
         {
             if ( IWidget* prevHovered = GetWidget( m_HoveredWidget ) )
-                prevHovered->OnPointerExit( *this, a_Event );
+                prevHovered->OnPointerExit( *this, event );
 
             m_HoveredWidget = hovered;
 
             if ( IWidget* newHovered = GetWidget( m_HoveredWidget ) )
-                newHovered->OnPointerEnter( *this, a_Event );
+                newHovered->OnPointerEnter( *this, event );
+        }
+
+        if ( hasScroll )
+        {
+            const auto PropagatePointerScroll = [&]( WidgetID a_StartID ) -> bool
+            {
+                WidgetID current = a_StartID;
+                while ( current != c_InvalidPoolID )
+                {
+                    IWidget* widget = GetWidget( current );
+                    if ( !widget )
+                        return false;
+
+                    if ( widget->OnPointerScroll( *this, event ) )
+                        return true;
+
+                    LayoutNode* node = Layouts.Get( widget->GetLayoutID() );
+                    if ( !node || !node->Parent() )
+                        return false;
+
+                    current = node->Parent()->WidgetID;
+                }
+
+                return false;
+            };
+
+            if ( PropagatePointerScroll( m_HoveredWidget ) )
+                return true;
+
+            if ( m_FocusedWidget != c_InvalidPoolID && m_FocusedWidget != m_HoveredWidget )
+                return PropagatePointerScroll( m_FocusedWidget );
         }
 
         return false;
