@@ -35,6 +35,11 @@ namespace RatUI
         static constexpr TextureID Null() { return TextureID{}; }
     };
 
+    /**
+     * @brief A texture resource managed by the renderer.
+     * The Texture class is a RAII wrapper around a TextureID, 
+     * ensuring that the texture is properly released when the Texture object goes out of scope.
+     */
     class Texture
     {
     public:
@@ -49,6 +54,11 @@ namespace RatUI
         TextureID  ID;
     };
 
+    /**
+     * @brief A handle to a texture resource that can be safely passed around and copied.
+     * The TextureHandle class manages a shared pointer to a Texture object, 
+     * allowing for reference counting and automatic cleanup of the underlying texture resource when no longer needed.
+     */
     class TextureHandle
     {
     public:
@@ -61,7 +71,10 @@ namespace RatUI
         /** @brief Get the underlying TextureID, or TextureID::Null() if this handle is empty. */
         TextureID GetID() const { return m_Texture ? m_Texture->ID : TextureID::Null(); }
 
-        /** @brief */
+        /** @brief Reset the handle, releasing the associated texture. */
+        void Reset() { m_Texture.reset(); }
+
+        /** @brief Get a null texture handle. */
         static TextureHandle Null() { return TextureHandle(); }
 
         bool operator==( const TextureHandle& a_Other ) const { return m_Texture == a_Other.m_Texture; }
