@@ -291,22 +291,19 @@ public:
         {
             const ButtonEvent& btnEvent = Get<ButtonEvent>( a_Event.Payload );
 
-            ENavAction navAction = ENavAction::None;
             switch ( btnEvent.Button )
             {
-                case EButtonID::KeyUp:    navAction = ENavAction::MoveUp; break;
-                case EButtonID::KeyDown:  navAction = ENavAction::MoveDown; break;
-                case EButtonID::KeyLeft:  navAction = ENavAction::MoveLeft; break;
-                case EButtonID::KeyRight: navAction = ENavAction::MoveRight; break;
-                case EButtonID::KeyEnter: navAction = ENavAction::Activate; break;
-                case EButtonID::KeyEscape: navAction = ENavAction::Cancel; break;
+                case EButtonID::KeyUp:     if ( btnEvent.Pressed ) m_Scene.Navigate( ENavAction::MoveUp );    break;
+                case EButtonID::KeyDown:   if ( btnEvent.Pressed ) m_Scene.Navigate( ENavAction::MoveDown );  break;
+                case EButtonID::KeyLeft:   if ( btnEvent.Pressed ) m_Scene.Navigate( ENavAction::MoveLeft );  break;
+                case EButtonID::KeyRight:  if ( btnEvent.Pressed ) m_Scene.Navigate( ENavAction::MoveRight ); break;
+                case EButtonID::KeyEscape: if ( btnEvent.Pressed ) m_Scene.Navigate( ENavAction::Cancel );    break;
+                case EButtonID::KeyEnter:
+					     if ( btnEvent.Pressed )  m_Scene.Navigate( ENavAction::ActivatePressed );
+					else if ( btnEvent.Released ) m_Scene.Navigate( ENavAction::ActivateReleased );
+					break;
                 default: break; // Unsupported key
-            }
-
-            if ( btnEvent.Pressed && navAction != ENavAction::None )
-            {
-                m_Scene.Navigate( navAction );
-            }
+            }   
 
             return;
         }

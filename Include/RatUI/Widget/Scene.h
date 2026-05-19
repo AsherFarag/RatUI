@@ -288,35 +288,42 @@ namespace RatUI
             return;
         }
 
-        if ( a_Action == ENavAction::Activate )
+        if ( a_Action == ENavAction::ActivatePressed || a_Action == ENavAction::ActivateReleased )
         {
-            // If focused widget is itself a scope, enter it
             WidgetID focused = GetFocusedWidget();
             if ( IWidget* w = GetWidget( focused ) )
             {
                 LayoutNode* node = Layouts.Get( w->GetLayoutID() );
-                if ( node && node->Style.IsFocusScope )
+
+                // If pressing and the widget is a focus scope, enter it
+                if ( a_Action == ENavAction::ActivatePressed && node && node->Style.IsFocusScope )
                 {
                     PushNavScope( focused );
-                    // Auto-focus first focusable child in new scope
                     FocusFirstIn( focused );
                     return;
                 }
+
+                const ButtonEvent ev{
+                    .Button = EButtonID::KeyEnter,
+                    .Pressed = ( a_Action == ENavAction::ActivatePressed ),
+                    .Released = ( a_Action == ENavAction::ActivateReleased ),
+                    .Held = ( a_Action == ENavAction::ActivatePressed ),
+                };
+
+                w->OnPressed( *this, ev );  // OnPressed checks ev.Pressed internally
+                w->OnReleased( *this, ev ); // OnReleased checks ev.Released internally
             }
-            // Otherwise activate the leaf
-            if ( IWidget* w = GetWidget( focused ) )
-                w->OnPressed( *this, ButtonEvent{ .Button = EButtonID::KeyEnter, .Pressed = true } );
             return;
         }
 
         // Directional nav within current scope
-        WidgetID scopeID  = GetCurrentNavScope();
-        WidgetID focused  = GetFocusedWidget();
+        WidgetID scopeID = GetCurrentNavScope();
+        WidgetID focused = GetFocusedWidget();
 
-        IWidget*    scopeWidget = GetWidget( scopeID );
-        LayoutNode* scopeNode   = scopeWidget ? Layouts.Get( scopeWidget->GetLayoutID() ) : nullptr;
+        IWidget*    scopeWidget    = GetWidget( scopeID );
+        LayoutNode* scopeNode      = scopeWidget ? Layouts.Get( scopeWidget->GetLayoutID() ) : nullptr;
         IWidget*    focusedWidget  = GetWidget( focused );
-        LayoutNode* focusedNode = focusedWidget ? Layouts.Get( focusedWidget->GetLayoutID() ) : nullptr;
+        LayoutNode* focusedNode    = focusedWidget ? Layouts.Get( focusedWidget->GetLayoutID() ) : nullptr;
 
         if ( !scopeNode ) return;
 

@@ -20,8 +20,9 @@ namespace RatUI
         MoveUp,
         MoveDown,
 
-        Activate,  ///< Activate the currently focused item, e.g., XBox A button, Enter key, etc.
-        Cancel,    ///< Cancel or go back, e.g., XBox B button, Escape key, etc.
+		ActivatePressed,  ///< Sent when the activation button/key is initially pressed, e.g., XBOX A button, Enter key, etc.
+        ActivateReleased, ///< Sent when the activation button/key is released after being pressed.
+        Cancel,           ///< Cancel or go back, e.g., XBOX B button, Escape key, etc.
     };
 
     /**

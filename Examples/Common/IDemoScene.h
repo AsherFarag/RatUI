@@ -95,8 +95,6 @@ public:
         const Rect<Unit>& rect = node->Layout.FinalRect;
         Vec2<Unit> center = rect.Center();
 
-        a_DrawList.SetDrawLayer( 1 ); // Draw circles above default layer 0 used by RectWidget
-
         if ( IsFilled )
         {
             if ( a_Scene.GetFocusedWidget() == GetID() )

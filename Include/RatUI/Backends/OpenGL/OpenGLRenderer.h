@@ -399,7 +399,7 @@ namespace RatUI::OpenGL
                     const u8 whitePixel[4] = { 255, 255, 255, 255 };
                     m_WhitePixelTexture = CreateTexture( 1, 1, ETextureFormat::RGBA8, whitePixel );
                 }
-                
+
                 glBindTexture( GL_TEXTURE_2D, static_cast<GLuint>( m_WhitePixelTexture.GetID().ID ) );
             }
 
