@@ -78,29 +78,29 @@ TEST_CASE( "Constraints::AtMost leaves min at zero and sets max", "[layout][cons
 
 TEST_CASE( "Visibility defaults to Visible", "[layout][visibility]" )
 {
-    Visibility v{};
-    REQUIRE( v.Value == Visibility::Visible );
+    LayoutStyle s{};
+    REQUIRE( s.Visibility == EVisibility::Visible );
 }
 
 TEST_CASE( "Visibility Visible AffectsLayout and IsRendered", "[layout][visibility]" )
 {
-    Visibility v{ Visibility::Visible };
-    REQUIRE( v.AffectsLayout() );
-    REQUIRE( v.IsRendered() );
+    EVisibility v{ EVisibility::Visible };
+    REQUIRE( Visibility::AffectsLayout( v ) );
+    REQUIRE( Visibility::IsRendered( v ) );
 }
 
 TEST_CASE( "Visibility Hidden AffectsLayout but not IsRendered", "[layout][visibility]" )
 {
-    Visibility v{ Visibility::Hidden };
-    REQUIRE( v.AffectsLayout() );
-    REQUIRE_FALSE( v.IsRendered() );
+    EVisibility v{ EVisibility::Hidden };
+    REQUIRE( Visibility::AffectsLayout( v ) );
+    REQUIRE_FALSE( Visibility::IsRendered( v ) );
 }
 
 TEST_CASE( "Visibility Collapsed does not affect layout and is not rendered", "[layout][visibility]" )
 {
-    Visibility v{ Visibility::Collapsed };
-    REQUIRE_FALSE( v.AffectsLayout() );
-    REQUIRE_FALSE( v.IsRendered() );
+    EVisibility v{ EVisibility::Collapsed };
+    REQUIRE_FALSE( Visibility::AffectsLayout( v ) );
+    REQUIRE_FALSE( Visibility::IsRendered( v ) );
 }
 
 // =============================================================================
@@ -357,7 +357,7 @@ TEST_CASE( "LayoutResult defaults to zero final rect", "[layout][result]" )
 TEST_CASE( "LayoutResult defaults to Visible visibility", "[layout][result]" )
 {
     LayoutResult r{};
-    REQUIRE( r.Visibility.Value == Visibility::Visible );
+    REQUIRE( r.Visibility == EVisibility::Visible );
 }
 
 // =============================================================================

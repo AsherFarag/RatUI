@@ -901,7 +901,7 @@ TEST_CASE( "ArrangeLinear Collapsed child is skipped and does not advance cursor
 
     LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
     c2.Style.FixedWidth = Unit{ 50.0f }; c2.Style.FixedHeight = Unit{ 30.0f };
-    c2.Layout.Visibility = { Visibility::Collapsed };
+    c2.Style.Visibility = EVisibility::Collapsed;
 
     LayoutNode c3{}; c3.Style.WidthMode = ESizingMode::Fixed; c3.Style.HeightMode = ESizingMode::Fixed;
     c3.Style.FixedWidth = Unit{ 70.0f }; c3.Style.FixedHeight = Unit{ 30.0f };
@@ -930,7 +930,7 @@ TEST_CASE( "ArrangeLinear Hidden child still occupies space in layout", "[arrang
 
     LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
     c2.Style.FixedWidth = Unit{ 60.0f }; c2.Style.FixedHeight = Unit{ 30.0f };
-    c2.Layout.Visibility = { Visibility::Hidden }; // affects layout, not rendered
+    c2.Style.Visibility = EVisibility::Hidden; // affects layout, not rendered
 
     LayoutNode c3{}; c3.Style.WidthMode = ESizingMode::Fixed; c3.Style.HeightMode = ESizingMode::Fixed;
     c3.Style.FixedWidth = Unit{ 40.0f }; c3.Style.FixedHeight = Unit{ 30.0f };
@@ -1043,7 +1043,7 @@ TEST_CASE( "Collapsed LayoutNode has zero desired size and empty FinalRect after
     w.Style.HeightMode  = ESizingMode::Fixed;
     w.Style.FixedWidth  = Unit{ 100.0f };
     w.Style.FixedHeight = Unit{ 50.0f };
-    w.Layout.Visibility = { Visibility::Collapsed };
+    w.Style.Visibility = EVisibility::Collapsed;
 
     Vec2f desired = MeasureLayoutNode( w, { 500.0f, 500.0f } );
     RequireApproxEqual( desired, Vec2f( 0.0f, 0.0f ) );
@@ -1399,7 +1399,7 @@ TEST_CASE( "ArrangeOverlay Collapsed child gets zero-size FinalRect and non-coll
     collapsed.Style.HeightMode  = ESizingMode::Fixed;
     collapsed.Style.FixedWidth  = Unit{ 100.0f };
     collapsed.Style.FixedHeight = Unit{ 50.0f };
-    collapsed.Layout.Visibility = { Visibility::Collapsed };
+    collapsed.Style.Visibility = EVisibility::Collapsed;
 
     LayoutNode visible{};
     visible.Style.WidthMode   = ESizingMode::Fixed;

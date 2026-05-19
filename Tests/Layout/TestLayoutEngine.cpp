@@ -475,7 +475,7 @@ TEST_CASE( "MeasureLayoutNode Collapsed child contributes nothing to Content par
 
     LayoutNode collapsed{}; collapsed.Style.WidthMode = ESizingMode::Fixed; collapsed.Style.HeightMode = ESizingMode::Fixed;
     collapsed.Style.FixedWidth = Unit{ 200.0f }; collapsed.Style.FixedHeight = Unit{ 200.0f };
-    collapsed.Layout.Visibility = { Visibility::Collapsed };
+    collapsed.Style.Visibility = EVisibility::Collapsed;
 
     parent.PushBackChild( visible );
     parent.PushBackChild( collapsed );
@@ -494,11 +494,11 @@ TEST_CASE( "MeasureLayoutNode all children Collapsed gives Content parent zero d
 
     LayoutNode c1{}; c1.Style.WidthMode = ESizingMode::Fixed; c1.Style.HeightMode = ESizingMode::Fixed;
     c1.Style.FixedWidth = Unit{ 100.0f }; c1.Style.FixedHeight = Unit{ 50.0f };
-    c1.Layout.Visibility = { Visibility::Collapsed };
+    c1.Style.Visibility = EVisibility::Collapsed;
 
     LayoutNode c2{}; c2.Style.WidthMode = ESizingMode::Fixed; c2.Style.HeightMode = ESizingMode::Fixed;
     c2.Style.FixedWidth = Unit{ 80.0f }; c2.Style.FixedHeight = Unit{ 60.0f };
-    c2.Layout.Visibility = { Visibility::Collapsed };
+    c2.Style.Visibility = EVisibility::Collapsed;
 
     parent.PushBackChild( c1 );
     parent.PushBackChild( c2 );
