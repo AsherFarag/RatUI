@@ -3,6 +3,11 @@
 
 namespace RatUI
 {
+    class IRenderer;
+
+    /**
+     * @brief Supported texture formats for renderer backends.
+     */
     enum class ETextureFormat : u8
     {
         Unknown = 0,
@@ -26,27 +31,41 @@ namespace RatUI
         };
 
         constexpr bool operator==( const TextureID& a_Other ) const { return ID == a_Other.ID; } 
-        constexpr bool IsValid() const { return *this != Null(); }
+
         static constexpr TextureID Null() { return TextureID{}; }
     };
 
-    //struct TextureData
-    //{
-    //    TextureID      ID{ TextureID::Null() };
-    //    ETextureFormat Format{ ETextureFormat::RGBA8 };
-//
-    //    u32         Width{ 0 }, Height{ 0 };
-    //    const void* Pixels{ nullptr };
-//
-    //};
-//
-    //struct TextureUpdate
-    //{
-    //    TextureID   ID{ TextureID::Null() };
-    //    u32         MipLevel{ 0 };
-    //    Rectu       Region{ Rectu::Infinite() };
-    //    const void* Data{ nullptr };
-    //    size        DataSizeBytes{ 0 };
-    //};
+    class Texture
+    {
+    public:
+        Texture( IRenderer& a_Renderer, TextureID a_ID )
+            : Renderer( a_Renderer )
+            , ID( a_ID )
+        {}
+
+        ~Texture(); ///< Defined in 'IRenderer.h' to avoid circular dependency.
+
+        IRenderer& Renderer;
+        TextureID  ID;
+    };
+
+    class TextureHandle
+    {
+    public:
+        TextureHandle() = default;
+		TextureHandle( Shared<class Texture> a_Texture ) : m_Texture( std::move( a_Texture ) ) {}
+
+        /** @brief Check if this handle currently owns a valid texture. */
+        bool IsValid() const { return m_Texture != nullptr; }
+
+        /** @brief Get the underlying TextureID, or TextureID::Null() if this handle is empty. */
+        TextureID GetID() const { return m_Texture ? m_Texture->ID : TextureID::Null(); }
+
+        bool operator==( const TextureHandle& a_Other ) const { return m_Texture == a_Other.m_Texture; }
+             operator bool() const { return IsValid(); }
+
+    private:
+        Shared<class Texture> m_Texture;
+    };
 
 } // namespace RatUI

@@ -101,6 +101,7 @@ protected:
     {
         m_Scene->Shutdown();
         m_Scene.reset();
+		m_Atlas.reset();
         return true;
     }
 

@@ -305,8 +305,8 @@ namespace RatUI::OpenGL
             glBindVertexArray( 0 );
         }
 
-        Optional<TextureID> CreateTexture( u32 a_Width, u32 a_Height,
-                                           ETextureFormat a_Format, const void* a_Data ) override
+        TextureHandle CreateTexture( u32 a_Width, u32 a_Height,
+                                     ETextureFormat a_Format, const void* a_Data ) override
         {
             GLuint texID = 0;
             glGenTextures( 1, &texID );
@@ -327,13 +327,13 @@ namespace RatUI::OpenGL
 
             TextureID id;
             id.ID = static_cast<uptr>( texID );
-            return id;
+            return TextureHandle( MakeShared<Texture>( *this, id ) );
         }
 
         bool UpdateTexture( TextureID a_Texture, u32 /*a_MipLevel*/,
                             Rectu a_Region, const void* a_Data, size a_DataSizeBytes ) override
         {
-            if ( !a_Texture.IsValid() || !a_Data )
+            if ( a_Texture == TextureID::Null() || !a_Data )
                 return false;
 
             const u32 w = a_Region.Size[0];
@@ -365,7 +365,7 @@ namespace RatUI::OpenGL
 
         void DestroyTexture( TextureID a_Texture ) override
         {
-            if ( a_Texture.IsValid() )
+			if ( IsValidTexture( a_Texture ) )
             {
                 GLuint texID = static_cast<GLuint>( a_Texture.ID );
                 glDeleteTextures( 1, &texID );

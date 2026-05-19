@@ -47,21 +47,17 @@ namespace RatUI
             , m_TextMetrics( a_TextMetrics )
             , m_Config     ( a_Config )
         {
-            m_Texture = m_Renderer.CreateTexture( m_Config.AtlasWidth, m_Config.AtlasHeight, ETextureFormat::RGBA8, nullptr )
-                        .value_or( TextureID::Null() );
-        }
-
-        ~GlyphAtlas()
-        {
-            if ( m_Texture.IsValid() )
-                m_Renderer.DestroyTexture( m_Texture );
+            m_Texture = m_Renderer.CreateTexture( 
+                m_Config.AtlasWidth, m_Config.AtlasHeight, 
+                ETextureFormat::RGBA8, 
+                nullptr );
         }
 
         GlyphAtlas( const GlyphAtlas& ) = delete;
         GlyphAtlas& operator=( const GlyphAtlas& ) = delete;
 
         /** @brief Returns the GPU texture that holds the rasterized glyph bitmaps. */
-        TextureID GetTexture() const { return m_Texture; }
+        const TextureHandle& GetTexture() const { return m_Texture; }
 
         /** @brief Returns a reference to the configuration settings of the glyph atlas. */
         const GlyphAtlasConfig& GetConfig() const { return m_Config; }
@@ -112,7 +108,7 @@ namespace RatUI
             if ( auto region = AllocateRegion( static_cast<u16>( width ), static_cast<u16>( height ) ) )
             {
                 const size dataSizeBytes = static_cast<size>( width ) * height * sizeof( Color );
-                m_Renderer.UpdateTexture( m_Texture, 0, region->Cast<u32>(), pixels, dataSizeBytes );
+                m_Renderer.UpdateTexture( m_Texture.GetID(), 0, region->Cast<u32>(), pixels, dataSizeBytes);
 
                 GlyphMetrics rect { .Bearing   = bearing,
                                     .AtlasRect = *region,
@@ -162,7 +158,7 @@ namespace RatUI
     protected:
         IRenderer&       m_Renderer;
         ITextMetrics&    m_TextMetrics;
-        TextureID        m_Texture{ TextureID::Null() };
+        TextureHandle    m_Texture;
         GlyphAtlasConfig m_Config;
         u16              m_CursorX{ 0 }, m_CursorY{ 0 }, m_RowBottom{ 0 };
         bool             m_AtlasFull{ false };

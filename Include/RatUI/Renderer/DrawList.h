@@ -116,7 +116,7 @@ namespace RatUI
             const Pixel fontSizePx = ToPixel( a_Shaped.FontSize, m_DPIScale );
             const f32   msdfScale  = baseSize > 0.f ? fontSizePx.ToFloat() / baseSize : 1.f;
 
-			Batcher.EnsureMSDFTextBatch( GetPixelClipRect(), GetPixelTransform(), MSDFTextDrawData::From( Atlas.GetTexture(), a_Style, msdfScale ) );
+			Batcher.EnsureMSDFTextBatch( GetPixelClipRect(), GetPixelTransform(), MSDFTextDrawData::From( Atlas.GetTexture().GetID(), a_Style, msdfScale));
 			Batcher.EmitText( a_Shaped, a_Style, ToPixelRect( a_Rect ), Atlas, m_DPIScale );
             return *this;
         }
