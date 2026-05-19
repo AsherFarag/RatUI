@@ -15,24 +15,34 @@ namespace RatUI
     class DrawList
     {
     public:
-		GlyphAtlas& Atlas;
+        struct RectStyle
+        {
+            Color          FillColor{ Colors::Transparent };
+            Color          BorderColor{ Colors::Transparent };
+            Unit           BorderThickness{ 0_u };
+            CornerRounding Rounding{ CornerRounding::None() };
+            TextureHandle  Texture{ TextureHandle::Null() };
+        };
+    
+        struct CircleStyle
+        {
+            Color         FillColor{ Colors::Transparent };
+            Color         BorderColor{ Colors::Transparent };
+            Unit          BorderThickness{ 0_u };
+            TextureHandle Texture{ TextureHandle::Null() };
+        };
 
 		DrawList( GlyphAtlas& a_Atlas, f32 a_DPIScale = 1.f )
-            : Atlas( a_Atlas )
+            : m_Atlas( a_Atlas )
             , m_DPIScale( a_DPIScale )
         {}
 
+        // ========================
+        // DPI Scaling
+        // ========================
+
         void SetDPIScale( f32 a_DPIScale ) { m_DPIScale = a_DPIScale; }
         f32  GetDPIScale() const { return m_DPIScale; }
-
-        void Clear()
-        {
-            m_ClipStackSize = 0;
-            m_TransformStackSize = 0;
-			m_CurrentLayer = 0;
-            for ( auto& [_, batcher] : m_Batchers )
-                batcher.Clear();
-        }
 
         // ========================
         // Layering
@@ -96,79 +106,113 @@ namespace RatUI
         // Drawing
         // ========================
 
-        DrawList& AddRect( Color a_Color, Rect<Unit> a_Rect, CornerRounding a_Rounding, Unit a_BorderThickness = 0_u, Color a_BorderColor = Colors::Transparent )
+        /**
+		 * @brief Adds a rectangle to the draw list with the specified style. 
+         * The rectangle will be transformed and clipped according to the current transform and clip stacks.
+         */
+        DrawList& AddRect( Rect<Unit> a_Rect, RectStyle a_Style )
         {
             DrawBatcher& batcher = GetCurrentBatcher();
-            batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureHandle::Null() );
-            batcher.EmitRect( ToPixelRect( a_Rect ), a_Color, ToPixel( a_BorderThickness, m_DPIScale ).ToFloat(), a_BorderColor, ToPixelRounding( a_Rounding ) );
+            batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), std::move( a_Style.Texture ) );
+            batcher.EmitRect( ToPixelRect( a_Rect ), 
+                a_Style.FillColor, 
+                ToPixel( a_Style.BorderThickness, m_DPIScale ), 
+                a_Style.BorderColor, 
+                ToPixelRounding( a_Style.Rounding ) );
             return *this;
         }
-
-        DrawList& AddImage( TextureHandle a_Texture, 
-                            Rect<Unit> a_Rect, 
-                            Color a_Tint = Colors::White, 
-                            CornerRounding a_Rounding = CornerRounding::None(), 
-                            Unit a_BorderThickness = 0_u, 
-                            Color a_BorderColor = Colors::Transparent )
+        
+        /**
+		 * @brief Adds a circle to the draw list with the specified style.
+		 * @note This is the same as calling AddRect with a square rect and uniform corner rounding equal to the radius, 
+         *       but is provided as a convenience method.
+         */
+        DrawList& AddCircle( Vec2<Unit> a_Center, Unit a_Radius, CircleStyle a_Style )
         {
-            DrawBatcher& batcher = GetCurrentBatcher();
-            batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), std::move( a_Texture ) );
-            batcher.EmitRect( ToPixelRect( a_Rect ), a_Tint, ToPixel( a_BorderThickness, m_DPIScale ).ToFloat(), a_BorderColor, ToPixelRounding( a_Rounding ) );
-            return *this;
+            // A circle is a rounded rect whose corner radius equals its half-size.
+            const Rect<Unit> rect{
+                a_Center - Vec2<Unit>{ a_Radius, a_Radius },
+                Vec2<Unit>{ a_Radius * 2.f, a_Radius * 2.f }
+            };
+
+            return AddRect( rect, RectStyle{
+                .FillColor = a_Style.FillColor,
+                .BorderColor = a_Style.BorderColor,
+                .BorderThickness = a_Style.BorderThickness,
+                .Rounding = CornerRounding::Uniform( a_Radius ),
+                .Texture = std::move( a_Style.Texture )
+            } );
         }
 
-        DrawList& AddRect( Color a_Color, const Rect<Unit>& a_Rect, Unit a_BorderThickness = 0_u, Color a_BorderColor = Colors::Transparent )
-        {
-            return AddRect( a_Color, a_Rect, CornerRounding::None(), a_BorderThickness, a_BorderColor );
-        }
-
-        DrawList& AddRectBorder( Color a_Color, const Rect<Unit>& a_Rect, Unit a_Thickness = 1_u )
-        {
-            return AddRect( Colors::Transparent, a_Rect, CornerRounding::None(), a_Thickness, a_Color );
-        }
-
-        DrawList& AddRectBorder( Color a_Color, const Rect<Unit>& a_Rect, CornerRounding a_Rounding, Unit a_Thickness = 1_u )
-        {
-            return AddRect( Colors::Transparent, a_Rect, a_Rounding, a_Thickness, a_Color );
-        }
-
-        DrawList& AddCircle( Color a_Color, Vec2<Unit> a_Center, Unit a_Radius, Unit a_BorderThickness = 0_u, Color a_BorderColor = Colors::Transparent )
-        {
-            DrawBatcher& batcher = GetCurrentBatcher();
-            batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureHandle::Null() );
-            batcher.EmitCircle( ToPixelVec2( a_Center ), ToPixel( a_Radius, m_DPIScale ), a_Color, ToPixel( a_BorderThickness, m_DPIScale ), a_BorderColor );
-            return *this;
-        }
-
-        DrawList& AddCircleBorder( Color a_Color, Vec2<Unit> a_Center, Unit a_Radius, Unit a_Thickness = 1_u )
-        {
-            return AddCircle( Colors::Transparent, a_Center, a_Radius, a_Thickness, a_Color );
-        }
-
+        /**
+		 * @brief Adds shaped text to the draw list with the specified style.
+		 * The text will be transformed and clipped according to the current transform and clip stacks. 
+         * The font size in the ShapedText is in units, but will be scaled to pixels based on the atlas configuration and current DPI scale.
+         */
         DrawList& AddText( const ShapedText& a_Shaped, const TextRenderStyle& a_Style, Rect<Unit> a_Rect )
 		{
-			const f32   baseSize   = Atlas.GetConfig().BaseSize.ToFloat();
+			const f32   baseSize   = m_Atlas.GetConfig().BaseSize.ToFloat();
             const Pixel fontSizePx = ToPixel( a_Shaped.FontSize, m_DPIScale );
             const f32   msdfScale  = baseSize > 0.f ? fontSizePx.ToFloat() / baseSize : 1.f;
 
 			DrawBatcher& batcher = GetCurrentBatcher();
-            batcher.EnsureMSDFTextBatch( GetPixelClipRect(), GetPixelTransform(), MSDFTextDrawData::From( Atlas.GetTexture(), a_Style, msdfScale));
-			batcher.EmitText( a_Shaped, a_Style, ToPixelRect( a_Rect ), Atlas, m_DPIScale );
+            batcher.EnsureMSDFTextBatch( GetPixelClipRect(), GetPixelTransform(), MSDFTextDrawData::From( m_Atlas.GetTexture(), a_Style, msdfScale));
+			batcher.EmitText( a_Shaped, a_Style, ToPixelRect( a_Rect ), m_Atlas, m_DPIScale );
             return *this;
         }
 
+        /**
+         * @brief Flushes the draw list by executing all recorded draw batches on the given renderer. 
+         * @note This does not clear the draw list, allowing for multiple flushes if needed. Call Clear() to reset the draw list state.
+         */
         void Flush( IRenderer& a_Renderer )
         {
+			// Note: Layers are drawn in ascending order, so lower layer numbers will appear behind higher layer numbers.
             for ( auto& [_, batcher] : m_Batchers )
                 a_Renderer.Execute( batcher );
         }
 
-    private:
+        /**
+         * @brief Clears the draw list, resetting all state including clip and transform stacks, current layer, and recorded draw batches.
+         * This should be called at the beginning of each frame before recording new draw commands.
+         */
+        void Clear()
+        {
+            m_ClipStackSize = 0;
+            m_TransformStackSize = 0;
+			m_CurrentLayer = 0;
+
+            // TODO: Still better optimisations we can do here.
+            // e.g. If theres a tool tip popup, it may be drawn often but not every frame, currently 
+            // it would cause a new batcher to be created and destroyed every frame which is not ideal. 
+            // Maybe have a pool of batchers or something.
+
+			// Clear all batches. 
+			// If a batcher has no batches, we can remove it from the map to save memory, 
+            // since we expect the number of active layers to be small and not all layers to be used every frame.
+			for ( auto it = m_Batchers.begin(); it != m_Batchers.end(); ++it )
+            {
+				auto& batcher = it->second; // TODO: Need Container util here
+
+                if ( Empty( batcher.GetBatches() ) )
+                {
+                    it = m_Batchers.erase( it );
+                    continue;
+                }
+
+                batcher.Clear();
+            }
+        }
+
+    protected:
         static constexpr size  c_MaxStackDepth = 64; 
+
+        GlyphAtlas& m_Atlas;
+
         FixedArray<Rect<Unit>, c_MaxStackDepth> m_ClipStack;
         FixedArray<Mat3<Unit>, c_MaxStackDepth> m_TransformStack;
-        size                                    m_ClipStackSize{ 0 };
-        size                                    m_TransformStackSize{ 0 };
+        size m_ClipStackSize{ 0 };
+        size m_TransformStackSize{ 0 };
 
         f32 m_DPIScale{ 1.f };
         i32 m_CurrentLayer{ 0 };
@@ -176,6 +220,8 @@ namespace RatUI
 
         DrawBatcher& GetBatcherForLayer( i32 a_Layer ) { return m_Batchers[a_Layer]; }
         DrawBatcher& GetCurrentBatcher() { return GetBatcherForLayer( m_CurrentLayer ); }
+
+        // TODO: All these conversion functions are gross and shouldnt be here
 
         Vec2<Pixel> ToPixelVec2( const Vec2<Unit>& a_Vec ) const
         {
@@ -224,10 +270,15 @@ namespace RatUI
             if ( m_ClipStackSize == 0 )
                 return NullOpt;
 
+            const auto toU16 = +[]( Pixel a_Pixel ) -> u16
+            {
+                return static_cast<u16>( std::lround( a_Pixel.ToFloat() ) );
+            };
+
 			Rect<Pixel> pixelRect = ToPixelRect( m_ClipStack[m_ClipStackSize - 1 ] );
             return Rectu16{
-                Vec2<u16>{ static_cast<u16>( pixelRect.Left().ToFloat() ), static_cast<u16>( pixelRect.Top().ToFloat() ) },
-                Vec2<u16>{ static_cast<u16>( pixelRect.Width().ToFloat() ), static_cast<u16>( pixelRect.Height().ToFloat() ) }
+                Vec2<u16>{ toU16( pixelRect.Left()   ), toU16( pixelRect.Top()    ) },
+                Vec2<u16>{ toU16( pixelRect.Width()  ), toU16( pixelRect.Height() ) }
 			};
         }
     };

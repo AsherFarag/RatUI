@@ -211,7 +211,7 @@ public:
         for ( int i = 3; i >= 0; --i )
         {
             Unit radius = 30_u + i * 10_u;
-            WidgetID swatch = m_Scene.CreateWidget<CircleWidget>( accentSwatchRow, radius, accentSwatches[i], false  );
+            WidgetID swatch = m_Scene.CreateWidget<CircleWidget>( accentSwatchRow, radius, accentSwatches[i] );
             auto* swatchNode = m_Scene.Layouts.Get( m_Scene.GetWidget( swatch )->GetLayoutID() );
             swatchNode->Style.WidthMode = ESizingMode::Fixed;
             swatchNode->Style.FixedWidth = radius * 2.f;

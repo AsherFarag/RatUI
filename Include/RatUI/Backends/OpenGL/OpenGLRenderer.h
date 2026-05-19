@@ -255,20 +255,20 @@ namespace RatUI::OpenGL
 
         void Execute( const DrawBatcher& a_Batcher ) override
         {
-            if ( Empty( a_Batcher.Vertices ) || Empty( a_Batcher.Indices ) )
+            if ( Empty( a_Batcher.GetVertices() ) || Empty( a_Batcher.GetIndices() ) )
                 return;
 
             // Stream the full frame's vertex and index data in one upload each.
             glBindBuffer( GL_ARRAY_BUFFER, m_VBO );
             glBufferData( GL_ARRAY_BUFFER,
-                          static_cast<GLsizeiptr>( Size( a_Batcher.Vertices ) ),
-                          Data( a_Batcher.Vertices ),
+                          static_cast<GLsizeiptr>( SizeBytes( a_Batcher.GetVertices() ) ),
+                          Data( a_Batcher.GetVertices() ),
                           GL_STREAM_DRAW );
 
             glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, m_IBO );
             glBufferData( GL_ELEMENT_ARRAY_BUFFER,
-                          static_cast<GLsizeiptr>( Size( a_Batcher.Indices ) * sizeof( u16 ) ),
-                          Data( a_Batcher.Indices ),
+                          static_cast<GLsizeiptr>( SizeBytes( a_Batcher.GetIndices() ) ),
+                          Data( a_Batcher.GetIndices() ),
                           GL_STREAM_DRAW );
 
             // Fixed render state for the entire frame.
@@ -277,7 +277,7 @@ namespace RatUI::OpenGL
             glDisable   ( GL_DEPTH_TEST );
             glDisable   ( GL_CULL_FACE  );
 
-            for ( const DrawBatch& batch : a_Batcher.Batches )
+            for ( const DrawBatch& batch : a_Batcher.GetBatches() )
             {
                 if ( batch.IndexCount == 0 )
                     continue;

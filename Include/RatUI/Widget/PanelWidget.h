@@ -26,10 +26,24 @@ namespace RatUI
             const Rect<Unit>& rect = node->Layout.FinalRect;
             const Color fill = NormalColor;
 
-            a_DrawList.AddRect( fill, rect, Rounding );
-
             if ( a_Scene.GetFocusedWidget() == GetID() )
-                a_DrawList.AddRectBorder( FocusOutlineColor, rect.Expanded( 2_u ), Rounding + 2_u, 2_u );
+            {
+                a_DrawList.AddRect( rect,
+                {
+                    .FillColor = fill,
+                    .BorderColor = Colors::White,
+                    .BorderThickness = 2_u,
+                    .Rounding = Rounding
+                } );
+            }
+            else
+            {
+                a_DrawList.AddRect( rect,
+                {
+                    .FillColor = fill,
+                    .Rounding = Rounding
+                } );
+            }
 
             a_DrawList.PushClipRect( rect );
             a_Scene.ForEachChildWidget( GetID(), [&]( IWidget& a_Child )

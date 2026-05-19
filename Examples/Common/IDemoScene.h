@@ -51,19 +51,29 @@ public:
 
         const Rect<Unit>& rect = node->Layout.FinalRect;
 
-		if ( a_Scene.GetFocusedWidget() == GetID() )
-			a_DrawList.AddRect( Colors::White, rect.Expanded( 4_u ), Rounding + 4_u );
+        if ( a_Scene.GetFocusedWidget() == GetID() )
+        {
+            a_DrawList.AddRect( rect,
+            {
+                .FillColor = Color,
+                .BorderColor = Colors::White,
+                .BorderThickness = 4_u,
+                .Rounding = Rounding
+            } );
+        }
+        else
+        {
+            a_DrawList.AddRect( rect,
+            {
+                .FillColor = Color,
+                .Rounding = Rounding
+            } );
+        }
 
-        static TextureHandle checkerboardTexture = LoadTexture( "Resources/Textures/LargeSquarePattern.jpg" );
-
-		a_DrawList.AddImage( checkerboardTexture, rect, Color, Rounding );
-
-        a_DrawList.PushClipRect( rect );
         a_Scene.ForEachChildWidget( GetID(), [&](IWidget& child)
         {
             child.OnPaint( a_Scene, a_DrawList );
 		} );
-        a_DrawList.PopClipRect();
     }
 
     bool IsFocusable( Scene& a_Scene ) const override
@@ -75,15 +85,12 @@ public:
 class CircleWidget : public IWidget
 {
 public:
-
     Unit  Radius;
     Color FillColor;
-    bool  IsFilled;
 
-    CircleWidget( Unit a_Radius, Color a_Color, bool a_Filled = true )
+    CircleWidget( Unit a_Radius, Color a_Color )
         : Radius( a_Radius )
         , FillColor( a_Color )
-        , IsFilled( a_Filled )
     {}
 
     void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
@@ -95,20 +102,21 @@ public:
         const Rect<Unit>& rect = node->Layout.FinalRect;
         Vec2<Unit> center = rect.Center();
 
-        if ( IsFilled )
+        if ( a_Scene.GetFocusedWidget() == GetID() )
         {
-            if ( a_Scene.GetFocusedWidget() == GetID() )
-			    a_DrawList.AddCircle( Colors::LightYellow, center, Radius + 4_u );
-
-            a_DrawList.AddCircle( FillColor, center, Radius );
+            a_DrawList.AddCircle( center, Radius,
+            {
+                .FillColor = FillColor,
+                .BorderColor = Colors::White,
+                .BorderThickness = 4_u,
+            } );
         }
         else
         {
-            const Unit borderThickness = 4_u;
-            if ( a_Scene.GetFocusedWidget() == GetID() )
-                a_DrawList.AddCircleBorder( Colors::LightYellow, center, Radius + 4_u, borderThickness + 2_u );
-
-            a_DrawList.AddCircleBorder( FillColor, center, Radius, borderThickness );
+            a_DrawList.AddCircle( center, Radius,
+            {
+                .FillColor = FillColor,
+            } );
         }
     }
 

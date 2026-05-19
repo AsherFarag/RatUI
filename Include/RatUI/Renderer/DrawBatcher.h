@@ -307,73 +307,18 @@ namespace RatUI
      * @brief A utility class for batching draw calls together. 
      * It allows for efficient rendering by minimizing state changes and draw calls on the backend.
      */
-    struct DrawBatcher
+    class DrawBatcher
     {
-        Array<byte>      Vertices;
-        Array<u16>       Indices;
-        Array<DrawBatch> Batches;
-
-        template<typename VertexT>
-        Span<VertexT> ReserveVertices( u32 a_Count )
-        {
-            const u32 byteOffset = static_cast<u32>( Size( Vertices ) );
-            Resize( Vertices, byteOffset + a_Count * sizeof( VertexT ) );
-            return Span<VertexT>{ reinterpret_cast<VertexT*>( Data( Vertices ) + byteOffset ), a_Count };
-        }
-
-        Span<u16> ReserveIndices( u32 a_Count )
-        {
-            const u32 offset = static_cast<u32>( Size( Indices ) );
-            Resize( Indices, offset + a_Count );
-            return Span<u16>{ Data( Indices ) + offset, a_Count };
-        }
+    public:
+		Span<const byte>      GetVertices() const noexcept { return m_Vertices; }
+		Span<const u16>       GetIndices()  const noexcept { return m_Indices; }
+		Span<const DrawBatch> GetBatches()  const noexcept { return m_Batches; }
 
         void Clear()
         {
-            ::RatUI::Clear( Vertices );
-            ::RatUI::Clear( Indices );
-            ::RatUI::Clear( Batches );
-        }
-
-        void Flatten()
-        {
-            if ( Size( Batches ) < 2 )
-                return;
-
-            size write = 0;
-            for ( size read = 1; read < Size( Batches ); ++read )
-            {
-                DrawBatch& current = Batches[read];
-                DrawBatch& last    = Batches[write];
-
-                if ( current.CanFlattenWith( last ) )
-                {
-                    last.IndexCount += current.IndexCount;
-                }
-                else
-                {
-                    ++write;
-                    if ( write != read )
-                        Batches[write] = current;
-                }
-            }
-
-            Resize( Batches, write + 1 );
-        }
-
-        void TryFlatten()
-        {
-            if ( Size( Batches ) < 2 )
-                return;
-
-            const DrawBatch& consumable = Back( Batches );
-                  DrawBatch& consumer   = Batches[ Size( Batches ) - 2 ];
-
-            if ( consumable.CanFlattenWith( consumer ) )
-            {
-                consumer.IndexCount += consumable.IndexCount;
-                PopBack( Batches );
-            }
+            ::RatUI::Clear( m_Vertices );
+            ::RatUI::Clear( m_Indices );
+            ::RatUI::Clear( m_Batches );
         }
 
         DrawBatch& EnsureSDFBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, TextureHandle a_Texture )
@@ -386,69 +331,124 @@ namespace RatUI
             return EnsureBatch( a_ClipRect, a_Transform, a_Data );
         }
 
-        void EmitRect( Rect<Pixel> a_Rect, Color a_FillColor,
-                       f32 a_BorderThickness = 0.f, Color a_BorderColor = Colors::Transparent,
+        void EmitRect( Rect<Pixel> a_Rect,
+                       Color a_FillColor,
+                       Pixel a_BorderThickness = 0_px,
+                       Color a_BorderColor = Colors::Transparent,
                        Vec4<Pixel> a_Rounding = {} )
         {
-            const f32 w  = a_Rect.Size[0].ToFloat();
-            const f32 h  = a_Rect.Size[1].ToFloat();
-            const f32 cx = a_Rect.Origin[0].ToFloat() + w * 0.5f;
-            const f32 cy = a_Rect.Origin[1].ToFloat() + h * 0.5f;
-
-            const Vec2f halfSize{ w * 0.5f, h * 0.5f };
-
-            // Expand the quad by border + aaPad pixels on every side so the SDF edge
-            // gradient and any border are never clipped by the triangle boundary.
-            constexpr f32 aaPad = 1.5f;
-            const f32     border = std::max( 0.f, a_BorderThickness );
-            const Vec2f   outerHalf{ halfSize[0] + border + aaPad, halfSize[1] + border + aaPad };
-
-            // Index base = number of SDFVertices already written for the current batch.
-            const u32 vertexBase = ( static_cast<u32>( Size( Vertices ) ) - Back( Batches ).VertexByteOffset ) / sizeof( SDFVertex );
-
+            const Pixel w = a_Rect.Size[0];
+            const Pixel h = a_Rect.Size[1];
+        
+            const Pixel halfW = w * 0.5f;
+            const Pixel halfH = h * 0.5f;
+        
+            const Pixel cx = a_Rect.Origin[0] + halfW;
+            const Pixel cy = a_Rect.Origin[1] + halfH;
+        
+            constexpr Pixel aaPad  = 1.5_px;
+            const Pixel     border = a_BorderThickness > 0_px ? a_BorderThickness : 0_px;
+        
+            const Pixel outerHalfW = halfW + border + aaPad;
+            const Pixel outerHalfH = halfH + border + aaPad;
+        
+            const u32 vertexBase =
+                ( static_cast<u32>( Size( m_Vertices ) )
+                  - Back( m_Batches ).VertexByteOffset )
+                / sizeof( SDFVertex );
+        
             auto verts = ReserveVertices<SDFVertex>( 4 );
-
-            auto makeVert = [&]( f32 xs, f32 ys, Vec2f uv, Pixel radius ) -> SDFVertex
+        
+            // ------------------------------------------------------------
+            // Normalize rounding:
+            // If the rounding is too large, it can cause artifacts, 
+            // so we need to scale it down to fit within the rect.
+            // ------------------------------------------------------------
+        
+            Pixel r0 = a_Rounding[0] > 0_px ? a_Rounding[0] : 0_px;
+            Pixel r1 = a_Rounding[1] > 0_px ? a_Rounding[1] : 0_px;
+            Pixel r2 = a_Rounding[2] > 0_px ? a_Rounding[2] : 0_px;
+            Pixel r3 = a_Rounding[3] > 0_px ? a_Rounding[3] : 0_px;
+        
+            f32 scale = 1.0f;
+        
+            const Pixel top    = r0 + r1;
+            const Pixel bottom = r2 + r3;
+            const Pixel left   = r0 + r2;
+            const Pixel right  = r1 + r3;
+        
+            if (top    > w) scale = std::min(scale, f32(w / top));
+            if (bottom > w) scale = std::min(scale, f32(w / bottom));
+            if (left   > h) scale = std::min(scale, f32(h / left));
+            if (right  > h) scale = std::min(scale, f32(h / right));
+        
+            if (scale < 1.0f)
             {
-                return SDFVertex{
-                    .Position        = Vec2<Pixel>{ Pixel{ cx + xs * outerHalf[0] },
-                                                    Pixel{ cy + ys * outerHalf[1] } },
-                    .LocalPos        = Vec2<Pixel>{ Pixel{ xs * outerHalf[0] },
-                                                    Pixel{ ys * outerHalf[1] } },
-                    .UV              = uv,
-                    .FillColor       = a_FillColor,
-                    .BorderColor     = a_BorderColor,
-                    .BorderThickness = Pixel{ border },
-                    .HalfSize        = Vec2<Pixel>{ Pixel{ halfSize[0] }, Pixel{ halfSize[1] } },
-                    .CornerRadius    = radius,
-                };
+                r0 *= scale;
+                r1 *= scale;
+                r2 *= scale;
+                r3 *= scale;
+            }
+        
+            // ------------------------------------------------------------
+            // Emit vertices
+            // ------------------------------------------------------------
+
+            verts[0] = {
+                .Position        = { cx - outerHalfW, cy - outerHalfH },
+                .LocalPos        = { -outerHalfW, -outerHalfH },
+                .UV              = { 0.f, 0.f },
+                .FillColor       = a_FillColor,
+                .BorderColor     = a_BorderColor,
+                .BorderThickness = border,
+                .HalfSize        = { halfW, halfH },
+                .CornerRadius    = r0
             };
-
-            // Each vertex carries its own corner radius so the fragment shader
-            // can interpolate and select the correct value per corner.
-            verts[0] = makeVert( -1.f, -1.f, { 0.f, 0.f }, a_Rounding[0] );
-            verts[1] = makeVert(  1.f, -1.f, { 1.f, 0.f }, a_Rounding[1] );
-            verts[2] = makeVert( -1.f,  1.f, { 0.f, 1.f }, a_Rounding[2] );
-            verts[3] = makeVert(  1.f,  1.f, { 1.f, 1.f }, a_Rounding[3] );
-
-            auto idx = ReserveIndices( 6 );
-            idx[0] = vertexBase + 0; idx[1] = vertexBase + 1; idx[2] = vertexBase + 2;
-            idx[3] = vertexBase + 1; idx[4] = vertexBase + 3; idx[5] = vertexBase + 2;
-            AddIndicesToCurrentBatch( 6 );
+        
+            verts[1] = {
+                .Position        = { cx + outerHalfW, cy - outerHalfH },
+                .LocalPos        = {  outerHalfW, -outerHalfH },
+                .UV              = { 1.f, 0.f },
+                .FillColor       = a_FillColor,
+                .BorderColor     = a_BorderColor,
+                .BorderThickness = border,
+                .HalfSize        = { halfW, halfH },
+                .CornerRadius    = r1
+            };
+        
+            verts[2] = {
+                .Position        = { cx - outerHalfW, cy + outerHalfH },
+                .LocalPos        = { -outerHalfW,  outerHalfH },
+                .UV              = { 0.f, 1.f },
+                .FillColor       = a_FillColor,
+                .BorderColor     = a_BorderColor,
+                .BorderThickness = border,
+                .HalfSize        = { halfW, halfH },
+                .CornerRadius    = r2
+            };
+        
+            verts[3] = {
+                .Position        = { cx + outerHalfW, cy + outerHalfH },
+                .LocalPos        = {  outerHalfW,  outerHalfH },
+                .UV              = { 1.f, 1.f },
+                .FillColor       = a_FillColor,
+                .BorderColor     = a_BorderColor,
+                .BorderThickness = border,
+                .HalfSize        = { halfW, halfH },
+                .CornerRadius    = r3
+            };
+        
+            auto idx = ReserveIndices(6);
+            idx[0] = vertexBase + 0;
+            idx[1] = vertexBase + 1;
+            idx[2] = vertexBase + 2;
+            idx[3] = vertexBase + 1;
+            idx[4] = vertexBase + 3;
+            idx[5] = vertexBase + 2;
+            
+            AddIndicesToCurrentBatch(6);
 
             TryFlatten();
-        }
-
-        void EmitCircle( Vec2<Pixel> a_Center, Pixel a_Radius, Color a_Color, Pixel a_BorderThickness = 0_px, Color a_BorderColor = Colors::Transparent )
-        {
-            // A circle is a rounded rect whose corner radius equals its half-size.
-            const Rect<Pixel> rect{
-                a_Center - Vec2<Pixel>{ a_Radius, a_Radius },
-                Vec2<Pixel>{ a_Radius * 2.f, a_Radius * 2.f }
-            };
-
-            EmitRect( rect, a_Color, a_BorderThickness.ToFloat(), a_BorderColor,
-                      Vec4<Pixel>{ a_Radius, a_Radius, a_Radius, a_Radius } );
         }
 
         void EmitText(
@@ -529,6 +529,10 @@ namespace RatUI
 
                 Pixel penX = lineX;
 
+                u32 vertexBase = ( static_cast<u32>( Size( m_Vertices ) ) 
+                                   - Back( m_Batches ).VertexByteOffset ) 
+                                 / sizeof( TextVertex );
+
                 for ( u32 g = line.Start; g < line.End; ++g )
                 {
                     const ShapedGlyph& sg = a_Text.Glyphs[ g ];
@@ -553,9 +557,6 @@ namespace RatUI
                     const f32 opacityA = computeFadeAlpha( gx      ) / 255.0f;
                     const f32 opacityB = computeFadeAlpha( gx + gw ) / 255.0f;
 
-                    // Index base in terms of TextVertex count within the current batch.
-                    const u32 vertexBase = ( static_cast<u32>( Size( Vertices ) ) - Back( Batches ).VertexByteOffset ) / sizeof( TextVertex );
-
                     auto verts = ReserveVertices<TextVertex>( 4 );
                     verts[0] = TextVertex{ Vec2<Pixel>{ gx,      gy      }, opacityA, Vec2f{ u0, v0 } };
                     verts[1] = TextVertex{ Vec2<Pixel>{ gx + gw, gy      }, opacityB, Vec2f{ u1, v0 } };
@@ -567,7 +568,8 @@ namespace RatUI
                     idx[3] = vertexBase + 1; idx[4] = vertexBase + 3; idx[5] = vertexBase + 2;
                     AddIndicesToCurrentBatch( 6 );
 
-                    penX += ToPixel( sg.XAdvance, fontSize, a_DpiScale );
+                    penX       += ToPixel( sg.XAdvance, fontSize, a_DpiScale );
+                    vertexBase += 4;
                 }
 
                 penY += ToPixel( a_Text.LineHeight, a_DpiScale );
@@ -576,29 +578,65 @@ namespace RatUI
             TryFlatten();
         }
 
-    private:
+    protected:
+        Array<byte>      m_Vertices;
+        Array<u16>       m_Indices;
+        Array<DrawBatch> m_Batches;
+
+        void TryFlatten()
+        {
+            if ( Size( m_Batches ) < 2 )
+                return;
+
+            const DrawBatch& consumable = Back( m_Batches );
+                  DrawBatch& consumer   = m_Batches[Size( m_Batches ) - 2];
+
+            if ( consumable.CanFlattenWith( consumer ) )
+            {
+                consumer.IndexCount += consumable.IndexCount;
+                PopBack( m_Batches );
+            }
+        }
+
         template<typename DrawDataT>
         DrawBatch& EnsureBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, const DrawDataT& a_Data )
         {
             DrawBatch newBatch{
-                .ClipRect = a_ClipRect,
-                .Transform = a_Transform,
-                .VertexByteOffset = static_cast<u32>( Size( Vertices ) ),
-                .IndexOffset = static_cast<u32>( Size( Indices ) ),
-                .IndexCount = 0,
-                .Data = a_Data
+                .ClipRect         = a_ClipRect,
+                .Transform        = a_Transform,
+                .VertexByteOffset = static_cast<u32>( Size( m_Vertices ) ),
+                .IndexOffset      = static_cast<u32>( Size( m_Indices ) ),
+                .IndexCount       = 0,
+                .Data             = a_Data
             };
 
-            if ( Empty( Batches ) || !Back( Batches ).CanFlattenWith( newBatch ) )
-                EmplaceBack( Batches, newBatch );
+            if ( Empty( m_Batches ) || !Back( m_Batches ).CanFlattenWith( newBatch ) )
+                EmplaceBack( m_Batches, newBatch );
 
-            return Back( Batches );
+            return Back( m_Batches );
+        }
+
+        template<typename VertexT>
+        Span<VertexT> ReserveVertices( u32 a_Count )
+        {
+            const u32 byteOffset = static_cast<u32>( Size( m_Vertices ) );
+            Resize( m_Vertices, byteOffset + a_Count * sizeof( VertexT ) );
+            return Span<VertexT>{ 
+                reinterpret_cast<VertexT*>( Data( m_Vertices ) + byteOffset ), 
+                a_Count };
+        }
+
+        Span<u16> ReserveIndices( u32 a_Count )
+        {
+            const u32 offset = static_cast<u32>( Size( m_Indices ) );
+            Resize( m_Indices, offset + a_Count );
+            return Span<u16>{ Data( m_Indices ) + offset, a_Count };
         }
 
         void AddIndicesToCurrentBatch( u32 a_Count )
         {
-            RATUI_ASSERT( !Empty( Batches ), "Emit call requires an active batch. Call an Ensure*Batch method first." );
-            Back( Batches ).IndexCount += a_Count;
+            RATUI_ASSERT( !Empty( m_Batches ), "Emit call requires an active batch. Call an Ensure*Batch method first." );
+            Back( m_Batches ).IndexCount += a_Count;
         }
     };
 
