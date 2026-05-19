@@ -2,6 +2,9 @@
 #include "../Core.h"
 #include "DrawBatcher.h"
 #include "RenderTransform.h"
+#include "IRenderer.h"
+
+#include <map> // TODO: Replace with RatUI::Map
 
 namespace RatUI
 {
@@ -12,14 +15,31 @@ namespace RatUI
     class DrawList
     {
     public:
-        DrawBatcher& Batcher;
-		GlyphAtlas&  Atlas;
+		GlyphAtlas& Atlas;
 
-		DrawList( DrawBatcher& a_Batcher, GlyphAtlas& a_Atlas, f32 a_DPIScale = 1.f )
-            : Batcher( a_Batcher )
-            , Atlas( a_Atlas )
+		DrawList( GlyphAtlas& a_Atlas, f32 a_DPIScale = 1.f )
+            : Atlas( a_Atlas )
             , m_DPIScale( a_DPIScale )
         {}
+
+        void SetDPIScale( f32 a_DPIScale ) { m_DPIScale = a_DPIScale; }
+        f32  GetDPIScale() const { return m_DPIScale; }
+
+        void Clear()
+        {
+            m_ClipStackSize = 0;
+            m_TransformStackSize = 0;
+			m_CurrentLayer = 0;
+            for ( auto& [_, batcher] : m_Batchers )
+                batcher.Clear();
+        }
+
+        // ========================
+        // Layering
+        // ========================
+
+        void SetDrawLayer( i32 a_Layer ) { m_CurrentLayer = a_Layer; }
+        i32  GetDrawLayer() const        { return m_CurrentLayer; }
 
         // ========================
         // Transform Stack
@@ -78,8 +98,9 @@ namespace RatUI
 
         DrawList& AddRect( Color a_Color, const Rect<Unit>& a_Rect, CornerRounding a_Rounding, Unit a_BorderThickness = 0_u, Color a_BorderColor = Colors::Transparent )
         {
-            Batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureHandle::Null() );
-            Batcher.EmitRect( ToPixelRect( a_Rect ), a_Color, ToPixel( a_BorderThickness, m_DPIScale ).ToFloat(), a_BorderColor, ToPixelRounding( a_Rounding ) );
+            DrawBatcher& batcher = GetCurrentBatcher();
+            batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureHandle::Null() );
+            batcher.EmitRect( ToPixelRect( a_Rect ), a_Color, ToPixel( a_BorderThickness, m_DPIScale ).ToFloat(), a_BorderColor, ToPixelRounding( a_Rounding ) );
             return *this;
         }
 
@@ -100,8 +121,9 @@ namespace RatUI
 
         DrawList& AddCircle( Color a_Color, Vec2<Unit> a_Center, Unit a_Radius, Unit a_BorderThickness = 0_u, Color a_BorderColor = Colors::Transparent )
         {
-            Batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureHandle::Null() );
-            Batcher.EmitCircle( ToPixelVec2( a_Center ), ToPixel( a_Radius, m_DPIScale ), a_Color, ToPixel( a_BorderThickness, m_DPIScale ), a_BorderColor );
+            DrawBatcher& batcher = GetCurrentBatcher();
+            batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureHandle::Null() );
+            batcher.EmitCircle( ToPixelVec2( a_Center ), ToPixel( a_Radius, m_DPIScale ), a_Color, ToPixel( a_BorderThickness, m_DPIScale ), a_BorderColor );
             return *this;
         }
 
@@ -116,14 +138,16 @@ namespace RatUI
             const Pixel fontSizePx = ToPixel( a_Shaped.FontSize, m_DPIScale );
             const f32   msdfScale  = baseSize > 0.f ? fontSizePx.ToFloat() / baseSize : 1.f;
 
-			Batcher.EnsureMSDFTextBatch( GetPixelClipRect(), GetPixelTransform(), MSDFTextDrawData::From( Atlas.GetTexture(), a_Style, msdfScale));
-			Batcher.EmitText( a_Shaped, a_Style, ToPixelRect( a_Rect ), Atlas, m_DPIScale );
+			DrawBatcher& batcher = GetCurrentBatcher();
+            batcher.EnsureMSDFTextBatch( GetPixelClipRect(), GetPixelTransform(), MSDFTextDrawData::From( Atlas.GetTexture(), a_Style, msdfScale));
+			batcher.EmitText( a_Shaped, a_Style, ToPixelRect( a_Rect ), Atlas, m_DPIScale );
             return *this;
         }
 
-        void Finish()
+        void Flush( IRenderer& a_Renderer )
         {
-            // Batches are finalized incrementally by DrawBatcher as commands are recorded.
+            for ( auto& [_, batcher] : m_Batchers )
+                a_Renderer.Execute( batcher );
         }
 
     private:
@@ -133,7 +157,12 @@ namespace RatUI
         size                                    m_ClipStackSize{ 0 };
         size                                    m_TransformStackSize{ 0 };
 
-        f32                  m_DPIScale{ 1.f };
+        f32 m_DPIScale{ 1.f };
+        i32 m_CurrentLayer{ 0 };
+        std::map<i32, DrawBatcher> m_Batchers; // TODO: Add RatUI::Map
+
+        DrawBatcher& GetBatcherForLayer( i32 a_Layer ) { return m_Batchers[a_Layer]; }
+        DrawBatcher& GetCurrentBatcher() { return GetBatcherForLayer( m_CurrentLayer ); }
 
         Vec2<Pixel> ToPixelVec2( const Vec2<Unit>& a_Vec ) const
         {

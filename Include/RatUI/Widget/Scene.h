@@ -393,6 +393,8 @@ namespace RatUI
         if ( !node )
             return false; // Layout node not found
 
+		node->DetachFromParent(); // Unlink from parent to avoid dangling references during recursive destruction
+
         // Recursively destroy child widgets
         node->ForEachChild( [&]( LayoutNode& childNode )
         {

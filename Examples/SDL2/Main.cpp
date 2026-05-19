@@ -26,7 +26,7 @@ public:
 
 protected:
 
-    DrawBatcher m_DrawBatcher;
+    Unique<DrawList> m_DrawList;
     Unique<GlyphAtlas> m_Atlas;
     FreeType::FontCache m_FontCache;
     FreeType::TextMetrics m_TextMetrics{};
@@ -45,6 +45,7 @@ protected:
         m_Scene->Init();
 
         m_Atlas = MakeUnique<GlyphAtlas>( *m_Renderer, m_TextMetrics );
+		m_DrawList = MakeUnique<DrawList>( *m_Atlas );
     
         return true;
     }
@@ -83,26 +84,25 @@ protected:
             return;
         }
 
-		m_DrawBatcher.Clear();
-
 		// Get dpi scale for current window (for correct text rendering on high-DPI displays)
         f32 dpiscale = 1.f;
         SDL_GetDisplayDPI( SDL_GetWindowDisplayIndex( GetWindow() ), nullptr, &dpiscale, nullptr );
 		dpiscale /= 96.f; // Convert from DPI to scale factor (assuming 96 DPI is the baseline)
+        m_DrawList->SetDPIScale( dpiscale * m_UIScale );
 
-        DrawList drawList{ m_DrawBatcher, *m_Atlas, dpiscale * m_UIScale };
-		m_Scene->Render( drawList );
-        drawList.Finish();
-
-        a_Renderer.Execute( m_DrawBatcher );
+        m_DrawList->Clear();
+		m_Scene->Render( *m_DrawList );
+		m_DrawList->Flush( a_Renderer );
     }
 
     bool OnShutdown() override
     {
-        m_DrawBatcher.Clear();
+		m_DrawList->Clear();
+        m_DrawList.reset();
 
         m_Scene->Shutdown();
         m_Scene.reset();
+
 		m_Atlas.reset();
         return true;
     }

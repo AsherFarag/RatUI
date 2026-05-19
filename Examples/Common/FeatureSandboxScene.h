@@ -219,12 +219,53 @@ public:
             swatchNode->Style.FixedHeight = radius * 2.f;
         }
 
+        // ---------------- DYNAMIC CONTENT DEMO ----------------
+        // HBOX
+
+        WidgetID dynamicContentRow = m_Scene.CreateWidget<RectWidget>( root, Colors::Surface800, "DynamicContentRow" );
+        auto* dynamicRowNode = m_Scene.Layouts.Get( m_Scene.GetWidget( dynamicContentRow )->GetLayoutID() );
+        dynamicRowNode->Style.LayoutType = ELayoutType::Horizontal;
+        dynamicRowNode->Style.Spacing = 20_u;
+        dynamicRowNode->Style.Padding = Edges::Uniform( 10_u );
+        dynamicRowNode->Style.HeightMode = ESizingMode::Fixed;
+        dynamicRowNode->Style.FixedHeight = 60_u;
+        dynamicRowNode->Style.WidthMode = ESizingMode::Flex;
+        dynamicRowNode->Style.IsFocusScope = true;
+
         // Add a button at the bottom
-		Callback<Scene&, WidgetID> buttonCallback = +[]( Scene& a_Scene, WidgetID a_WidgetID )
+		Callback<Scene&, WidgetID> buttonCallback = [=]( Scene& a_Scene, WidgetID a_WidgetID )
 		{
-			std::cout << "Button Pressed! WidgetID: " << std::endl;
+            static bool toggled = false;
+            static WidgetID dynamicTextWidget;
+            // Will create a new widget and destroy it on the next click, demonstrating dynamic widget management
+            if ( toggled )
+            {
+                a_Scene.DestroyWidget( dynamicTextWidget );
+            }
+            else
+            {
+                dynamicTextWidget = m_Scene.CreateWidget<ButtonWidget>( dynamicContentRow );
+                auto* buttonNode = m_Scene.Layouts.Get( m_Scene.GetWidget( dynamicTextWidget )->GetLayoutID() );
+
+                buttonNode->Style.WidthMode = ESizingMode::Fixed;
+                buttonNode->Style.FixedWidth = 300_u;
+                buttonNode->Style.HeightMode = ESizingMode::Fixed;
+                buttonNode->Style.FixedHeight = 40_u;
+                buttonNode->Style.ChildAlign = EAlignment::Center;
+
+                TextLayoutStyle btnTextStyle;
+                btnTextStyle.Font = DefaultFont;
+                btnTextStyle.Size = 16_u;
+                WidgetID buttonText = m_Scene.CreateWidget<TextWidget>( dynamicTextWidget, "Press Me", btnTextStyle );
+                auto* buttonTextNode = m_Scene.Layouts.Get( m_Scene.GetWidget( buttonText )->GetLayoutID() );
+                buttonTextNode->Style.WidthMode = ESizingMode::Content;
+                buttonTextNode->Style.HeightMode = ESizingMode::Content;
+		        buttonTextNode->Style.Visibility = EVisibility::HitTestInvisible;
+            }
+            toggled = !toggled;
 		};
-        WidgetID button = m_Scene.CreateWidget<ButtonWidget>( root, buttonCallback );
+        
+        WidgetID button = m_Scene.CreateWidget<ButtonWidget>( dynamicContentRow, buttonCallback );
         auto* buttonNode = m_Scene.Layouts.Get( m_Scene.GetWidget( button )->GetLayoutID() );
 
         buttonNode->Style.WidthMode = ESizingMode::Fixed;

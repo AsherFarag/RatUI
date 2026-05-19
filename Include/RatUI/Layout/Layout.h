@@ -396,11 +396,48 @@ namespace RatUI
 			void* UserData = nullptr; ///< Incase LayoutNode is not being used with the IWidget system, this can store arbitrary user data.
         };
 
+        /** @brief Hierachy access */
+
         LayoutNode* Parent()      const { return m_Parent; }
         LayoutNode* FirstChild()  const { return m_FirstChild; }
         LayoutNode* LastChild()   const { return m_LastChild; }
         LayoutNode* PrevSibling() const { return m_PrevSibling; }
         LayoutNode* NextSibling() const { return m_NextSibling; }
+
+        /** @brief Marks this node as dirty, indicating that its layout needs to be recalculated. Also marks all ancestor nodes as having a dirty descendant. */
+        void MarkDirty()
+        {
+            if ( !Layout.IsDirty )
+            {
+                Layout.IsDirty = true;
+                if ( m_Parent ) m_Parent->MarkDescendantDirty();
+            }
+        }
+
+        /** @brief Marks this node and all its descendants as dirty, indicating that their layout needs to be recalculated. */
+        void MarkDescendantDirty()
+        {
+            if ( Layout.IsDescendantDirty ) return; // Already marked as having a dirty descendant, so we can stop here.
+
+            Layout.IsDescendantDirty = true;
+
+            LayoutNode* parent = m_Parent;
+            LayoutNode* current = this;
+
+            while ( parent )
+            {
+                if ( !parent->Layout.IsDescendantDirty )
+                {
+                    parent->Layout.IsDescendantDirty = true;
+                    current = parent;
+                    parent = parent->m_Parent;
+                }
+                else
+                {
+                    break; // Ancestors are already marked as having a dirty descendant, so we can stop here.
+                }
+            }
+        }
 
         /** @brief Detaches this node from its parent, updating the linked list pointers of siblings and parent accordingly. */
         void DetachFromParent();
