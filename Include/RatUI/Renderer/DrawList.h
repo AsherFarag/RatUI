@@ -78,7 +78,7 @@ namespace RatUI
 
         DrawList& AddRect( Color a_Color, const Rect<Unit>& a_Rect, CornerRounding a_Rounding, Unit a_BorderThickness = 0_u, Color a_BorderColor = Colors::Transparent )
         {
-            Batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureID::Null() );
+            Batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureHandle::Null() );
             Batcher.EmitRect( ToPixelRect( a_Rect ), a_Color, ToPixel( a_BorderThickness, m_DPIScale ).ToFloat(), a_BorderColor, ToPixelRounding( a_Rounding ) );
             return *this;
         }
@@ -100,7 +100,7 @@ namespace RatUI
 
         DrawList& AddCircle( Color a_Color, Vec2<Unit> a_Center, Unit a_Radius, Unit a_BorderThickness = 0_u, Color a_BorderColor = Colors::Transparent )
         {
-            Batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureID::Null() );
+            Batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), TextureHandle::Null() );
             Batcher.EmitCircle( ToPixelVec2( a_Center ), ToPixel( a_Radius, m_DPIScale ), a_Color, ToPixel( a_BorderThickness, m_DPIScale ), a_BorderColor );
             return *this;
         }
@@ -116,7 +116,7 @@ namespace RatUI
             const Pixel fontSizePx = ToPixel( a_Shaped.FontSize, m_DPIScale );
             const f32   msdfScale  = baseSize > 0.f ? fontSizePx.ToFloat() / baseSize : 1.f;
 
-			Batcher.EnsureMSDFTextBatch( GetPixelClipRect(), GetPixelTransform(), MSDFTextDrawData::From( Atlas.GetTexture().GetID(), a_Style, msdfScale));
+			Batcher.EnsureMSDFTextBatch( GetPixelClipRect(), GetPixelTransform(), MSDFTextDrawData::From( Atlas.GetTexture(), a_Style, msdfScale));
 			Batcher.EmitText( a_Shaped, a_Style, ToPixelRect( a_Rect ), Atlas, m_DPIScale );
             return *this;
         }

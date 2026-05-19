@@ -99,6 +99,8 @@ protected:
 
     bool OnShutdown() override
     {
+        m_DrawBatcher.Clear();
+
         m_Scene->Shutdown();
         m_Scene.reset();
 		m_Atlas.reset();

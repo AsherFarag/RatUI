@@ -61,6 +61,9 @@ namespace RatUI
         /** @brief Get the underlying TextureID, or TextureID::Null() if this handle is empty. */
         TextureID GetID() const { return m_Texture ? m_Texture->ID : TextureID::Null(); }
 
+        /** @brief */
+        static TextureHandle Null() { return TextureHandle(); }
+
         bool operator==( const TextureHandle& a_Other ) const { return m_Texture == a_Other.m_Texture; }
              operator bool() const { return IsValid(); }
 

@@ -385,10 +385,10 @@ namespace RatUI::OpenGL
 
         void DispatchBatch( const SDFDrawData& a_Data, u32 a_VertexByteOffset, const f32 a_PVM[16] )
         {
-            if ( IsValidTexture( a_Data.Texture ) )
+            if ( TextureID texID = a_Data.Texture.GetID(); IsValidTexture( texID ) )
             {
                 glActiveTexture( GL_TEXTURE0 );
-                glBindTexture( GL_TEXTURE_2D, static_cast<GLuint>( a_Data.Texture.ID ) );
+                glBindTexture( GL_TEXTURE_2D, static_cast<GLuint>( texID.ID ) );
             }
 
             // Re-specify attrib pointers for this batch's region of the shared VBO.
@@ -418,10 +418,10 @@ namespace RatUI::OpenGL
 
         void DispatchBatch( const MSDFTextDrawData& a_Data, u32 a_VertexByteOffset, const f32 a_PVM[16] )
         {
-            if ( IsValidTexture( a_Data.FontAtlas ) )
+            if ( TextureID texID = a_Data.FontAtlas.GetID(); IsValidTexture( texID ) )
             {
                 glActiveTexture( GL_TEXTURE0 );
-                glBindTexture( GL_TEXTURE_2D, static_cast<GLuint>( a_Data.FontAtlas.ID ) );
+                glBindTexture( GL_TEXTURE_2D, static_cast<GLuint>( texID.ID ) );
             }
 
             // Re-specify attrib pointers for this batch's region of the shared VBO.

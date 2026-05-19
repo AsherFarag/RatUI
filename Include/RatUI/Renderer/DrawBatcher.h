@@ -111,14 +111,14 @@ namespace RatUI
      */
     struct SDFDrawData
     {
-        TextureID Texture{};
+        TextureHandle Texture{};
 
         /** 
          * @brief Determines if this SDFDrawData can be flattened with another, 
          * meaning they can be drawn together in the same batch without causing visual artifacts.
          * This is true if all properties that affect the visual output are equal between the two draw data.
          */
-        constexpr bool CanFlattenWith( const SDFDrawData& a_Other ) const
+        bool CanFlattenWith( const SDFDrawData& a_Other ) const
         {
             return Texture == a_Other.Texture;
         }
@@ -129,7 +129,7 @@ namespace RatUI
      */
     struct MSDFTextDrawData
     {
-        TextureID FontAtlas{}; ///< The texture ID of the font atlas to use for rendering the text.
+        TextureHandle FontAtlas{}; ///< The texture handle of the font atlas to use for rendering the text.
 
         f32 PixelRange{ c_MsdfPxRange };
         f32 Scale{ 1.f };
@@ -165,10 +165,10 @@ namespace RatUI
         f32   GlowPower { 0.0f };                ///< The falloff curve of the glow. Higher values create a tighter and brighter core, 
                                                  ///< while lower values create a softer glow. Typically in the range of 1.0 to 4.0.
 
-        static MSDFTextDrawData From( TextureID a_FontAtlas, const TextRenderStyle& a_Style, f32 a_MSDFScale )
+        static MSDFTextDrawData From( TextureHandle a_FontAtlas, const TextRenderStyle& a_Style, f32 a_MSDFScale )
         {
             MSDFTextDrawData result{
-                .FontAtlas = a_FontAtlas,
+                .FontAtlas = std::move( a_FontAtlas ),
                 .Scale = a_MSDFScale
             };
 
@@ -213,7 +213,7 @@ namespace RatUI
          * meaning they can be drawn together in the same batch without causing visual artifacts.
          * This is true if all properties that affect the visual output are equal between the two draw 
          */
-        constexpr bool CanFlattenWith( const MSDFTextDrawData& a_Other ) const
+        bool CanFlattenWith( const MSDFTextDrawData& a_Other ) const
         {
             if ( FontAtlas != a_Other.FontAtlas || PixelRange != a_Other.PixelRange || Scale != a_Other.Scale )
                 return false;
@@ -376,9 +376,9 @@ namespace RatUI
             }
         }
 
-        DrawBatch& EnsureSDFBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, TextureID a_Texture )
+        DrawBatch& EnsureSDFBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, TextureHandle a_Texture )
         {
-            return EnsureBatch( a_ClipRect, a_Transform, SDFDrawData{ .Texture = a_Texture } );
+            return EnsureBatch( a_ClipRect, a_Transform, SDFDrawData{ .Texture = std::move( a_Texture ) } );
         }
 
         DrawBatch& EnsureMSDFTextBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, const MSDFTextDrawData& a_Data )
