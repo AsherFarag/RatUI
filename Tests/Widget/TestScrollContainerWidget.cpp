@@ -27,8 +27,8 @@ static InputEvent MakeMouseScroll( Vec2f a_Pos, Vec2f a_Scroll )
         .Device  = EDeviceID::Mouse,
         .Payload = PointerEvent{
             .Position = ToUnitVec2( a_Pos ),
-            .ScrollDelta = ToUnitVec2( a_Scroll ),
-            .Type = EPointerType::Mouse
+            .Type = EPointerType::Mouse,
+            .ScrollDelta = ToUnitVec2( a_Scroll )
         }
     };
 }

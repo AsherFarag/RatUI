@@ -191,7 +191,10 @@ namespace RatUI
 
             m_ScrollOffset = a_NewOffset;
             if ( a_EmitEvent )
-                Invoke( OnScrollChanged, a_Scene, GetID(), m_ScrollOffset );
+            {
+                if ( OnScrollChanged )
+                    OnScrollChanged( a_Scene, GetID(), m_ScrollOffset );
+            }
 
             return true;
         }
