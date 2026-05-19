@@ -5,65 +5,6 @@
 namespace RatUI
 {
     /**
-     * @brief Represents the radius of each corner of a rectangle, allowing for asymmetric rounding.
-     */
-    struct CornerRounding
-    {
-        Unit TopLeft{};
-        Unit TopRight{};
-        Unit BottomLeft{};
-        Unit BottomRight{};
-
-        static constexpr CornerRounding None() { return {}; }
-        static constexpr CornerRounding Uniform( Unit a_Value ) { return { a_Value, a_Value, a_Value, a_Value }; }
-        static constexpr CornerRounding Symmetric( Unit a_Top, Unit a_Bottom ) { return { a_Top, a_Top, a_Bottom, a_Bottom }; }
-        static constexpr CornerRounding Asymmetric( Unit a_TopLeft, Unit a_TopRight, Unit a_BottomLeft, Unit a_BottomRight ) 
-        { 
-            return { a_TopLeft, a_TopRight, a_BottomLeft, a_BottomRight }; 
-        }
-
-        constexpr CornerRounding operator+( Unit a_Amount ) const
-        {
-            return {
-                .TopLeft = TopLeft + a_Amount,
-                .TopRight = TopRight + a_Amount,
-                .BottomLeft = BottomLeft + a_Amount,
-                .BottomRight = BottomRight + a_Amount
-            };
-        }
-
-        constexpr CornerRounding operator-( Unit a_Amount ) const
-        {
-            return {
-                .TopLeft = TopLeft - a_Amount,
-                .TopRight = TopRight - a_Amount,
-                .BottomLeft = BottomLeft - a_Amount,
-                .BottomRight = BottomRight - a_Amount
-            };
-        }
-
-        constexpr CornerRounding operator*( Unit a_Scalar ) const
-        {
-            return {
-                .TopLeft = TopLeft * a_Scalar,
-                .TopRight = TopRight * a_Scalar,
-                .BottomLeft = BottomLeft * a_Scalar,
-                .BottomRight = BottomRight * a_Scalar
-            };
-        }
-
-        constexpr CornerRounding operator/( Unit a_Scalar ) const
-        {
-            return {
-                .TopLeft = TopLeft / a_Scalar,
-                .TopRight = TopRight / a_Scalar,
-                .BottomLeft = BottomLeft / a_Scalar,
-                .BottomRight = BottomRight / a_Scalar
-            };
-        }
-    };
-
-    /**
      * @brief Used for custom rendering commands that don't fit into the predefined categories. 
      * @param a_Renderer The renderer to use for drawing.
      * @param a_Cmd The draw command containing the necessary information for rendering.

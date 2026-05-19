@@ -1,29 +1,21 @@
 #pragma once
 #include "Scene.h"
-#include "IWidget.h"
 
 namespace RatUI
 {
     /**
-     * @brief
+     * @brief A base widget that provides common button functionality, such as handling pointer events and click callbacks.
+     * This class can be extended to create various types of buttons with different visual styles and behaviors.
      */
-    class ButtonWidget : public IWidget
+    class ButtonBaseWidget : public IWidget
     {
     public:
         Callback<Scene&, WidgetID> OnClick; ///< Callback that is invoked when the button is clicked.
 
-        // TODO: Temp?
-        Color          NormalColor{ Colors::Surface700 };
-        Color          HoverColor{ Colors::Surface600 };
-        Color          PressedColor{ Colors::Surface500 };
-        Color          FocusOutlineColor{ Colors::White };
-        CornerRounding Rounding{ CornerRounding::Uniform( 8_u ) };
-        Unit           BorderThickness{ 1_u };
+        ButtonBaseWidget() = default;
+        ButtonBaseWidget( Callback<Scene&, WidgetID> a_OnClick ) : OnClick( std::move( a_OnClick ) ) {}
 
-        ButtonWidget() = default;
-        ButtonWidget( Callback<Scene&, WidgetID> a_OnClick ) : OnClick( std::move( a_OnClick ) ) {}
-
-        virtual ~ButtonWidget() = default;
+        virtual ~ButtonBaseWidget() = default;
 
         bool IsFocusable( Scene& a_Scene ) const override { return true; }
 
@@ -64,10 +56,61 @@ namespace RatUI
             if ( !node || !Visibility::IsRendered( node->Layout.Visibility ) )
                 return;
 
-            const Rect<Unit>& rect = node->Layout.FinalRect;
-            const Color fill = m_IsPressed ? PressedColor : ( m_IsHovered ? HoverColor : NormalColor );
+            a_Scene.ForEachChildWidget( GetID(), [&]( IWidget& a_Child )
+            {
+                a_Child.OnPaint( a_Scene, a_DrawList );
+            } );
+        }
 
-			// TODO: We shouldnt be doing drawing here, users should compose the style, like add a PanelWidget as a child and style that.
+        void OnPointerEnter( Scene& a_Scene, const PointerEvent& a_Event ) override { m_IsHovered = true; }
+        void OnPointerExit( Scene& a_Scene, const PointerEvent& a_Event ) override
+        {
+            m_IsHovered = false;
+            m_IsPressed = false;
+        }
+
+        bool IsHovered() const { return m_IsHovered; }
+        bool IsPressed() const { return m_IsPressed; }
+
+    protected:
+
+        // TODO: This shouldn't be handled here, what if users wanted to change the activation buttons or have multiple buttons with different activation buttons?
+        static constexpr bool IsActivationButton( EButtonID a_Button )
+        {
+            return a_Button == EButtonID::MouseLeft || a_Button == EButtonID::KeyEnter;
+        }
+
+        bool m_IsHovered{ false };
+        bool m_IsPressed{ false };
+    };
+
+    /**
+     * @brief A standard button widget that extends ButtonBaseWidget with a default visual style. 
+     * It renders a rectangular button with different colors for normal, hovered, and pressed states, as well as an outline when focused. 
+     * The button's appearance can be customized through its public properties.
+     */
+    class ButtonWidget : public ButtonBaseWidget
+    {
+    public:
+        Color          NormalColor{ Colors::Surface700 };
+        Color          HoverColor{ Colors::Surface600 };
+        Color          PressedColor{ Colors::Surface500 };
+        Color          FocusOutlineColor{ Colors::White };
+        CornerRounding Rounding{ CornerRounding::Uniform( 8_u ) };
+        Unit           BorderThickness{ 1_u };
+
+        using ButtonBaseWidget::ButtonBaseWidget;
+
+        void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
+        {
+            const LayoutNode* node = a_Scene.Layouts.Get( GetLayoutID() );
+            if ( !node || !Visibility::IsRendered( node->Layout.Visibility ) )
+                return;
+
+            const Rect<Unit>& rect = node->Layout.FinalRect;
+            const Color fill = m_IsPressed ? PressedColor 
+                                           : ( m_IsHovered ? HoverColor : NormalColor );
+
             if ( a_Scene.GetFocusedWidget() == GetID() )
             {
                 a_DrawList.AddRect( rect,
@@ -95,26 +138,6 @@ namespace RatUI
             a_DrawList.PopClipRect();
         }
 
-        void OnPointerEnter( Scene& a_Scene, const PointerEvent& a_Event ) override { m_IsHovered = true; }
-        void OnPointerExit( Scene& a_Scene, const PointerEvent& a_Event ) override
-        {
-            m_IsHovered = false;
-            m_IsPressed = false;
-        }
-
-        bool IsHovered() const { return m_IsHovered; }
-        bool IsPressed() const { return m_IsPressed; }
-
-    protected:
-
-        // TODO: This shouldn't be handled here, what if users wanted to change the activation buttons or have multiple buttons with different activation buttons?
-        static constexpr bool IsActivationButton( EButtonID a_Button )
-        {
-            return a_Button == EButtonID::MouseLeft || a_Button == EButtonID::KeyEnter;
-        }
-
-        bool m_IsHovered{ false };
-        bool m_IsPressed{ false };
     };
 
 } // namespace RatUI

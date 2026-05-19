@@ -305,6 +305,66 @@ namespace RatUI
         static constexpr Constraints AtMost ( Vec2<Unit> a_Max ) { return { { 0_u, 0_u }, a_Max }; }
     };
 
+    // TODO: THis shouldnt be in Layout.h but I dont know a better spot yet
+    /**
+     * @brief Represents the radius of each corner of a rectangle, allowing for asymmetric rounding.
+     */
+    struct CornerRounding
+    {
+        Unit TopLeft{};
+        Unit TopRight{};
+        Unit BottomLeft{};
+        Unit BottomRight{};
+
+        static constexpr CornerRounding None() { return {}; }
+        static constexpr CornerRounding Uniform( Unit a_Value ) { return { a_Value, a_Value, a_Value, a_Value }; }
+        static constexpr CornerRounding Symmetric( Unit a_Top, Unit a_Bottom ) { return { a_Top, a_Top, a_Bottom, a_Bottom }; }
+        static constexpr CornerRounding Asymmetric( Unit a_TopLeft, Unit a_TopRight, Unit a_BottomLeft, Unit a_BottomRight ) 
+        { 
+            return { a_TopLeft, a_TopRight, a_BottomLeft, a_BottomRight }; 
+        }
+
+        constexpr CornerRounding operator+( Unit a_Amount ) const
+        {
+            return {
+                .TopLeft = TopLeft + a_Amount,
+                .TopRight = TopRight + a_Amount,
+                .BottomLeft = BottomLeft + a_Amount,
+                .BottomRight = BottomRight + a_Amount
+            };
+        }
+
+        constexpr CornerRounding operator-( Unit a_Amount ) const
+        {
+            return {
+                .TopLeft = TopLeft - a_Amount,
+                .TopRight = TopRight - a_Amount,
+                .BottomLeft = BottomLeft - a_Amount,
+                .BottomRight = BottomRight - a_Amount
+            };
+        }
+
+        constexpr CornerRounding operator*( Unit a_Scalar ) const
+        {
+            return {
+                .TopLeft = TopLeft * a_Scalar,
+                .TopRight = TopRight * a_Scalar,
+                .BottomLeft = BottomLeft * a_Scalar,
+                .BottomRight = BottomRight * a_Scalar
+            };
+        }
+
+        constexpr CornerRounding operator/( Unit a_Scalar ) const
+        {
+            return {
+                .TopLeft = TopLeft / a_Scalar,
+                .TopRight = TopRight / a_Scalar,
+                .BottomLeft = BottomLeft / a_Scalar,
+                .BottomRight = BottomRight / a_Scalar
+            };
+        }
+    };
+
     /**
      * @brief Represents the input parameters for the layout process of a UI element.
      * If any of these values change, the computed layout is invalid and must be recalculated.

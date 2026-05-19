@@ -11,8 +11,6 @@ namespace RatUI
     {
     public:
         Color          NormalColor{ Colors::Surface700 };
-        Color          HoverColor{ Colors::Surface600 };
-        Color          PressedColor{ Colors::Surface500 };
         Color          FocusOutlineColor{ Colors::White };
         CornerRounding Rounding{ CornerRounding::Uniform( 8_u ) };
         Unit           BorderThickness{ 1_u };
