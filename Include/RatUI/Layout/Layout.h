@@ -12,6 +12,12 @@
 
 namespace RatUI
 {
+    enum class EOrientation : u8
+    {
+        Horizontal,
+        Vertical
+    };
+
     /** 
      * @brief Alignment flags for positioning UI elements within their parent containers. 
      * These can be combined to specify both horizontal and vertical alignment.
@@ -316,51 +322,53 @@ namespace RatUI
         Unit BottomLeft{};
         Unit BottomRight{};
 
+        constexpr CornerRounding() = default;
+        constexpr CornerRounding( Unit a_UniformValue ) : TopLeft( a_UniformValue ), TopRight( a_UniformValue ), BottomLeft( a_UniformValue ), BottomRight( a_UniformValue ) {}
+        constexpr CornerRounding( Unit a_Top, Unit a_Bottom ) : TopLeft( a_Top ), TopRight( a_Top ), BottomLeft( a_Bottom ), BottomRight( a_Bottom ) {}
+        constexpr CornerRounding( Unit a_TopLeft, Unit a_TopRight, Unit a_BottomLeft, Unit a_BottomRight ) : TopLeft( a_TopLeft ), TopRight( a_TopRight ), BottomLeft( a_BottomLeft ), BottomRight( a_BottomRight ) {}
+
         static constexpr CornerRounding None() { return {}; }
-        static constexpr CornerRounding Uniform( Unit a_Value ) { return { a_Value, a_Value, a_Value, a_Value }; }
-        static constexpr CornerRounding Symmetric( Unit a_Top, Unit a_Bottom ) { return { a_Top, a_Top, a_Bottom, a_Bottom }; }
-        static constexpr CornerRounding Asymmetric( Unit a_TopLeft, Unit a_TopRight, Unit a_BottomLeft, Unit a_BottomRight ) 
-        { 
-            return { a_TopLeft, a_TopRight, a_BottomLeft, a_BottomRight }; 
-        }
+        static constexpr CornerRounding Uniform( Unit a_Value ) { return { a_Value }; }
+        static constexpr CornerRounding Symmetric( Unit a_Top, Unit a_Bottom ) { return { a_Top, a_Bottom }; }
+        static constexpr CornerRounding Asymmetric( Unit a_TopLeft, Unit a_TopRight, Unit a_BottomLeft, Unit a_BottomRight ) { return { a_TopLeft, a_TopRight, a_BottomLeft, a_BottomRight }; }
 
         constexpr CornerRounding operator+( Unit a_Amount ) const
         {
             return {
-                .TopLeft = TopLeft + a_Amount,
-                .TopRight = TopRight + a_Amount,
-                .BottomLeft = BottomLeft + a_Amount,
-                .BottomRight = BottomRight + a_Amount
+                TopLeft + a_Amount,
+                TopRight + a_Amount,
+                BottomLeft + a_Amount,
+                BottomRight + a_Amount
             };
         }
 
         constexpr CornerRounding operator-( Unit a_Amount ) const
         {
             return {
-                .TopLeft = TopLeft - a_Amount,
-                .TopRight = TopRight - a_Amount,
-                .BottomLeft = BottomLeft - a_Amount,
-                .BottomRight = BottomRight - a_Amount
+                TopLeft - a_Amount,
+                TopRight - a_Amount,
+                BottomLeft - a_Amount,
+                BottomRight - a_Amount
             };
         }
 
         constexpr CornerRounding operator*( Unit a_Scalar ) const
         {
             return {
-                .TopLeft = TopLeft * a_Scalar,
-                .TopRight = TopRight * a_Scalar,
-                .BottomLeft = BottomLeft * a_Scalar,
-                .BottomRight = BottomRight * a_Scalar
+                TopLeft * a_Scalar,
+                TopRight * a_Scalar,
+                BottomLeft * a_Scalar,
+                BottomRight * a_Scalar
             };
         }
 
         constexpr CornerRounding operator/( Unit a_Scalar ) const
         {
             return {
-                .TopLeft = TopLeft / a_Scalar,
-                .TopRight = TopRight / a_Scalar,
-                .BottomLeft = BottomLeft / a_Scalar,
-                .BottomRight = BottomRight / a_Scalar
+                TopLeft / a_Scalar,
+                TopRight / a_Scalar,
+                BottomLeft / a_Scalar,
+                BottomRight / a_Scalar
             };
         }
     };

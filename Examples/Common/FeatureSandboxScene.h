@@ -1,5 +1,7 @@
 #pragma once
 #include "IDemoScene.h"
+#include <RatUI/Widget/ScrollContainerWidget.h>
+#include <RatUI/Widget/SliderWidget.h>
 
 class FeatureSandboxScene : public IDemoScene
 {
@@ -219,26 +221,81 @@ public:
             swatchNode->Style.FixedHeight = radius * 2.f;
         }
         
-		WidgetID button = m_Scene.CreateWidget<ButtonWidget>( root, []( Scene&, WidgetID )
-		{
-			std::cout << "Button Pressed!" << std::endl;
-		} );
-        auto* buttonNode = m_Scene.Layouts.Get( m_Scene.GetWidget( button )->GetLayoutID() );
+		//WidgetID button = m_Scene.CreateWidget<ButtonWidget>( root, []( Scene&, WidgetID )
+		//{
+		//	std::cout << "Button Pressed!" << std::endl;
+		//} );
+        //auto* buttonNode = m_Scene.Layouts.Get( m_Scene.GetWidget( button )->GetLayoutID() );
+        //
+        //buttonNode->Style.WidthMode = ESizingMode::Fixed;
+        //buttonNode->Style.FixedWidth = 300_u;
+        //buttonNode->Style.HeightMode = ESizingMode::Fixed;
+        //buttonNode->Style.FixedHeight = 40_u;
+        //buttonNode->Style.ChildAlign = EAlignment::Center;
+        //
+        //TextLayoutStyle btnTextStyle;
+        //btnTextStyle.Font = DefaultFont;
+        //btnTextStyle.Size = 16_u;
+        //WidgetID buttonText = m_Scene.CreateWidget<TextWidget>( button, "Press Me", btnTextStyle );
+        //auto* buttonTextNode = m_Scene.Layouts.Get( m_Scene.GetWidget( buttonText )->GetLayoutID() );
+        //buttonTextNode->Style.WidthMode = ESizingMode::Content;
+        //buttonTextNode->Style.HeightMode = ESizingMode::Content;
+		//buttonTextNode->Style.Visibility = EVisibility::HitTestInvisible;
 
-        buttonNode->Style.WidthMode = ESizingMode::Fixed;
-        buttonNode->Style.FixedWidth = 300_u;
-        buttonNode->Style.HeightMode = ESizingMode::Fixed;
-        buttonNode->Style.FixedHeight = 40_u;
-        buttonNode->Style.ChildAlign = EAlignment::Center;
+        // Test SliderWidget
+        {
+            WidgetID slider = m_Scene.CreateWidget<SliderWidget>( accentSwatchRow );
+            m_Scene.GetWidget<SliderWidget>( slider )->Value = 0.25f; // Set initial slider value
+            auto* sliderNode = m_Scene.Layouts.Get( m_Scene.GetWidget( slider )->GetLayoutID() );
+            sliderNode->Style.WidthMode = ESizingMode::Fixed;
+            sliderNode->Style.FixedWidth = 300_u;
+            sliderNode->Style.HeightMode = ESizingMode::Fixed;
+            sliderNode->Style.FixedHeight = 40_u;
+            sliderNode->Style.ChildAlign = EAlignment::Center;
+        }
 
-        TextLayoutStyle btnTextStyle;
-        btnTextStyle.Font = DefaultFont;
-        btnTextStyle.Size = 16_u;
-        WidgetID buttonText = m_Scene.CreateWidget<TextWidget>( button, "Press Me", btnTextStyle );
-        auto* buttonTextNode = m_Scene.Layouts.Get( m_Scene.GetWidget( buttonText )->GetLayoutID() );
-        buttonTextNode->Style.WidthMode = ESizingMode::Content;
-        buttonTextNode->Style.HeightMode = ESizingMode::Content;
-		buttonTextNode->Style.Visibility = EVisibility::HitTestInvisible;
+        // Test SliderWidget
+        {
+            WidgetID slider = m_Scene.CreateWidget<SliderWidget>( root );
+            m_Scene.GetWidget<SliderWidget>( slider )->Value = 0.25f; // Set initial slider value
+            m_Scene.GetWidget<SliderWidget>( slider )->Orientation = EOrientation::Vertical; // Set vertical orientation
+            auto* sliderNode = m_Scene.Layouts.Get( m_Scene.GetWidget( slider )->GetLayoutID() );
+            sliderNode->Style.WidthMode = ESizingMode::Fixed;
+            sliderNode->Style.FixedWidth = 40_u;
+            sliderNode->Style.HeightMode = ESizingMode::Fixed;
+            sliderNode->Style.FixedHeight = 300_u;
+            sliderNode->Style.ChildAlign = EAlignment::Center;
+        }
+
+        WidgetID scrollContainer = m_Scene.CreateWidget<ScrollContainerWidget>( root );
+        // Vertical scroll container with fixed height and multiple child widgets to demonstrate scrolling behavior
+        {
+            auto* scrollNode = m_Scene.Layouts.Get( m_Scene.GetWidget( scrollContainer )->GetLayoutID() );
+            scrollNode->Style.WidthMode = ESizingMode::Flex;
+            scrollNode->Style.HeightMode = ESizingMode::Fixed;
+            scrollNode->Style.FixedHeight = 150_u;
+            scrollNode->Style.Padding = Edges::Uniform( 10_u );
+            scrollNode->Style.Spacing = 10_u;
+            scrollNode->Style.LayoutType = ELayoutType::Vertical;
+
+            for ( int i = 0; i < 20; ++i )
+            {
+                WidgetID item = m_Scene.CreateWidget<RectWidget>( scrollContainer, Colors::Surface500, "ScrollItem" );
+                auto* itemNode = m_Scene.Layouts.Get( m_Scene.GetWidget( item )->GetLayoutID() );
+                itemNode->Style.WidthMode = ESizingMode::Flex;
+                itemNode->Style.HeightMode = ESizingMode::Fixed;
+                itemNode->Style.FixedHeight = 30_u;
+
+                TextLayoutStyle itemTextStyle;
+                itemTextStyle.Font = DefaultFont;
+                itemTextStyle.Size = 14_u;
+                WidgetID itemText = m_Scene.CreateWidget<TextWidget>( item, "Scrollable Item " + std::to_string( i + 1 ), itemTextStyle );
+                auto* itemTextNode = m_Scene.Layouts.Get( m_Scene.GetWidget( itemText )->GetLayoutID() );
+                itemTextNode->Style.WidthMode = ESizingMode::Content;
+                itemTextNode->Style.HeightMode = ESizingMode::Content;
+                itemTextNode->Style.Padding = Edges::Uniform( 5_u );
+            }
+        }
         
     }
 
