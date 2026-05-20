@@ -4,6 +4,7 @@
 #include <cmath>
 #include <type_traits>
 #include <utility>
+#include <algorithm>
 #include <concepts>
 #include <numbers>
 
