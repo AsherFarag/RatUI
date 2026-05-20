@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/runner/work/RatUI/RatUI/build-examples/_deps/freetype-subbuild/CMakeFiles/freetype-populate"
+		},
+		{
+			"file" : "/home/runner/work/RatUI/RatUI/build-examples/_deps/freetype-subbuild/CMakeFiles/freetype-populate.rule"
+		},
+		{
+			"file" : "/home/runner/work/RatUI/RatUI/build-examples/_deps/freetype-subbuild/CMakeFiles/freetype-populate-complete.rule"
+		},
+		{
+			"file" : "/home/runner/work/RatUI/RatUI/build-examples/_deps/freetype-subbuild/freetype-populate-prefix/src/freetype-populate-stamp/freetype-populate-build.rule"
+		},
+		{
+			"file" : "/home/runner/work/RatUI/RatUI/build-examples/_deps/freetype-subbuild/freetype-populate-prefix/src/freetype-populate-stamp/freetype-populate-configure.rule"
+		},
+		{
+			"file" : "/home/runner/work/RatUI/RatUI/build-examples/_deps/freetype-subbuild/freetype-populate-prefix/src/freetype-populate-stamp/freetype-populate-download.rule"
+		},
+		{
+			"file" : "/home/runner/work/RatUI/RatUI/build-examples/_deps/freetype-subbuild/freetype-populate-prefix/src/freetype-populate-stamp/freetype-populate-install.rule"
+		},
+		{
+			"file" : "/home/runner/work/RatUI/RatUI/build-examples/_deps/freetype-subbuild/freetype-populate-prefix/src/freetype-populate-stamp/freetype-populate-mkdir.rule"
+		},
+		{
+			"file" : "/home/runner/work/RatUI/RatUI/build-examples/_deps/freetype-subbuild/freetype-populate-prefix/src/freetype-populate-stamp/freetype-populate-patch.rule"
+		},
+		{
+			"file" : "/home/runner/work/RatUI/RatUI/build-examples/_deps/freetype-subbuild/freetype-populate-prefix/src/freetype-populate-stamp/freetype-populate-test.rule"
+		},
+		{
+			"file" : "/home/runner/work/RatUI/RatUI/build-examples/_deps/freetype-subbuild/freetype-populate-prefix/src/freetype-populate-stamp/freetype-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"freetype-populate"
+		],
+		"name" : "freetype-populate"
+	}
+}
