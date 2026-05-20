@@ -115,5 +115,23 @@ target_link_libraries(RatUI_Examples_Common
         OpenGL::GL
 )
 
+# Build backend implementations into RatUI when examples/dependencies are enabled.
+target_sources(RatUI
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/Source/RatUI/Backends/FreeType/FontCache.cpp
+        ${CMAKE_SOURCE_DIR}/Source/RatUI/Backends/FreeType/TextUtil.cpp
+        ${CMAKE_SOURCE_DIR}/Source/RatUI/Backends/FreeType/TextMetrics.cpp
+        ${CMAKE_SOURCE_DIR}/Source/RatUI/Backends/OpenGL/OpenGLRenderer.cpp
+)
+
+target_link_libraries(RatUI
+    PRIVATE
+        Freetype::Freetype
+        harfbuzz::harfbuzz
+        msdfgen::msdfgen
+        GLEW::GLEW
+        OpenGL::GL
+)
+
 # ─── Examples ────────────────────────────────────────────────────────────────
 add_subdirectory(SDL2)
