@@ -11,17 +11,22 @@ option(RATUI_BUILD_EXAMPLES "Build RatUI examples" OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # =========================
-# Header-only library
+# Library
 # =========================
-add_library(${PROJECT_NAME} INTERFACE)
+add_library(${PROJECT_NAME}
+    Source/RatUI/Layout/Layout.cpp
+    Source/RatUI/Layout/LayoutEngine.cpp
+    Source/RatUI/Renderer/DrawBatcher.cpp
+    Source/RatUI/Widget/Scene.cpp
+)
 
 target_include_directories(${PROJECT_NAME}
-    INTERFACE
+    PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Include>
         $<INSTALL_INTERFACE:Include>
 )
 
-target_compile_features(RatUI INTERFACE cxx_std_20)
+target_compile_features(RatUI PUBLIC cxx_std_20)
 
 # =========================
 # Subdirectories
