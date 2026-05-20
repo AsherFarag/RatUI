@@ -11,8 +11,7 @@ It's designed for games and aims to integrate into your codebase rather than the
 ## Features
 
 * Retained-mode UI architecture
-* Simple, header-only design
-* User-defined containers so you can use your own, defaults to std implementations.
+* Math and Container (String, etc) types are user overridable, defaults to STL implementations
 
 Hopefully some soon.
 
