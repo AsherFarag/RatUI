@@ -121,7 +121,6 @@ target_sources(RatUI
         ${CMAKE_SOURCE_DIR}/Source/RatUI/Backends/FreeType/FontCache.cpp
         ${CMAKE_SOURCE_DIR}/Source/RatUI/Backends/FreeType/TextUtil.cpp
         ${CMAKE_SOURCE_DIR}/Source/RatUI/Backends/FreeType/TextMetrics.cpp
-        ${CMAKE_SOURCE_DIR}/Source/RatUI/Backends/OpenGL/OpenGLRenderer.cpp
 )
 
 target_link_libraries(RatUI
