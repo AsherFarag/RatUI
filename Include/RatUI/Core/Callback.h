@@ -1,30 +1,30 @@
 #pragma once
-#include "../Core.h"
+#include "Types.h"
 
 #ifndef RATUI_OVERRIDE_CALLBACK_IMPL
-    #include <functional>
+#include <functional>
 
-    namespace RatUI
+ namespace RatUI
+ {
+     // TODO: Maybe add support for return type?
+
+    template<typename... Args>
+    using CallbackImpl = std::function<void( Args... )>;
+
+    template<typename... Args>
+    struct CoreTraits<CallbackImpl<Args...>>
     {
-        // TODO: Maybe add support for return type?
+        using Type = CallbackImpl<Args...>;
+        using Signature = void( Args... );
+        using ReturnType = void;
+        using ArgsTuple = std::tuple<std::decay_t<Args>...>;
 
-        template<typename... Args>
-        using CallbackImpl = std::function<void( Args... )>;
-
-        template<typename... Args>
-        struct CoreTraits<CallbackImpl<Args...>>
+        static constexpr auto Invoke(const Type& a_Callback, Args&&... a_Args)
         {
-            using Type = CallbackImpl<Args...>;
-            using Signature = void( Args... );
-            using ReturnType = void;
-            using ArgsTuple = std::tuple<std::decay_t<Args>...>;
-
-            static constexpr auto Invoke(const Type& a_Callback, Args&&... a_Args)
-            {
-                if ( a_Callback )
-                    return a_Callback( std::forward<Args>( a_Args )... );
-            }
-        };
+            if ( a_Callback )
+                return a_Callback( std::forward<Args>( a_Args )... );
+        }
+    };
     }
 
 #endif

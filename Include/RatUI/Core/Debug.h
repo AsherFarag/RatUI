@@ -1,5 +1,5 @@
 #pragma once
-#include "../Core.h"
+#include "Config.h"
 
 #if RATUI_ENABLE_ASSERTS
     #ifndef RATUI_ASSERT

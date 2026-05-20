@@ -6,7 +6,13 @@
  * It is included by Core.h and should not be included directly by user code.
  */
 
-#include "../Core.h"
+#if defined(__has_include)
+    #if __has_include("RatUIMemoryImpl.h")
+        #include "RatUIMemoryImpl.h"
+    #elif __has_include(<RatUIMemoryImpl.h>)
+        #include <RatUIMemoryImpl.h>
+    #endif
+#endif
 
 #ifndef RATUI_UNIQUE_PTR_IMPL
     #include <memory>

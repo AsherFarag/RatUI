@@ -1,14 +1,21 @@
 #pragma once
 
-#include "../Core.h"
+#include "Types.h"
 #include <cmath>
-#include <limits>
 #include <type_traits>
 #include <utility>
 #include <concepts>
 #include <numbers>
 
 // TODO: Might make more sense to have a Vec and Mat traits class with the specified operations but this is probably good enough for now. 
+
+#if defined(__has_include)
+    #if __has_include("RatUIMathImpl.h")
+        #include "RatUIMathImpl.h"
+    #elif __has_include(<RatUIMathImpl.h>)
+        #include <RatUIMathImpl.h>
+    #endif
+#endif
 
 /**
  * If you want to use your own math library, define RATUI_MATH_IMPL and the following macros before including this header:

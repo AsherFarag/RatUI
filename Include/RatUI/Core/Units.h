@@ -1,11 +1,11 @@
 #pragma once
-#include "../Core.h"
-#include "Math.inl"
+#include "Math.h"
+#include "Config.h"
 
-namespace RatUI {
+namespace RatUI 
+{
     /**
      * @brief Unit template for type-safe representation of various units of measurement in RatUI.
-     *
      */
     template<typename _Tag>
     struct UnitBase

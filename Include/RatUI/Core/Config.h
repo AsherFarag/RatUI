@@ -1,5 +1,13 @@
 #pragma once
 
+#if defined(__has_include)
+    #if __has_include("RatUIConfig.h")
+        #include "RatUIConfig.h"
+    #elif __has_include(<RatUIConfig.h>)
+        #include <RatUIConfig.h>
+    #endif
+#endif
+
 /** 
  * @file Config.h
  * @brief This file contains configuration options and macros for RatUI. 
