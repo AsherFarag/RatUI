@@ -33,6 +33,38 @@ public:
         rootNode->Style.WidthMode = ESizingMode::Flex;
         rootNode->Style.HeightMode = ESizingMode::Flex;
         rootNode->Style.IsFocusScope = true;
+
+        // Test Grid
+        {
+            WidgetID grid = m_Scene.CreateWidget<RectWidget>( root, Colors::Surface700, "TestGrid" );
+            LayoutNode* gridNode = m_Scene.Layouts.Get( m_Scene.GetWidget( grid )->GetLayoutID() );
+            gridNode->Style.LayoutType = ELayoutType::Grid;
+            gridNode->Style.GridColumns = 2;
+            gridNode->Style.GridRows = 2;
+			gridNode->Style.Spacing = 10_u;
+			gridNode->Style.WidthMode = ESizingMode::Flex;
+			gridNode->Style.HeightMode = ESizingMode::Flex;
+
+			Color cellColors[4] = {
+				Colors::AccentBlue,
+				Colors::AccentPurple,
+				Colors::AccentEmerald,
+				Colors::AccentRose
+			};
+
+            for ( int i = 0; i < 4; ++i )
+            {
+                WidgetID cell = m_Scene.CreateWidget<RectWidget>( grid, cellColors[i], "Cell" );
+                LayoutNode* cellNode = m_Scene.Layouts.Get( m_Scene.GetWidget( cell )->GetLayoutID() );
+                cellNode->Style.WidthMode = ESizingMode::Flex;
+                cellNode->Style.HeightMode = ESizingMode::Flex;
+                cellNode->Style.FixedHeight = 50_u;
+                cellNode->Style.FixedWidth = 50_u;
+            }
+
+        }
+
+        return;
     
         // ---------------- HEADER BAR (was Red) ----------------
         WidgetID headerBar = m_Scene.CreateWidget<RectWidget>( root, Colors::AccentBlue, "HeaderBar" );
@@ -278,6 +310,10 @@ public:
             scrollNode->Style.Spacing = 10_u;
             scrollNode->Style.LayoutType = ELayoutType::Vertical;
 
+			auto* scrollWidget = m_Scene.GetWidget<ScrollContainerWidget>( scrollContainer );
+			scrollWidget->VScrollbarMode = EScrollbarMode::Always;
+            scrollWidget->HScrollbarMode = EScrollbarMode::Always;
+
             for ( int i = 0; i < 20; ++i )
             {
                 WidgetID item = m_Scene.CreateWidget<RectWidget>( scrollContainer, Colors::Surface500, "ScrollItem" );
@@ -328,7 +364,7 @@ public:
     void Update( f32 a_DeltaTime ) override
     {
         Time += a_DeltaTime;
-
+        return;
         // Animate green widget's width with a sine wave
         if ( auto* mainContentAreaNode = m_Scene.Layouts.Get( m_Scene.GetWidget( MainContentArea )->GetLayoutID() ) )
         {
