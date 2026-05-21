@@ -44,6 +44,13 @@ static Anchor MakeAnchor( Vec2f a_Min, Vec2f a_Max, Vec2f a_Pivot, Vec2f a_Offse
     return anchor;
 }
 
+static EAlignment ResolveAlign( const LayoutNode& a_Child, const LayoutNode& a_Parent )
+{
+    return a_Child.Style.SelfAlign != EAlignment::Inherit
+        ? a_Child.Style.SelfAlign
+        : a_Parent.Style.ChildAlign;
+}
+
 // =============================================================================
 // AlignRect
 // =============================================================================
