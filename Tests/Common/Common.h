@@ -48,12 +48,33 @@ inline void ArrangeLayoutNode( RatUI::LayoutNode& a_Node, RatUI::Rectf a_Allocat
 
 inline RatUI::Rectf AlignRect( RatUI::Vec2f a_ContentSize, RatUI::Rectf a_Container, RatUI::EAlignment a_Align )
 {
-    return ToFloatRect( RatUI::AlignRect( ToUnitVec2( a_ContentSize ), ToUnitRect( a_Container ), a_Align ) );
+    RatUI::Vec2f offset{ 0.0f, 0.0f };
+
+    if ( RatUI::HasFlag( a_Align, RatUI::EAlignment::HCenter ) ) offset[ 0 ] = ( a_Container.Size[ 0 ] - a_ContentSize[ 0 ] ) * 0.5f;
+    else if ( RatUI::HasFlag( a_Align, RatUI::EAlignment::Right ) ) offset[ 0 ] = a_Container.Size[ 0 ] - a_ContentSize[ 0 ];
+
+    if ( RatUI::HasFlag( a_Align, RatUI::EAlignment::VCenter ) ) offset[ 1 ] = ( a_Container.Size[ 1 ] - a_ContentSize[ 1 ] ) * 0.5f;
+    else if ( RatUI::HasFlag( a_Align, RatUI::EAlignment::Bottom ) ) offset[ 1 ] = a_Container.Size[ 1 ] - a_ContentSize[ 1 ];
+
+    return {
+        .Origin = { a_Container.Origin[ 0 ] + offset[ 0 ], a_Container.Origin[ 1 ] + offset[ 1 ] },
+        .Size = a_ContentSize
+    };
 }
 
 inline float AlignCrossAxis( float a_ChildSize, float a_ParentPos, float a_ParentSize, RatUI::EAlignment a_Align, bool a_IsMainAxisHorizontal )
 {
-    return RatUI::AlignCrossAxis( ToUnit( a_ChildSize ), ToUnit( a_ParentPos ), ToUnit( a_ParentSize ), a_Align, a_IsMainAxisHorizontal ).ToFloat();
+    const bool center = a_IsMainAxisHorizontal
+        ? RatUI::HasFlag( a_Align, RatUI::EAlignment::VCenter )
+        : RatUI::HasFlag( a_Align, RatUI::EAlignment::HCenter );
+
+    const bool end = a_IsMainAxisHorizontal
+        ? RatUI::HasFlag( a_Align, RatUI::EAlignment::Bottom )
+        : RatUI::HasFlag( a_Align, RatUI::EAlignment::Right );
+
+    if ( center ) return a_ParentPos + ( a_ParentSize - a_ChildSize ) * 0.5f;
+    if ( end ) return a_ParentPos + a_ParentSize - a_ChildSize;
+    return a_ParentPos;
 }
 
 /** @brief Checks that two Vec2f values are approximately equal component-wise. */
