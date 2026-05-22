@@ -4,20 +4,49 @@
 
 namespace RatUI
 {
-
+    /**
+     * @brief
+     */
     class SliderWidget : public IWidget
     {
     public:
-        EOrientation   Orientation{ EOrientation::Horizontal }; ///< Orientation of the slider, either horizontal or vertical.
-        Unit           TrackThickness{ 4_u };                   ///< Thickness of the slider track.
-        CornerRounding TrackRounding{ 2_u };                    ///< Rounding of the slider track corners.
-        Color          TrackColor{ Colors::Surface600 };        ///< Color of the slider track.
+        // =====================================================================
+        // Visual properties
+        // =====================================================================
 
-        Vec2<Unit>     ThumbSize{ 12_u, 12_u };          ///< Size of the slider thumb.
-        CornerRounding ThumbRounding{ 6_u };             ///< Rounding of the slider thumb corners.
-        Color          ThumbColor{ Colors::Surface500 }; ///< Color of the slider thumb.
+        // TODO: Need the style system
 
-        Observable<f32> Value{}; ///< The current value of the slider, typically in the range [0.0, 1.0]. 
+        EOrientation   Orientation     { EOrientation::Horizontal };
+        Unit           TrackThickness  { 4_u };
+        CornerRounding TrackRounding   { CornerRounding::Uniform( 2_u ) };
+        Color          TrackColor      { Colors::Surface600 };
+        Color          TrackFillColor  { Colors::AccentBlue }; ///< Filled portion of the track (from min to thumb).
+        bool           ShowTrackFill   { true };               ///< Whether to render the filled portion of the track.
+
+        Vec2<Unit>     ThumbSize       { 16_u, 16_u };
+        CornerRounding ThumbRounding   { CornerRounding::Uniform( 8_u ) }; ///< Default: circular thumb.
+        Color          ThumbColor      { Colors::White };
+        Color          ThumbHoverColor { Colors::LightGray };
+        Color          ThumbPressColor { Colors::Gray };
+
+        // =====================================================================
+        // Behaviour properties
+        // =====================================================================
+
+        f32 Min       { 0.f };
+        f32 Max       { 1.f };
+        f32 Step      { 0.f };   ///< If > 0, the value will snap to multiples of Step between Min and Max.
+        f32 ScrollStep{ 0.05f }; ///< Scroll wheel step.
+
+        Observable<f32> Value{}; ///< Current value, clamped to [Min, Max].
+
+        SliderWidget() = default;
+
+        SliderWidget( f32 a_Min, f32 a_Max, f32 a_InitialValue = 0.f )
+            : Min( a_Min ), Max( a_Max )
+        {
+            Value.Set( std::clamp( a_InitialValue, a_Min, a_Max ) );
+        }
 
         bool IsFocusable( Scene& a_Scene ) const override { return true; }
 
@@ -29,90 +58,250 @@ namespace RatUI
 
             const Rect<Unit>& rect = node->Layout.FinalRect;
 
-            if ( a_Scene.GetFocusedWidget() == GetID() )
+            PaintTrack( a_DrawList, rect );
+            PaintThumb( a_DrawList, rect );
+        }
+
+        // =====================================================================
+        // Input
+        // =====================================================================
+
+        bool OnPressed( Scene& a_Scene, const ButtonEvent& a_Event ) override
+        {
+            if ( !a_Event.Pressed )
+                return false;
+
+            const bool isHz = ( Orientation == EOrientation::Horizontal );
+
+            // Mouse button begins a drag
+            if ( a_Event.Button == EButtonID::MouseLeft )
             {
-				a_DrawList.AddRect( rect,
-				{
-					.BorderColor = Colors::White,
-					.BorderThickness = 2_u,
-					.Rounding = TrackRounding
-				} );
+                const LayoutNode* node = a_Scene.Layouts.Get( GetLayoutID() );
+                if ( node )
+                {
+                    m_IsDragging = true;
+                    a_Scene.CapturePointer( GetID() );
+                    UpdateFromPointer( node->Layout.FinalRect, m_LastPointerPos );
+                }
+
+                return true;
             }
 
-            DrawTrack( a_DrawList, rect );
-            DrawThumb( a_DrawList, rect, false );
+            return false;
+        }
+
+        bool OnReleased( Scene& a_Scene, const ButtonEvent& a_Event ) override
+        {
+            if ( a_Event.Button == EButtonID::MouseLeft && m_IsDragging )
+            {
+                m_IsDragging = false;
+                a_Scene.ReleasePointerCapture();
+                return true;
+            }
+            
+            return false;
+        }
+
+        // =====================================================================
+        // Input: pointer
+        // =====================================================================
+
+        void OnPointerEnter( Scene& a_Scene, const PointerEvent& a_Event ) override
+        {
+            m_IsHovered = true;
+            m_LastPointerPos = a_Event.Position;
+        }
+
+        void OnPointerExit( Scene& a_Scene, const PointerEvent& a_Event ) override
+        {
+            m_IsHovered = false;
+            if ( !m_IsDragging )
+                m_IsThumbPressed = false;
+        }
+
+        void OnPointerMove( Scene& a_Scene, const PointerEvent& a_Event ) override
+        {
+            m_LastPointerPos = a_Event.Position;
+
+            if ( !m_IsDragging )
+                return;
+
+            const LayoutNode* node = a_Scene.Layouts.Get( GetLayoutID() );
+            if ( node )
+                UpdateFromPointer( node->Layout.FinalRect, a_Event.Position );
+        }
+
+        void OnPointerScroll( Scene& a_Scene, const PointerEvent& a_Event ) override
+        {
+            const bool isHz = ( Orientation == EOrientation::Horizontal );
+            const f32  delta = isHz
+                ? a_Event.ScrollDelta[0].ToFloat()
+				: a_Event.ScrollDelta[1].ToFloat() * -1.f; // Invert vertical scroll to match typical scrollbar behaviour.
+
+            if ( delta != 0.f )
+                Nudge( delta * ScrollStep );
+        }
+
+        /** @brief Set the normalised [0, 1] position of the thumb. */
+        void SetNormalized( f32 a_T )
+        {
+            const f32 clamped = std::clamp( a_T, 0.f, 1.f );
+            Value.Set( Min + clamped * ( Max - Min ) );
+        }
+
+        /** @brief Get the normalised [0, 1] position of the thumb. */
+        f32 GetNormalized() const
+        {
+            const f32 range = Max - Min;
+            if ( range <= 0.f ) return 0.f;
+            return std::clamp( ( Value.Get() - Min ) / range, 0.f, 1.f );
+        }
+
+        /** @brief Nudge the value by @p a_Delta in value space. */
+        void Nudge( f32 a_Delta )
+        {
+            Value.Set( std::clamp( Value.Get() + a_Delta, Min, Max ) );
         }
 
     protected:
 
-        void DrawTrack( DrawList& a_DrawList, Rect<Unit> a_Rect ) const
+        bool m_IsDragging     { false };
+        bool m_IsHovered      { false };
+        bool m_IsThumbPressed { false };
+        Vec2<Unit> m_LastPointerPos{ 0_u, 0_u };
+
+        /** @brief Returns the track rect centred inside @p a_Rect. */
+        Rect<Unit> GetTrackRect( Rect<Unit> a_Rect ) const
         {
-            Rect<Unit> trackRect;
             if ( Orientation == EOrientation::Horizontal )
             {
-                trackRect = {
-                    .Origin = { a_Rect.Left(), a_Rect.Center()[1] - TrackThickness / 2 },
-                    .Size   = { a_Rect.Width(), TrackThickness }
+                const Unit cy = a_Rect.Origin[1] + a_Rect.Size[1] * 0.5f;
+                return {
+                    { a_Rect.Left(), cy - TrackThickness * 0.5f },
+                    { a_Rect.Width(), TrackThickness }
                 };
             }
             else
             {
-                trackRect = {
-                    .Origin = { a_Rect.Center()[0] - TrackThickness / 2, a_Rect.Top() },
-                    .Size   = { TrackThickness, a_Rect.Height() }
+                const Unit cx = a_Rect.Origin[0] + a_Rect.Size[0] * 0.5f;
+                return {
+                    { cx - TrackThickness * 0.5f, a_Rect.Top() },
+                    { TrackThickness, a_Rect.Height() }
+                };
+            }
+        }
+
+        /** @brief Returns the rect of the thumb for the current value. */
+        Rect<Unit> GetThumbRect( Rect<Unit> a_Rect ) const
+        {
+            const f32 t = GetNormalized();
+
+            Vec2<Unit> centre;
+
+            if ( Orientation == EOrientation::Horizontal )
+            {
+                // Reserve half-thumb width at each end so thumb never clips.
+                const Unit travel = a_Rect.Width() - ThumbSize[0];
+                centre = {
+                    a_Rect.Left() + ThumbSize[0] * 0.5f + travel * t,
+                    a_Rect.Origin[1] + a_Rect.Size[1] * 0.5f
+                };
+            }
+            else
+            {
+                const Unit travel = a_Rect.Height() - ThumbSize[1];
+                centre = {
+                    a_Rect.Origin[0] + a_Rect.Size[0] * 0.5f,
+                    a_Rect.Top() + ThumbSize[1] * 0.5f + travel * t
                 };
             }
 
-            a_DrawList.AddRect( trackRect,
+            return {
+                centre - ThumbSize * 0.5_u,
+                ThumbSize
+            };
+        }
+
+        void PaintTrack( DrawList& a_DrawList, const Rect<Unit>& a_Rect ) const
+        {
+            const Rect<Unit> track = GetTrackRect( a_Rect );
+
+            // Background track
+            a_DrawList.AddRect( track,
             {
                 .FillColor = TrackColor,
                 .Rounding  = TrackRounding
             } );
+
+            if ( !ShowTrackFill )
+                return;
+
+            // Filled portion (min -> thumb)
+            const f32 t = GetNormalized();
+            if ( t > 0.f )
+            {
+                Rect<Unit> filled = track;
+                if ( Orientation == EOrientation::Horizontal )
+                    filled.Size[0] = track.Size[0] * t;
+                else
+                    filled.Size[1] = track.Size[1] * t;
+
+                a_DrawList.AddRect( filled,
+                {
+                    .FillColor = TrackFillColor,
+                    .Rounding  = TrackRounding
+                } );
+            }
         }
 
-        void DrawThumb( DrawList& a_DrawList, Rect<Unit> a_Rect, bool a_ThumbFocused ) const
+        void PaintThumb( DrawList& a_DrawList, const Rect<Unit>& a_Rect ) const
         {
-            Vec2<Unit> thumbCenter = a_Rect.Center();
+            const Rect<Unit> thumb = GetThumbRect( a_Rect );
 
-            const f32 clampedValue = std::clamp( Value.Get(), 0.f, 1.f );
+            const Color fill = m_IsThumbPressed ? ThumbPressColor
+                             : m_IsHovered      ? ThumbHoverColor
+                                                : ThumbColor;
+
+            a_DrawList.AddRect( thumb,
+            {
+                .FillColor       = fill,
+                .BorderColor     = m_IsDragging ? Colors::AccentBlue : Colors::Transparent,
+                .BorderThickness = m_IsDragging ? 2_u : 0_u,
+                .Rounding        = ThumbRounding
+            } );
+        }
+
+        // ---------------------------------------------------------------------
+        // Drag logic
+        // ---------------------------------------------------------------------
+
+        void UpdateFromPointer( const Rect<Unit>& a_Rect, Vec2<Unit> a_Pos )
+        {
+			const auto stepValue = [=]( f32 a_Value ) -> f32
+			{
+				if ( Step <= 0.f ) return a_Value;
+				return std::round( a_Value / Step ) * Step;
+			};
 
             if ( Orientation == EOrientation::Horizontal )
             {
-                Unit x = a_Rect.Left() + a_Rect.Width() * clampedValue;
-                thumbCenter = { x, a_Rect.Center()[1] };
+                const Unit travel = a_Rect.Width() - ThumbSize[0];
+                if ( travel <= 0_u ) return;
+
+                const f32 t = ( a_Pos[0] - ( a_Rect.Left() + ThumbSize[0] * 0.5f ) ).ToFloat()
+                              / travel.ToFloat();
+                SetNormalized( stepValue( t ) );
             }
             else
             {
-                Unit y = a_Rect.Top() + a_Rect.Height() * clampedValue;
-                thumbCenter = { a_Rect.Center()[0], y };
-            }
+                const Unit travel = a_Rect.Height() - ThumbSize[1];
+                if ( travel <= 0_u ) return;
 
-            Rect<Unit> thumbRect{
-                thumbCenter - ThumbSize / 2_u,
-                ThumbSize
-            };
-
-            if ( a_ThumbFocused )
-            {
-                a_DrawList.AddRect( thumbRect,
-                {
-                    .FillColor = ThumbColor,
-                    .BorderColor = Colors::White,
-                    .BorderThickness = 2_u,
-                    .Rounding  = ThumbRounding
-                } );
+                const f32 t = ( a_Pos[1] - ( a_Rect.Top() + ThumbSize[1] * 0.5f ) ).ToFloat()
+                              / travel.ToFloat();
+				SetNormalized( stepValue( t ) );
             }
-            else
-            {
-                a_DrawList.AddRect( thumbRect,
-                {
-                    .FillColor = ThumbColor,
-                    .Rounding  = ThumbRounding
-                } );
-            }
-            
         }
-
     };
 
 } // namespace RatUI

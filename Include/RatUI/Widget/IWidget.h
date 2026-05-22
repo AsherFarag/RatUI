@@ -57,6 +57,12 @@ namespace RatUI
         /** @brief Called when a pointer (e.g., mouse cursor) enters the widget's bounds. */
         virtual void OnPointerEnter( Scene& a_Scene, const PointerEvent& a_Event ) {}
 
+        /** @brief Called each frame while a pointer is inside (or captured by) this widget. */
+        virtual void OnPointerMove( Scene& a_Scene, const PointerEvent& a_Event ) {}
+
+        /** @brief Called when the pointer scrolls over this widget. */
+        virtual void OnPointerScroll( Scene& a_Scene, const PointerEvent& a_Event ) {}
+
         /** @brief Called when a pointer (e.g., mouse cursor) exits the widget's bounds. */
         virtual void OnPointerExit( Scene& a_Scene, const PointerEvent& a_Event ) {}
 

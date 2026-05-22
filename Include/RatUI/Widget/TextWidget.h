@@ -159,9 +159,9 @@ namespace RatUI
                 case ETextOverflow::Clip:
                 case ETextOverflow::Fade:
                 {
-                    a_DrawList.PushClipRect( textRect );
+                    //a_DrawList.PushClipRect( textRect );
                     a_DrawList.AddText( *m_ShapedText, effectiveStyle, textRect );
-                    a_DrawList.PopClipRect();
+                    //a_DrawList.PopClipRect();
                     break;
                 }
                 default:

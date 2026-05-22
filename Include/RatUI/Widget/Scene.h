@@ -117,6 +117,12 @@ namespace RatUI
         /** @brief Clears the focus from the current focused widget. */
         void ClearFocus() { SetFocus( c_InvalidPoolID ); }
 
+        void CapturePointer( WidgetID a_WidgetID ) { m_CapturedWidget = a_WidgetID; }
+
+        void ReleasePointerCapture() { m_CapturedWidget = c_InvalidPoolID; }
+
+        WidgetID GetCapturedWidget() const { return m_CapturedWidget; }
+
         // - Navigation
 
         void Navigate( ENavAction a_Action );
@@ -162,6 +168,7 @@ namespace RatUI
 
         WidgetID m_FocusedWidget{ c_InvalidPoolID };
         WidgetID m_HoveredWidget{ c_InvalidPoolID };
+        WidgetID m_CapturedWidget{ c_InvalidPoolID };
         PointerEvent m_LastPointerEvent{}; ///< The last pointer event received, used for hit testing and hover state management.
 
         struct NavScope

@@ -33,38 +33,6 @@ public:
         rootNode->Style.WidthMode = ESizingMode::Flex;
         rootNode->Style.HeightMode = ESizingMode::Flex;
         rootNode->Style.IsFocusScope = true;
-
-        // Test Grid
-        {
-            WidgetID grid = m_Scene.CreateWidget<RectWidget>( root, Colors::Surface700, "TestGrid" );
-            LayoutNode* gridNode = m_Scene.Layouts.Get( m_Scene.GetWidget( grid )->GetLayoutID() );
-            gridNode->Style.LayoutType = ELayoutType::Grid;
-            gridNode->Style.GridColumns = 2;
-            gridNode->Style.GridRows = 2;
-			gridNode->Style.Spacing = 10_u;
-			gridNode->Style.WidthMode = ESizingMode::Flex;
-			gridNode->Style.HeightMode = ESizingMode::Flex;
-
-			Color cellColors[4] = {
-				Colors::AccentBlue,
-				Colors::AccentPurple,
-				Colors::AccentEmerald,
-				Colors::AccentRose
-			};
-
-            for ( int i = 0; i < 4; ++i )
-            {
-                WidgetID cell = m_Scene.CreateWidget<RectWidget>( grid, cellColors[i], "Cell" );
-                LayoutNode* cellNode = m_Scene.Layouts.Get( m_Scene.GetWidget( cell )->GetLayoutID() );
-                cellNode->Style.WidthMode = ESizingMode::Flex;
-                cellNode->Style.HeightMode = ESizingMode::Flex;
-                cellNode->Style.FixedHeight = 50_u;
-                cellNode->Style.FixedWidth = 50_u;
-            }
-
-        }
-
-        return;
     
         // ---------------- HEADER BAR (was Red) ----------------
         WidgetID headerBar = m_Scene.CreateWidget<RectWidget>( root, Colors::AccentBlue, "HeaderBar" );
@@ -286,19 +254,6 @@ public:
             sliderNode->Style.ChildAlign = EAlignment::Center;
         }
 
-        // Test SliderWidget
-        {
-            WidgetID slider = m_Scene.CreateWidget<SliderWidget>( root );
-            m_Scene.GetWidget<SliderWidget>( slider )->Value = 0.25f; // Set initial slider value
-            m_Scene.GetWidget<SliderWidget>( slider )->Orientation = EOrientation::Vertical; // Set vertical orientation
-            auto* sliderNode = m_Scene.Layouts.Get( m_Scene.GetWidget( slider )->GetLayoutID() );
-            sliderNode->Style.WidthMode = ESizingMode::Fixed;
-            sliderNode->Style.FixedWidth = 40_u;
-            sliderNode->Style.HeightMode = ESizingMode::Fixed;
-            sliderNode->Style.FixedHeight = 300_u;
-            sliderNode->Style.ChildAlign = EAlignment::Center;
-        }
-
         WidgetID scrollContainer = m_Scene.CreateWidget<ScrollContainerWidget>( root );
         // Vertical scroll container with fixed height and multiple child widgets to demonstrate scrolling behavior
         {
@@ -308,13 +263,14 @@ public:
             scrollNode->Style.FixedHeight = 150_u;
             scrollNode->Style.Padding = Edges::Uniform( 10_u );
             scrollNode->Style.Spacing = 10_u;
-            scrollNode->Style.LayoutType = ELayoutType::Vertical;
+            scrollNode->Style.LayoutType = ELayoutType::Grid;
+            scrollNode->Style.GridColumns = 3;
 
 			auto* scrollWidget = m_Scene.GetWidget<ScrollContainerWidget>( scrollContainer );
 			scrollWidget->VScrollbarMode = EScrollbarMode::Always;
             scrollWidget->HScrollbarMode = EScrollbarMode::Always;
 
-            for ( int i = 0; i < 20; ++i )
+            for ( int i = 0; i < 20 * 1 - 1; ++i )
             {
                 WidgetID item = m_Scene.CreateWidget<RectWidget>( scrollContainer, Colors::Surface500, "ScrollItem" );
                 auto* itemNode = m_Scene.Layouts.Get( m_Scene.GetWidget( item )->GetLayoutID() );

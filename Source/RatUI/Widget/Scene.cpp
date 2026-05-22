@@ -272,6 +272,28 @@ namespace RatUI
 
         m_LastPointerEvent = a_Event;
 
+        // --- Scroll ---
+        if ( a_Event.ScrollDelta[0] != 0_u || a_Event.ScrollDelta[1] != 0_u )
+        {
+            WidgetID scrollTarget = m_CapturedWidget != c_InvalidPoolID
+                ? m_CapturedWidget
+                : HitTest( RootWidget, a_Event.Position );
+
+            if ( IWidget* w = GetWidget( scrollTarget ) )
+                w->OnPointerScroll( *this, a_Event );
+
+            return false;
+        }
+
+        // --- Move (captured widget takes priority) ---
+        if ( m_CapturedWidget != c_InvalidPoolID )
+        {
+            if ( IWidget* w = GetWidget( m_CapturedWidget ) )
+                w->OnPointerMove( *this, a_Event );
+            return false;
+        }
+
+        // --- Hover tracking ---
         WidgetID hovered = HitTest( RootWidget, a_Event.Position );
         if ( hovered != m_HoveredWidget )
         {
@@ -283,36 +305,41 @@ namespace RatUI
             if ( IWidget* newHovered = GetWidget( m_HoveredWidget ) )
                 newHovered->OnPointerEnter( *this, a_Event );
         }
+        else if ( hovered != c_InvalidPoolID )
+        {
+            if ( IWidget* w = GetWidget( hovered ) )
+                w->OnPointerMove( *this, a_Event );
+        }
 
         return false;
     }
 
     bool Scene::ProcessButtonEvent( const ButtonEvent& a_Event )
     {
+        // Release pointer capture on any mouse button release
+        if ( a_Event.Released && m_CapturedWidget != c_InvalidPoolID )
+        {
+            if ( IWidget* w = GetWidget( m_CapturedWidget ) )
+                w->OnReleased( *this, a_Event );
+
+            ReleasePointerCapture();
+            return true;
+        }
+
         if ( IWidget* hovered = GetWidget( m_HoveredWidget ) )
         {
             bool consumed = false;
-
-            if ( a_Event.Pressed )
-                consumed |= hovered->OnPressed( *this, a_Event );
-            else
-                consumed |= hovered->OnReleased( *this, a_Event );
-
-            if ( consumed )
-                return true;
+            if ( a_Event.Pressed )  consumed |= hovered->OnPressed( *this, a_Event );
+            else                    consumed |= hovered->OnReleased( *this, a_Event );
+            if ( consumed ) return true;
         }
 
         if ( IWidget* focused = GetWidget( GetFocusedWidget() ) )
         {
             bool consumed = false;
-
-            if ( a_Event.Pressed )
-                consumed |= focused->OnPressed( *this, a_Event );
-            else
-                consumed |= focused->OnReleased( *this, a_Event );
-
-            if ( consumed )
-                return true;
+            if ( a_Event.Pressed )  consumed |= focused->OnPressed( *this, a_Event );
+            else                    consumed |= focused->OnReleased( *this, a_Event );
+            if ( consumed ) return true;
         }
 
         return false;
