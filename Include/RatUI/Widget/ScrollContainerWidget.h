@@ -40,17 +40,26 @@ namespace RatUI
 		void SetVScrollbarMode( EScrollbarMode a_Mode ) 
         {
             if ( m_VScrollbarMode == a_Mode ) return;
+			m_VScrollbarMode = a_Mode;
 
-			if ( a_Mode == EScrollbarMode::Never )
+			if ( a_Mode != EScrollbarMode::Auto )
 			{
-				m_ScrollOffset[1] = 0_u; // Reset scroll offset when hiding scrollbar
-				if ( OnScroll ) OnScroll( *this, m_ScrollOffset );
-
-				// Collapse vertical scrollbar node if it exists
+				ShowScrollbar( m_VScrollbarID, a_Mode == EScrollbarMode::Never );
 			}
         }
 
 		EScrollbarMode GetHScrollbarMode() const { return m_HScrollbarMode; }
+
+        void SetHScrollbarMode( EScrollbarMode a_Mode )
+        {
+            if ( m_HScrollbarMode == a_Mode ) return;
+            m_HScrollbarMode = a_Mode;
+
+            if ( a_Mode != EScrollbarMode::Auto )
+            {
+				ShowScrollbar( m_HScrollbarID, a_Mode == EScrollbarMode::Never );
+            }
+        }
 
         // =====================================================================
         // IWidget overrides
@@ -156,6 +165,18 @@ namespace RatUI
         // Scrollbar widget IDs
         WidgetID m_VScrollbarID{ c_InvalidWidgetID };
         WidgetID m_HScrollbarID{ c_InvalidWidgetID };
+
+		void ShowScrollbar( WidgetID a_ScrollbarID, bool a_Hidden = false )
+		{
+			if ( IWidget* scrollbar = GetScene().GetWidget( a_ScrollbarID ) )
+			{
+				if ( LayoutNode* scrollbarNode = GetScene().Layouts.Get( scrollbar->GetLayoutID() ) )
+				{
+					scrollbarNode->Style.Visibility = a_Hidden ? EVisibility::Collapsed : EVisibility::Visible;
+					scrollbarNode->MarkDirty();
+				}
+			}
+		}
 
         // =====================================================================
         // Setup helpers
