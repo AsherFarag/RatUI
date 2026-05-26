@@ -17,9 +17,9 @@ namespace RatUI
 
         virtual ~ButtonBaseWidget() = default;
 
-        bool IsFocusable( Scene& a_Scene ) const override { return true; }
+        bool IsFocusable() const override { return true; }
 
-        bool OnPressed( Scene& a_Scene, const ButtonEvent& a_Event ) override
+        bool OnPressed( const ButtonEvent& a_Event ) override
         {
             if ( !a_Event.Pressed )
                 return false;
@@ -33,7 +33,7 @@ namespace RatUI
             return false;
         }
 
-        bool OnReleased( Scene& a_Scene, const ButtonEvent& a_Event ) override
+        bool OnReleased( const ButtonEvent& a_Event ) override
         {
             if ( !a_Event.Released )
                 return false;
@@ -45,25 +45,26 @@ namespace RatUI
             m_IsPressed = false;
 
             if ( wasPressed )
-                Invoke( OnClick, a_Scene, GetID() );
+                Invoke( OnClick, GetScene(), GetID() );
 
             return true;
         }
 
-        void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
+        void OnPaint( DrawList& a_DrawList ) override
         {
-            const LayoutNode* node = a_Scene.Layouts.Get( GetLayoutID() );
+            Scene& scene = GetScene();
+            const LayoutNode* node = scene.Layouts.Get( GetLayoutID() );
             if ( !node || !Visibility::IsRendered( node->Layout.Visibility ) )
                 return;
 
-            a_Scene.ForEachChildWidget( GetLayoutID(), [&]( IWidget& a_Child )
+            scene.ForEachChildWidget( GetLayoutID(), [&]( IWidget& a_Child )
             {
-                a_Child.OnPaint( a_Scene, a_DrawList );
+                a_Child.OnPaint( a_DrawList );
             } );
         }
 
-        void OnPointerEnter( Scene& a_Scene, const PointerEvent& a_Event ) override { m_IsHovered = true; }
-        void OnPointerExit( Scene& a_Scene, const PointerEvent& a_Event ) override
+        void OnPointerEnter( const PointerEvent& a_Event ) override { m_IsHovered = true; }
+        void OnPointerExit( const PointerEvent& a_Event ) override
         {
             m_IsHovered = false;
             m_IsPressed = false;
@@ -101,9 +102,10 @@ namespace RatUI
 
         using ButtonBaseWidget::ButtonBaseWidget;
 
-        void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
+        void OnPaint( DrawList& a_DrawList ) override
         {
-            const LayoutNode* node = a_Scene.Layouts.Get( GetLayoutID() );
+            Scene& scene = GetScene();
+            const LayoutNode* node = scene.Layouts.Get( GetLayoutID() );
             if ( !node || !Visibility::IsRendered( node->Layout.Visibility ) )
                 return;
 
@@ -111,7 +113,7 @@ namespace RatUI
             const Color fill = m_IsPressed ? PressedColor 
                                            : ( m_IsHovered ? HoverColor : NormalColor );
 
-            if ( a_Scene.GetFocusedWidget() == GetID() )
+            if ( scene.GetFocusedWidget() == GetID() )
             {
                 a_DrawList.AddRect( rect,
                 {
@@ -131,9 +133,9 @@ namespace RatUI
             }
 
             a_DrawList.PushClipRect( rect );
-            a_Scene.ForEachChildWidget( GetLayoutID(), [&]( IWidget& a_Child )
+            scene.ForEachChildWidget( GetLayoutID(), [&]( IWidget& a_Child )
             {
-                a_Child.OnPaint( a_Scene, a_DrawList );
+                a_Child.OnPaint( a_DrawList );
             } );
             a_DrawList.PopClipRect();
         }

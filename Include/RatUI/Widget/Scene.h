@@ -211,6 +211,9 @@ namespace RatUI
 
         LayoutNode* node   = Layouts.Get( nodeID );
 
+        // Set scene pointer for the widget
+        widget->m_Scene = this;
+
         // Wire widget <-> node
         widget->m_ID       = widgetID;
         widget->m_LayoutID = nodeID;
@@ -223,7 +226,7 @@ namespace RatUI
         }
 
         // Call construct after fully initialized and linked into hierarchy, in case widget logic depends on that
-        widget->OnConstruct( *this );
+        widget->OnConstruct();
 
         return widgetID;
     }

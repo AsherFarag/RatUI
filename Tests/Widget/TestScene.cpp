@@ -31,19 +31,19 @@ public:
     bool Focusable{ false };
     bool ConsumePress{ false };
 
-    void OnConstruct( Scene& ) override           { ++ConstructCount; }
-    void OnDestroy( Scene& ) override             { ++DestroyCount; }
-    void OnPaint( Scene&, DrawList& ) override    { ++PaintCount; }
+    void OnConstruct() override                   { ++ConstructCount; }
+    void OnDestroy() override                     { ++DestroyCount; }
+    void OnPaint( DrawList& ) override            { ++PaintCount; }
 
-    bool IsFocusable( Scene& ) const override     { return Focusable; }
-    void OnFocusReceived( Scene& ) override       { ++FocusReceivedCount; }
-    void OnFocusLost( Scene& ) override           { ++FocusLostCount; }
+    bool IsFocusable() const override             { return Focusable; }
+    void OnFocusReceived() override               { ++FocusReceivedCount; }
+    void OnFocusLost() override                   { ++FocusLostCount; }
 
-    void OnPointerEnter( Scene&, const PointerEvent& ) override { ++PointerEnterCount; }
-    void OnPointerExit( Scene&, const PointerEvent& ) override  { ++PointerExitCount; }
+    void OnPointerEnter( const PointerEvent& ) override { ++PointerEnterCount; }
+    void OnPointerExit( const PointerEvent& ) override  { ++PointerExitCount; }
 
-    bool OnPressed ( Scene&, const ButtonEvent& ) override { ++PressedCount;  return ConsumePress; }
-    bool OnReleased( Scene&, const ButtonEvent& ) override { ++ReleasedCount; return ConsumePress; }
+    bool OnPressed ( const ButtonEvent& ) override { ++PressedCount;  return ConsumePress; }
+    bool OnReleased( const ButtonEvent& ) override { ++ReleasedCount; return ConsumePress; }
 };
 
 /** Builds a mouse PointerEvent at the given position. */

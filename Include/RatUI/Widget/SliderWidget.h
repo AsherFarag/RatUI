@@ -51,11 +51,12 @@ namespace RatUI
             Value.Set( std::clamp( a_InitialValue, a_Min, a_Max ) );
         }
 
-        bool IsFocusable( Scene& a_Scene ) const override { return true; }
+        bool IsFocusable() const override { return true; }
 
-        void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
+        void OnPaint( DrawList& a_DrawList ) override
         {
-            const LayoutNode* node = a_Scene.Layouts.Get( GetLayoutID() );
+            const Scene& scene = GetScene();
+            const LayoutNode* node = scene.Layouts.Get( GetLayoutID() );
             if ( !node || !Visibility::IsRendered( node->Layout.Visibility ) )
                 return;
 
@@ -69,7 +70,7 @@ namespace RatUI
         // Input
         // =====================================================================
 
-        bool OnPressed( Scene& a_Scene, const ButtonEvent& a_Event ) override
+        bool OnPressed( const ButtonEvent& a_Event ) override
         {
             if ( !a_Event.Pressed )
                 return false;
@@ -79,11 +80,11 @@ namespace RatUI
             // Mouse button begins a drag
             if ( a_Event.Button == EButtonID::MouseLeft )
             {
-                const LayoutNode* node = a_Scene.Layouts.Get( GetLayoutID() );
+                const LayoutNode* node = GetScene().Layouts.Get( GetLayoutID() );
                 if ( node )
                 {
                     m_IsDragging = true;
-                    a_Scene.CapturePointer( GetID() );
+                    GetScene().CapturePointer( GetID() );
                     UpdateFromPointer( node->Layout.FinalRect, m_LastPointerPos );
                 }
 
@@ -93,12 +94,12 @@ namespace RatUI
             return false;
         }
 
-        bool OnReleased( Scene& a_Scene, const ButtonEvent& a_Event ) override
+        bool OnReleased( const ButtonEvent& a_Event ) override
         {
             if ( a_Event.Button == EButtonID::MouseLeft && m_IsDragging )
             {
                 m_IsDragging = false;
-                a_Scene.ReleasePointerCapture();
+                GetScene().ReleasePointerCapture();
                 return true;
             }
             
@@ -109,32 +110,32 @@ namespace RatUI
         // Input: pointer
         // =====================================================================
 
-        void OnPointerEnter( Scene& a_Scene, const PointerEvent& a_Event ) override
+        void OnPointerEnter( const PointerEvent& a_Event ) override
         {
             m_IsHovered = true;
             m_LastPointerPos = a_Event.Position;
         }
 
-        void OnPointerExit( Scene& a_Scene, const PointerEvent& a_Event ) override
+        void OnPointerExit( const PointerEvent& a_Event ) override
         {
             m_IsHovered = false;
             if ( !m_IsDragging )
                 m_IsThumbPressed = false;
         }
 
-        void OnPointerMove( Scene& a_Scene, const PointerEvent& a_Event ) override
+        void OnPointerMove( const PointerEvent& a_Event ) override
         {
             m_LastPointerPos = a_Event.Position;
 
             if ( !m_IsDragging )
                 return;
 
-            const LayoutNode* node = a_Scene.Layouts.Get( GetLayoutID() );
+            const LayoutNode* node = GetScene().Layouts.Get( GetLayoutID() );
             if ( node )
                 UpdateFromPointer( node->Layout.FinalRect, a_Event.Position );
         }
 
-        void OnPointerScroll( Scene& a_Scene, const PointerEvent& a_Event ) override
+        void OnPointerScroll( const PointerEvent& a_Event ) override
         {
             const bool isHz = ( Orientation == EOrientation::Horizontal );
             const f32  delta = isHz

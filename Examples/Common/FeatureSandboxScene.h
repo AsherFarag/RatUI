@@ -272,7 +272,7 @@ public:
                 itemNode->Style.HeightMode = ESizingMode::Fixed;
                 itemNode->Style.FixedHeight = 30_u;
 				itemNode->Style.FixedWidth = 2000_u;
-				scrollWidget->AddChild( m_Scene, itemNode );
+				scrollWidget->AddChild( itemNode );
 
                 TextLayoutStyle itemTextStyle;
                 itemTextStyle.Font = DefaultFont;

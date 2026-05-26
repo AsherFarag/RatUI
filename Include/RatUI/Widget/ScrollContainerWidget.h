@@ -33,51 +33,67 @@ namespace RatUI
     public:
         Callback<ScrollContainerWidget&, Vec2<Unit>> OnScroll; ///< Callback invoked when the scroll offset changes, providing the new offset.
 
-        EScrollbarMode VScrollbarMode{ EScrollbarMode::Auto };
-        EScrollbarMode HScrollbarMode{ EScrollbarMode::Auto };
-
         static constexpr Unit c_ScrollbarSize = 16_u;
+
+		EScrollbarMode GetVScrollbarMode() const { return m_VScrollbarMode; }
+
+		void SetVScrollbarMode( EScrollbarMode a_Mode ) 
+        {
+            if ( m_VScrollbarMode == a_Mode ) return;
+
+			if ( a_Mode == EScrollbarMode::Never )
+			{
+				m_ScrollOffset[1] = 0_u; // Reset scroll offset when hiding scrollbar
+				if ( OnScroll ) OnScroll( *this, m_ScrollOffset );
+
+				// Collapse vertical scrollbar node if it exists
+			}
+        }
+
+		EScrollbarMode GetHScrollbarMode() const { return m_HScrollbarMode; }
 
         // =====================================================================
         // IWidget overrides
         // =====================================================================
 
-        void OnConstruct( Scene& a_Scene ) override
+        void OnConstruct() override
         {
+            Scene& scene = GetScene();
             // Root node: vertical layout so the h-scrollbar row sits below the content row.
             {
-                LayoutNode* node = a_Scene.Layouts.Get( GetLayoutID() );
+                LayoutNode* node = scene.Layouts.Get( GetLayoutID() );
                 node->Style.LayoutType = ELayoutType::Vertical;
                 node->Style.WidthMode  = ESizingMode::Flex;
                 node->Style.HeightMode = ESizingMode::Flex;
             }
 
-            EnsureContentRow( a_Scene );
-            EnsureScrollbars( a_Scene );
+            EnsureContentRow();
+            EnsureScrollbars();
         }
 
         /**
          * @brief Reparents @p a_ChildNode under the internal content node instead of
          *        directly under this widget's root node.
          */
-        void AddChild( Scene& a_Scene, LayoutNode* a_ChildNode )
+        void AddChild( LayoutNode* a_ChildNode )
         {
-            a_Scene.Layouts.Get( m_ContentNodeID )->PushBackChild( *a_ChildNode );
+            GetScene().Layouts.Get( m_ContentNodeID )->PushBackChild( *a_ChildNode );
         }
 
-        bool IsFocusable( Scene& a_Scene ) const override { return true; }
+        bool IsFocusable() const override { return true; }
 
-        void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
+        void OnPaint( DrawList& a_DrawList ) override
         {
-            const LayoutNode* node = a_Scene.Layouts.Get( GetLayoutID() );
+            Scene& scene = GetScene();
+            const LayoutNode* node = scene.Layouts.Get( GetLayoutID() );
             if ( !node || !Visibility::IsRendered( node->Layout.Visibility ) )
                 return;
 
-            UpdateScrollMetrics( a_Scene );
+            UpdateScrollMetrics();
 
             // Draw content with clipping and translation based on scroll offset
             {
-                const Rect<Unit> contentRect = a_Scene.Layouts.Get( m_ContentNodeID )->Layout.FinalRect;
+                const Rect<Unit> contentRect = scene.Layouts.Get( m_ContentNodeID )->Layout.FinalRect;
                 a_DrawList.PushClipRect( contentRect );
 
                 const bool hasTranslation = !IsApproxEqual( m_ScrollOffset[0].ToFloat(), 0.f ) ||
@@ -92,9 +108,9 @@ namespace RatUI
                     a_DrawList.PushTransform( translation );
                 }
 
-                a_Scene.ForEachChildWidget( m_ContentNodeID, [&]( IWidget& a_Child )
+                scene.ForEachChildWidget( m_ContentNodeID, [&]( IWidget& a_Child )
                 {
-                    a_Child.OnPaint( a_Scene, a_DrawList );
+                    a_Child.OnPaint( a_DrawList );
                 } );
 
                 if ( hasTranslation )
@@ -104,14 +120,14 @@ namespace RatUI
             }
 
             // Draw scrollbars if needed
-            if ( IWidget* vScrollbar = a_Scene.GetWidget( m_VScrollbarID ) )
+            if ( IWidget* vScrollbar = scene.GetWidget( m_VScrollbarID ) )
             {
-                vScrollbar->OnPaint( a_Scene, a_DrawList );
+                vScrollbar->OnPaint( a_DrawList );
             }
 
-            if ( IWidget* hScrollbar = a_Scene.GetWidget( m_HScrollbarID ) )
+            if ( IWidget* hScrollbar = scene.GetWidget( m_HScrollbarID ) )
             {
-                hScrollbar->OnPaint( a_Scene, a_DrawList );
+                hScrollbar->OnPaint( a_DrawList );
             }
         }
 
@@ -128,6 +144,8 @@ namespace RatUI
         }
 
     protected:
+        EScrollbarMode m_VScrollbarMode{ EScrollbarMode::Auto };
+        EScrollbarMode m_HScrollbarMode{ EScrollbarMode::Auto };
         Vec2<Unit> m_ScrollOffset{ 0_u, 0_u };
         Vec2<Unit> m_MaxScrollOffset{ 0_u, 0_u };
 
@@ -149,16 +167,17 @@ namespace RatUI
          * Content row:  Horizontal layout, Flex in both axes (fills root minus h-scrollbar).
          * Content node: Flex in both axes (fills row minus v-scrollbar).
          */
-        void EnsureContentRow( Scene& a_Scene )
+        void EnsureContentRow()
         {
             if ( m_ContentRowID != c_InvalidNodeID )
                 return;
 
-            LayoutNode* selfNode = a_Scene.Layouts.Get( GetLayoutID() );
+            Scene& scene = GetScene();
+            LayoutNode* selfNode = scene.Layouts.Get( GetLayoutID() );
 
             // --- Content row ---
-            m_ContentRowID = a_Scene.Layouts.Allocate( LayoutNode{} );
-            LayoutNode* rowNode = a_Scene.Layouts.Get( m_ContentRowID );
+            m_ContentRowID = scene.Layouts.Allocate( LayoutNode{} );
+            LayoutNode* rowNode = scene.Layouts.Get( m_ContentRowID );
             selfNode->PushBackChild( *rowNode );
 
             rowNode->Style.LayoutType = ELayoutType::Horizontal;
@@ -166,8 +185,8 @@ namespace RatUI
             rowNode->Style.HeightMode = ESizingMode::Flex;
 
             // --- Content node (user children go here) ---
-            m_ContentNodeID = a_Scene.Layouts.Allocate( LayoutNode{} );
-            LayoutNode* contentNode = a_Scene.Layouts.Get( m_ContentNodeID );
+            m_ContentNodeID = scene.Layouts.Allocate( LayoutNode{} );
+            LayoutNode* contentNode = scene.Layouts.Get( m_ContentNodeID );
             rowNode->PushBackChild( *contentNode );
 
             contentNode->Style.WidthMode = ESizingMode::Flex;
@@ -181,10 +200,11 @@ namespace RatUI
          * V-scrollbar: appended to the content row  � Fixed width, Flex height.
          * H-scrollbar: appended to the root node    � Flex width, Fixed height.
          */
-        void EnsureScrollbars( Scene& a_Scene )
+        void EnsureScrollbars()
         {
-            LayoutNode* selfNode = a_Scene.Layouts.Get( GetLayoutID() );
-            LayoutNode* rowNode = a_Scene.Layouts.Get( m_ContentRowID );
+            Scene& scene = GetScene();
+            LayoutNode* selfNode = scene.Layouts.Get( GetLayoutID() );
+            LayoutNode* rowNode = scene.Layouts.Get( m_ContentRowID );
 
             const auto setUpScrollbarStyle = [&]( SliderWidget& a_Slider, EOrientation a_Orientation )
             {
@@ -222,9 +242,9 @@ namespace RatUI
 
             // --- Vertical scrollbar ---
             {
-				m_VScrollbarID        = a_Scene.CreateWidget<SliderWidget>( m_ContentRowID );
-                SliderWidget* vScroll = a_Scene.GetWidget<SliderWidget>( m_VScrollbarID );
-                LayoutNode* vNode     = a_Scene.Layouts.Get( vScroll->GetLayoutID() );
+                m_VScrollbarID        = scene.CreateWidget<SliderWidget>( m_ContentRowID );
+                SliderWidget* vScroll = scene.GetWidget<SliderWidget>( m_VScrollbarID );
+                LayoutNode* vNode     = scene.Layouts.Get( vScroll->GetLayoutID() );
 
                 vNode->Style.WidthMode  = ESizingMode::Fixed;
                 vNode->Style.FixedWidth = c_ScrollbarSize;
@@ -235,9 +255,9 @@ namespace RatUI
 
             // --- Horizontal scrollbar ---
             {
-                m_HScrollbarID        = a_Scene.CreateWidget<SliderWidget>( GetID() );
-                SliderWidget* hScroll = a_Scene.GetWidget<SliderWidget>( m_HScrollbarID );
-                LayoutNode* hNode     = a_Scene.Layouts.Get( hScroll->GetLayoutID() );
+                m_HScrollbarID        = scene.CreateWidget<SliderWidget>( GetID() );
+                SliderWidget* hScroll = scene.GetWidget<SliderWidget>( m_HScrollbarID );
+                LayoutNode* hNode     = scene.Layouts.Get( hScroll->GetLayoutID() );
 
                 hNode->Style.WidthMode   = ESizingMode::Flex;
                 hNode->Style.HeightMode  = ESizingMode::Fixed;
@@ -247,9 +267,10 @@ namespace RatUI
             }
         }
 
-        void UpdateScrollMetrics( Scene& a_Scene )
+        void UpdateScrollMetrics()
         {
-            const LayoutNode* contentNode = a_Scene.Layouts.Get( m_ContentNodeID );
+            Scene& scene = GetScene();
+            const LayoutNode* contentNode = scene.Layouts.Get( m_ContentNodeID );
             if ( !contentNode )
                 return;
 
@@ -288,7 +309,7 @@ namespace RatUI
             const f32 clampedY = std::clamp( m_ScrollOffset[1].ToFloat(), 0.f, maxY );
             m_ScrollOffset = { Unit( clampedX ), Unit( clampedY ) };
 
-            if ( SliderWidget* hScroll = a_Scene.GetWidget<SliderWidget>( m_HScrollbarID ) )
+            if ( SliderWidget* hScroll = scene.GetWidget<SliderWidget>( m_HScrollbarID ) )
             {
                 hScroll->Min = 0.f;
                 hScroll->Max = maxX;
@@ -297,7 +318,7 @@ namespace RatUI
                 hScroll->ThumbScale = contentWidth <= 0.f ? 1.f : std::clamp( viewportRect.Width().ToFloat() / contentWidth, 0.f, 1.f );
             }
 
-            if ( SliderWidget* vScroll = a_Scene.GetWidget<SliderWidget>( m_VScrollbarID ) )
+            if ( SliderWidget* vScroll = scene.GetWidget<SliderWidget>( m_VScrollbarID ) )
             {
                 vScroll->Min = 0.f;
                 vScroll->Max = maxY;

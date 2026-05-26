@@ -43,15 +43,16 @@ public:
     Color          Color;
     CornerRounding Rounding;
 
-	void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
+	void OnPaint( DrawList& a_DrawList ) override
     {
-        const LayoutNode* node = a_Scene.Layouts.Get( GetLayoutID() );
+        Scene& scene = GetScene();
+        const LayoutNode* node = scene.Layouts.Get( GetLayoutID() );
         if ( !node )
             return;
 
         const Rect<Unit>& rect = node->Layout.FinalRect;
 
-        if ( a_Scene.GetFocusedWidget() == GetID() )
+        if ( scene.GetFocusedWidget() == GetID() )
         {
             a_DrawList.AddRect( rect,
             {
@@ -70,13 +71,13 @@ public:
             } );
         }
 
-        a_Scene.ForEachChildWidget( GetLayoutID(), [&](IWidget& child)
+        scene.ForEachChildWidget( GetLayoutID(), [&](IWidget& child)
         {
-            child.OnPaint( a_Scene, a_DrawList );
+            child.OnPaint( a_DrawList );
 		} );
     }
 
-    bool IsFocusable( Scene& a_Scene ) const override
+    bool IsFocusable() const override
     {
         return true;
 	}
@@ -93,16 +94,17 @@ public:
         , FillColor( a_Color )
     {}
 
-    void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
+    void OnPaint( DrawList& a_DrawList ) override
     {
-        const LayoutNode* node = a_Scene.Layouts.Get( GetLayoutID() );
+        Scene& scene = GetScene();
+        const LayoutNode* node = scene.Layouts.Get( GetLayoutID() );
         if ( !node )
             return;
 
         const Rect<Unit>& rect = node->Layout.FinalRect;
         Vec2<Unit> center = rect.Center();
 
-        if ( a_Scene.GetFocusedWidget() == GetID() )
+        if ( scene.GetFocusedWidget() == GetID() )
         {
             a_DrawList.AddCircle( center, Radius,
             {
@@ -120,7 +122,7 @@ public:
         }
     }
 
-    bool IsFocusable( Scene& a_Scene ) const override
+    bool IsFocusable() const override
     {
         return true;
     }

@@ -52,9 +52,9 @@ namespace RatUI
         // IWidget overrides
         // =====================================================================
 
-        void OnSyncLayout( Scene& a_Scene, LayoutNode& a_Node, Vec2<Unit> a_AvailableSize ) override
+        void OnSyncLayout( LayoutNode& a_Node, Vec2<Unit> a_AvailableSize ) override
         {
-            ITextMetrics* metrics = a_Scene.TextMetrics;
+            ITextMetrics* metrics = GetScene().TextMetrics;
             a_Node.Layout.IntrinsicSize = { 0_u, 0_u };
 
             if ( !metrics || Empty( m_Text ) )
@@ -134,9 +134,10 @@ namespace RatUI
             a_Node.Layout.IntrinsicSize = { m_ShapedText->MaxWidth, m_ShapedText->TotalHeight };
         }
 
-        void OnPaint( Scene& a_Scene, DrawList& a_DrawList ) override
+        void OnPaint( DrawList& a_DrawList ) override
         {
-            LayoutNode* node = a_Scene.Layouts.Get( GetLayoutID() );
+            Scene& scene = GetScene();
+            LayoutNode* node = scene.Layouts.Get( GetLayoutID() );
 
             if ( !node || !Visibility::IsRendered( node->Layout.Visibility ) )
                 return;

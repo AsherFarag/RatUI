@@ -29,7 +29,7 @@ namespace RatUI
             if ( IWidget* widget = GetWidget( node.WidgetID ) )
             {
                 const Vec2<Unit> oldIntrinsics = node.Layout.IntrinsicSize;
-                widget->OnSyncLayout( *this, node, parentSize );
+                widget->OnSyncLayout( node, parentSize );
                 anyChanged |= ( node.Layout.IntrinsicSize != oldIntrinsics );
             }
 
@@ -58,7 +58,7 @@ namespace RatUI
     void Scene::Render( DrawList& a_DrawList )
     {
         if ( IWidget* root = GetWidget( RootWidget ) )
-            root->OnPaint( *this, a_DrawList );
+            root->OnPaint( a_DrawList );
     }
 
     void Scene::SetFocus( WidgetID a_WidgetID )
@@ -68,12 +68,12 @@ namespace RatUI
             if ( currentFocus->GetID() == a_WidgetID )
                 return;
 
-            currentFocus->OnFocusLost( *this );
+            currentFocus->OnFocusLost();
         }
 
         m_FocusedWidget = a_WidgetID;
         if ( IWidget* newFocus = GetWidget( m_FocusedWidget ) )
-            newFocus->OnFocusReceived( *this );
+            newFocus->OnFocusReceived();
     }
 
     void Scene::Navigate( ENavAction a_Action )
@@ -91,7 +91,7 @@ namespace RatUI
             for ( LayoutNode* child = scopeNode->FirstChild(); child; child = child->NextSibling() )
             {
                 IWidget* w = GetWidget( child->WidgetID );
-                if ( w && w->IsFocusable( *this ) )
+                if ( w && w->IsFocusable() )
                 {
                     SetFocus( child->WidgetID );
                     return;
@@ -126,8 +126,8 @@ namespace RatUI
                     .Held = ( a_Action == ENavAction::ActivatePressed ),
                 };
 
-                w->OnPressed( *this, ev );
-                w->OnReleased( *this, ev );
+                w->OnPressed( ev );
+                w->OnReleased( ev );
             }
             return;
         }
@@ -155,7 +155,7 @@ namespace RatUI
                                                          if ( !node )
                                                              return false;
                                                          IWidget* w = GetWidget( node->WidgetID );
-                                                         return w && ( w->IsFocusable( *this ) || node->Style.IsFocusScope );
+                                                         return w && ( w->IsFocusable() || node->Style.IsFocusScope );
                                                      } );
 
         const LayoutNode* nextNode = FindNavigatableNode( a_Action, focusedNode, focusableNodes );
@@ -215,7 +215,7 @@ namespace RatUI
         node->ForEachChild( [&]( LayoutNode& childNode )
                             { DestroyWidget( childNode.WidgetID ); } );
 
-        widget->OnDestroy( *this );
+        widget->OnDestroy();
         Widgets.Deallocate( widget->GetID() );
         Layouts.Deallocate( widget->GetLayoutID() );
 
@@ -291,7 +291,7 @@ namespace RatUI
                 : HitTest( RootWidget, a_Event.Position );
 
             if ( IWidget* w = GetWidget( scrollTarget ) )
-                w->OnPointerScroll( *this, a_Event );
+                w->OnPointerScroll( a_Event );
 
             return false;
         }
@@ -300,7 +300,7 @@ namespace RatUI
         if ( m_CapturedWidget != c_InvalidWidgetID )
         {
             if ( IWidget* w = GetWidget( m_CapturedWidget ) )
-                w->OnPointerMove( *this, a_Event );
+                w->OnPointerMove( a_Event );
             return false;
         }
 
@@ -309,17 +309,17 @@ namespace RatUI
         if ( hovered != m_HoveredWidget )
         {
             if ( IWidget* prevHovered = GetWidget( m_HoveredWidget ) )
-                prevHovered->OnPointerExit( *this, a_Event );
+                prevHovered->OnPointerExit( a_Event );
 
             m_HoveredWidget = hovered;
 
             if ( IWidget* newHovered = GetWidget( m_HoveredWidget ) )
-                newHovered->OnPointerEnter( *this, a_Event );
+                newHovered->OnPointerEnter( a_Event );
         }
         else if ( hovered != c_InvalidWidgetID )
         {
             if ( IWidget* w = GetWidget( hovered ) )
-                w->OnPointerMove( *this, a_Event );
+                w->OnPointerMove( a_Event );
         }
 
         return false;
@@ -331,7 +331,7 @@ namespace RatUI
         if ( a_Event.Released && m_CapturedWidget != c_InvalidWidgetID )
         {
             if ( IWidget* w = GetWidget( m_CapturedWidget ) )
-                w->OnReleased( *this, a_Event );
+                w->OnReleased( a_Event );
 
             ReleasePointerCapture();
             return true;
@@ -340,16 +340,16 @@ namespace RatUI
         if ( IWidget* hovered = GetWidget( m_HoveredWidget ) )
         {
             bool consumed = false;
-            if ( a_Event.Pressed )  consumed |= hovered->OnPressed( *this, a_Event );
-            else                    consumed |= hovered->OnReleased( *this, a_Event );
+            if ( a_Event.Pressed )  consumed |= hovered->OnPressed( a_Event );
+            else                    consumed |= hovered->OnReleased( a_Event );
             if ( consumed ) return true;
         }
 
         if ( IWidget* focused = GetWidget( GetFocusedWidget() ) )
         {
             bool consumed = false;
-            if ( a_Event.Pressed )  consumed |= focused->OnPressed( *this, a_Event );
-            else                    consumed |= focused->OnReleased( *this, a_Event );
+            if ( a_Event.Pressed )  consumed |= focused->OnPressed( a_Event );
+            else                    consumed |= focused->OnReleased( a_Event );
             if ( consumed ) return true;
         }
 
