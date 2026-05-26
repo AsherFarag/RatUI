@@ -73,7 +73,7 @@ TEST_CASE( "CreateRootWidget sets RootWidget and calls OnConstruct", "[scene]" )
     Scene scene;
     WidgetID id = scene.CreateRootWidget<TrackingWidget>();
 
-    REQUIRE( id != c_InvalidPoolID );
+    REQUIRE( id != c_InvalidWidgetID );
     REQUIRE( scene.RootWidget == id );
 
     TrackingWidget* w = scene.GetWidget<TrackingWidget>( id );
@@ -119,7 +119,7 @@ TEST_CASE( "CreateWidget calls OnConstruct on each created widget", "[scene]" )
 TEST_CASE( "GetWidget returns nullptr for invalid ID", "[scene]" )
 {
     Scene scene;
-    REQUIRE( scene.GetWidget( c_InvalidPoolID ) == nullptr );
+    REQUIRE( scene.GetWidget( c_InvalidWidgetID ) == nullptr );
 }
 
 TEST_CASE( "GetWidget<Type> returns typed pointer for matching type", "[scene]" )
@@ -151,7 +151,7 @@ TEST_CASE( "DestroyWidget calls OnDestroy and invalidates the ID", "[scene]" )
 TEST_CASE( "DestroyWidget returns false for an invalid ID", "[scene]" )
 {
     Scene scene;
-    REQUIRE( scene.DestroyWidget( c_InvalidPoolID ) == false );
+    REQUIRE( scene.DestroyWidget( c_InvalidWidgetID ) == false );
 }
 
 TEST_CASE( "DestroyWidget recursively destroys child widgets", "[scene]" )
@@ -178,7 +178,7 @@ TEST_CASE( "ForEachChildWidget iterates each direct child widget", "[scene]" )
     WidgetID childID2 = scene.CreateWidget<TrackingWidget>( rootID );
 
     Array<WidgetID> seen{};
-    scene.ForEachChildWidget( rootID, [&]( IWidget& w ) { PushBack( seen, w.GetID() ); } );
+    scene.ForEachChildWidget( scene.GetWidget( rootID )->GetLayoutID(), [&]( IWidget& w ) { PushBack( seen, w.GetID() ); } );
 
     REQUIRE( Size( seen ) == 2 );
     REQUIRE( seen[ 0 ] == childID1 );
@@ -258,7 +258,7 @@ TEST_CASE( "UpdateLayout with no root widget is a no-op", "[scene]" )
 TEST_CASE( "GetFocusedWidget returns invalid ID when nothing is focused", "[scene][focus]" )
 {
     Scene scene;
-    REQUIRE( scene.GetFocusedWidget() == c_InvalidPoolID );
+    REQUIRE( scene.GetFocusedWidget() == c_InvalidWidgetID );
 }
 
 TEST_CASE( "SetFocus calls OnFocusReceived on newly focused widget", "[scene][focus]" )
@@ -304,7 +304,7 @@ TEST_CASE( "ClearFocus removes the current focused widget", "[scene][focus]" )
     REQUIRE( scene.GetFocusedWidget() == id );
 
     scene.ClearFocus();
-    REQUIRE( scene.GetFocusedWidget() == c_InvalidPoolID );
+    REQUIRE( scene.GetFocusedWidget() == c_InvalidWidgetID );
 }
 
 TEST_CASE( "SetFocus is idempotent when called twice with the same ID", "[scene][focus]" )
@@ -531,9 +531,9 @@ TEST_CASE( "Reset clears all widgets and resets state", "[scene]" )
 
     scene.Reset();
 
-    REQUIRE( scene.RootWidget == c_InvalidPoolID );
-    REQUIRE( scene.GetFocusedWidget() == c_InvalidPoolID );
+    REQUIRE( scene.RootWidget == c_InvalidWidgetID );
+    REQUIRE( scene.GetFocusedWidget() == c_InvalidWidgetID );
     REQUIRE( scene.GetWidget( rootID  ) == nullptr );
     REQUIRE( scene.GetWidget( childID ) == nullptr );
-    REQUIRE( scene.GetCurrentNavScope() == c_InvalidPoolID );
+    REQUIRE( scene.GetCurrentNavScope() == c_InvalidWidgetID );
 }
