@@ -44,7 +44,7 @@ namespace RatUI
             }
 
             a_DrawList.PushClipRect( rect );
-            a_Scene.ForEachChildWidget( GetID(), [&]( IWidget& a_Child )
+            a_Scene.ForEachChildWidget( GetLayoutID(), [&]( IWidget& a_Child )
             {
                 a_Child.OnPaint( a_Scene, a_DrawList );
             } );

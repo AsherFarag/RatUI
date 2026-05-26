@@ -24,6 +24,9 @@ namespace RatUI
         bool           ShowTrackFill   { true };               ///< Whether to render the filled portion of the track.
 
         Vec2<Unit>     ThumbSize       { 16_u, 16_u };
+        bool           ScaleThumbOnTrackAxis { false }; ///< When enabled, thumb size is scaled along the scrolling axis by ThumbScale.
+        f32            ThumbScale      { 1.f };         ///< [0,1] size ratio of the thumb along the scrolling axis when ScaleThumbOnTrackAxis is enabled.
+        Unit           MinThumbSizeOnTrackAxis{ 8_u };  ///< Minimum thumb size along the scrolling axis when scaling is enabled.
         CornerRounding ThumbRounding   { CornerRounding::Uniform( 8_u ) }; ///< Default: circular thumb.
         Color          ThumbColor      { Colors::White };
         Color          ThumbHoverColor { Colors::LightGray };
@@ -195,30 +198,31 @@ namespace RatUI
         Rect<Unit> GetThumbRect( Rect<Unit> a_Rect ) const
         {
             const f32 t = GetNormalized();
+            const Vec2<Unit> thumbSize = GetEffectiveThumbSize( a_Rect );
 
             Vec2<Unit> centre;
 
             if ( Orientation == EOrientation::Horizontal )
             {
                 // Reserve half-thumb width at each end so thumb never clips.
-                const Unit travel = a_Rect.Width() - ThumbSize[0];
+                const Unit travel = a_Rect.Width() - thumbSize[0];
                 centre = {
-                    a_Rect.Left() + ThumbSize[0] * 0.5f + travel * t,
+                    a_Rect.Left() + thumbSize[0] * 0.5f + travel * t,
                     a_Rect.Origin[1] + a_Rect.Size[1] * 0.5f
                 };
             }
             else
             {
-                const Unit travel = a_Rect.Height() - ThumbSize[1];
+                const Unit travel = a_Rect.Height() - thumbSize[1];
                 centre = {
                     a_Rect.Origin[0] + a_Rect.Size[0] * 0.5f,
-                    a_Rect.Top() + ThumbSize[1] * 0.5f + travel * t
+                    a_Rect.Top() + thumbSize[1] * 0.5f + travel * t
                 };
             }
 
             return {
-                centre - ThumbSize * 0.5_u,
-                ThumbSize
+                centre - thumbSize * 0.5_u,
+                thumbSize
             };
         }
 
@@ -283,24 +287,47 @@ namespace RatUI
 				return std::round( a_Value / Step ) * Step;
 			};
 
+            const Vec2<Unit> thumbSize = GetEffectiveThumbSize( a_Rect );
+
             if ( Orientation == EOrientation::Horizontal )
             {
-                const Unit travel = a_Rect.Width() - ThumbSize[0];
+                const Unit travel = a_Rect.Width() - thumbSize[0];
                 if ( travel <= 0_u ) return;
 
-                const f32 t = ( a_Pos[0] - ( a_Rect.Left() + ThumbSize[0] * 0.5f ) ).ToFloat()
+                const f32 t = ( a_Pos[0] - ( a_Rect.Left() + thumbSize[0] * 0.5f ) ).ToFloat()
                               / travel.ToFloat();
                 SetNormalized( stepValue( t ) );
             }
             else
             {
-                const Unit travel = a_Rect.Height() - ThumbSize[1];
+                const Unit travel = a_Rect.Height() - thumbSize[1];
                 if ( travel <= 0_u ) return;
 
-                const f32 t = ( a_Pos[1] - ( a_Rect.Top() + ThumbSize[1] * 0.5f ) ).ToFloat()
+                const f32 t = ( a_Pos[1] - ( a_Rect.Top() + thumbSize[1] * 0.5f ) ).ToFloat()
                               / travel.ToFloat();
 				SetNormalized( stepValue( t ) );
             }
+        }
+
+        Vec2<Unit> GetEffectiveThumbSize( const Rect<Unit>& a_Rect ) const
+        {
+            Vec2<Unit> thumbSize = ThumbSize;
+            if ( !ScaleThumbOnTrackAxis )
+                return thumbSize;
+
+            const f32 clampedScale = std::clamp( ThumbScale, 0.f, 1.f );
+            if ( Orientation == EOrientation::Horizontal )
+            {
+                const Unit scaledSize = Unit( a_Rect.Width().ToFloat() * clampedScale );
+                thumbSize[0] = std::max( MinThumbSizeOnTrackAxis, std::min( a_Rect.Width(), scaledSize ) );
+            }
+            else
+            {
+                const Unit scaledSize = Unit( a_Rect.Height().ToFloat() * clampedScale );
+                thumbSize[1] = std::max( MinThumbSizeOnTrackAxis, std::min( a_Rect.Height(), scaledSize ) );
+            }
+
+            return thumbSize;
         }
     };
 

@@ -4,33 +4,6 @@
 
 namespace RatUI
 {
-    // TODO: Support pmr allocators for the buckets?
-
-    /**
-     * @brief Represents a safe and unique identifier for a layout node.
-     */
-    struct PoolID
-    {
-        union
-        {
-            struct
-            {
-                u32 Index   : 24; ///< The index of the node in the layout system's internal storage.
-                u32 Version : 8;  ///< A version number that can be used to detect stale references to nodes that have been removed and potentially reused.
-            };
-
-            u32 Packed{ ~0u };    ///< The packed representation of the PoolID, combining the index and version into a single 32-bit value for efficient storage and comparison.
-        };
-
-        constexpr PoolID() = default;
-        constexpr PoolID( u32 a_Index, u8 a_Version ) : Index( a_Index ), Version( a_Version ) {}
-        constexpr explicit PoolID( u32 a_Packed ) : Packed( a_Packed ) {}
-
-        constexpr bool operator==( const PoolID& a_Other ) const { return Packed == a_Other.Packed; }
-    };
-
-    static constexpr PoolID c_InvalidPoolID{};
-
     /**
      * @brief A versioned, bucket-based pool allocator providing stable pointers and safe handle validation via PoolID.
      * Grows by allocating new buckets on the heap - existing bucket pointers and item references are never invalidated.
@@ -44,6 +17,31 @@ namespace RatUI
     public:
         using ElementType = T;
         static constexpr u32 c_ItemsPerBucket = ItemsPerBucket;
+
+        /**
+         * @brief Represents a safe and unique identifier for a layout node.
+         */
+        struct PoolID
+        {
+            union
+            {
+                struct
+                {
+                    u32 Index : 24; ///< The index of the node in the layout system's internal storage.
+                    u32 Version : 8;  ///< A version number that can be used to detect stale references to nodes that have been removed and potentially reused.
+                };
+
+                u32 Packed{ ~0u };    ///< The packed representation of the PoolID, combining the index and version into a single 32-bit value for efficient storage and comparison.
+            };
+
+            constexpr PoolID() = default;
+            constexpr PoolID( u32 a_Index, u8 a_Version ) : Index( a_Index ), Version( a_Version ) {}
+            constexpr explicit PoolID( u32 a_Packed ) : Packed( a_Packed ) {}
+
+            constexpr bool operator==( const PoolID& a_Other ) const { return Packed == a_Other.Packed; }
+        };
+
+        static constexpr PoolID c_InvalidPoolID{};
 
         /**
          * @brief A bucket containing a fixed number of items, along with versioning and occupancy tracking for safe allocation and deallocation.

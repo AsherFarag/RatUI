@@ -261,31 +261,27 @@ public:
             scrollNode->Style.WidthMode = ESizingMode::Flex;
             scrollNode->Style.HeightMode = ESizingMode::Fixed;
             scrollNode->Style.FixedHeight = 150_u;
-            scrollNode->Style.Padding = Edges::Uniform( 10_u );
-            scrollNode->Style.Spacing = 10_u;
-            scrollNode->Style.LayoutType = ELayoutType::Grid;
-            scrollNode->Style.GridColumns = 3;
 
 			auto* scrollWidget = m_Scene.GetWidget<ScrollContainerWidget>( scrollContainer );
-			scrollWidget->VScrollbarMode = EScrollbarMode::Always;
-            scrollWidget->HScrollbarMode = EScrollbarMode::Always;
 
             for ( int i = 0; i < 20 * 1 - 1; ++i )
             {
                 WidgetID item = m_Scene.CreateWidget<RectWidget>( scrollContainer, Colors::Surface500, "ScrollItem" );
                 auto* itemNode = m_Scene.Layouts.Get( m_Scene.GetWidget( item )->GetLayoutID() );
-                itemNode->Style.WidthMode = ESizingMode::Flex;
+                itemNode->Style.WidthMode = ESizingMode::Fixed;
                 itemNode->Style.HeightMode = ESizingMode::Fixed;
                 itemNode->Style.FixedHeight = 30_u;
+				itemNode->Style.FixedWidth = 2000_u;
+				scrollWidget->AddChild( m_Scene, itemNode );
 
                 TextLayoutStyle itemTextStyle;
                 itemTextStyle.Font = DefaultFont;
                 itemTextStyle.Size = 14_u;
                 WidgetID itemText = m_Scene.CreateWidget<TextWidget>( item, "Scrollable Item " + std::to_string( i + 1 ), itemTextStyle );
                 auto* itemTextNode = m_Scene.Layouts.Get( m_Scene.GetWidget( itemText )->GetLayoutID() );
-                itemTextNode->Style.WidthMode = ESizingMode::Content;
+                itemTextNode->Style.WidthMode  = ESizingMode::Content;
                 itemTextNode->Style.HeightMode = ESizingMode::Content;
-                itemTextNode->Style.Padding = Edges::Uniform( 5_u );
+                itemTextNode->Style.Padding    = Edges::Uniform( 5_u );
             }
         }
         

@@ -70,7 +70,7 @@ public:
             } );
         }
 
-        a_Scene.ForEachChildWidget( GetID(), [&](IWidget& child)
+        a_Scene.ForEachChildWidget( GetLayoutID(), [&](IWidget& child)
         {
             child.OnPaint( a_Scene, a_DrawList );
 		} );

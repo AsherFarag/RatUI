@@ -441,8 +441,11 @@ namespace RatUI
 		bool        IsDescendantDirty{ true };  ///< Whether any descendant elements are dirty and require layout recalculation.
     };
 
-    using WidgetID = PoolID;
-    using NodeID = PoolID;
+	using NodeID = typename Pool<class LayoutNode>::PoolID;
+	static constexpr NodeID c_InvalidNodeID{};
+
+    using WidgetID = typename Pool<Unique<class IWidget>>::PoolID;
+    static constexpr WidgetID c_InvalidWidgetID{};
 
     /**
      * @brief Represents a UI element in the RatUI layout system, containing layout styles, results, and hierarchical relationships with other nodes.
@@ -460,7 +463,7 @@ namespace RatUI
 
         union
         {
-			PoolID WidgetID;          ///< The ID of the widget associated with this layout node.
+            WidgetID WidgetID;          ///< The ID of the widget associated with this layout node.
 			void* UserData = nullptr; ///< Incase LayoutNode is not being used with the IWidget system, this can store arbitrary user data.
         };
 

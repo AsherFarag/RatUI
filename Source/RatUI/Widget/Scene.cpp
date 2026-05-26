@@ -180,7 +180,7 @@ namespace RatUI
 
         WidgetID restored = Back( m_NavStack ).Restored;
         PopBack( m_NavStack );
-        if ( restored != c_InvalidPoolID )
+        if ( restored != c_InvalidWidgetID )
             SetFocus( restored );
     }
 
@@ -226,43 +226,54 @@ namespace RatUI
     {
         Layouts.Clear();
         Widgets.Clear();
-        RootWidget = c_InvalidPoolID;
-        m_HoveredWidget = c_InvalidPoolID;
+        RootWidget = c_InvalidWidgetID;
+        m_HoveredWidget = c_InvalidWidgetID;
         ClearFocus();
         Clear( m_NavStack );
     }
 
     WidgetID Scene::HitTest( WidgetID a_ID, Vec2<Unit> a_LogicalPos )
     {
-        IWidget* widget = GetWidget( a_ID );
-        if ( !widget )
-            return c_InvalidPoolID;
+        IWidget* rootWidget = GetWidget( a_ID );
+        if ( !rootWidget )
+            return c_InvalidWidgetID;
 
-        LayoutNode* node = Layouts.Get( widget->GetLayoutID() );
-        if ( !node )
-            return c_InvalidPoolID;
+        LayoutNode* rootNode = Layouts.Get( rootWidget->GetLayoutID() );
+        if ( !rootNode )
+            return c_InvalidWidgetID;
 
-        if ( !node->Layout.FinalRect.Contains( a_LogicalPos ) )
-            return c_InvalidPoolID;
-
-        WidgetID result = c_InvalidPoolID;
-
-        if ( Visibility::AreChildrenHitTestable( node->Layout.Visibility ) )
+        const auto HitTestNode = [&]( auto&& Self, LayoutNode* a_Node ) -> WidgetID
         {
-            node->ForEachChild( [&]( LayoutNode& child )
-                                {
-                WidgetID childHit = HitTest( child.WidgetID, a_LogicalPos );
-                if ( childHit != c_InvalidPoolID )
-                    result = childHit; } );
+            if ( !a_Node )
+                return c_InvalidWidgetID;
 
-            if ( result != c_InvalidPoolID )
-                return result;
-        }
+            if ( !a_Node->Layout.FinalRect.Contains( a_LogicalPos ) )
+                return c_InvalidWidgetID;
 
-        if ( Visibility::IsHitTestable( node->Layout.Visibility ) )
-            return a_ID;
+            WidgetID result = c_InvalidWidgetID;
 
-        return c_InvalidPoolID;
+            if ( Visibility::AreChildrenHitTestable( a_Node->Layout.Visibility ) )
+            {
+                a_Node->ForEachChild( [&]( LayoutNode& child )
+                                      {
+                    WidgetID childHit = Self( Self, &child );
+                    if ( childHit != c_InvalidWidgetID )
+                        result = childHit; } );
+
+                if ( result != c_InvalidWidgetID )
+                    return result;
+            }
+
+            if ( Visibility::IsHitTestable( a_Node->Layout.Visibility ) &&
+                 a_Node->WidgetID != c_InvalidWidgetID )
+            {
+                return a_Node->WidgetID;
+            }
+
+            return c_InvalidWidgetID;
+        };
+
+        return HitTestNode( HitTestNode, rootNode );
     }
 
     bool Scene::ProcessPointerEvent( const PointerEvent& a_Event )
@@ -275,7 +286,7 @@ namespace RatUI
         // --- Scroll ---
         if ( a_Event.ScrollDelta[0] != 0_u || a_Event.ScrollDelta[1] != 0_u )
         {
-            WidgetID scrollTarget = m_CapturedWidget != c_InvalidPoolID
+            WidgetID scrollTarget = m_CapturedWidget != c_InvalidWidgetID
                 ? m_CapturedWidget
                 : HitTest( RootWidget, a_Event.Position );
 
@@ -286,7 +297,7 @@ namespace RatUI
         }
 
         // --- Move (captured widget takes priority) ---
-        if ( m_CapturedWidget != c_InvalidPoolID )
+        if ( m_CapturedWidget != c_InvalidWidgetID )
         {
             if ( IWidget* w = GetWidget( m_CapturedWidget ) )
                 w->OnPointerMove( *this, a_Event );
@@ -305,7 +316,7 @@ namespace RatUI
             if ( IWidget* newHovered = GetWidget( m_HoveredWidget ) )
                 newHovered->OnPointerEnter( *this, a_Event );
         }
-        else if ( hovered != c_InvalidPoolID )
+        else if ( hovered != c_InvalidWidgetID )
         {
             if ( IWidget* w = GetWidget( hovered ) )
                 w->OnPointerMove( *this, a_Event );
@@ -317,7 +328,7 @@ namespace RatUI
     bool Scene::ProcessButtonEvent( const ButtonEvent& a_Event )
     {
         // Release pointer capture on any mouse button release
-        if ( a_Event.Released && m_CapturedWidget != c_InvalidPoolID )
+        if ( a_Event.Released && m_CapturedWidget != c_InvalidWidgetID )
         {
             if ( IWidget* w = GetWidget( m_CapturedWidget ) )
                 w->OnReleased( *this, a_Event );

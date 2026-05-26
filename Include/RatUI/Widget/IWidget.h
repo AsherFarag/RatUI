@@ -74,8 +74,9 @@ namespace RatUI
 
     protected:
         friend Scene;
+		Scene*   m_Scene{ nullptr }; // TODO: Implement this so Scene doesnt need to pass itself as an argument to every function.
         WidgetID m_ID{};
-        NodeID m_LayoutID{};
+        NodeID   m_LayoutID{};
     };
 
 } // namespace RatUI
