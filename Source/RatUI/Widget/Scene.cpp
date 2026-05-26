@@ -151,12 +151,11 @@ namespace RatUI
 
         auto focusableNodes = Detail::LayoutChildRange{ scopeNode->FirstChild() }
                               | std::views::filter( [&]( LayoutNode* node ) -> bool
-                                                     {
-                                                         if ( !node )
-                                                             return false;
-                                                         IWidget* w = GetWidget( node->Widget );
-                                                         return w && ( w->IsFocusable() || node->Style.IsFocusScope );
-                                                     } );
+                                {
+                                    if ( !node ) return false;
+                                    IWidget* w = GetWidget( node->Widget );
+                                    return w && ( w->IsFocusable() || node->Style.IsFocusScope );
+                                } );
 
         const LayoutNode* nextNode = FindNavigatableNode( a_Action, focusedNode, focusableNodes );
         if ( nextNode )
@@ -166,9 +165,9 @@ namespace RatUI
     void Scene::PushNavScope( WidgetID a_ScopeID )
     {
         PushBack( m_NavStack, NavScope{
-                                 .Scope = a_ScopeID,
-                                 .Restored = GetFocusedWidget(),
-                             } );
+            .Scope = a_ScopeID,
+            .Restored = GetFocusedWidget(),
+        } );
     }
 
     void Scene::PopNavScope()
@@ -212,8 +211,7 @@ namespace RatUI
 
         node->DetachFromParent();
 
-        node->ForEachChild( [&]( LayoutNode& childNode )
-                            { DestroyWidget( childNode.Widget ); } );
+        node->ForEachChild( [&]( LayoutNode& child ) { DestroyWidget( child.Widget ); } );
 
         widget->OnDestroy();
         Widgets.Deallocate( widget->GetID() );
@@ -342,6 +340,7 @@ namespace RatUI
             bool consumed = false;
             if ( a_Event.Pressed )  consumed |= hovered->OnPressed( a_Event );
             else                    consumed |= hovered->OnReleased( a_Event );
+
             if ( consumed ) return true;
         }
 
@@ -350,6 +349,7 @@ namespace RatUI
             bool consumed = false;
             if ( a_Event.Pressed )  consumed |= focused->OnPressed( a_Event );
             else                    consumed |= focused->OnReleased( a_Event );
+
             if ( consumed ) return true;
         }
 
