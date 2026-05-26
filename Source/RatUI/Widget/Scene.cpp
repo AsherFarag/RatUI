@@ -26,7 +26,7 @@ namespace RatUI
         {
             bool anyChanged = false;
 
-            if ( IWidget* widget = GetWidget( node.WidgetID ) )
+            if ( IWidget* widget = GetWidget( node.Widget ) )
             {
                 const Vec2<Unit> oldIntrinsics = node.Layout.IntrinsicSize;
                 widget->OnSyncLayout( node, parentSize );
@@ -90,10 +90,10 @@ namespace RatUI
 
             for ( LayoutNode* child = scopeNode->FirstChild(); child; child = child->NextSibling() )
             {
-                IWidget* w = GetWidget( child->WidgetID );
+                IWidget* w = GetWidget( child->Widget );
                 if ( w && w->IsFocusable() )
                 {
-                    SetFocus( child->WidgetID );
+                    SetFocus( child->Widget );
                     return;
                 }
             }
@@ -154,13 +154,13 @@ namespace RatUI
                                                      {
                                                          if ( !node )
                                                              return false;
-                                                         IWidget* w = GetWidget( node->WidgetID );
+                                                         IWidget* w = GetWidget( node->Widget );
                                                          return w && ( w->IsFocusable() || node->Style.IsFocusScope );
                                                      } );
 
         const LayoutNode* nextNode = FindNavigatableNode( a_Action, focusedNode, focusableNodes );
         if ( nextNode )
-            SetFocus( nextNode->WidgetID );
+            SetFocus( nextNode->Widget );
     }
 
     void Scene::PushNavScope( WidgetID a_ScopeID )
@@ -213,7 +213,7 @@ namespace RatUI
         node->DetachFromParent();
 
         node->ForEachChild( [&]( LayoutNode& childNode )
-                            { DestroyWidget( childNode.WidgetID ); } );
+                            { DestroyWidget( childNode.Widget ); } );
 
         widget->OnDestroy();
         Widgets.Deallocate( widget->GetID() );
@@ -265,9 +265,9 @@ namespace RatUI
             }
 
             if ( Visibility::IsHitTestable( a_Node->Layout.Visibility ) &&
-                 a_Node->WidgetID != c_InvalidWidgetID )
+                 a_Node->Widget != c_InvalidWidgetID )
             {
-                return a_Node->WidgetID;
+                return a_Node->Widget;
             }
 
             return c_InvalidWidgetID;

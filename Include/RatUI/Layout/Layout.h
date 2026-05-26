@@ -463,7 +463,7 @@ namespace RatUI
 
         union
         {
-            WidgetID WidgetID;          ///< The ID of the widget associated with this layout node.
+            WidgetID Widget;          ///< The ID of the widget associated with this layout node.
 			void* UserData = nullptr; ///< Incase LayoutNode is not being used with the IWidget system, this can store arbitrary user data.
         };
 

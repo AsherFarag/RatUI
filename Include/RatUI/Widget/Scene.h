@@ -217,7 +217,7 @@ namespace RatUI
         // Wire widget <-> node
         widget->m_ID       = widgetID;
         widget->m_LayoutID = nodeID;
-        node->WidgetID     = widgetID;
+        node->Widget       = widgetID;
 
 		if ( a_ParentID != c_InvalidNodeID )
         {
@@ -239,7 +239,7 @@ namespace RatUI
 
         node->ForEachChild( [&]( LayoutNode& childNode )
         {
-            IWidget* childWidget = GetWidget( childNode.WidgetID );
+            IWidget* childWidget = GetWidget( childNode.Widget );
             if ( childWidget ) a_Func( *childWidget );
         } );
     }
@@ -252,7 +252,7 @@ namespace RatUI
 
         node->ForEachChild( [&]( const LayoutNode& childNode )
         {
-            const IWidget* childWidget = GetWidget( childNode.WidgetID );
+            const IWidget* childWidget = GetWidget( childNode.Widget );
             if ( childWidget ) a_Func( *childWidget );
         } );
     }
