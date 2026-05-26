@@ -284,6 +284,48 @@ public:
                 itemTextNode->Style.Padding    = Edges::Uniform( 5_u );
             }
         }
+
+		// Button that toggles the scroll container's scroll mode between vertical and horizontal to demonstrate dynamic layout changes
+        {
+			WidgetID buttonID = m_Scene.CreateWidget<ButtonWidget>( root, [this, scrollContainer]( Scene&, WidgetID )
+			{
+				if ( auto* scrollWidget = m_Scene.GetWidget<ScrollContainerWidget>( scrollContainer ) )
+				{
+					scrollWidget->SetVScrollbarMode( scrollWidget->GetVScrollbarMode() == EScrollbarMode::Never
+                                                     ? EScrollbarMode::Always : EScrollbarMode::Never );
+				}
+			} );
+
+			auto* buttonNode = m_Scene.Layouts.Get( m_Scene.GetWidget( buttonID )->GetLayoutID() );
+			buttonNode->Style.WidthMode = ESizingMode::Fixed;
+			buttonNode->Style.FixedWidth = 300_u;
+			buttonNode->Style.FixedHeight = 40_u;
+			buttonNode->Style.HeightMode = ESizingMode::Fixed;
+
+			// Text for the button
+			WidgetID buttonText = m_Scene.CreateWidget<TextWidget>( buttonID, "Toggle V Scroll Mode", TextLayoutStyle{ .Font = DefaultFont, .Size = 16_u } );
+        }
+
+                // Button that toggles the scroll container's scroll mode between vertical and horizontal to demonstrate dynamic layout changes
+        {
+            WidgetID buttonID = m_Scene.CreateWidget<ButtonWidget>( root, [this, scrollContainer]( Scene&, WidgetID )
+            {
+                if ( auto* scrollWidget = m_Scene.GetWidget<ScrollContainerWidget>( scrollContainer ) )
+                {
+                    scrollWidget->SetHScrollbarMode( scrollWidget->GetHScrollbarMode() == EScrollbarMode::Never
+                                                     ? EScrollbarMode::Always : EScrollbarMode::Never );
+                }
+            } );
+
+            auto* buttonNode = m_Scene.Layouts.Get( m_Scene.GetWidget( buttonID )->GetLayoutID() );
+            buttonNode->Style.WidthMode = ESizingMode::Fixed;
+            buttonNode->Style.FixedWidth = 300_u;
+            buttonNode->Style.FixedHeight = 40_u;
+            buttonNode->Style.HeightMode = ESizingMode::Fixed;
+
+            // Text for the button
+            WidgetID buttonText = m_Scene.CreateWidget<TextWidget>( buttonID, "Toggle H Scroll Mode", TextLayoutStyle{ .Font = DefaultFont, .Size = 16_u } );
+        }
         
     }
 
