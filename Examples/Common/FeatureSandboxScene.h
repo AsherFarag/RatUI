@@ -86,7 +86,7 @@ public:
             WidgetID footerText = m_Scene.CreateWidget<TextWidget>( MainContentArea, DefaultTheme, 
                 "This is the main content area. It can contain the primary information or controls for the application.\n"
                 "Hello ifahjkfhaiofhoajfojaofjasojdioajodjaodjoas", 
-                layStyle, textStyle
+                layStyle
             );
             auto* footerTextNode = m_Scene.Layouts.Get( m_Scene.GetWidget( footerText )->GetLayoutID() );
 

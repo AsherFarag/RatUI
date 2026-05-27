@@ -12,13 +12,11 @@ namespace RatUI
     public:
         TextWidget( Shared<const Theme> a_Theme,
                     String a_Text = {},
-                    const TextLayoutStyle& a_Style       = {},
-                    const TextRenderStyle& a_RenderStyle = {} )
-            : m_Text       ( std::move( a_Text ) )
+                    const TextLayoutStyle& a_Style = {} )
+            : m_Theme      ( std::move( a_Theme ) )
+            , m_Text       ( std::move( a_Text ) )
             , m_LayoutStyle( a_Style )
-            , m_RenderStyle( a_RenderStyle )
         {
-            SetTheme( std::move( a_Theme ) );
         }
 
         virtual ~TextWidget() override = default;
@@ -43,21 +41,9 @@ namespace RatUI
             InvalidatePrepared();
         }
 
-        /**
-         * @brief Replaces the render style.
-         * Does NOT invalidate layout caches - render style only affects drawing.
-         */
-        void SetRenderStyle( const TextRenderStyle& a_RenderStyle )
-        {
-            m_RenderStyle = a_RenderStyle;
-        }
-
         void SetTheme( Shared<const Theme> a_Theme )
         {
             m_Theme = std::move( a_Theme );
-
-            if ( m_Theme && m_RenderStyle == TextRenderStyle{} )
-                m_RenderStyle = m_Theme->GetTextStyle( ThemeKey::TextStyle::Default, m_RenderStyle );
         }
 
         // =====================================================================
@@ -66,6 +52,20 @@ namespace RatUI
 
         void OnSyncLayout( LayoutNode& a_Node, Vec2<Unit> a_AvailableSize ) override
         {
+            // TODO: We need a cleaner way to detect theme changes that affect layout like fonts. This doesnt make sense to check here
+            if ( m_Theme )
+            {
+				if ( const FontHandle* font = m_Theme->TryGetFont( ThemeKey::Font::Default ) )
+				{
+					if ( m_LayoutStyle.Font != *font )
+					{
+						m_LayoutStyle.Font = *font;
+						InvalidatePrepared();
+                        InvalidateShaped();
+					}
+				}
+            }
+
             ITextMetrics* metrics = GetScene().TextMetrics;
             a_Node.Layout.IntrinsicSize = { 0_u, 0_u };
 
@@ -148,6 +148,9 @@ namespace RatUI
 
         void OnPaint( DrawList& a_DrawList ) override
         {
+            if ( !m_Theme )
+                return;
+
             Scene& scene = GetScene();
             LayoutNode* node = scene.Layouts.Get( GetLayoutID() );
 
@@ -161,10 +164,16 @@ namespace RatUI
 
             // Suppress the fade percentage when not in Fade overflow mode so the
             // MSDF shader doesn't accidentally fade glyphs in Clip/Ellipsis mode.
-            TextRenderStyle effectiveStyle = m_RenderStyle;
+            TextRenderStyle effectiveStyle{};
+            if ( const auto* textStyle = m_Theme->TryGetTextStyle( ThemeKey::TextStyle::Default ) )
+                effectiveStyle = *textStyle;
+            else
+                return; // No default text style in theme - can't render legibly, so bail out.
+
+
             effectiveStyle.FadePercentage  =
                 ( m_LayoutStyle.Overflow == ETextOverflow::Fade )
-                ? m_RenderStyle.FadePercentage
+				? effectiveStyle.FadePercentage
                 : 0.f;
 
             switch ( m_LayoutStyle.Overflow )
@@ -201,9 +210,8 @@ namespace RatUI
             m_ShapedWidth = Unit{ -1.f }; // sentinel, any real width will differ
         }
 
-        String          m_Text;
-        TextLayoutStyle m_LayoutStyle;
-        TextRenderStyle m_RenderStyle;
+        String                m_Text;
+        TextLayoutStyle       m_LayoutStyle;
         Shared<const Theme>   m_Theme;
 
         /// Snapshot of m_LayoutStyle at the time of the last successful Prepare() call.

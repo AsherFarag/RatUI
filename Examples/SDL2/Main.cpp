@@ -7,6 +7,7 @@
 
 #include "../Common/FeatureSandboxScene.h"
 #include "../Common/DynamicTextScene.h"
+#include "../Common/ThemeShowcaseScene.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "../Common/stb_image.h"
@@ -46,10 +47,12 @@ protected:
         g_Renderer = GetRenderer();
 
         const FontHandle fontHandle = { 1 };
+		const FontHandle minecraftFontHandle = { 2 };
         m_FontCache.RegisterFontHandle( fontHandle, "Resources/Fonts/Roboto-Medium.ttf" );
+        m_FontCache.RegisterFontHandle( minecraftFontHandle, "Resources/Fonts/Minecraft.ttf" );
 		m_TextMetrics.SetFontCache( &m_FontCache );
 
-        m_Scene = MakeUnique<DynamicTextScene>( fontHandle, &m_TextMetrics );
+        m_Scene = MakeUnique<ThemeShowcaseScene>( fontHandle, &m_TextMetrics );
         m_Scene->Init();
 
         m_Atlas = MakeUnique<GlyphAtlas>( *m_Renderer, m_TextMetrics );

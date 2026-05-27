@@ -181,6 +181,7 @@ namespace RatUI
         RATUI_THEME_PROPERTY( CornerRounding,  Rounding,  Roundings,  m_Roundings  )
         RATUI_THEME_PROPERTY( TextRenderStyle, TextStyle, TextStyles, m_TextStyles )
         RATUI_THEME_PROPERTY( Unit,            Metric,    Metrics,    m_Metrics    )
+        RATUI_THEME_PROPERTY( FontHandle,      Font,      Fonts,      m_Fonts      )
     
     #undef RATUI_THEME_PROPERTY
     
@@ -193,6 +194,7 @@ namespace RatUI
         ValueMap<CornerRounding>  m_Roundings;
         ValueMap<TextRenderStyle> m_TextStyles;
         ValueMap<Unit>            m_Metrics;
+		ValueMap<FontHandle>      m_Fonts;
     };
 
     /**
@@ -250,6 +252,11 @@ namespace RatUI
             inline constexpr ThemeID SliderTrackThickness  = "Slider.TrackThickness"_theme;
             inline constexpr ThemeID SliderMinThumbSize    = "Slider.MinThumbSize"_theme;
         }
+
+		namespace Font 
+        {
+			inline constexpr ThemeID Default = "Default"_theme;
+		}
     }
 
 } // namespace RatUI
