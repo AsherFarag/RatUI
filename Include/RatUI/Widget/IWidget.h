@@ -6,7 +6,7 @@
 
 namespace RatUI
 {
-    struct Scene;
+    class Scene;
 
     /**
      * @brief The base class for all UI elements.

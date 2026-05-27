@@ -2,6 +2,47 @@
 
 namespace RatUI
 {
+    // TODO: Make this a reusable utility?
+    namespace 
+    {
+        struct LayoutChildIterator
+        {
+            using iterator_concept = std::forward_iterator_tag;
+            using iterator_category = std::forward_iterator_tag;
+            using value_type = LayoutNode*;
+            using difference_type = std::ptrdiff_t;
+
+            LayoutNode* Current{ nullptr };
+
+            value_type operator*() const { return Current; }
+
+            LayoutChildIterator& operator++()
+            {
+                Current = Current ? Current->NextSibling() : nullptr;
+                return *this;
+            }
+
+            LayoutChildIterator operator++( int )
+            {
+                LayoutChildIterator copy = *this;
+                ++( *this );
+                return copy;
+            }
+
+            bool operator==( std::default_sentinel_t ) const { return Current == nullptr; }
+        };
+
+        struct LayoutChildRange : std::ranges::view_interface<LayoutChildRange>
+        {
+            LayoutNode* First{ nullptr };
+
+            LayoutChildRange( LayoutNode* a_First ) : First( a_First ) {}
+            LayoutChildIterator begin() const { return LayoutChildIterator{ First }; }
+            std::default_sentinel_t end() const { return {}; }
+        };
+
+    } // namespace
+
     bool Scene::DispatchInputEvent( const InputEvent& a_Event )
     {
         if ( Holds<PointerEvent>( a_Event.Payload ) )
@@ -149,7 +190,7 @@ namespace RatUI
             return;
         }
 
-        auto focusableNodes = Detail::LayoutChildRange{ scopeNode->FirstChild() }
+        auto focusableNodes = LayoutChildRange{ scopeNode->FirstChild() }
                               | std::views::filter( [&]( LayoutNode* node ) -> bool
                                 {
                                     if ( !node ) return false;

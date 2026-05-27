@@ -11,48 +11,6 @@
 
 namespace RatUI
 {
-    // TODO: Idk if this was worth the effort to avoid the array alloc in Navigate,
-    // Make this a reusable utility
-    namespace Detail
-    {
-        struct LayoutChildIterator
-        {
-            using iterator_concept = std::forward_iterator_tag;
-            using iterator_category = std::forward_iterator_tag;
-            using value_type = LayoutNode*;
-            using difference_type = std::ptrdiff_t;
-
-            LayoutNode* Current{ nullptr };
-
-            value_type operator*() const { return Current; }
-
-            LayoutChildIterator& operator++()
-            {
-                Current = Current ? Current->NextSibling() : nullptr;
-                return *this;
-            }
-
-            LayoutChildIterator operator++( int )
-            {
-                LayoutChildIterator copy = *this;
-                ++( *this );
-                return copy;
-            }
-
-            bool operator==( std::default_sentinel_t ) const { return Current == nullptr; }
-        };
-
-        struct LayoutChildRange : std::ranges::view_interface<LayoutChildRange>
-        {
-            LayoutNode* First{ nullptr };
-
-			LayoutChildRange( LayoutNode* a_First ) : First( a_First ) {}
-            LayoutChildIterator begin() const { return LayoutChildIterator{ First }; }
-            std::default_sentinel_t end() const { return {}; }
-        };
-
-    } // namespace Detail
-
     using LayoutNodePool = Pool<LayoutNode>;
     using WidgetPool = Pool<Unique<IWidget>>;
 

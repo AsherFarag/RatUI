@@ -295,7 +295,7 @@ namespace RatUI
             if ( !contentNode )
                 return;
 
-            const Rect<Unit>& viewportRect = contentNode->Layout.FinalRect;
+            const Rect<Unit> viewportRect = contentNode->Layout.FinalRect;
 
             Unit maxRight = viewportRect.Right();
             Unit maxBottom = viewportRect.Bottom();

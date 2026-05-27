@@ -63,4 +63,8 @@ namespace RatUI
     template<typename T>
     using Shared = RATUI_SHARED_PTR_IMPL<T>;
 
+    // TODO
+    template<typename T>
+    using Weak = std::weak_ptr<T>;
+
 } // namespace RatUI
