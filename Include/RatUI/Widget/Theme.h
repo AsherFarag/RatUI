@@ -5,9 +5,14 @@
 
 namespace RatUI
 {
+    /**
+     * @brief Represents a hash of a theme property name, used for efficient lookup of theme values.
+     * ThemeIDs are generated from string names using a consistent hash function.
+     */
     struct ThemeID
     {
-        u64 Hash{ 0 };
+        u64         Hash{ 0 };
+        const char* Name{ nullptr }; ///< Optional: String the hash was generated from, used for debugging purposes. This must be set manually.
 
         constexpr auto operator<=>( const ThemeID& ) const = default;
 
@@ -32,9 +37,14 @@ namespace RatUI
 
     namespace Literals
     {
+        /**
+         * @brief User-defined literal for creating ThemeIDs from string literals. Usage: "MyWidget.StyleVar"_theme
+         */
         constexpr ThemeID operator"" _theme( const char* a_String, size_t a_Length )
         {
-            return ThemeID( StringView{ a_String, a_Length } );
+            ThemeID id( StringView( a_String, a_Length ) );
+            id.Name = a_String; // Store the string pointer for debugging (we assume string literals have static storage duration, so this is safe)
+            return id;
         }
     } // namespace Literals
 
@@ -46,48 +56,200 @@ namespace RatUI
         }
     };
     
-
-    struct Theme
+    /**
+     * @brief A collection of typed theme properties (colors, metrics, etc.)
+     * that can optionally inherit from a parent, cascading lookups up the chain.
+     */
+    class Theme
     {
-        Weak<Theme> Parent; ///< Optional parent theme to inherit from. If a property is not found in this theme, 
-                            ///< it will be looked up in the parent theme.
-                  
-        HashMap<ThemeID, Color,           ThemeIDHash> Colors;
-        HashMap<ThemeID, CornerRounding,  ThemeIDHash> Roundings;
-        HashMap<ThemeID, TextRenderStyle, ThemeIDHash> TextStyles;
-        HashMap<ThemeID, Unit,            ThemeIDHash> Metrics;
+    public:
+        template<typename T>
+        using ValueMap = HashMap<ThemeID, T, ThemeIDHash, std::equal_to<ThemeID>>;
+    
+        Theme() = default;
 
-        // TODO: People might not like the use of macros here, but it saves a lot of boilerplate code for these accessors. 
-        // Maybe we can find a better way to generate them in the future.
-        #define RATUI_THEME_PROPERTY_ACCESSORS( Type, ValueName, MapName ) \
-            Optional<Type> TryGet##ValueName( ThemeID a_ID ) const \
-            { \
-                if ( auto it = Find( MapName, a_ID ); it != End( MapName ) ) \
-                    return it->second; \
-                \
-                if ( auto lock = Parent.lock() ) \
-                    return lock->TryGet##ValueName( a_ID ); \
-                \
-                return NullOpt; \
-            } \
-            \
-            Type Get##ValueName( ThemeID a_ID, Type a_Default ) const \
-            { \
-                if ( auto it = Find( MapName, a_ID ); it != End( MapName ) ) \
-                    return it->second; \
-                \
-                if ( auto lock = Parent.lock() ) \
-                    return lock->Get##ValueName( a_ID, a_Default ); \
-                \
-                return a_Default; \
+        explicit Theme( Shared<const Theme> a_Parent )
+            : m_Parent( std::move( a_Parent ) )
+        {}
+    
+        Theme( const Theme& a_Other )
+            : m_Parent   ( a_Other.m_Parent )
+            , m_Colors   ( a_Other.m_Colors )
+            , m_Roundings( a_Other.m_Roundings )
+            , m_TextStyles( a_Other.m_TextStyles )
+            , m_Metrics  ( a_Other.m_Metrics )
+            // m_Version intentionally starts at 0 for a fresh copy
+        {}
+    
+        Theme( Theme&& ) = default;
+    
+        Theme& operator=( const Theme& a_Other )
+        {
+            if ( this != &a_Other )
+            {
+                RATUI_USER_ASSERT( a_Other.m_Parent.get() != this, 
+                                   "Cannot assign a theme to one of its ancestors (circular parent chain)" );
+
+                m_Parent    = a_Other.m_Parent;
+                m_Colors    = a_Other.m_Colors;
+                m_Roundings = a_Other.m_Roundings;
+                m_TextStyles = a_Other.m_TextStyles;
+                m_Metrics   = a_Other.m_Metrics;
+                ++m_Version; // assignment is a mutation of this theme
             }
 
-        RATUI_THEME_PROPERTY_ACCESSORS( Color,           Color, Colors )
-        RATUI_THEME_PROPERTY_ACCESSORS( CornerRounding,  Rounding, Roundings )
-        RATUI_THEME_PROPERTY_ACCESSORS( TextRenderStyle, TextStyle, TextStyles )
-        RATUI_THEME_PROPERTY_ACCESSORS( Unit,            Metric, Metrics )
+            return *this;
+        }
+    
+        Theme& operator=( Theme&& a_Other ) noexcept
+        {
+            if ( this != &a_Other )
+            {
+                RATUI_USER_ASSERT( a_Other.m_Parent.get() != this, 
+                                   "Cannot assign a theme to one of its ancestors (circular parent chain)" );
+                m_Parent     = std::move( a_Other.m_Parent );
+                m_Colors     = std::move( a_Other.m_Colors );
+                m_Roundings  = std::move( a_Other.m_Roundings );
+                m_TextStyles = std::move( a_Other.m_TextStyles );
+                m_Metrics    = std::move( a_Other.m_Metrics );
+                ++m_Version;
+            }
+            return *this;
+        }
+    
+        /** @brief Returns the parent theme, if any. */
+        const Shared<const Theme>& GetParent() const { return m_Parent; }
+    
+        /** @brief Checks if the theme has a parent. */
+        bool HasParent() const { return m_Parent != nullptr; }
 
-        #undef RATUI_THEME_PROPERTY_ACCESSORS
+        /**
+         * @brief Returns the version number of the theme.
+         * Monotonically increasing counter, incremented on every write to this
+         * theme (not its parent). Use as a cache-invalidation signal.
+         */
+        u32 GetVersion() const { return m_Version; }
+    
+        // -------------------------------------------------------------------------
+        // Per-type accessors  (generated via below)
+        // -------------------------------------------------------------------------
+        //
+        // For each type T, the following methods are generated:
+        //
+        //   const T&           GetColor( ThemeID, const T& default = {} ) const
+        //   const T*           TryGetColor( ThemeID ) const           // nullptr if absent
+        //   bool               HasColor( ThemeID ) const              // checks parent chain
+        //   Theme&             SetColor( ThemeID, T )                 // fluent
+        //   Theme&             SetColors( std::initializer_list<...> )// bulk, merges
+        //   const ValueMap<T>& GetColors() const
+        //
+        // The same pattern repeats for Rounding, TextStyle, Metric.
+    
+    #define RATUI_THEME_PROPERTY( Type, Singular, Plural, Member )                          \
+        const Type& Get##Singular( ThemeID a_ID, const Type& a_Default = {} ) const         \
+        {                                                                                   \
+            if ( const Type* v = TryGet##Singular( a_ID ) ) return *v;                      \
+            return a_Default;                                                               \
+        }                                                                                   \
+        const Type* TryGet##Singular( ThemeID a_ID ) const                                  \
+        {                                                                                   \
+            if ( auto it = Find( Member, a_ID ); it != End( Member ) )                      \
+                return &it->second;                                                         \
+            return m_Parent ? m_Parent->TryGet##Singular( a_ID ) : nullptr;                 \
+        }                                                                                   \
+        bool Has##Singular( ThemeID a_ID ) const                                            \
+        {                                                                                   \
+            if ( Find( Member, a_ID ) != End( Member ) ) return true;                       \
+            return m_Parent && m_Parent->Has##Singular( a_ID );                             \
+        }                                                                                   \
+        Theme& Set##Singular( ThemeID a_ID, Type a_Value )                                  \
+        {                                                                                   \
+            Member[a_ID] = std::move( a_Value );                                            \
+            ++m_Version;                                                                    \
+            return *this;                                                                   \
+        }                                                                                   \
+        Theme& Set##Plural( std::initializer_list<std::pair<const ThemeID, Type>> a_List )  \
+        {                                                                                   \
+            for ( auto& [id, val] : a_List )                                                \
+                Member[id] = std::move( val );                                              \
+            ++m_Version;                                                                    \
+            return *this;                                                                   \
+        }                                                                                   \
+        const ValueMap<Type>& Get##Plural() const { return Member; }
+    
+        RATUI_THEME_PROPERTY( Color,           Color,     Colors,     m_Colors     )
+        RATUI_THEME_PROPERTY( CornerRounding,  Rounding,  Roundings,  m_Roundings  )
+        RATUI_THEME_PROPERTY( TextRenderStyle, TextStyle, TextStyles, m_TextStyles )
+        RATUI_THEME_PROPERTY( Unit,            Metric,    Metrics,    m_Metrics    )
+    
+    #undef RATUI_THEME_PROPERTY
+    
+    protected:
+        Shared<const Theme> m_Parent;
+    
+        u32 m_Version { 0 };
+    
+        ValueMap<Color>           m_Colors;
+        ValueMap<CornerRounding>  m_Roundings;
+        ValueMap<TextRenderStyle> m_TextStyles;
+        ValueMap<Unit>            m_Metrics;
     };
+
+    /**
+     * @brief Namespace containing predefined themes that can be used out of the box. 
+     */
+    namespace Themes
+    {
+        /**
+         * @brief Returns the dark theme.
+         * @return A shared pointer to the dark theme.
+         */
+        const Shared<const Theme>& Dark();
+    }
+
+    /**
+     * @brief Namespace containing predefined theme property IDs for the built-in widgets.
+     * These can be used when setting or getting theme values to ensure consistency across themes.
+     */
+    namespace ThemeKey
+    {
+        namespace Color
+        {
+            inline constexpr ThemeID ButtonNormal       = "Button.Normal"_theme;
+            inline constexpr ThemeID ButtonHover        = "Button.Hover"_theme;
+            inline constexpr ThemeID ButtonPressed      = "Button.Pressed"_theme;
+            inline constexpr ThemeID ButtonFocusOutline = "Button.FocusOutline"_theme;
+
+            inline constexpr ThemeID PanelNormal       = "Panel.Normal"_theme;
+            inline constexpr ThemeID PanelFocusOutline = "Panel.FocusOutline"_theme;
+
+            inline constexpr ThemeID SliderTrack        = "Slider.Track"_theme;
+            inline constexpr ThemeID SliderTrackFill    = "Slider.TrackFill"_theme;
+            inline constexpr ThemeID SliderThumb        = "Slider.Thumb"_theme;
+            inline constexpr ThemeID SliderThumbHover   = "Slider.ThumbHover"_theme;
+            inline constexpr ThemeID SliderThumbPressed = "Slider.ThumbPressed"_theme;
+        }
+
+        namespace Rounding
+        {
+            inline constexpr ThemeID Button      = "Button"_theme;
+            inline constexpr ThemeID Panel       = "Panel"_theme;
+            inline constexpr ThemeID SliderTrack  = "Slider.Track"_theme;
+            inline constexpr ThemeID SliderThumb   = "Slider.Thumb"_theme;
+        }
+
+        namespace TextStyle
+        {
+            inline constexpr ThemeID Default = "Default"_theme;
+        }
+
+        namespace Metric
+        {
+            inline constexpr ThemeID ButtonBorderThickness = "Button.BorderThickness"_theme;
+            inline constexpr ThemeID PanelBorderThickness  = "Panel.BorderThickness"_theme;
+            inline constexpr ThemeID SliderTrackThickness  = "Slider.TrackThickness"_theme;
+            inline constexpr ThemeID SliderMinThumbSize    = "Slider.MinThumbSize"_theme;
+        }
+    }
 
 } // namespace RatUI

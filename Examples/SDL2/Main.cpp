@@ -49,7 +49,7 @@ protected:
         m_FontCache.RegisterFontHandle( fontHandle, "Resources/Fonts/Roboto-Medium.ttf" );
 		m_TextMetrics.SetFontCache( &m_FontCache );
 
-        m_Scene = MakeUnique<FeatureSandboxScene>( fontHandle, &m_TextMetrics );
+        m_Scene = MakeUnique<DynamicTextScene>( fontHandle, &m_TextMetrics );
         m_Scene->Init();
 
         m_Atlas = MakeUnique<GlyphAtlas>( *m_Renderer, m_TextMetrics );

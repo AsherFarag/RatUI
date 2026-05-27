@@ -12,11 +12,18 @@ public:
     FontHandle DefaultFont;
     WidgetID MainContentArea;
     f32 Time = 0.f;
+    Shared<Theme> DefaultTheme;
 
     void Init() override
     {
+        DefaultTheme = MakeShared<Theme>( *Themes::Dark() );
+        DefaultTheme->SetTextStyle(
+            ThemeKey::TextStyle::Default,
+            TextRenderStyle{}
+        );
+
         // Root container - deep app background
-        WidgetID trueRoot = m_Scene.CreateRootWidget<RectWidget>( Colors::Surface900, "AppBackground" );
+        WidgetID trueRoot = m_Scene.CreateRootWidget<PanelWidget>( DefaultTheme );
         LayoutNode* trueRootNode = m_Scene.Layouts.Get( m_Scene.GetWidget( trueRoot )->GetLayoutID() );
         trueRootNode->Style.LayoutType = ELayoutType::Vertical;
         trueRootNode->Style.Spacing = 10_u;
@@ -25,7 +32,7 @@ public:
         trueRootNode->Style.HeightMode = ESizingMode::Flex;
     
         // Main panel - slightly lighter surface
-        WidgetID root = m_Scene.CreateWidget<RectWidget>( trueRoot, Colors::Surface800, "MainPanel" );
+        WidgetID root = m_Scene.CreateWidget<PanelWidget>( trueRoot, DefaultTheme );
         LayoutNode* rootNode = m_Scene.Layouts.Get( m_Scene.GetWidget( root )->GetLayoutID() );
         rootNode->Style.LayoutType = ELayoutType::Vertical;
         rootNode->Style.Spacing = 10_u;
@@ -35,7 +42,7 @@ public:
         rootNode->Style.IsFocusScope = true;
     
         // ---------------- HEADER BAR (was Red) ----------------
-        WidgetID headerBar = m_Scene.CreateWidget<RectWidget>( root, Colors::AccentBlue, "HeaderBar" );
+        WidgetID headerBar = m_Scene.CreateWidget<PanelWidget>( root, DefaultTheme );
         auto* headerBarNode = m_Scene.Layouts.Get( m_Scene.GetWidget( headerBar )->GetLayoutID() );
     
         headerBarNode->Style.FixedHeight = 100_u;
@@ -44,7 +51,7 @@ public:
         headerBarNode->Style.Margin = Edges::Uniform( 10_u );
     
         // ---------------- CONTENT ROW (was HBox) ----------------
-        WidgetID contentRow = m_Scene.CreateWidget<RectWidget>( root, Colors::Surface700, "ContentRow" );
+        WidgetID contentRow = m_Scene.CreateWidget<PanelWidget>( root, DefaultTheme );
         auto* contentRowNode = m_Scene.Layouts.Get( m_Scene.GetWidget( contentRow )->GetLayoutID() );
     
         contentRowNode->Style.LayoutType = ELayoutType::Horizontal;
@@ -58,7 +65,7 @@ public:
     
         // ---------------- MAIN CONTENT AREA ----------------
         {
-            MainContentArea = m_Scene.CreateWidget<RectWidget>( contentRow, Colors::Surface600, "MainContentArea" );
+            MainContentArea = m_Scene.CreateWidget<PanelWidget>( contentRow, DefaultTheme );
             auto* mainContentNode = m_Scene.Layouts.Get( m_Scene.GetWidget( MainContentArea )->GetLayoutID() );
             
             mainContentNode->Style.WidthMode = ESizingMode::Flex;
@@ -76,7 +83,7 @@ public:
             textStyle.FillColor = Colors::AccentRose;
 
             // Add some text to the footer bar
-            WidgetID footerText = m_Scene.CreateWidget<TextWidget>( MainContentArea, Shared<Theme>{}, 
+            WidgetID footerText = m_Scene.CreateWidget<TextWidget>( MainContentArea, DefaultTheme, 
                 "This is the main content area. It can contain the primary information or controls for the application.\n"
                 "Hello ifahjkfhaiofhoajfojaofjasojdioajodjaodjoas", 
                 layStyle, textStyle
@@ -91,7 +98,7 @@ public:
     
         // ---------------- SIDEBAR PANEL ----------------
         {
-            WidgetID sidebarPanel = m_Scene.CreateWidget<RectWidget>( contentRow, Colors::Surface600, "SidebarPanel" );
+            WidgetID sidebarPanel = m_Scene.CreateWidget<PanelWidget>( contentRow, DefaultTheme );
             auto* sidebarNode = m_Scene.Layouts.Get( m_Scene.GetWidget( sidebarPanel )->GetLayoutID() );
     
             sidebarNode->Style.LayoutType = ELayoutType::Vertical;
@@ -104,7 +111,7 @@ public:
             sidebarNode->Style.IsFocusScope = true;
     
             // ---------------- STATUS INDICATOR ----------------
-            WidgetID statusIndicator = m_Scene.CreateWidget<RectWidget>( sidebarPanel, Colors::AccentEmerald, "StatusIndicator" );
+            WidgetID statusIndicator = m_Scene.CreateWidget<PanelWidget>( sidebarPanel, DefaultTheme );
             auto* statusNode = m_Scene.Layouts.Get( m_Scene.GetWidget( statusIndicator )->GetLayoutID() );
     
             statusNode->Style.WidthMode = ESizingMode::Flex;
@@ -113,7 +120,7 @@ public:
             statusNode->Style.FixedHeight = 60_u;
     
             // ---------------- NOTIFICATION DOT ----------------
-            WidgetID notificationDot = m_Scene.CreateWidget<RectWidget>( sidebarPanel, Colors::AccentRose, "NotificationDot" );
+            WidgetID notificationDot = m_Scene.CreateWidget<PanelWidget>( sidebarPanel, DefaultTheme );
             auto* notifNode = m_Scene.Layouts.Get( m_Scene.GetWidget( notificationDot )->GetLayoutID() );
     
             notifNode->Style.WidthMode = ESizingMode::Flex;
@@ -125,7 +132,7 @@ public:
     
         // ---------------- SECONDARY CONTENT AREA ----------------
         {
-            WidgetID secondaryContent = m_Scene.CreateWidget<RectWidget>( contentRow, Colors::Surface600, "SecondaryContentArea" );
+            WidgetID secondaryContent = m_Scene.CreateWidget<PanelWidget>( contentRow, DefaultTheme );
             auto* secondaryNode = m_Scene.Layouts.Get( m_Scene.GetWidget( secondaryContent )->GetLayoutID() );
             
             secondaryNode->Style.WidthMode = ESizingMode::Flex;
@@ -137,7 +144,7 @@ public:
             layStyle.Font = DefaultFont;
             layStyle.Size = 16_u;
             layStyle.Wrap = TextWrap::WrapWord();
-            WidgetID longText = m_Scene.CreateWidget<TextWidget>( secondaryContent, Shared<Theme>{}, 
+            WidgetID longText = m_Scene.CreateWidget<TextWidget>( secondaryContent, DefaultTheme, 
                 "This is the secondary content area. It can contain supplementary information or controls that support the main content.\n"
                 "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.", 
                 layStyle
@@ -151,7 +158,7 @@ public:
     
         // ---------------- FOOTER BAR ----------------
         {
-            WidgetID footerBar = m_Scene.CreateWidget<RectWidget>( root, Colors::Surface700, "FooterBar" );
+            WidgetID footerBar = m_Scene.CreateWidget<PanelWidget>( root, DefaultTheme );
             auto* footerNode = m_Scene.Layouts.Get( m_Scene.GetWidget( footerBar )->GetLayoutID() );
 
             footerNode->Style.FixedHeight = 120_u;
@@ -164,7 +171,7 @@ public:
             layStyle.Wrap = TextWrap::WrapWord();
 
             // Add some text to the footer bar
-            WidgetID footerText = m_Scene.CreateWidget<TextWidget>( footerBar, Shared<Theme>{}, 
+            WidgetID footerText = m_Scene.CreateWidget<TextWidget>( footerBar, DefaultTheme, 
                 "This is the footer bar. It can contain status messages, controls, or other information.\n"
                 "VAVAVAVA\n"
                 "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\n"
@@ -178,7 +185,7 @@ public:
         }
     
         // ---------------- ACCENT SWATCH ROW ----------------
-        WidgetID accentSwatchRow = m_Scene.CreateWidget<RectWidget>( root, Colors::Surface800, "AccentSwatchRow" );
+        WidgetID accentSwatchRow = m_Scene.CreateWidget<PanelWidget>( root, DefaultTheme );
         auto* swatchRowNode = m_Scene.Layouts.Get( m_Scene.GetWidget( accentSwatchRow )->GetLayoutID() );
         swatchRowNode->Style.LayoutType = ELayoutType::Horizontal;
         swatchRowNode->Style.Spacing = 20_u;
@@ -266,7 +273,7 @@ public:
 
             for ( int i = 0; i < 20 * 1 - 1; ++i )
             {
-                WidgetID item = m_Scene.CreateWidget<RectWidget>( scrollContainer, Colors::Surface500, "ScrollItem" );
+                WidgetID item = m_Scene.CreateWidget<PanelWidget>( scrollContainer, DefaultTheme );
                 auto* itemNode = m_Scene.Layouts.Get( m_Scene.GetWidget( item )->GetLayoutID() );
                 itemNode->Style.WidthMode = ESizingMode::Fixed;
                 itemNode->Style.HeightMode = ESizingMode::Fixed;
@@ -277,7 +284,7 @@ public:
                 TextLayoutStyle itemTextStyle;
                 itemTextStyle.Font = DefaultFont;
                 itemTextStyle.Size = 14_u;
-                WidgetID itemText = m_Scene.CreateWidget<TextWidget>( item, Shared<Theme>{}, "Scrollable Item " + std::to_string( i + 1 ), itemTextStyle );
+                WidgetID itemText = m_Scene.CreateWidget<TextWidget>( item, DefaultTheme, "Scrollable Item " + std::to_string( i + 1 ), itemTextStyle );
                 auto* itemTextNode = m_Scene.Layouts.Get( m_Scene.GetWidget( itemText )->GetLayoutID() );
                 itemTextNode->Style.WidthMode  = ESizingMode::Content;
                 itemTextNode->Style.HeightMode = ESizingMode::Content;
@@ -287,7 +294,7 @@ public:
 
 		// Button that toggles the scroll container's scroll mode between vertical and horizontal to demonstrate dynamic layout changes
         {
-			WidgetID buttonID = m_Scene.CreateWidget<ButtonWidget>( root, Shared<Theme>{}, [this, scrollContainer]( Scene&, WidgetID )
+            WidgetID buttonID = m_Scene.CreateWidget<ButtonWidget>( root, DefaultTheme, [this, scrollContainer]( Scene&, WidgetID )
 			{
 				if ( auto* scrollWidget = m_Scene.GetWidget<ScrollContainerWidget>( scrollContainer ) )
 				{
@@ -303,12 +310,12 @@ public:
 			buttonNode->Style.HeightMode = ESizingMode::Fixed;
 
 			// Text for the button
-            WidgetID buttonText = m_Scene.CreateWidget<TextWidget>( buttonID, Shared<Theme>{}, "Toggle V Scroll Mode", TextLayoutStyle{ .Font = DefaultFont, .Size = 16_u } );
+            WidgetID buttonText = m_Scene.CreateWidget<TextWidget>( buttonID, DefaultTheme, "Toggle V Scroll Mode", TextLayoutStyle{ .Font = DefaultFont, .Size = 16_u } );
         }
 
                 // Button that toggles the scroll container's scroll mode between vertical and horizontal to demonstrate dynamic layout changes
         {
-            WidgetID buttonID = m_Scene.CreateWidget<ButtonWidget>( root, Shared<Theme>{}, [this, scrollContainer]( Scene&, WidgetID )
+            WidgetID buttonID = m_Scene.CreateWidget<ButtonWidget>( root, DefaultTheme, [this, scrollContainer]( Scene&, WidgetID )
             {
                 if ( auto* scrollWidget = m_Scene.GetWidget<ScrollContainerWidget>( scrollContainer ) )
                 {
@@ -324,7 +331,7 @@ public:
             buttonNode->Style.HeightMode = ESizingMode::Fixed;
 
             // Text for the button
-            WidgetID buttonText = m_Scene.CreateWidget<TextWidget>( buttonID, Shared<Theme>{}, "Toggle H Scroll Mode", TextLayoutStyle{ .Font = DefaultFont, .Size = 16_u } );
+            WidgetID buttonText = m_Scene.CreateWidget<TextWidget>( buttonID, DefaultTheme, "Toggle H Scroll Mode", TextLayoutStyle{ .Font = DefaultFont, .Size = 16_u } );
         }
         
     }

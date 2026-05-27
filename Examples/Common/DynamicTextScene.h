@@ -39,6 +39,7 @@ private:
     FontHandle m_Font;
     f32        m_Time{ 0.f };
     WidgetID   m_AnimContainer{};
+    Shared<Theme> DefaultTheme;
 
     // -------------------------------------------------------------------------
     // Convenience accessors
@@ -79,6 +80,15 @@ private:
         return s;
     }
 
+    Shared<Theme> MakePanelTheme( Color a_Color, CornerRounding a_Rounding = CornerRounding::None(), Unit a_BorderThickness = 2_u ) const
+    {
+        Shared<Theme> theme = MakeShared<Theme>( DefaultTheme );
+        theme->SetColor( ThemeKey::Color::PanelNormal, a_Color );
+        theme->SetRounding( ThemeKey::Rounding::Panel, a_Rounding );
+        theme->SetMetric( ThemeKey::Metric::PanelBorderThickness, a_BorderThickness );
+        return theme;
+    }
+
     // -------------------------------------------------------------------------
     // Layout primitives
     // -------------------------------------------------------------------------
@@ -91,7 +101,7 @@ private:
         ESizingMode wMode = ESizingMode::Flex,
         Unit        fixedW = 0_u )
     {
-        WidgetID w = m_Scene.CreateWidget<TextWidget>( parent, Shared<Theme>{}, text, style.Layout, style.Render );
+        WidgetID w = m_Scene.CreateWidget<TextWidget>( parent, DefaultTheme, text, style.Layout, style.Render );
         auto* n = Node( w );
         n->Style.WidthMode  = wMode;
         n->Style.FixedWidth = fixedW;
@@ -102,10 +112,7 @@ private:
     /// Vertical card with heading + divider. Returns card WidgetID.
     WidgetID BeginCard( WidgetID parent, const char* title )
     {
-        WidgetID card = m_Scene.CreateWidget<RectWidget>(
-            parent, Colors::Surface700, "Card",
-            CornerRounding::Uniform( 6_u )
-        );
+        WidgetID card = m_Scene.CreateWidget<PanelWidget>( parent, MakePanelTheme( Colors::Surface700, CornerRounding::Uniform( 6_u ) ) );
         {
             auto* n = Node( card );
             n->Style.LayoutType = ELayoutType::Vertical;
@@ -117,9 +124,7 @@ private:
 
         AddText( card, title, SectionHeadingStyle(), ESizingMode::Flex );
 
-        WidgetID div = m_Scene.CreateWidget<RectWidget>(
-            card, Colors::Surface500, "Div", CornerRounding::None()
-        );
+        WidgetID div = m_Scene.CreateWidget<PanelWidget>( card, MakePanelTheme( Colors::Surface500, CornerRounding::None(), 0_u ) );
         {
             auto* n = Node( div );
             n->Style.WidthMode   = ESizingMode::Flex;
@@ -140,9 +145,7 @@ private:
     /// Three-column horizontal container inside a vertical parent.
     ColumnSet3 MakeCols( WidgetID parent )
     {
-        WidgetID row = m_Scene.CreateWidget<RectWidget>(
-            parent, Colors::Surface900, "ColRow"
-        );
+        WidgetID row = m_Scene.CreateWidget<PanelWidget>( parent, MakePanelTheme( Colors::Surface900 ) );
         {
             auto* n = Node( row );
             n->Style.LayoutType = ELayoutType::Horizontal;
@@ -153,7 +156,7 @@ private:
 
         auto MakeCol = [&]() -> WidgetID
         {
-            WidgetID c = m_Scene.CreateWidget<RectWidget>( row, Colors::Surface900, "Col" );
+            WidgetID c = m_Scene.CreateWidget<PanelWidget>( row, MakePanelTheme( Colors::Surface900 ) );
             auto* n = Node( c );
             n->Style.LayoutType = ELayoutType::Vertical;
             n->Style.Spacing    = 12_u;
@@ -175,9 +178,7 @@ private:
         ESizingMode textWMode = ESizingMode::Flex,
         Unit        textFixedW = 0_u )
     {
-        WidgetID row = m_Scene.CreateWidget<RectWidget>(
-            card, Colors::Surface800, "Row"
-        );
+        WidgetID row = m_Scene.CreateWidget<PanelWidget>( card, MakePanelTheme( Colors::Surface800 ) );
         {
             auto* n = Node( row );
             n->Style.LayoutType = ELayoutType::Horizontal;
@@ -188,7 +189,7 @@ private:
 
         // Label column (fixed width)
         TextStyle lblStyle = RowLabelStyle();
-        WidgetID lbl = m_Scene.CreateWidget<TextWidget>( row, Shared<Theme>{}, rowLabel, lblStyle.Layout, lblStyle.Render );
+        WidgetID lbl = m_Scene.CreateWidget<TextWidget>( row, DefaultTheme, rowLabel, lblStyle.Layout, lblStyle.Render );
         {
             auto* n = Node( lbl );
             n->Style.Padding    = Edges::Uniform( 4_u );
@@ -272,7 +273,7 @@ private:
             { ETextBaseline::Hanging,    "Hanging"    },
         };
 
-        WidgetID row = m_Scene.CreateWidget<RectWidget>( card, Colors::Surface800, "BaselineRow" );
+        WidgetID row = m_Scene.CreateWidget<PanelWidget>( card, MakePanelTheme( Colors::Surface800 ) );
         {
             auto* n = Node( row );
             n->Style.LayoutType = ELayoutType::Horizontal;
@@ -282,7 +283,7 @@ private:
         }
 
         TextStyle lblStyle = RowLabelStyle();
-        WidgetID lbl = m_Scene.CreateWidget<TextWidget>( row, Shared<Theme>{}, "Baseline", lblStyle.Layout, lblStyle.Render );
+        WidgetID lbl = m_Scene.CreateWidget<TextWidget>( row, DefaultTheme, "Baseline", lblStyle.Layout, lblStyle.Render );
         {
             auto* n = Node( lbl );
             n->Style.Padding    = Edges::Uniform( 4_u );
@@ -291,9 +292,7 @@ private:
             n->Style.HeightMode = ESizingMode::Content;
         }
 
-        WidgetID box = m_Scene.CreateWidget<RectWidget>(
-            row, Colors::Transparent, "BaselineBox", CornerRounding::Uniform( 4_u )
-        );
+        WidgetID box = m_Scene.CreateWidget<PanelWidget>( row, MakePanelTheme( Colors::Transparent, CornerRounding::Uniform( 4_u ), 0_u ) );
         {
             auto* n = Node( box );
             n->Style.Padding    = Edges::Uniform( 4_u );
@@ -314,7 +313,7 @@ private:
         {
             ts.Render.Baseline = e.baseline;
 
-            WidgetID txt = m_Scene.CreateWidget<TextWidget>( box, Shared<Theme>{}, e.label, ts.Layout, ts.Render );
+            WidgetID txt = m_Scene.CreateWidget<TextWidget>( box, DefaultTheme, e.label, ts.Layout, ts.Render );
             {
                 auto* n = Node( txt );
                 n->Style.WidthMode  = ESizingMode::Content;
@@ -582,7 +581,7 @@ private:
         );
 
         // Row container
-        WidgetID row = m_Scene.CreateWidget<RectWidget>( card, Colors::Surface800, "ARow" );
+        WidgetID row = m_Scene.CreateWidget<PanelWidget>( card, MakePanelTheme( Colors::Surface800 ) );
         {
             auto* n = Node( row );
             n->Style.LayoutType = ELayoutType::Horizontal;
@@ -593,7 +592,7 @@ private:
 
         // Label
         const TextStyle lblStyle = RowLabelStyle();
-        WidgetID lbl = m_Scene.CreateWidget<TextWidget>( row, Shared<Theme>{}, "Ellipsis", lblStyle.Layout, lblStyle.Render );
+        WidgetID lbl = m_Scene.CreateWidget<TextWidget>( row, DefaultTheme, "Ellipsis", lblStyle.Layout, lblStyle.Render );
         {
             auto* n = Node( lbl );
             n->Style.Padding = Edges::Uniform( 4_u );
@@ -606,17 +605,14 @@ private:
         {
             // We wrap the animated container in a flex parent because percent widths are based on the parent's content width, not the available width.
 
-            WidgetID container = m_Scene.CreateWidget<RectWidget>( row, Colors::Transparent, "ARow" );
+            WidgetID container = m_Scene.CreateWidget<PanelWidget>( row, MakePanelTheme( Colors::Transparent, CornerRounding::None(), 0_u ) );
             {
                 auto* n = Node( container );
                 n->Style.WidthMode  = ESizingMode::Flex;
                 n->Style.HeightMode = ESizingMode::Content;
             }
 
-            m_AnimContainer = m_Scene.CreateWidget<RectWidget>(
-                container, Colors::Surface600, "AnimBox",
-                CornerRounding::Uniform( 6_u )
-            );
+            m_AnimContainer = m_Scene.CreateWidget<PanelWidget>( container, MakePanelTheme( Colors::Surface600, CornerRounding::Uniform( 6_u ) ) );
             {
                 auto* n = Node( m_AnimContainer );
                 n->Style.WidthMode  = ESizingMode::Percent;
@@ -636,7 +632,7 @@ private:
         {
             WidgetID txt = m_Scene.CreateWidget<TextWidget>(
             m_AnimContainer,
-            Shared<Theme>{},
+            DefaultTheme,
             "The quick brown fox jumps over the lazy dog.",
 			ts.Layout, ts.Render
             );
@@ -652,7 +648,7 @@ private:
             ts.Render.FillColor    = Colors::AccentEmerald;
             WidgetID txt = m_Scene.CreateWidget<TextWidget>(
             m_AnimContainer,
-            Shared<Theme>{},
+            DefaultTheme,
             "Amazingly few discotheques provide jukeboxes.",
 			ts.Layout, ts.Render
             );
@@ -672,9 +668,9 @@ public:
     void Init() override
     {
         // Root
-        WidgetID root = m_Scene.CreateRootWidget<RectWidget>(
-            Colors::Surface900, "Root", CornerRounding::None()
-        );
+        DefaultTheme = MakeShared<Theme>( Themes::Dark() );
+
+        WidgetID root = m_Scene.CreateRootWidget<PanelWidget>( MakePanelTheme( Colors::Surface900, CornerRounding::None(), 0_u ) );
         {
             auto* n = Node( root );
             n->Style.LayoutType = ELayoutType::Vertical;
@@ -686,9 +682,7 @@ public:
 
         // Title bar
         {
-            WidgetID bar = m_Scene.CreateWidget<RectWidget>(
-                root, Colors::Surface800, "TitleBar", CornerRounding::None()
-            );
+            WidgetID bar = m_Scene.CreateWidget<PanelWidget>( root, MakePanelTheme( Colors::Surface800, CornerRounding::None(), 0_u ) );
             auto* n = Node( bar );
             n->Style.LayoutType = ELayoutType::Vertical;
             n->Style.Padding    = Edges{ 14_u, 28_u, 10_u, 28_u };
@@ -714,9 +708,7 @@ public:
         }
 
         // Scrollable / content column
-        WidgetID content = m_Scene.CreateWidget<RectWidget>(
-            root, Colors::Surface900, "Content"
-        );
+        WidgetID content = m_Scene.CreateWidget<PanelWidget>( root, MakePanelTheme( Colors::Surface900 ) );
         {
             auto* n = Node( content );
             n->Style.LayoutType = ELayoutType::Vertical;

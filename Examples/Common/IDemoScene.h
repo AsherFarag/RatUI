@@ -30,59 +30,6 @@ protected:
     Scene m_Scene; 
 };
 
-class RectWidget : public IWidget
-{
-public:
-	RectWidget( Color a_Color, StringView a_Name, CornerRounding a_Rounding = CornerRounding::Uniform( 10_u ) )
-		: Color( a_Color )
-		, Name( a_Name )
-        , Rounding( a_Rounding )
-    {}
-
-	StringView     Name;
-    Color          Color;
-    CornerRounding Rounding;
-
-	void OnPaint( DrawList& a_DrawList ) override
-    {
-        Scene& scene = GetScene();
-        const LayoutNode* node = scene.Layouts.Get( GetLayoutID() );
-        if ( !node )
-            return;
-
-        const Rect<Unit>& rect = node->Layout.FinalRect;
-
-        if ( scene.GetFocusedWidget() == GetID() )
-        {
-            a_DrawList.AddRect( rect,
-            {
-                .FillColor = Color,
-                .BorderColor = Colors::White,
-                .BorderThickness = 4_u,
-                .Rounding = Rounding
-            } );
-        }
-        else
-        {
-            a_DrawList.AddRect( rect,
-            {
-                .FillColor = Color,
-                .Rounding = Rounding
-            } );
-        }
-
-        scene.ForEachChildWidget( GetLayoutID(), [&](IWidget& child)
-        {
-            child.OnPaint( a_DrawList );
-		} );
-    }
-
-    bool IsFocusable() const override
-    {
-        return true;
-	}
-};
-
 class CircleWidget : public IWidget
 {
 public:

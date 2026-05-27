@@ -7,18 +7,10 @@
 
 namespace RatUI
 {
-    namespace ThemeKey
-    {
-        namespace TextStyle
-        {
-            inline constexpr ThemeID Default = "Default"_theme;
-        }
-    }
-
     class TextWidget : public IWidget
     {
     public:
-        TextWidget( Shared<Theme> a_Theme,
+        TextWidget( Shared<const Theme> a_Theme,
                     String a_Text = {},
                     const TextLayoutStyle& a_Style       = {},
                     const TextRenderStyle& a_RenderStyle = {} )
@@ -60,7 +52,7 @@ namespace RatUI
             m_RenderStyle = a_RenderStyle;
         }
 
-        void SetTheme( Shared<Theme> a_Theme )
+        void SetTheme( Shared<const Theme> a_Theme )
         {
             m_Theme = std::move( a_Theme );
 
@@ -212,7 +204,7 @@ namespace RatUI
         String          m_Text;
         TextLayoutStyle m_LayoutStyle;
         TextRenderStyle m_RenderStyle;
-        Shared<Theme>   m_Theme;
+        Shared<const Theme>   m_Theme;
 
         /// Snapshot of m_LayoutStyle at the time of the last successful Prepare() call.
         /// Used to detect which fields changed and whether re-preparation is needed.

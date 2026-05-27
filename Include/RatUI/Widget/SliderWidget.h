@@ -6,30 +6,6 @@
 
 namespace RatUI
 {
-    namespace ThemeKey
-    {
-        namespace Color
-        {
-            inline constexpr ThemeID SliderTrack        = "Slider.Track"_theme;
-            inline constexpr ThemeID SliderTrackFill    = "Slider.TrackFill"_theme;
-            inline constexpr ThemeID SliderThumb        = "Slider.Thumb"_theme;
-            inline constexpr ThemeID SliderThumbHover   = "Slider.ThumbHover"_theme;
-            inline constexpr ThemeID SliderThumbPressed = "Slider.ThumbPressed"_theme;
-        }
-
-        namespace Rounding
-        {
-            inline constexpr ThemeID SliderTrack = "Slider.Track"_theme;
-            inline constexpr ThemeID SliderThumb  = "Slider.Thumb"_theme;
-        }
-
-        namespace Metric
-        {
-            inline constexpr ThemeID SliderTrackThickness = "Slider.TrackThickness"_theme;
-            inline constexpr ThemeID SliderMinThumbSize   = "Slider.MinThumbSize"_theme;
-        }
-    }
-
     /**
      * @brief
      */
@@ -59,19 +35,19 @@ namespace RatUI
 
         SliderWidget() = default;
 
-        SliderWidget( Shared<Theme> a_Theme )
+        SliderWidget( Shared<const Theme> a_Theme )
         {
             m_Theme = std::move( a_Theme );
         }
 
-        SliderWidget( Shared<Theme> a_Theme, f32 a_Min, f32 a_Max, f32 a_InitialValue = 0.f )
+        SliderWidget( Shared<const Theme> a_Theme, f32 a_Min, f32 a_Max, f32 a_InitialValue = 0.f )
             : Min( a_Min ), Max( a_Max )
         {
             Value.Set( std::clamp( a_InitialValue, a_Min, a_Max ) );
             m_Theme = std::move( a_Theme );
         }
 
-        void SetTheme( Shared<Theme> a_Theme )
+        void SetTheme( Shared<const Theme> a_Theme )
         {
             m_Theme = std::move( a_Theme );
         }
@@ -198,7 +174,7 @@ namespace RatUI
         bool m_IsHovered      { false };
         bool m_IsThumbPressed { false };
         Vec2<Unit> m_LastPointerPos{ 0_u, 0_u };
-        Shared<Theme> m_Theme;
+        Shared<const Theme> m_Theme;
 
         /** @brief Returns the track rect centred inside @p a_Rect. */
         Rect<Unit> GetTrackRect( Rect<Unit> a_Rect ) const

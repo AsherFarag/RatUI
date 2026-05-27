@@ -4,27 +4,6 @@
 
 namespace RatUI
 {
-    namespace ThemeKey
-    {
-        namespace Color
-        {
-            inline constexpr ThemeID ButtonNormal       = "Button.Normal"_theme;
-            inline constexpr ThemeID ButtonHover        = "Button.Hover"_theme;
-            inline constexpr ThemeID ButtonPressed      = "Button.Pressed"_theme;
-            inline constexpr ThemeID ButtonFocusOutline = "Button.FocusOutline"_theme;
-        }
-
-        namespace Rounding
-        {
-            inline constexpr ThemeID Button = "Button"_theme;
-        }
-
-        namespace Metric
-        {
-            inline constexpr ThemeID ButtonBorderThickness = "Button.BorderThickness"_theme;
-        }
-    }
-
     /**
      * @brief A base widget that provides common button functionality, such as handling pointer events and click callbacks.
      * This class can be extended to create various types of buttons with different visual styles and behaviors.
@@ -35,7 +14,7 @@ namespace RatUI
         Callback<Scene&, WidgetID> OnClick; ///< Callback that is invoked when the button is clicked.
 
         ButtonBaseWidget() = default;
-        ButtonBaseWidget( Shared<Theme> a_Theme, Callback<Scene&, WidgetID> a_OnClick )
+        ButtonBaseWidget( Shared<const Theme> a_Theme, Callback<Scene&, WidgetID> a_OnClick )
             : OnClick( std::move( a_OnClick ) )
         {
             (void)a_Theme;
@@ -121,18 +100,18 @@ namespace RatUI
     public:
         ButtonWidget() = default;
 
-        ButtonWidget( Shared<Theme> a_Theme )
+        ButtonWidget( Shared<const Theme> a_Theme )
         {
             m_Theme = std::move( a_Theme );
         }
 
-        ButtonWidget( Shared<Theme> a_Theme, Callback<Scene&, WidgetID> a_OnClick )
+        ButtonWidget( Shared<const Theme> a_Theme, Callback<Scene&, WidgetID> a_OnClick )
             : ButtonBaseWidget( a_Theme, std::move( a_OnClick ) )
         {
             m_Theme = std::move( a_Theme );
         }
 
-        void SetTheme( Shared<Theme> a_Theme )
+        void SetTheme( Shared<const Theme> a_Theme )
         {
             m_Theme = std::move( a_Theme );
         }
@@ -182,7 +161,7 @@ namespace RatUI
         }
 
     private:
-        Shared<Theme> m_Theme;
+        Shared<const Theme> m_Theme;
 
         Color GetThemeColor( ThemeID a_ID, Color a_Default ) const
         {

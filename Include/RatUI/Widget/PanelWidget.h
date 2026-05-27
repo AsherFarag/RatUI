@@ -5,25 +5,6 @@
 
 namespace RatUI
 {
-    namespace ThemeKey
-    {
-        namespace Color
-        {
-            inline constexpr ThemeID PanelNormal       = "Panel.Normal"_theme;
-            inline constexpr ThemeID PanelFocusOutline = "Panel.FocusOutline"_theme;
-        }
-
-        namespace Rounding
-        {
-            inline constexpr ThemeID Panel = "Panel"_theme;
-        }
-
-        namespace Metric
-        {
-            inline constexpr ThemeID PanelBorderThickness = "Panel.BorderThickness"_theme;
-        }
-    }
-
     /**
      * @brief
      */
@@ -32,12 +13,12 @@ namespace RatUI
     public:
         PanelWidget() = default;
 
-        PanelWidget( Shared<Theme> a_Theme )
+        PanelWidget( Shared<const Theme> a_Theme )
         {
             m_Theme = std::move( a_Theme );
         }
 
-        void SetTheme( Shared<Theme> a_Theme )
+        void SetTheme( Shared<const Theme> a_Theme )
         {
             m_Theme = std::move( a_Theme );
         }
@@ -83,7 +64,7 @@ namespace RatUI
         }
 
     private:
-        Shared<Theme> m_Theme;
+        Shared<const Theme> m_Theme;
 
         Color GetThemeColor( ThemeID a_ID, Color a_Default ) const
         {

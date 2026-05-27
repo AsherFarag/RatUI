@@ -13,11 +13,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # =========================
 # Library
 # =========================
+file(GLOB_RECURSE RATUI_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.cpp"
+)
+
 add_library(${PROJECT_NAME}
-    Source/RatUI/Layout/Layout.cpp
-    Source/RatUI/Layout/LayoutEngine.cpp
-    Source/RatUI/Renderer/DrawBatcher.cpp
-    Source/RatUI/Widget/Scene.cpp
+    ${RATUI_SOURCES}
 )
 
 target_include_directories(${PROJECT_NAME}
