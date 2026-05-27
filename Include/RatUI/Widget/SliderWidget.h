@@ -2,8 +2,34 @@
 #include "Scene.h"
 #include "IWidget.h"
 
+#include "Theme.h"
+
 namespace RatUI
 {
+    namespace ThemeKey
+    {
+        namespace Color
+        {
+            inline constexpr ThemeID SliderTrack        = "Slider.Track"_theme;
+            inline constexpr ThemeID SliderTrackFill    = "Slider.TrackFill"_theme;
+            inline constexpr ThemeID SliderThumb        = "Slider.Thumb"_theme;
+            inline constexpr ThemeID SliderThumbHover   = "Slider.ThumbHover"_theme;
+            inline constexpr ThemeID SliderThumbPressed = "Slider.ThumbPressed"_theme;
+        }
+
+        namespace Rounding
+        {
+            inline constexpr ThemeID SliderTrack = "Slider.Track"_theme;
+            inline constexpr ThemeID SliderThumb  = "Slider.Thumb"_theme;
+        }
+
+        namespace Metric
+        {
+            inline constexpr ThemeID SliderTrackThickness = "Slider.TrackThickness"_theme;
+            inline constexpr ThemeID SliderMinThumbSize   = "Slider.MinThumbSize"_theme;
+        }
+    }
+
     /**
      * @brief
      */
@@ -11,26 +37,14 @@ namespace RatUI
     {
     public:
         // =====================================================================
-        // Visual properties
+        // Behaviour properties
         // =====================================================================
 
-        // TODO: Need the style system
-
         EOrientation   Orientation     { EOrientation::Horizontal };
-        Unit           TrackThickness  { 4_u };
-        CornerRounding TrackRounding   { CornerRounding::Uniform( 2_u ) };
-        Color          TrackColor      { Colors::Surface600 };
-        Color          TrackFillColor  { Colors::AccentBlue }; ///< Filled portion of the track (from min to thumb).
         bool           ShowTrackFill   { true };               ///< Whether to render the filled portion of the track.
 
-        Vec2<Unit>     ThumbSize       { 16_u, 16_u };
         bool           ScaleThumbOnTrackAxis { false }; ///< When enabled, thumb size is scaled along the scrolling axis by ThumbScale.
         f32            ThumbScale      { 1.f };         ///< [0,1] size ratio of the thumb along the scrolling axis when ScaleThumbOnTrackAxis is enabled.
-        Unit           MinThumbSizeOnTrackAxis{ 8_u };  ///< Minimum thumb size along the scrolling axis when scaling is enabled.
-        CornerRounding ThumbRounding   { CornerRounding::Uniform( 8_u ) }; ///< Default: circular thumb.
-        Color          ThumbColor      { Colors::White };
-        Color          ThumbHoverColor { Colors::LightGray };
-        Color          ThumbPressColor { Colors::Gray };
 
         // =====================================================================
         // Behaviour properties
@@ -45,10 +59,21 @@ namespace RatUI
 
         SliderWidget() = default;
 
-        SliderWidget( f32 a_Min, f32 a_Max, f32 a_InitialValue = 0.f )
+        SliderWidget( Shared<Theme> a_Theme )
+        {
+            m_Theme = std::move( a_Theme );
+        }
+
+        SliderWidget( Shared<Theme> a_Theme, f32 a_Min, f32 a_Max, f32 a_InitialValue = 0.f )
             : Min( a_Min ), Max( a_Max )
         {
             Value.Set( std::clamp( a_InitialValue, a_Min, a_Max ) );
+            m_Theme = std::move( a_Theme );
+        }
+
+        void SetTheme( Shared<Theme> a_Theme )
+        {
+            m_Theme = std::move( a_Theme );
         }
 
         bool IsFocusable() const override { return true; }
@@ -173,24 +198,26 @@ namespace RatUI
         bool m_IsHovered      { false };
         bool m_IsThumbPressed { false };
         Vec2<Unit> m_LastPointerPos{ 0_u, 0_u };
+        Shared<Theme> m_Theme;
 
         /** @brief Returns the track rect centred inside @p a_Rect. */
         Rect<Unit> GetTrackRect( Rect<Unit> a_Rect ) const
         {
+			const Unit trackThickness = GetThemeMetric( ThemeKey::Metric::SliderTrackThickness, 4_u );
             if ( Orientation == EOrientation::Horizontal )
             {
                 const Unit cy = a_Rect.Origin[1] + a_Rect.Size[1] * 0.5f;
                 return {
-                    { a_Rect.Left(), cy - TrackThickness * 0.5f },
-                    { a_Rect.Width(), TrackThickness }
+                    { a_Rect.Left(), cy - trackThickness * 0.5f },
+                    { a_Rect.Width(), trackThickness }
                 };
             }
             else
             {
                 const Unit cx = a_Rect.Origin[0] + a_Rect.Size[0] * 0.5f;
                 return {
-                    { cx - TrackThickness * 0.5f, a_Rect.Top() },
-                    { TrackThickness, a_Rect.Height() }
+                    { cx - trackThickness * 0.5f, a_Rect.Top() },
+                    { trackThickness, a_Rect.Height() }
                 };
             }
         }
@@ -230,12 +257,16 @@ namespace RatUI
         void PaintTrack( DrawList& a_DrawList, const Rect<Unit>& a_Rect ) const
         {
             const Rect<Unit> track = GetTrackRect( a_Rect );
+            const Unit trackThickness = GetThemeMetric( ThemeKey::Metric::SliderTrackThickness, 4_u );
+            const Color trackColor = GetThemeColor( ThemeKey::Color::SliderTrack, Colors::Surface600 );
+            const Color trackFillColor = GetThemeColor( ThemeKey::Color::SliderTrackFill, Colors::AccentBlue );
+            const CornerRounding trackRounding = GetThemeRounding( ThemeKey::Rounding::SliderTrack, CornerRounding::Uniform( 2_u ) );
 
             // Background track
             a_DrawList.AddRect( track,
             {
-                .FillColor = TrackColor,
-                .Rounding  = TrackRounding
+                .FillColor = trackColor,
+                .Rounding  = trackRounding
             } );
 
             if ( !ShowTrackFill )
@@ -253,8 +284,8 @@ namespace RatUI
 
                 a_DrawList.AddRect( filled,
                 {
-                    .FillColor = TrackFillColor,
-                    .Rounding  = TrackRounding
+                    .FillColor = trackFillColor,
+                    .Rounding  = trackRounding
                 } );
             }
         }
@@ -262,17 +293,22 @@ namespace RatUI
         void PaintThumb( DrawList& a_DrawList, const Rect<Unit>& a_Rect ) const
         {
             const Rect<Unit> thumb = GetThumbRect( a_Rect );
+            const Vec2<Unit> thumbSize = GetThemeThumbSize( a_Rect );
+            const Color thumbColor = GetThemeColor( ThemeKey::Color::SliderThumb, Colors::White );
+            const Color thumbHoverColor = GetThemeColor( ThemeKey::Color::SliderThumbHover, Colors::LightGray );
+            const Color thumbPressColor = GetThemeColor( ThemeKey::Color::SliderThumbPressed, Colors::Gray );
+            const CornerRounding thumbRounding = GetThemeRounding( ThemeKey::Rounding::SliderThumb, CornerRounding::Uniform( 8_u ) );
 
-            const Color fill = m_IsThumbPressed ? ThumbPressColor
-                             : m_IsHovered      ? ThumbHoverColor
-                                                : ThumbColor;
+            const Color fill = m_IsThumbPressed ? thumbPressColor
+                             : m_IsHovered      ? thumbHoverColor
+                                                : thumbColor;
 
             a_DrawList.AddRect( thumb,
             {
                 .FillColor       = fill,
                 .BorderColor     = m_IsDragging ? Colors::AccentBlue : Colors::Transparent,
                 .BorderThickness = m_IsDragging ? 2_u : 0_u,
-                .Rounding        = ThumbRounding
+                .Rounding        = thumbRounding
             } );
         }
 
@@ -312,7 +348,7 @@ namespace RatUI
 
         Vec2<Unit> GetEffectiveThumbSize( const Rect<Unit>& a_Rect ) const
         {
-            Vec2<Unit> thumbSize = ThumbSize;
+            Vec2<Unit> thumbSize = GetThemeThumbSize( a_Rect );
             if ( !ScaleThumbOnTrackAxis )
                 return thumbSize;
 
@@ -320,15 +356,35 @@ namespace RatUI
             if ( Orientation == EOrientation::Horizontal )
             {
                 const Unit scaledSize = Unit( a_Rect.Width().ToFloat() * clampedScale );
-                thumbSize[0] = std::max( MinThumbSizeOnTrackAxis, std::min( a_Rect.Width(), scaledSize ) );
+                thumbSize[0] = std::max( GetThemeMetric( ThemeKey::Metric::SliderMinThumbSize, 8_u ), std::min( a_Rect.Width(), scaledSize ) );
             }
             else
             {
                 const Unit scaledSize = Unit( a_Rect.Height().ToFloat() * clampedScale );
-                thumbSize[1] = std::max( MinThumbSizeOnTrackAxis, std::min( a_Rect.Height(), scaledSize ) );
+                thumbSize[1] = std::max( GetThemeMetric( ThemeKey::Metric::SliderMinThumbSize, 8_u ), std::min( a_Rect.Height(), scaledSize ) );
             }
 
             return thumbSize;
+        }
+
+        Vec2<Unit> GetThemeThumbSize( const Rect<Unit>& ) const
+        {
+            return { 16_u, 16_u };
+        }
+
+        Color GetThemeColor( ThemeID a_ID, Color a_Default ) const
+        {
+            return m_Theme ? m_Theme->GetColor( a_ID, a_Default ) : a_Default;
+        }
+
+        CornerRounding GetThemeRounding( ThemeID a_ID, CornerRounding a_Default ) const
+        {
+            return m_Theme ? m_Theme->GetRounding( a_ID, a_Default ) : a_Default;
+        }
+
+        Unit GetThemeMetric( ThemeID a_ID, Unit a_Default ) const
+        {
+            return m_Theme ? m_Theme->GetMetric( a_ID, a_Default ) : a_Default;
         }
     };
 

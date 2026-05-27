@@ -1,8 +1,30 @@
 #pragma once
+#include "Theme.h"
 #include "Scene.h"
 
 namespace RatUI
 {
+    namespace ThemeKey
+    {
+        namespace Color
+        {
+            inline constexpr ThemeID ButtonNormal       = "Button.Normal"_theme;
+            inline constexpr ThemeID ButtonHover        = "Button.Hover"_theme;
+            inline constexpr ThemeID ButtonPressed      = "Button.Pressed"_theme;
+            inline constexpr ThemeID ButtonFocusOutline = "Button.FocusOutline"_theme;
+        }
+
+        namespace Rounding
+        {
+            inline constexpr ThemeID Button = "Button"_theme;
+        }
+
+        namespace Metric
+        {
+            inline constexpr ThemeID ButtonBorderThickness = "Button.BorderThickness"_theme;
+        }
+    }
+
     /**
      * @brief A base widget that provides common button functionality, such as handling pointer events and click callbacks.
      * This class can be extended to create various types of buttons with different visual styles and behaviors.
@@ -13,7 +35,11 @@ namespace RatUI
         Callback<Scene&, WidgetID> OnClick; ///< Callback that is invoked when the button is clicked.
 
         ButtonBaseWidget() = default;
-        ButtonBaseWidget( Callback<Scene&, WidgetID> a_OnClick ) : OnClick( std::move( a_OnClick ) ) {}
+        ButtonBaseWidget( Shared<Theme> a_Theme, Callback<Scene&, WidgetID> a_OnClick )
+            : OnClick( std::move( a_OnClick ) )
+        {
+            (void)a_Theme;
+        }
 
         virtual ~ButtonBaseWidget() = default;
 
@@ -93,14 +119,23 @@ namespace RatUI
     class ButtonWidget : public ButtonBaseWidget
     {
     public:
-        Color          NormalColor{ Colors::Surface700 };
-        Color          HoverColor{ Colors::Surface600 };
-        Color          PressedColor{ Colors::Surface500 };
-        Color          FocusOutlineColor{ Colors::White };
-        CornerRounding Rounding{ CornerRounding::Uniform( 8_u ) };
-        Unit           BorderThickness{ 1_u };
+        ButtonWidget() = default;
 
-        using ButtonBaseWidget::ButtonBaseWidget;
+        ButtonWidget( Shared<Theme> a_Theme )
+        {
+            m_Theme = std::move( a_Theme );
+        }
+
+        ButtonWidget( Shared<Theme> a_Theme, Callback<Scene&, WidgetID> a_OnClick )
+            : ButtonBaseWidget( a_Theme, std::move( a_OnClick ) )
+        {
+            m_Theme = std::move( a_Theme );
+        }
+
+        void SetTheme( Shared<Theme> a_Theme )
+        {
+            m_Theme = std::move( a_Theme );
+        }
 
         void OnPaint( DrawList& a_DrawList ) override
         {
@@ -110,17 +145,23 @@ namespace RatUI
                 return;
 
             const Rect<Unit>& rect = node->Layout.FinalRect;
-            const Color fill = m_IsPressed ? PressedColor 
-                                           : ( m_IsHovered ? HoverColor : NormalColor );
+            const Color normalColor = GetThemeColor( ThemeKey::Color::ButtonNormal, Colors::Surface700 );
+            const Color hoverColor = GetThemeColor( ThemeKey::Color::ButtonHover, Colors::Surface600 );
+            const Color pressedColor = GetThemeColor( ThemeKey::Color::ButtonPressed, Colors::Surface500 );
+            const Color fill = m_IsPressed ? pressedColor
+                                           : ( m_IsHovered ? hoverColor : normalColor );
+            const Color focusOutlineColor = GetThemeColor( ThemeKey::Color::ButtonFocusOutline, Colors::White );
+            const CornerRounding rounding = GetThemeRounding( ThemeKey::Rounding::Button, CornerRounding::Uniform( 8_u ) );
+            const Unit borderThickness = GetThemeMetric( ThemeKey::Metric::ButtonBorderThickness, 1_u );
 
             if ( scene.GetFocusedWidget() == GetID() )
             {
                 a_DrawList.AddRect( rect,
                 {
                     .FillColor = fill,
-                    .BorderColor = Colors::White,
-                    .BorderThickness = 2_u,
-                    .Rounding = Rounding
+                    .BorderColor = focusOutlineColor,
+                    .BorderThickness = borderThickness,
+                    .Rounding = rounding
                 } );
             }
             else
@@ -128,7 +169,7 @@ namespace RatUI
                 a_DrawList.AddRect( rect,
                 {
                     .FillColor = fill,
-                    .Rounding = Rounding
+                    .Rounding = rounding
                 } );
             }
 
@@ -138,6 +179,24 @@ namespace RatUI
                 a_Child.OnPaint( a_DrawList );
             } );
             a_DrawList.PopClipRect();
+        }
+
+    private:
+        Shared<Theme> m_Theme;
+
+        Color GetThemeColor( ThemeID a_ID, Color a_Default ) const
+        {
+            return m_Theme ? m_Theme->GetColor( a_ID, a_Default ) : a_Default;
+        }
+
+        CornerRounding GetThemeRounding( ThemeID a_ID, CornerRounding a_Default ) const
+        {
+            return m_Theme ? m_Theme->GetRounding( a_ID, a_Default ) : a_Default;
+        }
+
+        Unit GetThemeMetric( ThemeID a_ID, Unit a_Default ) const
+        {
+            return m_Theme ? m_Theme->GetMetric( a_ID, a_Default ) : a_Default;
         }
 
     };

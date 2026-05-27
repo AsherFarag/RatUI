@@ -1,21 +1,33 @@
 #pragma once
 #include "../Text/Text.h"
 #include "../Text/TextLayout.h"
+#include "Theme.h"
 #include "Scene.h"
 #include "IWidget.h"
 
 namespace RatUI
 {
+    namespace ThemeKey
+    {
+        namespace TextStyle
+        {
+            inline constexpr ThemeID Default = "Default"_theme;
+        }
+    }
+
     class TextWidget : public IWidget
     {
     public:
-        TextWidget( String a_Text = {},
+        TextWidget( Shared<Theme> a_Theme,
+                    String a_Text = {},
                     const TextLayoutStyle& a_Style       = {},
                     const TextRenderStyle& a_RenderStyle = {} )
             : m_Text       ( std::move( a_Text ) )
             , m_LayoutStyle( a_Style )
             , m_RenderStyle( a_RenderStyle )
-        {}
+        {
+            SetTheme( std::move( a_Theme ) );
+        }
 
         virtual ~TextWidget() override = default;
 
@@ -46,6 +58,14 @@ namespace RatUI
         void SetRenderStyle( const TextRenderStyle& a_RenderStyle )
         {
             m_RenderStyle = a_RenderStyle;
+        }
+
+        void SetTheme( Shared<Theme> a_Theme )
+        {
+            m_Theme = std::move( a_Theme );
+
+            if ( m_Theme && m_RenderStyle == TextRenderStyle{} )
+                m_RenderStyle = m_Theme->GetTextStyle( ThemeKey::TextStyle::Default, m_RenderStyle );
         }
 
         // =====================================================================
@@ -192,6 +212,7 @@ namespace RatUI
         String          m_Text;
         TextLayoutStyle m_LayoutStyle;
         TextRenderStyle m_RenderStyle;
+        Shared<Theme>   m_Theme;
 
         /// Snapshot of m_LayoutStyle at the time of the last successful Prepare() call.
         /// Used to detect which fields changed and whether re-preparation is needed.

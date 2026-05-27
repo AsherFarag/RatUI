@@ -235,11 +235,7 @@ namespace RatUI
                 
 				// Slider track should be the same size as the scrollbar, so set the thickness to fill the entire scrollbar in the non-scrolling axis.
                 a_Slider.ShowTrackFill = false;
-				a_Slider.TrackThickness = c_ScrollbarSize;
-				a_Slider.ThumbRounding = CornerRounding::Uniform( c_ScrollbarSize / 2 );
-				a_Slider.TrackRounding = {};
                 a_Slider.ScaleThumbOnTrackAxis = true;
-                a_Slider.MinThumbSizeOnTrackAxis = 12_u;
 
 				// Subscribe to value changes to update scroll offset and invoke OnScroll callback
 

@@ -91,7 +91,7 @@ private:
         ESizingMode wMode = ESizingMode::Flex,
         Unit        fixedW = 0_u )
     {
-        WidgetID w = m_Scene.CreateWidget<TextWidget>( parent, text, style.Layout, style.Render );
+        WidgetID w = m_Scene.CreateWidget<TextWidget>( parent, Shared<Theme>{}, text, style.Layout, style.Render );
         auto* n = Node( w );
         n->Style.WidthMode  = wMode;
         n->Style.FixedWidth = fixedW;
@@ -188,7 +188,7 @@ private:
 
         // Label column (fixed width)
         TextStyle lblStyle = RowLabelStyle();
-        WidgetID lbl = m_Scene.CreateWidget<TextWidget>( row, rowLabel, lblStyle.Layout, lblStyle.Render );
+        WidgetID lbl = m_Scene.CreateWidget<TextWidget>( row, Shared<Theme>{}, rowLabel, lblStyle.Layout, lblStyle.Render );
         {
             auto* n = Node( lbl );
             n->Style.Padding    = Edges::Uniform( 4_u );
@@ -282,7 +282,7 @@ private:
         }
 
         TextStyle lblStyle = RowLabelStyle();
-        WidgetID lbl = m_Scene.CreateWidget<TextWidget>( row, "Baseline", lblStyle.Layout, lblStyle.Render );
+        WidgetID lbl = m_Scene.CreateWidget<TextWidget>( row, Shared<Theme>{}, "Baseline", lblStyle.Layout, lblStyle.Render );
         {
             auto* n = Node( lbl );
             n->Style.Padding    = Edges::Uniform( 4_u );
@@ -314,7 +314,7 @@ private:
         {
             ts.Render.Baseline = e.baseline;
 
-            WidgetID txt = m_Scene.CreateWidget<TextWidget>( box, e.label, ts.Layout, ts.Render );
+            WidgetID txt = m_Scene.CreateWidget<TextWidget>( box, Shared<Theme>{}, e.label, ts.Layout, ts.Render );
             {
                 auto* n = Node( txt );
                 n->Style.WidthMode  = ESizingMode::Content;
@@ -592,8 +592,8 @@ private:
         }
 
         // Label
-		const TextStyle lblStyle = RowLabelStyle();
-		WidgetID lbl = m_Scene.CreateWidget<TextWidget>( row, "Ellipsis", lblStyle.Layout, lblStyle.Render );
+        const TextStyle lblStyle = RowLabelStyle();
+        WidgetID lbl = m_Scene.CreateWidget<TextWidget>( row, Shared<Theme>{}, "Ellipsis", lblStyle.Layout, lblStyle.Render );
         {
             auto* n = Node( lbl );
             n->Style.Padding = Edges::Uniform( 4_u );
@@ -636,6 +636,7 @@ private:
         {
             WidgetID txt = m_Scene.CreateWidget<TextWidget>(
             m_AnimContainer,
+            Shared<Theme>{},
             "The quick brown fox jumps over the lazy dog.",
 			ts.Layout, ts.Render
             );
@@ -651,6 +652,7 @@ private:
             ts.Render.FillColor    = Colors::AccentEmerald;
             WidgetID txt = m_Scene.CreateWidget<TextWidget>(
             m_AnimContainer,
+            Shared<Theme>{},
             "Amazingly few discotheques provide jukeboxes.",
 			ts.Layout, ts.Render
             );

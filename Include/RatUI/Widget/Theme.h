@@ -90,34 +90,4 @@ namespace RatUI
         #undef RATUI_THEME_PROPERTY_ACCESSORS
     };
 
-    // TODO: These should be defined in the matching Widget's header
-    namespace ThemeKey
-    {
-        namespace Color
-        {
-            inline constexpr ThemeID ButtonNormal  = "Button.Normal"_theme;
-            inline constexpr ThemeID ButtonHover   = "Button.Hover"_theme;
-            inline constexpr ThemeID ButtonPressed = "Button.Pressed"_theme;
-
-            inline constexpr ThemeID PanelNormal   = "Panel.Normal"_theme;
-        }
-
-        namespace Rounding
-        {
-            inline constexpr ThemeID Button = "Button"_theme;
-            inline constexpr ThemeID Panel  = "Panel"_theme;
-        }
-
-        namespace TextStyle
-        {
-            inline constexpr ThemeID Default = "Default"_theme;
-        }
-
-        namespace Metric
-        {
-            inline constexpr ThemeID ButtonPadding = "Button.Padding"_theme;
-            inline constexpr ThemeID PanelPadding  = "Panel.Padding"_theme;
-        }
-    }
-
 } // namespace RatUI
