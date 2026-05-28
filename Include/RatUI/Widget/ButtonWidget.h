@@ -22,29 +22,30 @@ namespace RatUI
 
         virtual ~ButtonBaseWidget() = default;
 
-        bool IsFocusable() const override { return true; }
+        bool IsInteractable() const override { return true; }
+        bool IsFocusable()    const override { return true; }
 
-        bool OnPressed( const ButtonEvent& a_Event ) override
+        Reply OnButtonPressed( const ButtonEvent& a_Event ) override
         {
             if ( !a_Event.Pressed )
-                return false;
+                return Reply::Unhandled();
 
             if ( IsActivationButton( a_Event.Button ) )
             {
                 m_IsPressed = true;
-                return true;
+                return Reply::Handled();
             }
 
-            return false;
+            return Reply::Unhandled();
         }
 
-        bool OnReleased( const ButtonEvent& a_Event ) override
+        Reply OnButtonReleased( const ButtonEvent& a_Event ) override
         {
             if ( !a_Event.Released )
-                return false;
+                return Reply::Unhandled();
 
             if ( !IsActivationButton( a_Event.Button ) )
-                return false;
+                return Reply::Unhandled();
 
             const bool wasPressed = m_IsPressed;
             m_IsPressed = false;
@@ -52,7 +53,7 @@ namespace RatUI
             if ( wasPressed )
                 Invoke( OnClick, GetScene(), GetID() );
 
-            return true;
+            return Reply::Handled();
         }
 
         void OnPaint( DrawList& a_DrawList ) override
@@ -68,11 +69,17 @@ namespace RatUI
             } );
         }
 
-        void OnPointerEnter( const PointerEvent& a_Event ) override { m_IsHovered = true; }
-        void OnPointerExit( const PointerEvent& a_Event ) override
+        Reply OnPointerEnter( const PointerEvent& a_Event ) override
+        {
+            m_IsHovered = true;
+            return Reply::Unhandled();
+        }
+
+        Reply OnPointerExit( const PointerEvent& a_Event ) override
         {
             m_IsHovered = false;
             m_IsPressed = false;
+            return Reply::Unhandled();
         }
 
         bool IsHovered() const { return m_IsHovered; }

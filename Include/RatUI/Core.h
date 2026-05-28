@@ -13,6 +13,6 @@
 #include "Core/Debug.h"
 #include "Core/Math.h"
 #include "Core/Memory.h"
-#include "Core/Pool.inl"
+#include "Core/Pool.h"
 
 #undef RATUI_TRY_EXPR

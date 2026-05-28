@@ -88,4 +88,62 @@ namespace RatUI
         return best;
     }
 
+    /**
+     * @brief Represents the result of a navigation attempt and determines how the focus should be handled.
+     */
+    class NavigationReply
+    {
+    public:
+        enum class EBoundaryRule : u8
+        {
+            Escape,   ///< Focus can leave this boundary normally. Default.
+            Stop,     ///< Trap focus - wrap around within this boundary.
+            Explicit, ///< Redirect focus to a specific widget.
+            Custom,   ///< Invoke a callback to decide at runtime.
+        };
+    
+        static NavigationReply Escape()
+        {
+            return NavigationReply{ EBoundaryRule::Escape };
+        }
+    
+        static NavigationReply Stop()
+        {
+            return NavigationReply{ EBoundaryRule::Stop };
+        }
+    
+        static NavigationReply Explicit( WidgetID a_Target )
+        {
+            NavigationReply r{ EBoundaryRule::Explicit };
+            r.m_ExplicitTarget = a_Target;
+            return r;
+        }
+    
+        static NavigationReply Custom( Callback<ENavAction, WidgetID /*current*/> a_Handler )
+        {
+            NavigationReply r{ EBoundaryRule::Custom };
+            r.m_CustomHandler = std::move( a_Handler );
+            return r;
+        }
+    
+        EBoundaryRule GetRule()           const { return m_Rule; }
+        WidgetID      GetExplicitTarget() const { return m_ExplicitTarget; }
+    
+        WidgetID ResolveCustom( ENavAction a_Action, WidgetID a_Current ) const
+        {
+            // TODO: I was stupid and thought Callback<> wouldnt need a return type. Upgrade Callback to support returns.
+            if ( m_CustomHandler )
+                /*return*/ m_CustomHandler( a_Action, a_Current );
+
+            return c_InvalidWidgetID;
+        }
+    
+    private:
+        explicit NavigationReply( EBoundaryRule a_Rule ) : m_Rule( a_Rule ) {}
+    
+        Callback<ENavAction, WidgetID>           m_CustomHandler;
+        WidgetID                                 m_ExplicitTarget{ c_InvalidWidgetID };
+        EBoundaryRule                            m_Rule{ EBoundaryRule::Escape };
+    };
+
 } // namespace RatUI

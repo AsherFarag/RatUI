@@ -1,6 +1,7 @@
 #pragma once
 #include "../Core.h"
 #include "../Input/InputEvent.h"
+#include "../Input/Navigation.h"
 #include "../Layout/Layout.h"
 #include "../Renderer/DrawList.h"
 
@@ -47,10 +48,15 @@ namespace RatUI
         /** @brief Called when the widget should render itself and its children. */
         virtual void OnPaint( DrawList& a_DrawList ) {}
 
-        // - Input Events
+        // - Capabilities
+
+        /** @brief Returns whether this widget can receive pointer events. */
+        virtual bool IsInteractable() const { return false; }
 
         /** @brief Returns whether this widget can receive focus for input. */
         virtual bool IsFocusable() const { return false; }
+        
+        // - Focus Events
 
         /** @brief Called when this widget receives focus for input. */
         virtual void OnFocusReceived() {}
@@ -58,27 +64,33 @@ namespace RatUI
 		/** @brief Called when this widget loses focus for input. */
         virtual void OnFocusLost() {}
 
+        // - Pointer Events: Only called for widgets that return true from IsInteractable()
+
         /** @brief Called when a pointer (e.g., mouse cursor) enters the widget's bounds. */
-        virtual void OnPointerEnter( const PointerEvent& a_Event ) {}
+        virtual Reply OnPointerEnter( const PointerEvent& a_Event ) { return Reply::Unhandled(); }
 
         /** @brief Called each frame while a pointer is inside (or captured by) this widget. */
-        virtual void OnPointerMove( const PointerEvent& a_Event ) {}
+        virtual Reply OnPointerMove( const PointerEvent& a_Event ) { return Reply::Unhandled(); }
 
         /** @brief Called when the pointer scrolls over this widget. */
-        virtual void OnPointerScroll( const PointerEvent& a_Event ) {}
+        virtual Reply OnPointerScroll( const PointerEvent& a_Event ) { return Reply::Unhandled(); }
 
         /** @brief Called when a pointer (e.g., mouse cursor) exits the widget's bounds. */
-        virtual void OnPointerExit( const PointerEvent& a_Event ) {}
+        virtual Reply OnPointerExit( const PointerEvent& a_Event ) { return Reply::Unhandled(); }
+
+        // - Button Events:
 
         /** @brief Called when an input button is pressed while this widget is focused. */
-        virtual bool OnPressed( const ButtonEvent& a_Event ) { return false; }
+        virtual Reply OnButtonPressed( const ButtonEvent& a_Event ) { return Reply::Unhandled(); }
 
         /** @brief Called when an input button is released while this widget is focused. */
-        virtual bool OnReleased( const ButtonEvent& a_Event ) { return false; }
+        virtual Reply OnButtonReleased( const ButtonEvent& a_Event ) { return Reply::Unhandled(); }
+
+        // - Navigation
 
     protected:
         friend Scene;
-		Scene*   m_Scene{ nullptr }; // TODO: Implement this so Scene doesnt need to pass itself as an argument to every function.
+		Scene*   m_Scene{ nullptr };
         WidgetID m_ID{};
         NodeID   m_LayoutID{};
     };

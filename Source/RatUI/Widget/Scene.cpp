@@ -104,6 +104,13 @@ namespace RatUI
 
     void Scene::SetFocus( WidgetID a_WidgetID )
     {
+        // Callers should not need to check IsFocusable() before calling SetFocus().
+        if ( IWidget* target = GetWidget( a_WidgetID ) )
+        {
+            if ( !target->IsFocusable() )
+                return;
+        }
+
         if ( IWidget* currentFocus = GetWidget( m_FocusedWidget ) )
         {
             if ( currentFocus->GetID() == a_WidgetID )
@@ -113,6 +120,7 @@ namespace RatUI
         }
 
         m_FocusedWidget = a_WidgetID;
+
         if ( IWidget* newFocus = GetWidget( m_FocusedWidget ) )
             newFocus->OnFocusReceived();
     }
@@ -167,8 +175,8 @@ namespace RatUI
                     .Held = ( a_Action == ENavAction::ActivatePressed ),
                 };
 
-                w->OnPressed( ev );
-                w->OnReleased( ev );
+                w->OnButtonPressed( ev );
+                w->OnButtonReleased( ev );
             }
             return;
         }
@@ -281,7 +289,7 @@ namespace RatUI
         if ( !rootNode )
             return c_InvalidWidgetID;
 
-        const auto HitTestNode = [&]( auto&& Self, LayoutNode* a_Node ) -> WidgetID
+        const auto hitTestNode = [&]( auto&& Self, LayoutNode* a_Node ) -> WidgetID
         {
             if ( !a_Node )
                 return c_InvalidWidgetID;
@@ -294,25 +302,47 @@ namespace RatUI
             if ( Visibility::AreChildrenHitTestable( a_Node->Layout.Visibility ) )
             {
                 a_Node->ForEachChild( [&]( LayoutNode& child )
-                                      {
+                {
                     WidgetID childHit = Self( Self, &child );
                     if ( childHit != c_InvalidWidgetID )
-                        result = childHit; } );
+                        result = childHit;
+                });
 
                 if ( result != c_InvalidWidgetID )
                     return result;
             }
 
+            // Only return this node as a hit target if:
+            // it is both visibility-hit-testable 
+            // AND the widget explicitly opts in via IsInteractable().
+            // Non-interactive widgets (Panel, decorative containers, etc) fall
+            // through so their interactable ancestor can receive the event instead.
             if ( Visibility::IsHitTestable( a_Node->Layout.Visibility ) &&
                  a_Node->Widget != c_InvalidWidgetID )
             {
-                return a_Node->Widget;
+                IWidget* w = GetWidget( a_Node->Widget );
+                if ( w && w->IsInteractable() )
+                    return a_Node->Widget;
             }
 
             return c_InvalidWidgetID;
         };
 
-        return HitTestNode( HitTestNode, rootNode );
+        return hitTestNode( hitTestNode, rootNode );
+    }
+
+    void Scene::ApplyReply( const Reply& a_Reply )
+    {
+        if ( a_Reply.ShouldCaptureMouse() )
+            CapturePointer( a_Reply.GetMouseCaptureTarget() );
+
+        if ( a_Reply.ShouldReleaseMouse() )
+            ReleasePointerCapture();
+
+        if ( a_Reply.ShouldSetFocus() )
+            SetFocus( a_Reply.GetFocusTarget() );
+        else if ( a_Reply.ShouldClearFocus() )
+            ClearFocus();
     }
 
     bool Scene::ProcessPointerEvent( const PointerEvent& a_Event )
@@ -330,7 +360,10 @@ namespace RatUI
                 : HitTest( RootWidget, a_Event.Position );
 
             if ( IWidget* w = GetWidget( scrollTarget ) )
-                w->OnPointerScroll( a_Event );
+            {
+                Reply reply = w->OnPointerScroll( a_Event );
+                ApplyReply( reply );
+            }
 
             return false;
         }
@@ -339,26 +372,39 @@ namespace RatUI
         if ( m_CapturedWidget != c_InvalidWidgetID )
         {
             if ( IWidget* w = GetWidget( m_CapturedWidget ) )
-                w->OnPointerMove( a_Event );
+            {
+                Reply reply = w->OnPointerMove( a_Event );
+                ApplyReply( reply );
+            }
             return false;
         }
 
         // --- Hover tracking ---
         WidgetID hovered = HitTest( RootWidget, a_Event.Position );
+
         if ( hovered != m_HoveredWidget )
         {
             if ( IWidget* prevHovered = GetWidget( m_HoveredWidget ) )
-                prevHovered->OnPointerExit( a_Event );
+            {
+                Reply reply = prevHovered->OnPointerExit( a_Event );
+                ApplyReply( reply );
+            }
 
             m_HoveredWidget = hovered;
 
             if ( IWidget* newHovered = GetWidget( m_HoveredWidget ) )
-                newHovered->OnPointerEnter( a_Event );
+            {
+                Reply reply = newHovered->OnPointerEnter( a_Event );
+                ApplyReply( reply );
+            }
         }
         else if ( hovered != c_InvalidWidgetID )
         {
             if ( IWidget* w = GetWidget( hovered ) )
-                w->OnPointerMove( a_Event );
+            {
+                Reply reply = w->OnPointerMove( a_Event );
+                ApplyReply( reply );
+            }
         }
 
         return false;
@@ -366,32 +412,56 @@ namespace RatUI
 
     bool Scene::ProcessButtonEvent( const ButtonEvent& a_Event )
     {
-        // Release pointer capture on any mouse button release
-        if ( a_Event.Released && m_CapturedWidget != c_InvalidWidgetID )
+        // Captured widget gets all button events first during an active drag/press.
+        if ( m_CapturedWidget != c_InvalidWidgetID )
         {
             if ( IWidget* w = GetWidget( m_CapturedWidget ) )
-                w->OnReleased( a_Event );
+            {
+                Reply reply = a_Event.Pressed
+                    ? w->OnButtonPressed( a_Event )
+                    : w->OnButtonReleased( a_Event );
 
-            ReleasePointerCapture();
-            return true;
+                ApplyReply( reply );
+
+                // Release capture on mouse button up regardless of whether the
+                // widget handled it — a capture shouldn't outlive its button press.
+                if ( a_Event.Released )
+                    ReleasePointerCapture();
+
+                if ( reply.IsHandled() )
+                    return true;
+            }
         }
 
+        // Hovered widget gets mouse button events.
         if ( IWidget* hovered = GetWidget( m_HoveredWidget ) )
         {
-            bool consumed = false;
-            if ( a_Event.Pressed )  consumed |= hovered->OnPressed( a_Event );
-            else                    consumed |= hovered->OnReleased( a_Event );
+            Reply reply = a_Event.Pressed
+                ? hovered->OnButtonPressed( a_Event )
+                : hovered->OnButtonReleased( a_Event );
 
-            if ( consumed ) return true;
+            ApplyReply( reply );
+
+            if ( reply.IsHandled() )
+                return true;
         }
 
-        if ( IWidget* focused = GetWidget( GetFocusedWidget() ) )
+        // Focused widget gets keyboard/gamepad events that the hovered widget
+        // didn't consume. Skip if hovered == focused to avoid double-dispatch.
+        WidgetID focusedID = GetFocusedWidget();
+        if ( focusedID != m_HoveredWidget )
         {
-            bool consumed = false;
-            if ( a_Event.Pressed )  consumed |= focused->OnPressed( a_Event );
-            else                    consumed |= focused->OnReleased( a_Event );
+            if ( IWidget* focused = GetWidget( focusedID ) )
+            {
+                Reply reply = a_Event.Pressed
+                    ? focused->OnButtonPressed( a_Event )
+                    : focused->OnButtonReleased( a_Event );
 
-            if ( consumed ) return true;
+                ApplyReply( reply );
+
+                if ( reply.IsHandled() )
+                    return true;
+            }
         }
 
         return false;

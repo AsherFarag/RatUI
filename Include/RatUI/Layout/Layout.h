@@ -399,7 +399,8 @@ namespace RatUI
         Edges Padding{};        ///< The padding to apply around the content of the element, in pixels.
         Edges Margin{};         ///< The margin to apply around the element itself, in pixels.
         struct Anchor Anchor{}; ///< The anchor points for the element, used when PositionMode is set to Anchored.
-        EPositioningMode PositionMode{ EPositioningMode::Flow }; ///< The positioning mode for the element, determining how it is positioned relative to its parent container.
+        EPositioningMode PositionMode{ EPositioningMode::Flow }; ///< The positioning mode for the element, 
+                                                                 ///< determining how it is positioned relative to its parent container.
 
         // - Alignment properties
         EAlignment SelfAlign{ EAlignment::Inherit }; ///< Overrides parent's ChildAlign for this element. Only applicable when PositionMode is Flow.
@@ -440,12 +441,6 @@ namespace RatUI
         bool        IsDirty{ true };            ///< Whether the layout needs to be recalculated. Set to true when properties affecting layout are changed.
 		bool        IsDescendantDirty{ true };  ///< Whether any descendant elements are dirty and require layout recalculation.
     };
-
-	using NodeID = typename Pool<class LayoutNode>::PoolID;
-	static constexpr NodeID c_InvalidNodeID{};
-
-    using WidgetID = typename Pool<Unique<class IWidget>>::PoolID;
-    static constexpr WidgetID c_InvalidWidgetID{};
 
     /**
      * @brief Represents a UI element in the RatUI layout system, containing layout styles, results, and hierarchical relationships with other nodes.

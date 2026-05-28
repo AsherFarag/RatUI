@@ -198,4 +198,76 @@ namespace RatUI
         Variant<Monostate, PointerEvent, ButtonEvent> Payload;
     };
 
+    /**
+     * @brief Reply structure for handling input events and managing their propagation.
+     */
+    class Reply
+    {
+    public:
+        /** @brief Factory method to create an event that was not handled; propagate to next candidate. */
+        static constexpr Reply Unhandled() { return Reply{ false }; }
+
+        /** @brief Factory method to create an event that was handled; stop propagation. */
+        static constexpr Reply Handled() { return Reply{ true }; }
+
+        /** @brief Capture all future pointer events to this widget. */
+        constexpr Reply& CaptureMouse( WidgetID a_Widget )
+        {
+            m_MouseCapture = a_Widget;
+            m_RequestCapture = true;
+            return *this;
+        }
+
+        /** @brief Release mouse capture if currently held. */
+        constexpr Reply& ReleaseMouseCapture()
+        {
+            m_ReleaseMouse = true;
+            return *this;
+        }
+
+        /** @brief Set keyboard focus to the specified widget. */
+        constexpr Reply& SetFocus( WidgetID a_Widget )
+        {
+            m_FocusWidget = a_Widget;
+            return *this;
+        }
+
+        /** @brief Clear keyboard focus if currently held. */
+        constexpr Reply& ClearFocus()
+        {
+            m_ClearFocus = true;
+            return *this;
+        }
+
+        /** @brief Prevent the default behavior associated with this event (e.g., text input, button clicks). */
+        constexpr Reply& PreventDefault()
+        {
+            m_PreventDefault = true;
+            return *this;
+        }
+
+        constexpr bool IsHandled()          const { return m_Handled; }
+        constexpr bool ShouldCaptureMouse() const { return m_RequestCapture; }
+        constexpr bool ShouldReleaseMouse() const { return m_ReleaseMouse; }
+        constexpr bool ShouldSetFocus()     const { return m_FocusWidget != c_InvalidWidgetID; }
+        constexpr bool ShouldClearFocus()   const { return m_ClearFocus; }
+        constexpr bool IsDefaultPrevented() const { return m_PreventDefault; }
+
+        /** @brief Get the widget that is currently capturing mouse events. */
+        constexpr WidgetID GetMouseCaptureTarget() const { return m_MouseCapture; }
+        /** @brief Get the widget that currently has keyboard focus. */
+        constexpr WidgetID GetFocusTarget()        const { return m_FocusWidget; }
+
+    private:
+        constexpr explicit Reply( bool a_Handled ) : m_Handled( a_Handled ) {}
+
+        WidgetID m_MouseCapture   { c_InvalidWidgetID };
+        WidgetID m_FocusWidget    { c_InvalidWidgetID };
+        bool     m_Handled        : 1 { false };
+        bool     m_RequestCapture : 1 { false };
+        bool     m_ReleaseMouse   : 1 { false };
+        bool     m_ClearFocus     : 1 { false };
+        bool     m_PreventDefault : 1 { false };
+    };
+
 } // namespace RatUI

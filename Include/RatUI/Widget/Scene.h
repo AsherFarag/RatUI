@@ -69,7 +69,7 @@ namespace RatUI
         /** @brief Returns the WidgetID of the currently focused widget, or c_InvalidPoolID if no widget is focused. */
         WidgetID GetFocusedWidget() const { return m_FocusedWidget; }
 
-        /** @brief Sets the focus to the specified widget, if it is focusable. */
+        /** @brief Sets the focus to the specified widget, if it is focusable. */ 
         void SetFocus( WidgetID a_WidgetID );
 
         /** @brief Clears the focus from the current focused widget. */
@@ -129,6 +129,8 @@ namespace RatUI
         void Reset();
 
     protected:
+		void ApplyReply( const Reply& a_Reply );
+
         bool ProcessPointerEvent( const PointerEvent& a_Event );
         bool ProcessButtonEvent( const ButtonEvent& a_Event );
         WidgetID HitTest( WidgetID a_ID, Vec2<Unit> a_LogicalPos );
