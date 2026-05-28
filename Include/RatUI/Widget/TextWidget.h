@@ -19,7 +19,10 @@ namespace RatUI
         {
         }
 
-        virtual ~TextWidget() override = default;
+        ~TextWidget() override = default;
+
+        bool IsFocusable() const { return false; }
+        bool IsNavigationBoundary() const { return false; }
 
         /**
          * @brief Replaces the text content.

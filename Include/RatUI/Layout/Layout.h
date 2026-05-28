@@ -60,7 +60,7 @@ namespace RatUI
     /** 
      * @brief Positioning modes define how a UI element is positioned relative to its parent container. 
      */
-    enum class EPositioningMode : u8
+    enum class EPositionMode : u8
     {
         Flow,     ///< Participates in parent's stack/flex layout.
         Anchored, ///< Positioned based on its Anchor relative to the parent.
@@ -399,7 +399,7 @@ namespace RatUI
         Edges Padding{};        ///< The padding to apply around the content of the element, in pixels.
         Edges Margin{};         ///< The margin to apply around the element itself, in pixels.
         struct Anchor Anchor{}; ///< The anchor points for the element, used when PositionMode is set to Anchored.
-        EPositioningMode PositionMode{ EPositioningMode::Flow }; ///< The positioning mode for the element, 
+        EPositionMode PositionMode{ EPositionMode::Flow }; ///< The positioning mode for the element, 
                                                                  ///< determining how it is positioned relative to its parent container.
 
         // - Alignment properties
@@ -422,6 +422,29 @@ namespace RatUI
 
         f32 FlexGrow{ 0.0f };          ///< Determines how much of the remaining space the element should occupy relative to its siblings.
         Constraints SizeConstraints{}; ///< The size constraints to consider when laying out the element.
+
+		constexpr LayoutStyle& SetSpacing( Unit a_Spacing ) { Spacing = a_Spacing; return *this; }
+		constexpr LayoutStyle& SetLayoutType( ELayoutType a_LayoutType ) { LayoutType = a_LayoutType; return *this; }
+        constexpr LayoutStyle& SetChildAlign( EAlignment a_ChildAlign ) { ChildAlign = a_ChildAlign; return *this; }
+        constexpr LayoutStyle& SetWrapMode( EWrapMode a_WrapMode ) { WrapMode = a_WrapMode; return *this; }
+        constexpr LayoutStyle& SetVisibility( EVisibility a_Visibility ) { Visibility = a_Visibility; return *this; }
+        constexpr LayoutStyle& SetEnabled( bool a_IsEnabled ) { IsEnabled = a_IsEnabled; return *this; }
+        constexpr LayoutStyle& SetFocusScope( bool a_IsFocusScope ) { IsFocusScope = a_IsFocusScope; return *this; }
+        constexpr LayoutStyle& SetGridColumns( u16 a_GridColumns ) { GridColumns = a_GridColumns; return *this; }
+        constexpr LayoutStyle& SetGridRows( u16 a_GridRows ) { GridRows = a_GridRows; return *this; }
+        constexpr LayoutStyle& SetPadding( Edges a_Padding ) { Padding = a_Padding; return *this; }
+        constexpr LayoutStyle& SetMargin( Edges a_Margin ) { Margin = a_Margin; return *this; }
+        constexpr LayoutStyle& SetAnchor( struct Anchor a_Anchor ) { this->Anchor = a_Anchor; return *this; }
+        constexpr LayoutStyle& SetPositionMode( EPositionMode a_PositionMode ) { PositionMode = a_PositionMode; return *this; }
+        constexpr LayoutStyle& SetSelfAlign( EAlignment a_SelfAlign ) { SelfAlign = a_SelfAlign; return *this; }
+        constexpr LayoutStyle& SetWidthMode( ESizingMode a_WidthMode ) { WidthMode = a_WidthMode; return *this; }
+        constexpr LayoutStyle& SetHeightMode( ESizingMode a_HeightMode ) { HeightMode = a_HeightMode; return *this; }
+        constexpr LayoutStyle& SetFixedWidth( Unit a_FixedWidth ) { FixedWidth = a_FixedWidth; return *this; }
+        constexpr LayoutStyle& SetFixedHeight( Unit a_FixedHeight ) { FixedHeight = a_FixedHeight; return *this; }
+        constexpr LayoutStyle& SetPercentWidth( f32 a_PercentWidth ) { PercentWidth = a_PercentWidth; return *this; }
+        constexpr LayoutStyle& SetPercentHeight( f32 a_PercentHeight ) { PercentHeight = a_PercentHeight; return *this; }
+        constexpr LayoutStyle& SetFlexGrow( f32 a_FlexGrow ) { FlexGrow = a_FlexGrow; return *this; }
+        constexpr LayoutStyle& SetSizeConstraints( Constraints a_SizeConstraints ) { SizeConstraints = a_SizeConstraints; return *this; }
     };
 
     /**

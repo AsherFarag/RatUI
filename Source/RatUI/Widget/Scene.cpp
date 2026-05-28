@@ -104,6 +104,8 @@ namespace RatUI
 
     void Scene::SetFocus( WidgetID a_WidgetID )
     {
+		FocusEvent focusEvent; // TODO: Populate this with useful information?
+
         // Callers should not need to check IsFocusable() before calling SetFocus().
         if ( IWidget* target = GetWidget( a_WidgetID ) )
         {
@@ -116,13 +118,30 @@ namespace RatUI
             if ( currentFocus->GetID() == a_WidgetID )
                 return;
 
-            currentFocus->OnFocusLost();
+            currentFocus->OnFocusLost( focusEvent );
         }
 
         m_FocusedWidget = a_WidgetID;
 
         if ( IWidget* newFocus = GetWidget( m_FocusedWidget ) )
-            newFocus->OnFocusReceived();
+            newFocus->OnFocusReceived( focusEvent );
+    }
+
+    NavigationReply Scene::QueryBoundaryReply( ENavAction a_Action, WidgetID a_Focused )
+    {
+        // Walk up from the focused widget asking each navigation boundary widget.
+        IWidget* w = GetWidget( a_Focused );
+        while ( w )
+        {
+            if ( w->IsNavigationBoundary() )
+                return w->OnNavigationBoundary( a_Action );
+
+            LayoutNode* node = Layouts.Get( w->GetLayoutID() );
+            LayoutNode* parent = node ? node->Parent() : nullptr;
+            w = parent ? GetWidget( parent->Widget ) : nullptr;
+        }
+
+        return NavigationReply::Escape();
     }
 
     void Scene::Navigate( ENavAction a_Action )
@@ -130,12 +149,10 @@ namespace RatUI
         const auto FocusFirstIn = [&]( WidgetID a_ScopeID )
         {
             IWidget* scopeWidget = GetWidget( a_ScopeID );
-            if ( !scopeWidget )
-                return;
+            if ( !scopeWidget ) return;
 
             LayoutNode* scopeNode = Layouts.Get( scopeWidget->GetLayoutID() );
-            if ( !scopeNode )
-                return;
+            if ( !scopeNode ) return;
 
             for ( LayoutNode* child = scopeNode->FirstChild(); child; child = child->NextSibling() )
             {
@@ -175,19 +192,22 @@ namespace RatUI
                     .Held = ( a_Action == ENavAction::ActivatePressed ),
                 };
 
-                w->OnButtonPressed( ev );
-                w->OnButtonReleased( ev );
+                // TODO: Shouldnt be making fake events like this, should add something like IWidget::OnPressed/OnHovered etc??
+                Reply reply = a_Action == ENavAction::ActivatePressed
+                    ? w->OnButtonPressed( ev )
+                    : w->OnButtonReleased( ev );
+
+                ApplyReply( reply );
             }
             return;
         }
 
-        WidgetID scopeID = GetCurrentNavScope();
-        WidgetID focused = GetFocusedWidget();
-
-        IWidget* scopeWidget = GetWidget( scopeID );
-        LayoutNode* scopeNode = scopeWidget ? Layouts.Get( scopeWidget->GetLayoutID() ) : nullptr;
-        IWidget* focusedWidget = GetWidget( focused );
-        LayoutNode* focusedNode = focusedWidget ? Layouts.Get( focusedWidget->GetLayoutID() ) : nullptr;
+        WidgetID    scopeID       = GetCurrentNavScope();
+        WidgetID    focused       = GetFocusedWidget();
+        IWidget*    scopeWidget   = GetWidget( scopeID );
+        LayoutNode* scopeNode     = scopeWidget ? Layouts.Get( scopeWidget->GetLayoutID() ) : nullptr;
+        IWidget*    focusedWidget = GetWidget( focused );
+        LayoutNode* focusedNode   = focusedWidget ? Layouts.Get( focusedWidget->GetLayoutID() ) : nullptr;
 
         if ( !scopeNode )
             return;
@@ -198,17 +218,52 @@ namespace RatUI
             return;
         }
 
+        // TODO: If I move navigation from LayoutNodes to Widgets, I should remove ts
+		// TODO: Though I do like not having explicit widget types for containers like VBox/HBox/Grid etc and still keep nav for them.
+
         auto focusableNodes = LayoutChildRange{ scopeNode->FirstChild() }
-                              | std::views::filter( [&]( LayoutNode* node ) -> bool
-                                {
-                                    if ( !node ) return false;
-                                    IWidget* w = GetWidget( node->Widget );
-                                    return w && ( w->IsFocusable() || node->Style.IsFocusScope );
-                                } );
+            | std::views::filter( [&]( LayoutNode* node ) -> bool
+            {
+                if ( !node ) return false;
+                IWidget* w = GetWidget( node->Widget );
+                // TODO: Probs dont need LayoutStyle::IsFocusScope anymore
+                return w && ( w->IsFocusable() || node->Style.IsFocusScope );
+            } );
 
         const LayoutNode* nextNode = FindNavigatableNode( a_Action, focusedNode, focusableNodes );
+
         if ( nextNode )
+        {
             SetFocus( nextNode->Widget );
+            return;
+        }
+
+        // No target found within the current scope - consult boundary policy.
+        const NavigationReply navReply = QueryBoundaryReply( a_Action, focused );
+
+        switch ( navReply.GetRule() )
+        {
+            case NavigationReply::EBoundaryRule::Escape:
+                PopNavScope();
+                break;
+
+            case NavigationReply::EBoundaryRule::Stop:
+                // Wrap: focus the first/last focusable child depending on direction.
+                FocusFirstIn( scopeID );
+                break;
+
+            case NavigationReply::EBoundaryRule::Explicit:
+                SetFocus( navReply.GetExplicitTarget() );
+                break;
+
+            case NavigationReply::EBoundaryRule::Custom:
+            {
+                WidgetID target = navReply.ResolveCustom( a_Action, focused );
+                if ( target != c_InvalidWidgetID )
+                    SetFocus( target );
+                break;
+            }
+        }
     }
 
     void Scene::PushNavScope( WidgetID a_ScopeID )
@@ -424,7 +479,7 @@ namespace RatUI
                 ApplyReply( reply );
 
                 // Release capture on mouse button up regardless of whether the
-                // widget handled it — a capture shouldn't outlive its button press.
+                // widget handled it - a capture shouldn't outlive its button press.
                 if ( a_Event.Released )
                     ReleasePointerCapture();
 

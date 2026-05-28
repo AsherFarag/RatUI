@@ -9,6 +9,12 @@ namespace RatUI
 {
     class Scene;
 
+    struct FocusEvent 
+    {
+        // TODO: Add more stuff here
+        // TODO: Should this be in a different file?
+    };
+
     /**
      * @brief The base class for all UI elements.
      * Widgets are responsible for rendering themselves and handling input events. 
@@ -53,16 +59,11 @@ namespace RatUI
         /** @brief Returns whether this widget can receive pointer events. */
         virtual bool IsInteractable() const { return false; }
 
-        /** @brief Returns whether this widget can receive focus for input. */
-        virtual bool IsFocusable() const { return false; }
-        
-        // - Focus Events
+        /** @brief Returns whether this widget can hold keyboard/gamepad focus. */
+        virtual bool IsFocusable() const { return true; }
 
-        /** @brief Called when this widget receives focus for input. */
-        virtual void OnFocusReceived() {}
-
-		/** @brief Called when this widget loses focus for input. */
-        virtual void OnFocusLost() {}
+        /** @brief Whether this widget defines a navigation boundary. */
+        virtual bool IsNavigationBoundary() const { return true; }
 
         // - Pointer Events: Only called for widgets that return true from IsInteractable()
 
@@ -78,6 +79,14 @@ namespace RatUI
         /** @brief Called when a pointer (e.g., mouse cursor) exits the widget's bounds. */
         virtual Reply OnPointerExit( const PointerEvent& a_Event ) { return Reply::Unhandled(); }
 
+		// - Focus Events: Only called for widgets that return true from IsFocusable()
+
+        /** @brief Called when this widget receives focus for input. */
+        virtual void OnFocusReceived( const FocusEvent& a_Event ) {}
+
+        /** @brief Called when this widget loses focus for input. */
+        virtual void OnFocusLost( const FocusEvent& a_Event ) {}
+
         // - Button Events:
 
         /** @brief Called when an input button is pressed while this widget is focused. */
@@ -86,7 +95,11 @@ namespace RatUI
         /** @brief Called when an input button is released while this widget is focused. */
         virtual Reply OnButtonReleased( const ButtonEvent& a_Event ) { return Reply::Unhandled(); }
 
-        // - Navigation
+		// - Navigation: Only called for widgets that return true from IsNavigationBoundary()
+
+		/** @brief */
+        // TODO: Should I make a_Action a struct with more info and for api stability?
+		virtual NavigationReply OnNavigationBoundary( ENavAction a_Action ) { return NavigationReply::Escape(); }
 
     protected:
         friend Scene;

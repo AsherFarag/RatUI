@@ -31,27 +31,23 @@ namespace RatUI
                 return;
 
             const Rect<Unit>& rect = node->Layout.FinalRect;
-            const Color fill = GetThemeColor( ThemeKey::Color::PanelNormal, Colors::Surface700 );
-            const Color focusOutlineColor = GetThemeColor( ThemeKey::Color::PanelFocusOutline, Colors::White );
-            const CornerRounding rounding = GetThemeRounding( ThemeKey::Rounding::Panel, CornerRounding::Uniform( 8_u ) );
-            const Unit borderThickness = GetThemeMetric( ThemeKey::Metric::PanelBorderThickness, 1_u );
+
+            a_DrawList.AddRect( rect,
+                {
+					.FillColor = GetThemeColor( ThemeKey::Color::PanelNormal, Colors::Surface700 ),
+					.BorderColor = GetThemeColor( ThemeKey::Color::PanelBorder, Colors::Transparent ),
+					.BorderThickness = GetThemeMetric( ThemeKey::Metric::PanelBorderThickness, 1_u ),
+					.Rounding = GetThemeRounding( ThemeKey::Rounding::Panel, CornerRounding::None() )
+                } );
 
             if ( scene.GetFocusedWidget() == GetID() )
             {
                 a_DrawList.AddRect( rect,
                 {
-                    .FillColor = fill,
-                    .BorderColor = focusOutlineColor,
-                    .BorderThickness = borderThickness,
-                    .Rounding = rounding
-                } );
-            }
-            else
-            {
-                a_DrawList.AddRect( rect,
-                {
-                    .FillColor = fill,
-                    .Rounding = rounding
+					.FillColor = Colors::Transparent,
+					.BorderColor = GetThemeColor( ThemeKey::Color::FocusOutline, Colors::White ),
+					.BorderThickness = GetThemeMetric( ThemeKey::Metric::FocusOutlineThickness, 2_u ),
+                    .Rounding = GetThemeRounding( ThemeKey::Rounding::FocusOutline, CornerRounding::None() )
                 } );
             }
 

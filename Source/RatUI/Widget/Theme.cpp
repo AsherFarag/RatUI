@@ -10,15 +10,15 @@ namespace RatUI::Themes
             auto theme = std::make_shared<Theme>();
 
             theme->SetColors( {
+                { ThemeKey::Color::FocusOutline, Colors::White },
+
                 // Panel
                 { ThemeKey::Color::PanelNormal, Colors::Surface700 },
-                { ThemeKey::Color::PanelFocusOutline, Colors::White },
 
                 // Button
                 { ThemeKey::Color::ButtonNormal,       Colors::Surface600 },
                 { ThemeKey::Color::ButtonHover,        Colors::Surface500 },
                 { ThemeKey::Color::ButtonPressed,      Colors::White },
-                { ThemeKey::Color::ButtonFocusOutline, Colors::White },
                 
                 // Slider
                 { ThemeKey::Color::SliderThumb, Colors::AccentBlue },

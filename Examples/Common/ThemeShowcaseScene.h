@@ -67,15 +67,17 @@ public:
         controlsNode->Style.Padding = Edges::Uniform( 12_u );
         controlsNode->Style.Spacing = 10_u;
         controlsNode->Style.FlexGrow = 1.f;
+		controlsNode->Style.IsFocusScope = true;
 
         WidgetID previewPanel = TrackThemedWidget( m_Scene.CreateWidget<PanelWidget>( contentRow, m_ActiveTheme ) );
-        LayoutNode* previewNode = GetNode( previewPanel );
-        previewNode->Style.LayoutType = ELayoutType::Vertical;
-        previewNode->Style.WidthMode = ESizingMode::Flex;
-        previewNode->Style.HeightMode = ESizingMode::Flex;
-        previewNode->Style.Padding = Edges::Uniform( 12_u );
-        previewNode->Style.Spacing = 10_u;
-        previewNode->Style.FlexGrow = 1.f;
+        GetNode( previewPanel )->Style
+			.SetLayoutType( ELayoutType::Vertical )
+            .SetWidthMode( ESizingMode::Flex )
+            .SetHeightMode( ESizingMode::Flex )
+            .SetPadding( Edges::Uniform( 12_u ) )
+            .SetSpacing( 10_u )
+            .SetFlexGrow( 1.f )
+            .SetFocusScope( true );
 
         WidgetID controlsTitle = TrackThemedWidget( m_Scene.CreateWidget<TextWidget>( controlsPanel, m_ActiveTheme, "Controls", MakeTextLayout( 20_u, ETextOverflow::Clip ) ) );
         GetNode( controlsTitle )->Style.HeightMode = ESizingMode::Content;
@@ -202,12 +204,11 @@ private:
 		// Light
         m_Themes[1] = MakeShared<Theme>( *Themes::Dark() );
         m_Themes[1]->SetColors( {
+            { ThemeKey::Color::FocusOutline, Colors::DarkBlue },
             { ThemeKey::Color::PanelNormal, Colors::LightGray },
-            { ThemeKey::Color::PanelFocusOutline, Colors::DarkBlue },
             { ThemeKey::Color::ButtonNormal, Colors::White },
             { ThemeKey::Color::ButtonHover, Colors::PowderBlue },
             { ThemeKey::Color::ButtonPressed, Colors::LightBlue },
-            { ThemeKey::Color::ButtonFocusOutline, Colors::DarkBlue },
             { ThemeKey::Color::SliderTrack, Colors::Silver },
             { ThemeKey::Color::SliderTrackFill, Colors::DarkBlue },
             { ThemeKey::Color::SliderThumb, Colors::AccentBlue },
@@ -219,12 +220,11 @@ private:
 		// Neon
         m_Themes[2] = MakeShared<Theme>( *Themes::Dark() );
         m_Themes[2]->SetColors( {
+            { ThemeKey::Color::FocusOutline, Colors::AccentRose },
             { ThemeKey::Color::PanelNormal, FromColorF32( 0.07f, 0.03f, 0.10f ) },
-            { ThemeKey::Color::PanelFocusOutline, Colors::AccentRose },
             { ThemeKey::Color::ButtonNormal, FromColorF32( 0.20f, 0.05f, 0.28f ) },
             { ThemeKey::Color::ButtonHover, FromColorF32( 0.30f, 0.08f, 0.45f ) },
             { ThemeKey::Color::ButtonPressed, FromColorF32( 0.12f, 0.45f, 0.42f ) },
-            { ThemeKey::Color::ButtonFocusOutline, Colors::AccentSky },
             { ThemeKey::Color::SliderTrack, FromColorF32( 0.10f, 0.10f, 0.20f ) },
             { ThemeKey::Color::SliderTrackFill, Colors::AccentRose },
             { ThemeKey::Color::SliderThumb, Colors::AccentSky },

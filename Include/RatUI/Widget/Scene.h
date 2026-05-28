@@ -130,6 +130,7 @@ namespace RatUI
 
     protected:
 		void ApplyReply( const Reply& a_Reply );
+        NavigationReply QueryBoundaryReply( ENavAction a_Action, WidgetID a_Focused );
 
         bool ProcessPointerEvent( const PointerEvent& a_Event );
         bool ProcessButtonEvent( const ButtonEvent& a_Event );

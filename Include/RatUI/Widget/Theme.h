@@ -217,13 +217,15 @@ namespace RatUI
     {
         namespace Color
         {
-            inline constexpr ThemeID ButtonNormal       = "Button.Normal"_theme;
-            inline constexpr ThemeID ButtonHover        = "Button.Hover"_theme;
-            inline constexpr ThemeID ButtonPressed      = "Button.Pressed"_theme;
-            inline constexpr ThemeID ButtonFocusOutline = "Button.FocusOutline"_theme;
+            inline constexpr ThemeID FocusOutline = "FocusOutline"_theme;
 
-            inline constexpr ThemeID PanelNormal       = "Panel.Normal"_theme;
-            inline constexpr ThemeID PanelFocusOutline = "Panel.FocusOutline"_theme;
+            inline constexpr ThemeID ButtonBorder  = "Button.Border"_theme;
+            inline constexpr ThemeID ButtonNormal  = "Button.Normal"_theme;
+            inline constexpr ThemeID ButtonHover   = "Button.Hover"_theme;
+            inline constexpr ThemeID ButtonPressed = "Button.Pressed"_theme;
+
+            inline constexpr ThemeID PanelBorder = "Panel.Border"_theme;
+            inline constexpr ThemeID PanelNormal = "Panel.Normal"_theme;
 
             inline constexpr ThemeID SliderTrack        = "Slider.Track"_theme;
             inline constexpr ThemeID SliderTrackFill    = "Slider.TrackFill"_theme;
@@ -234,10 +236,11 @@ namespace RatUI
 
         namespace Rounding
         {
-            inline constexpr ThemeID Button      = "Button"_theme;
-            inline constexpr ThemeID Panel       = "Panel"_theme;
+            inline constexpr ThemeID FocusOutline = "FocusOutline"_theme;
+            inline constexpr ThemeID Button       = "Button"_theme;
+            inline constexpr ThemeID Panel        = "Panel"_theme;
             inline constexpr ThemeID SliderTrack  = "Slider.Track"_theme;
-            inline constexpr ThemeID SliderThumb   = "Slider.Thumb"_theme;
+            inline constexpr ThemeID SliderThumb  = "Slider.Thumb"_theme;
         }
 
         namespace TextStyle
@@ -247,6 +250,7 @@ namespace RatUI
 
         namespace Metric
         {
+			inline constexpr ThemeID FocusOutlineThickness = "FocusOutlineThickness"_theme;
             inline constexpr ThemeID ButtonBorderThickness = "Button.BorderThickness"_theme;
             inline constexpr ThemeID PanelBorderThickness  = "Panel.BorderThickness"_theme;
             inline constexpr ThemeID SliderTrackThickness  = "Slider.TrackThickness"_theme;

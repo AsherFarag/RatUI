@@ -280,7 +280,7 @@ TEST_CASE( "LayoutStyle defaults to NoWrap wrap mode", "[layout][style]" )
 TEST_CASE( "LayoutStyle defaults to Flow positioning mode", "[layout][style]" )
 {
     LayoutStyle s{};
-    REQUIRE( s.PositionMode == EPositioningMode::Flow );
+    REQUIRE( s.PositionMode == EPositionMode::Flow );
 }
 
 TEST_CASE( "LayoutStyle defaults to Content sizing modes", "[layout][style]" )

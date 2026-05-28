@@ -142,7 +142,7 @@ namespace RatUI
                 if ( !Visibility::AffectsLayout( child.Layout.Visibility ) )
                     return;
 
-                if ( child.Style.PositionMode == EPositioningMode::Anchored )
+                if ( child.Style.PositionMode == EPositionMode::Anchored )
                 {
                     // Anchored children are measured but don't contribute to
                     // the parent's content size.
@@ -331,7 +331,7 @@ namespace RatUI
             if ( !Visibility::AffectsLayout( child.Layout.Visibility ) )
                 return;
 
-            if ( child.Style.PositionMode == EPositioningMode::Anchored )
+            if ( child.Style.PositionMode == EPositionMode::Anchored )
             {
                 ArrangeAnchored( child, a_Inner );
                 return;
@@ -363,7 +363,7 @@ namespace RatUI
         {
             const EVisibility childVis = Visibility::Apply( a_Node.Layout.Visibility, child.Style.Visibility );
 
-            if ( child.Style.PositionMode == EPositioningMode::Anchored ) return;
+            if ( child.Style.PositionMode == EPositionMode::Anchored ) return;
             if ( !Visibility::AffectsLayout( childVis ) ) return;
 
             const bool isFlexMain    = ( isHz && child.Style.WidthMode  == ESizingMode::Flex )
@@ -396,7 +396,7 @@ namespace RatUI
         {
             ResolveNodeVisibility( child );
 
-            if ( child.Style.PositionMode == EPositioningMode::Anchored )
+            if ( child.Style.PositionMode == EPositionMode::Anchored )
             {
                 ArrangeAnchored( child, a_Inner );
                 return;
@@ -475,7 +475,7 @@ namespace RatUI
         {
             ResolveNodeVisibility( child );
 
-            if ( child.Style.PositionMode == EPositioningMode::Anchored )
+            if ( child.Style.PositionMode == EPositionMode::Anchored )
             {
                 ArrangeAnchored( child, a_Inner );
                 return;

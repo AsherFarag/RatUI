@@ -131,31 +131,31 @@ namespace RatUI
                 return;
 
             const Rect<Unit>& rect = node->Layout.FinalRect;
-            const Color normalColor = GetThemeColor( ThemeKey::Color::ButtonNormal, Colors::Surface700 );
-            const Color hoverColor = GetThemeColor( ThemeKey::Color::ButtonHover, Colors::Surface600 );
-            const Color pressedColor = GetThemeColor( ThemeKey::Color::ButtonPressed, Colors::Surface500 );
-            const Color fill = m_IsPressed ? pressedColor
-                                           : ( m_IsHovered ? hoverColor : normalColor );
-            const Color focusOutlineColor = GetThemeColor( ThemeKey::Color::ButtonFocusOutline, Colors::White );
-            const CornerRounding rounding = GetThemeRounding( ThemeKey::Rounding::Button, CornerRounding::Uniform( 8_u ) );
-            const Unit borderThickness = GetThemeMetric( ThemeKey::Metric::ButtonBorderThickness, 1_u );
 
+			// Fill color based on state: pressed > hovered > normal
+            const Color fill = m_IsPressed ? GetThemeColor( ThemeKey::Color::ButtonPressed, Colors::Surface500 )
+                                           : ( m_IsHovered 
+                                               ? GetThemeColor( ThemeKey::Color::ButtonHover, Colors::Surface600 )
+                                               : GetThemeColor( ThemeKey::Color::ButtonNormal, Colors::Surface700 ) );
+
+            a_DrawList.AddRect( rect,
+            {
+                .FillColor = fill,
+                .BorderColor = GetThemeColor( ThemeKey::Color::ButtonHover, Colors::Transparent ),
+                .BorderThickness = GetThemeMetric( ThemeKey::Metric::ButtonBorderThickness, 1_u ),
+                .Rounding = GetThemeRounding( ThemeKey::Rounding::Button, CornerRounding::None() )
+            } );
+
+            // Draw focus ring 
+            // TODO: Should this be a util or even handled here?
             if ( scene.GetFocusedWidget() == GetID() )
             {
                 a_DrawList.AddRect( rect,
                 {
-                    .FillColor = fill,
-                    .BorderColor = focusOutlineColor,
-                    .BorderThickness = borderThickness,
-                    .Rounding = rounding
-                } );
-            }
-            else
-            {
-                a_DrawList.AddRect( rect,
-                {
-                    .FillColor = fill,
-                    .Rounding = rounding
+                    .FillColor = Colors::Transparent,
+                    .BorderColor = GetThemeColor( ThemeKey::Color::FocusOutline, Colors::White ),
+                    .BorderThickness = GetThemeMetric( ThemeKey::Metric::FocusOutlineThickness, 2_u ),
+                    .Rounding = GetThemeRounding( ThemeKey::Rounding::FocusOutline, CornerRounding::None() )
                 } );
             }
 

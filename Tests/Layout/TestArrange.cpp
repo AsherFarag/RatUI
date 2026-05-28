@@ -732,7 +732,7 @@ TEST_CASE( "ArrangeAnchored TopLeft point anchor places child at top-left of par
     child.Style.HeightMode     = ESizingMode::Fixed;
     child.Style.FixedWidth     = Unit{ 40.0f };
     child.Style.FixedHeight    = Unit{ 20.0f };
-    child.Style.PositionMode   = EPositioningMode::Anchored;
+    child.Style.PositionMode   = EPositionMode::Anchored;
     child.Style.Anchor         = Anchor::TopLeft();  // Min=(0,0), Pivot=(0,0)
 
     parent.PushBackChild( child );
@@ -756,7 +756,7 @@ TEST_CASE( "ArrangeAnchored Center point anchor places child at parent center", 
     child.Style.HeightMode   = ESizingMode::Fixed;
     child.Style.FixedWidth   = Unit{ 40.0f };
     child.Style.FixedHeight  = Unit{ 20.0f };
-    child.Style.PositionMode = EPositioningMode::Anchored;
+    child.Style.PositionMode = EPositionMode::Anchored;
     child.Style.Anchor       = Anchor::Center(); // Min=(0.5,0.5), Pivot=(0.5,0.5)
 
     parent.PushBackChild( child );
@@ -781,7 +781,7 @@ TEST_CASE( "ArrangeAnchored BottomRight point anchor places child at bottom-righ
     child.Style.HeightMode   = ESizingMode::Fixed;
     child.Style.FixedWidth   = Unit{ 40.0f };
     child.Style.FixedHeight  = Unit{ 20.0f };
-    child.Style.PositionMode = EPositioningMode::Anchored;
+    child.Style.PositionMode = EPositionMode::Anchored;
     child.Style.Anchor       = Anchor::BottomRight(); // Min=(1,1), Pivot=(1,1)
 
     parent.PushBackChild( child );
@@ -806,7 +806,7 @@ TEST_CASE( "ArrangeAnchored StretchAll fills the entire parent", "[arrange][anch
     child.Style.HeightMode   = ESizingMode::Fixed;
     child.Style.FixedWidth   = Unit{ 0.0f };
     child.Style.FixedHeight  = Unit{ 0.0f };
-    child.Style.PositionMode = EPositioningMode::Anchored;
+    child.Style.PositionMode = EPositionMode::Anchored;
     child.Style.Anchor       = Anchor::StretchAll(); // Min=(0,0), Max=(1,1), offset=(0,0)
 
     parent.PushBackChild( child );
@@ -832,7 +832,7 @@ TEST_CASE( "ArrangeAnchored with pixel offset shifts position", "[arrange][ancho
     child.Style.HeightMode   = ESizingMode::Fixed;
     child.Style.FixedWidth   = Unit{ 40.0f };
     child.Style.FixedHeight  = Unit{ 20.0f };
-    child.Style.PositionMode = EPositioningMode::Anchored;
+    child.Style.PositionMode = EPositionMode::Anchored;
     // Point anchor at top-left with a pixel offset of (10, 5)
     child.Style.Anchor = MakeAnchor( { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 10.0f, 5.0f } );
 
@@ -858,7 +858,7 @@ TEST_CASE( "ArrangeAnchored StretchTop stretches across top edge with zero heigh
     child.Style.HeightMode   = ESizingMode::Fixed;
     child.Style.FixedWidth   = Unit{ 0.0f };
     child.Style.FixedHeight  = Unit{ 0.0f };
-    child.Style.PositionMode = EPositioningMode::Anchored;
+    child.Style.PositionMode = EPositionMode::Anchored;
     child.Style.Anchor       = Anchor::StretchTop(); // Min=(0,0), Max=(1,0)
 
     parent.PushBackChild( child );
@@ -883,7 +883,7 @@ TEST_CASE( "ArrangeAnchored anchored child does not affect parent content size",
     child.Style.HeightMode   = ESizingMode::Fixed;
     child.Style.FixedWidth   = Unit{ 300.0f };
     child.Style.FixedHeight  = Unit{ 200.0f };
-    child.Style.PositionMode = EPositioningMode::Anchored;
+    child.Style.PositionMode = EPositionMode::Anchored;
     child.Style.Anchor       = Anchor::TopLeft();
 
     parent.PushBackChild( child );
@@ -1167,7 +1167,7 @@ TEST_CASE( "ArrangeAnchored StretchBottom stretches across bottom edge with zero
     child.Style.HeightMode   = ESizingMode::Fixed;
     child.Style.FixedWidth   = Unit{ 0.0f };
     child.Style.FixedHeight  = Unit{ 0.0f };
-    child.Style.PositionMode = EPositioningMode::Anchored;
+    child.Style.PositionMode = EPositionMode::Anchored;
     child.Style.Anchor       = Anchor::StretchBottom(); // Min=(0,1), Max=(1,1)
 
     parent.PushBackChild( child );
@@ -1194,7 +1194,7 @@ TEST_CASE( "ArrangeAnchored StretchLeft stretches along left edge", "[arrange][a
     child.Style.HeightMode   = ESizingMode::Fixed;
     child.Style.FixedWidth   = Unit{ 0.0f };
     child.Style.FixedHeight  = Unit{ 0.0f };
-    child.Style.PositionMode = EPositioningMode::Anchored;
+    child.Style.PositionMode = EPositionMode::Anchored;
     child.Style.Anchor       = Anchor::StretchLeft(); // Min=(0,0), Max=(0,1)
 
     parent.PushBackChild( child );
@@ -1221,7 +1221,7 @@ TEST_CASE( "ArrangeAnchored StretchRight stretches along right edge", "[arrange]
     child.Style.HeightMode   = ESizingMode::Fixed;
     child.Style.FixedWidth   = Unit{ 0.0f };
     child.Style.FixedHeight  = Unit{ 0.0f };
-    child.Style.PositionMode = EPositioningMode::Anchored;
+    child.Style.PositionMode = EPositionMode::Anchored;
     child.Style.Anchor       = Anchor::StretchRight(); // Min=(1,0), Max=(1,1)
 
     parent.PushBackChild( child );
@@ -1248,7 +1248,7 @@ TEST_CASE( "ArrangeAnchored StretchAll with inward offset shrinks the stretch re
     child.Style.HeightMode   = ESizingMode::Fixed;
     child.Style.FixedWidth   = Unit{ 0.0f };
     child.Style.FixedHeight  = Unit{ 0.0f };
-    child.Style.PositionMode = EPositioningMode::Anchored;
+    child.Style.PositionMode = EPositionMode::Anchored;
     // StretchAll with offset=(10,5) pushes each edge inward by the offset value
     child.Style.Anchor = MakeAnchor( { 0.0f, 0.0f }, { 1.0f, 1.0f }, { 0.5f, 0.5f }, { 10.0f, 5.0f } );
 
@@ -1276,7 +1276,7 @@ TEST_CASE( "ArrangeAnchored with non-zero parent container origin positions chil
     child.Style.HeightMode   = ESizingMode::Fixed;
     child.Style.FixedWidth   = Unit{ 40.0f };
     child.Style.FixedHeight  = Unit{ 20.0f };
-    child.Style.PositionMode = EPositioningMode::Anchored;
+    child.Style.PositionMode = EPositionMode::Anchored;
     child.Style.Anchor       = Anchor::Center(); // Min=Max=(0.5,0.5), Pivot=(0.5,0.5)
 
     parent.PushBackChild( child );
@@ -1313,7 +1313,7 @@ TEST_CASE( "ArrangeLinear Horizontal anchored children do not advance the flow c
     anchored.Style.HeightMode   = ESizingMode::Fixed;
     anchored.Style.FixedWidth   = Unit{ 200.0f };
     anchored.Style.FixedHeight  = Unit{ 200.0f };
-    anchored.Style.PositionMode = EPositioningMode::Anchored;
+    anchored.Style.PositionMode = EPositionMode::Anchored;
     anchored.Style.Anchor       = Anchor::TopLeft();
 
     LayoutNode c3{}; c3.Style.WidthMode = ESizingMode::Fixed; c3.Style.HeightMode = ESizingMode::Fixed;
