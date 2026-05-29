@@ -3,11 +3,11 @@
 
 namespace RatUI
 {
-    // TODO: This api might be to complex for user renderers. Might remove it
+    // TODO: This would be useful, find a clean and easy way to implement it in user renderers
 
     struct SolidBrush
     {
-        Colorf Color{ 1.0f, 1.0f, 1.0f, 1.0f };
+        Color Fill{ 1.0f, 1.0f, 1.0f, 1.0f };
     };
 
     struct GradientBrush

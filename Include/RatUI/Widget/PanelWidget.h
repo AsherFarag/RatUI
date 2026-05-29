@@ -23,6 +23,10 @@ namespace RatUI
             m_Theme = std::move( a_Theme );
         }
 
+        bool IsInteractable() const override { return false; }
+		bool IsFocusable() const override { return true; }
+        bool IsNavigationBoundary() const { return true; }
+
         void OnPaint( DrawList& a_DrawList ) override
         {
             Scene& scene = GetScene();

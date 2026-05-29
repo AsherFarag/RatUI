@@ -60,10 +60,10 @@ namespace RatUI
         virtual bool IsInteractable() const { return false; }
 
         /** @brief Returns whether this widget can hold keyboard/gamepad focus. */
-        virtual bool IsFocusable() const { return true; }
+        virtual bool IsFocusable() const { return false; }
 
         /** @brief Whether this widget defines a navigation boundary. */
-        virtual bool IsNavigationBoundary() const { return true; }
+        virtual bool IsNavigationBoundary() const { return false; }
 
         // - Pointer Events: Only called for widgets that return true from IsInteractable()
 
