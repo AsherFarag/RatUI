@@ -69,10 +69,11 @@ namespace RatUI::OpenGL
         /** @brief Updates the orthographic projection to match a new framebuffer size. */
         void SetViewport( int a_Width, int a_Height );
         void Execute( const DrawBatcher& a_Batcher ) override;
-        TextureHandle CreateTexture( u32 a_Width, u32 a_Height, ETextureFormat a_Format, const void* a_Data ) override;
+        TextureHandle CreateTexture( TextureInfo a_Info, const void* a_Data ) override;
         bool UpdateTexture( TextureID a_Texture, u32 a_MipLevel, Rectu a_Region, const void* a_Data, size a_DataSizeBytes ) override;
         void DestroyTexture( TextureID a_Texture ) override;
         bool IsValidTexture( TextureID a_Texture ) const override;
+		Optional<TextureInfo> QueryTextureInfo( TextureID a_Texture ) const override;
 
     private:
 
@@ -237,7 +238,7 @@ namespace RatUI::OpenGL
 
     OpenGLRenderer::OpenGLRenderer( int a_ViewportWidth, int a_ViewportHeight )
     {
-        static_assert( sizeof( SDFVertex ) == 48, "SDFVertex layout assumption broken" );
+        static_assert( sizeof( SDFVertex ) == 52, "SDFVertex layout assumption broken" );
         static_assert( sizeof( TextVertex ) == 20, "TextVertex layout assumption broken" );
 
         m_SDFProgram = Detail::LinkProgram( GLSL::c_SDFVertSrc, GLSL::c_SDFFragSrc );
@@ -259,7 +260,7 @@ namespace RatUI::OpenGL
         glBindVertexArray( m_SDFVAO );
         glBindBuffer( GL_ARRAY_BUFFER, m_VBO );
         glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, m_IBO );
-        for ( int i = 0; i < 8; ++i )
+        for ( int i = 0; i < 9; ++i )
             glEnableVertexAttribArray( i );
         glBindVertexArray( 0 );
 
@@ -340,28 +341,44 @@ namespace RatUI::OpenGL
         glBindVertexArray( 0 );
     }
 
-    TextureHandle OpenGLRenderer::CreateTexture( u32 a_Width, u32 a_Height, ETextureFormat a_Format, const void* a_Data )
+    TextureHandle OpenGLRenderer::CreateTexture( TextureInfo a_Info, const void* a_Data )
     {
         GLuint texID = 0;
         glGenTextures( 1, &texID );
         glBindTexture( GL_TEXTURE_2D, texID );
 
-        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+        // Filtering
+        const GLint filter =
+            a_Info.Sampler.Filter == ETextureFilter::Nearest
+            ? GL_NEAREST
+            : GL_LINEAR;
+
+        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter );
+        glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter );
+
+        // Wrapping
         glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
         glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
 
-        glTexImage2D( GL_TEXTURE_2D, 0,
-                      static_cast<GLint>( FormatToGLInternal( a_Format ) ),
-                      static_cast<GLsizei>( a_Width ),
-                      static_cast<GLsizei>( a_Height ),
-                      0, FormatToGLBase( a_Format ), GL_UNSIGNED_BYTE, a_Data );
+        // Upload
+        glTexImage2D(
+            GL_TEXTURE_2D,
+            0,
+            static_cast<GLint>( FormatToGLInternal( a_Info.Format ) ),
+            static_cast<GLsizei>( a_Info.Size[0] ),
+            static_cast<GLsizei>( a_Info.Size[1] ),
+            0,
+            FormatToGLBase( a_Info.Format ),
+            GL_UNSIGNED_BYTE,
+            a_Data
+        );
 
         glBindTexture( GL_TEXTURE_2D, 0 );
 
         TextureID id;
         id.ID = static_cast<uptr>( texID );
-        return TextureHandle( MakeShared<Texture>( *this, id ) );
+
+        return TextureHandle(  MakeShared<Texture>( *this, id ) );
     }
 
     bool OpenGLRenderer::UpdateTexture( TextureID a_Texture, u32 /*a_MipLevel*/, Rectu a_Region, const void* a_Data, size a_DataSizeBytes )
@@ -408,6 +425,72 @@ namespace RatUI::OpenGL
         return a_Texture.ID != 0;
     }
 
+    Optional<TextureInfo> OpenGLRenderer::QueryTextureInfo( TextureID a_Texture ) const
+    {
+        if ( !IsValidTexture( a_Texture ) )
+            return NullOpt;
+
+        glBindTexture( GL_TEXTURE_2D, static_cast<GLuint>( a_Texture.ID ) );
+
+        TextureInfo info{};
+
+        // Size
+        GLint width = 0;
+        GLint height = 0;
+
+        glGetTexLevelParameteriv( GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width );
+        glGetTexLevelParameteriv( GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &height );
+
+        info.Size = Vec2u(
+            static_cast<u32>( width ),
+            static_cast<u32>( height )
+        );
+
+        // Format
+        GLint internalFormat = 0;
+        glGetTexLevelParameteriv(
+            GL_TEXTURE_2D,
+            0,
+            GL_TEXTURE_INTERNAL_FORMAT,
+            &internalFormat
+        );
+
+        switch ( internalFormat )
+        {
+            case GL_R8:    info.Format = ETextureFormat::R8; break;
+            case GL_RG8:   info.Format = ETextureFormat::RG8; break;
+            case GL_RGB8:  info.Format = ETextureFormat::RGB8; break;
+            case GL_RGBA8: info.Format = ETextureFormat::RGBA8; break;
+            default:       info.Format = ETextureFormat::Unknown; break;
+        }
+
+        // Filter
+        GLint minFilter = 0;
+        glGetTexParameteriv(
+            GL_TEXTURE_2D,
+            GL_TEXTURE_MIN_FILTER,
+            &minFilter
+        );
+
+        switch ( minFilter )
+        {
+            case GL_NEAREST:
+            case GL_NEAREST_MIPMAP_NEAREST:
+            case GL_NEAREST_MIPMAP_LINEAR:
+                info.Sampler.Filter = ETextureFilter::Nearest;
+                break;
+
+            case GL_LINEAR:
+            case GL_LINEAR_MIPMAP_NEAREST:
+            case GL_LINEAR_MIPMAP_LINEAR:
+            default:
+                info.Sampler.Filter = ETextureFilter::Linear;
+                break;
+        }
+
+        return info;
+    }
+
     void OpenGLRenderer::DispatchBatch( const SDFDrawData& a_Data, u32 a_VertexByteOffset, const f32 a_PVM[16] )
     {
         glActiveTexture( GL_TEXTURE0 );
@@ -421,7 +504,7 @@ namespace RatUI::OpenGL
             if ( m_WhitePixelTexture.GetID() == TextureID::Null() )
             {
                 const u8 whitePixel[4] = { 255, 255, 255, 255 };
-                m_WhitePixelTexture = CreateTexture( 1, 1, ETextureFormat::RGBA8, whitePixel );
+                m_WhitePixelTexture = CreateTexture( { .Size = { 1, 1 }, .Format = ETextureFormat::RGBA8 }, whitePixel );
             }
 
             glBindTexture( GL_TEXTURE_2D, static_cast<GLuint>( m_WhitePixelTexture.GetID().ID ) );
@@ -437,6 +520,7 @@ namespace RatUI::OpenGL
         glVertexAttribPointer( 5, 1, GL_FLOAT, GL_FALSE, sizeof( SDFVertex ), (const void*)( vo + 32 ) );
         glVertexAttribPointer( 6, 2, GL_FLOAT, GL_FALSE, sizeof( SDFVertex ), (const void*)( vo + 36 ) );
         glVertexAttribPointer( 7, 1, GL_FLOAT, GL_FALSE, sizeof( SDFVertex ), (const void*)( vo + 44 ) );
+		glVertexAttribPointer( 8, 1, GL_FLOAT, GL_FALSE, sizeof( SDFVertex ), (const void*)( vo + 48 ) );
 
         glUseProgram( m_SDFProgram );
         glUniformMatrix4fv( m_SDFUniforms[GLSL::ESDFUniform_PVM], 1, GL_FALSE, a_PVM );

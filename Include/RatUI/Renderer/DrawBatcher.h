@@ -5,13 +5,6 @@
 namespace RatUI
 {
     /**
-     * @brief Used for custom rendering commands that don't fit into the predefined categories. 
-     * @param a_Renderer The renderer to use for drawing.
-     * @param a_Cmd The draw command containing the necessary information for rendering.
-     */
-    using CustomDrawFunc = void(*)( class IRenderer& a_Renderer, void* a_UserData, const Mat3f& a_CurrentTransform );
-
-    /**
      * @brief Represents a single vertex in the rendering pipeline, containing position, color, and texture coordinates.
      */
     struct TextVertex
@@ -45,6 +38,9 @@ namespace RatUI
 
         Vec2<Pixel> HalfSize;        ///< Half of the width and height of the shape, used for SDF calculations. For rectangles, this is half the size of the rect. For circles, this is the radius in both dimensions.
         Pixel       CornerRadius;    ///< 0 = rect
+
+		f32         Softness = 0.5;  ///< Edge anti-alias softness, in SDF units. 
+                                     ///< Higher values create softer edges but may cause more blurring. Typically in the range of 0.0 to 0.5.
     };
 
     /**
@@ -160,6 +156,10 @@ namespace RatUI
                        Pixel a_BorderThickness = 0_px,
                        Color a_BorderColor = Colors::Transparent,
                        Vec4<Pixel> a_Rounding = {} );
+
+        void EmitSlicedRect( Rect<Pixel> a_Rect, 
+                             NineSlice a_NineSlice, 
+                             Color a_Tint = Colors::White );
 
         void EmitText(
             const ShapedText&      a_Text,

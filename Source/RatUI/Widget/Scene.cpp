@@ -127,7 +127,7 @@ namespace RatUI
             newFocus->OnFocusReceived( focusEvent );
     }
 
-    NavigationReply Scene::QueryBoundaryReply( ENavAction a_Action, WidgetID a_Focused )
+    NavReply Scene::QueryBoundaryReply( ENavAction a_Action, WidgetID a_Focused )
     {
         // Walk up from the focused widget asking each navigation boundary widget.
         IWidget* w = GetWidget( a_Focused );
@@ -141,7 +141,7 @@ namespace RatUI
             w = parent ? GetWidget( parent->Widget ) : nullptr;
         }
 
-        return NavigationReply::Escape();
+        return NavReply::Escape();
     }
 
     void Scene::Navigate( ENavAction a_Action )
@@ -239,24 +239,24 @@ namespace RatUI
         }
 
         // No target found within the current scope - consult boundary policy.
-        const NavigationReply navReply = QueryBoundaryReply( a_Action, focused );
+        const NavReply navReply = QueryBoundaryReply( a_Action, focused );
 
         switch ( navReply.GetRule() )
         {
-            case NavigationReply::EBoundaryRule::Escape:
+            case NavReply::EBoundaryRule::Escape:
                 PopNavScope();
                 break;
 
-            case NavigationReply::EBoundaryRule::Stop:
+            case NavReply::EBoundaryRule::Stop:
                 // Wrap: focus the first/last focusable child depending on direction.
                 FocusFirstIn( scopeID );
                 break;
 
-            case NavigationReply::EBoundaryRule::Explicit:
+            case NavReply::EBoundaryRule::Explicit:
                 SetFocus( navReply.GetExplicitTarget() );
                 break;
 
-            case NavigationReply::EBoundaryRule::Custom:
+            case NavReply::EBoundaryRule::Custom:
             {
                 WidgetID target = navReply.ResolveCustom( a_Action, focused );
                 if ( target != c_InvalidWidgetID )

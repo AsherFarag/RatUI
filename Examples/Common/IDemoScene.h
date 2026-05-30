@@ -6,7 +6,7 @@
 
 using namespace RatUI;
 
-extern TextureHandle LoadTexture( const char* a_FilePath );
+extern TextureHandle LoadTexture( const char* a_FilePath, TextureSampler a_Sampler = {} );
 
 /**
  * @brief Interface for demo scenes in the RatUI examples. 

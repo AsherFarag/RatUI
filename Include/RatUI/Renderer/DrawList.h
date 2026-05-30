@@ -23,6 +23,13 @@ namespace RatUI
             CornerRounding Rounding{ CornerRounding::None() };
             TextureHandle  Texture{ TextureHandle::Null() };
         };
+
+        struct SlicedRectStyle
+        {
+            TextureHandle Texture;
+            NineSlice     Slice;
+            Color         Tint{ Colors::White };
+        };
     
         struct CircleStyle
         {
@@ -121,6 +128,17 @@ namespace RatUI
                 ToPixelRounding( a_Style.Rounding ) );
             return *this;
         }
+
+		DrawList& AddSlicedRect( Rect<Unit> a_Rect, const SlicedRectStyle& a_Style )
+		{
+			DrawBatcher& batcher = GetCurrentBatcher();
+            batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), a_Style.Texture );
+            batcher.EmitSlicedRect( ToPixelRect( a_Rect ),
+                a_Style.Slice,
+                a_Style.Tint );
+
+			return *this;
+		}
         
         /**
 		 * @brief Adds a circle to the draw list with the specified style.

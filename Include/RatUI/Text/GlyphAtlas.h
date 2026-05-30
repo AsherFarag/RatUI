@@ -48,8 +48,10 @@ namespace RatUI
             , m_Config     ( a_Config )
         {
             m_Texture = m_Renderer.CreateTexture( 
-                m_Config.AtlasWidth, m_Config.AtlasHeight, 
-                ETextureFormat::RGBA8, 
+                {
+					.Size = { m_Config.AtlasWidth, m_Config.AtlasHeight },
+					.Format = ETextureFormat::RGBA8,
+                },
                 nullptr );
         }
 

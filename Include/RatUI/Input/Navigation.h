@@ -91,7 +91,7 @@ namespace RatUI
     /**
      * @brief Represents the result of a navigation attempt and determines how the focus should be handled.
      */
-    class NavigationReply
+    class NavReply
     {
     public:
         enum class EBoundaryRule : u8
@@ -102,26 +102,26 @@ namespace RatUI
             Custom,   ///< Invoke a callback to decide at runtime.
         };
     
-        static NavigationReply Escape()
+        static NavReply Escape()
         {
-            return NavigationReply{ EBoundaryRule::Escape };
+            return NavReply{ EBoundaryRule::Escape };
         }
     
-        static NavigationReply Stop()
+        static NavReply Stop()
         {
-            return NavigationReply{ EBoundaryRule::Stop };
+            return NavReply{ EBoundaryRule::Stop };
         }
     
-        static NavigationReply Explicit( WidgetID a_Target )
+        static NavReply Explicit( WidgetID a_Target )
         {
-            NavigationReply r{ EBoundaryRule::Explicit };
+            NavReply r{ EBoundaryRule::Explicit };
             r.m_ExplicitTarget = a_Target;
             return r;
         }
     
-        static NavigationReply Custom( Callback<ENavAction, WidgetID /*current*/> a_Handler )
+        static NavReply Custom( Callback<ENavAction, WidgetID /*current*/> a_Handler )
         {
-            NavigationReply r{ EBoundaryRule::Custom };
+            NavReply r{ EBoundaryRule::Custom };
             r.m_CustomHandler = std::move( a_Handler );
             return r;
         }
@@ -139,7 +139,7 @@ namespace RatUI
         }
     
     private:
-        explicit NavigationReply( EBoundaryRule a_Rule ) : m_Rule( a_Rule ) {}
+        explicit NavReply( EBoundaryRule a_Rule ) : m_Rule( a_Rule ) {}
     
         Callback<ENavAction, WidgetID>           m_CustomHandler;
         WidgetID                                 m_ExplicitTarget{ c_InvalidWidgetID };

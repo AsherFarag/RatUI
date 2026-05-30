@@ -99,7 +99,7 @@ namespace RatUI
 
 		/** @brief */
         // TODO: Should I make a_Action a struct with more info and for api stability?
-		virtual NavigationReply OnNavigationBoundary( ENavAction a_Action ) { return NavigationReply::Escape(); }
+		virtual NavReply OnNavigationBoundary( ENavAction a_Action ) { return NavReply::Escape(); }
 
     protected:
         friend Scene;

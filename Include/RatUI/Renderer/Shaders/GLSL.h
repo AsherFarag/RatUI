@@ -92,6 +92,7 @@ namespace RatUI::GLSL
     layout(location = 5) in float a_BorderThickness;
     layout(location = 6) in vec2  a_HalfSize;
     layout(location = 7) in float a_CornerRadius;
+    layout(location = 8) in float a_Softness;
 
     uniform mat4 u_PVM;
 
@@ -102,6 +103,7 @@ namespace RatUI::GLSL
     out float v_BorderThickness;
     out vec2  v_HalfSize;
     out float v_CornerRadius;
+    out float v_Softness;
 
     void main()
     {
@@ -113,6 +115,7 @@ namespace RatUI::GLSL
         v_BorderThickness = a_BorderThickness;
         v_HalfSize        = a_HalfSize;
         v_CornerRadius    = a_CornerRadius;
+        v_Softness        = a_Softness;
     }
     )";
 
@@ -135,11 +138,9 @@ namespace RatUI::GLSL
     in float v_BorderThickness;
     in vec2  v_HalfSize;
     in float v_CornerRadius;
+    in float v_Softness;
 
     out vec4 FragColor;
-
-    const float c_FillSoftness   = 0.5;
-    const float c_BorderSoftness = 0.5;
 
     uniform sampler2D u_Texture;
 
@@ -159,12 +160,12 @@ namespace RatUI::GLSL
     void main()
     {
         float d  = SDRoundedBox(v_LocalPos, v_HalfSize, v_CornerRadius);
-        float aa = max(fwidth(d) * c_FillSoftness, 0.5);
+        float aa = max(fwidth(d) * v_Softness, 0.5);
 
         // 1 inside the fill area, smooth edge at d=0.
         float fillMask = 1.0 - smoothstep(
-            -aa - c_FillSoftness,
-             aa + c_FillSoftness,
+            -aa - v_Softness,
+             aa + v_Softness,
              d );
 
         // Border band: outside fill (d > 0) up to d == borderThickness.
@@ -172,8 +173,8 @@ namespace RatUI::GLSL
         if (v_BorderThickness > 0.0)
         {
             float outerMask = 1.0 - smoothstep(
-                -aa - c_BorderSoftness, 
-                 aa + c_BorderSoftness,
+                -aa - v_Softness, 
+                 aa + v_Softness,
                  d - v_BorderThickness );
 
             borderMask = clamp(outerMask - fillMask, 0.0, 1.0);

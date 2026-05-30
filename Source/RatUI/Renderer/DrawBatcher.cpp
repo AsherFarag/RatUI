@@ -241,6 +241,127 @@ namespace RatUI
         TryFlatten();
     }
 
+    void DrawBatcher::EmitSlicedRect( Rect<Pixel> a_Rect, NineSlice a_Slice, Color a_Tint )
+    {
+        // TODO: Need cleaner and safer api here
+		const TextureHandle& texture = std::get<SDFDrawData>( Back( m_Batches ).Data ).Texture;
+
+        Optional<TextureInfo> texInfo = texture.QueryInfo();
+
+        if ( !texInfo )
+        {
+			RATUI_ASSERT( false, "Failed to query texture info for nine-slice rect" );
+            return;
+        }
+
+		const Vec2u texSize = texInfo->Size;
+
+        const f32 rcpTexW = 1.f / static_cast<f32>( texSize[0] );
+        const f32 rcpTexH = 1.f / static_cast<f32>( texSize[1] );
+
+        const f32 rectW = a_Rect.Size[0].ToFloat();
+        const f32 rectH = a_Rect.Size[1].ToFloat();
+
+        // Apply user scaling first
+        const f32 scaledLeft   = static_cast<f32>( a_Slice.Left )   * a_Slice.Scale[0];
+        const f32 scaledRight  = static_cast<f32>( a_Slice.Right )  * a_Slice.Scale[0];
+        const f32 scaledTop    = static_cast<f32>( a_Slice.Top )    * a_Slice.Scale[1];
+        const f32 scaledBottom = static_cast<f32>( a_Slice.Bottom ) * a_Slice.Scale[1];
+
+        // Scale corners down if they would overlap
+        const f32 rawCornerW = scaledLeft + scaledRight;
+        const f32 rawCornerH = scaledTop  + scaledBottom;
+
+        const f32 fitScaleX = ( rawCornerW > rectW && rawCornerW > 0.f )
+            ? rectW / rawCornerW
+            : 1.f;
+
+        const f32 fitScaleY = ( rawCornerH > rectH && rawCornerH > 0.f )
+            ? rectH / rawCornerH
+            : 1.f;
+
+        const f32 dstLeft   = scaledLeft   * fitScaleX;
+        const f32 dstRight  = scaledRight  * fitScaleX;
+        const f32 dstTop    = scaledTop    * fitScaleY;
+        const f32 dstBottom = scaledBottom * fitScaleY;
+
+        // Destination X/Y split points
+        const f32 x0 = a_Rect.Origin[0].ToFloat();
+        const f32 x1 = x0 + dstLeft;
+        const f32 x3 = x0 + rectW;
+        const f32 x2 = x3 - dstRight;
+
+        const f32 y0 = a_Rect.Origin[1].ToFloat();
+        const f32 y1 = y0 + dstTop;
+        const f32 y3 = y0 + rectH;
+        const f32 y2 = y3 - dstBottom;
+
+        // Source UV split points
+        const f32 u0 = 0.f;
+        const f32 u1 = static_cast<f32>( a_Slice.Left ) * rcpTexW;
+        const f32 u2 = 1.f - static_cast<f32>( a_Slice.Right ) * rcpTexW;
+        const f32 u3 = 1.f;
+
+        const f32 v0 = 0.f;
+        const f32 v1 = static_cast<f32>( a_Slice.Top ) * rcpTexH;
+        const f32 v2 = 1.f - static_cast<f32>( a_Slice.Bottom ) * rcpTexH;
+        const f32 v3 = 1.f;
+
+        const auto EmitQuad = [&]( f32 dx0, f32 dy0, f32 dx1, f32 dy1,
+                                   f32 su0, f32 sv0, f32 su1, f32 sv1 )
+        {
+            if ( dx1 - dx0 <= 0.f || dy1 - dy0 <= 0.f )
+                return;
+
+            const Vec2<Pixel> halfSize{ Pixel{ ( dx1 - dx0 ) * 0.5f }, 
+                                        Pixel{ ( dy1 - dy0 ) * 0.5f } };
+
+            const u32 vertexBase = ( static_cast<u32>( Size( m_Vertices ) )
+                                   - Back( m_Batches ).VertexByteOffset ) / sizeof( SDFVertex );
+
+			// TODO: Since we know how many vertices/indices we're going to emit, 
+            // we could reserve them all at once before the loop instead of per quad.
+
+            auto verts = ReserveVertices<SDFVertex>( 4 );
+
+            verts[0] = { .Position = { Pixel{ dx0 }, Pixel{ dy0 } }, .LocalPos = { -halfSize[0], -halfSize[1] },
+                         .UV = { su0, sv0 }, .FillColor = a_Tint, .BorderColor = Colors::Transparent,
+						 .BorderThickness = 0_px, .HalfSize = halfSize, .CornerRadius = 0_px, .Softness = 0.f };
+
+            verts[1] = { .Position = { Pixel{ dx1 }, Pixel{ dy0 } }, .LocalPos = {  halfSize[0], -halfSize[1] },
+                         .UV = { su1, sv0 }, .FillColor = a_Tint, .BorderColor = Colors::Transparent,
+                         .BorderThickness = 0_px, .HalfSize = halfSize, .CornerRadius = 0_px, .Softness = 0.f };
+
+            verts[2] = { .Position = { Pixel{ dx0 }, Pixel{ dy1 } }, .LocalPos = { -halfSize[0],  halfSize[1] },
+                         .UV = { su0, sv1 }, .FillColor = a_Tint, .BorderColor = Colors::Transparent,
+                         .BorderThickness = 0_px, .HalfSize = halfSize, .CornerRadius = 0_px, .Softness = 0.f };
+
+            verts[3] = { .Position = { Pixel{ dx1 }, Pixel{ dy1 } }, .LocalPos = {  halfSize[0],  halfSize[1] },
+                         .UV = { su1, sv1 }, .FillColor = a_Tint, .BorderColor = Colors::Transparent,
+                         .BorderThickness = 0_px, .HalfSize = halfSize, .CornerRadius = 0_px, .Softness = 0.f };
+
+            auto idx = ReserveIndices( 6 );
+            idx[0] = vertexBase + 0; idx[1] = vertexBase + 1; idx[2] = vertexBase + 2;
+            idx[3] = vertexBase + 1; idx[4] = vertexBase + 3; idx[5] = vertexBase + 2;
+            AddIndicesToCurrentBatch( 6 );
+        };
+
+        // Row-major: TL, T, TR, L, C, R, BL, B, BR
+        EmitQuad( x0, y0, x1, y1, u0, v0, u1, v1 );
+        EmitQuad( x1, y0, x2, y1, u1, v0, u2, v1 );
+        EmitQuad( x2, y0, x3, y1, u2, v0, u3, v1 );
+
+        EmitQuad( x0, y1, x1, y2, u0, v1, u1, v2 );
+        EmitQuad( x1, y1, x2, y2, u1, v1, u2, v2 );
+        EmitQuad( x2, y1, x3, y2, u2, v1, u3, v2 );
+
+        EmitQuad( x0, y2, x1, y3, u0, v2, u1, v3 );
+        EmitQuad( x1, y2, x2, y3, u1, v2, u2, v3 );
+        EmitQuad( x2, y2, x3, y3, u2, v2, u3, v3 );
+
+        TryFlatten();
+    }
+
     void DrawBatcher::EmitText( const ShapedText& a_Text, const TextRenderStyle& a_Style, Rect<Pixel> a_LayoutRect, GlyphAtlas& a_Atlas, f32 a_DpiScale )
     {
         if ( Empty( a_Text.Glyphs ) || Empty( a_Text.Lines ) )
