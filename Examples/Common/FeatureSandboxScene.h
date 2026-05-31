@@ -6,15 +6,13 @@
 class FeatureSandboxScene : public IDemoScene
 {
 public:
-    FeatureSandboxScene( FontHandle a_Font, ITextMetrics* a_TextMetrics ) : IDemoScene( a_TextMetrics ), DefaultFont( a_Font ) {}
-    ~FeatureSandboxScene() override = default;
-
     FontHandle DefaultFont;
     WidgetID MainContentArea;
     f32 Time = 0.f;
     Shared<Theme> DefaultTheme;
 
-    void Init() override
+    FeatureSandboxScene( FontHandle a_Font, ITextMetrics* a_TextMetrics ) 
+        : IDemoScene( a_TextMetrics ), DefaultFont( a_Font )
     {
         DefaultTheme = MakeShared<Theme>( *Themes::Dark() );
         DefaultTheme->SetTextStyle(
@@ -377,10 +375,5 @@ public:
     void Render( DrawList& a_DrawList ) override
     {
         m_Scene.Render( a_DrawList );
-    }
-
-    void Shutdown() override
-    {
-        //m_Scene.DestroyWidget( m_Scene.RootWidget );
     }
 };

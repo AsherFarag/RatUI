@@ -7,10 +7,10 @@ namespace RatUI::FreeType
 {
     Optional<PreparedText> TextMetrics::Prepare( StringView a_Text, const TextLayoutStyle& a_Style )
     {
-        if ( !m_FontCache || !a_Style.Font.IsValid() || Empty( a_Text ) )
+        if ( !a_Style.Font.IsValid() || Empty( a_Text ) )
             return NullOpt;
 
-        Font* font = m_FontCache->GetOrLoadFont( a_Style.Font );
+        Font* font = m_FontCache.GetOrLoadFont( a_Style.Font );
         if ( !font )
             return NullOpt;
 
@@ -31,10 +31,10 @@ namespace RatUI::FreeType
         if ( a_MaxSize[0] <= 0_u || a_MaxSize[1] <= 0_u )
             return NullOpt;
 
-        if ( !m_FontCache || !a_Style.Font.IsValid() || Empty( a_Prepared.Segments ) )
+        if ( !a_Style.Font.IsValid() || Empty( a_Prepared.Segments ) )
             return NullOpt;
 
-        Font* font = m_FontCache->GetOrLoadFont( a_Style.Font );
+        Font* font = m_FontCache.GetOrLoadFont( a_Style.Font );
         if ( !font )
             return NullOpt;
 
@@ -165,10 +165,7 @@ namespace RatUI::FreeType
         o_Bearing = Vec2<FontUnit>{ 0_fu, 0_fu };
         o_XAdvance = 0_fu;
 
-        if ( !m_FontCache )
-            return false;
-
-        Font* font = m_FontCache->GetOrLoadFont( a_Font );
+        Font* font = m_FontCache.GetOrLoadFont( a_Font );
         if ( !font || !font->IsValid() )
             return false;
 

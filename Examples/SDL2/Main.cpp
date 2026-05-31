@@ -33,11 +33,10 @@ public:
 
 protected:
 
-    Unique<DrawList> m_DrawList;
-    Unique<GlyphAtlas> m_Atlas;
-    FreeType::FontCache m_FontCache;
-    FreeType::TextMetrics m_TextMetrics{};
-
+    Optional<FreeType::FontCache> m_FontCache;
+    Optional<FreeType::TextMetrics> m_TextMetrics;
+    Optional<GlyphAtlas> m_Atlas;
+    Optional<DrawList> m_DrawList;
     Unique<IDemoScene> m_Scene;
 
 	f32 m_UIScale{ 1.f };
@@ -48,15 +47,15 @@ protected:
 
         const FontHandle fontHandle = { 1 };
 		const FontHandle minecraftFontHandle = { 2 };
-        m_FontCache.RegisterFontHandle( fontHandle, "Resources/Fonts/Roboto-Medium.ttf" );
-        m_FontCache.RegisterFontHandle( minecraftFontHandle, "Resources/Fonts/Minecraft.ttf" );
-		m_TextMetrics.SetFontCache( &m_FontCache );
+        m_FontCache.emplace();
+        m_FontCache->RegisterFontHandle( fontHandle, "Resources/Fonts/Roboto-Medium.ttf" );
+        m_FontCache->RegisterFontHandle( minecraftFontHandle, "Resources/Fonts/Minecraft.ttf" );
 
-        m_Scene = MakeUnique<ThemeShowcaseScene>( fontHandle, &m_TextMetrics );
-        m_Scene->Init();
+        m_TextMetrics.emplace( *m_FontCache );
+        m_Atlas.emplace( *m_Renderer, *m_TextMetrics );
+		m_DrawList.emplace( *m_Atlas );
 
-        m_Atlas = MakeUnique<GlyphAtlas>( *m_Renderer, m_TextMetrics );
-		m_DrawList = MakeUnique<DrawList>( *m_Atlas );
+        m_Scene = MakeUnique<ThemeShowcaseScene>( fontHandle, &*m_TextMetrics );
     
         return true;
     }
@@ -108,13 +107,11 @@ protected:
 
     bool OnShutdown() override
     {
-		m_DrawList->Clear();
-        m_DrawList.reset();
-
-        m_Scene->Shutdown();
         m_Scene.reset();
-
+		m_DrawList.reset();
 		m_Atlas.reset();
+		m_TextMetrics.reset();
+        m_FontCache.reset();
         return true;
     }
 

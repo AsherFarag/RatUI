@@ -46,7 +46,8 @@ namespace RatUI
                                                                       "0123456789"
                                                                       ".,!?-+/():;%&`\"*#=[]";
 
-        GlyphAtlas( IRenderer& a_Renderer, ITextMetrics& a_TextMetrics,
+        GlyphAtlas( IRenderer& a_Renderer, 
+                    ITextMetrics& a_TextMetrics,
                     const GlyphAtlasConfig& a_Config = {} )
             : m_Renderer   ( a_Renderer )
             , m_TextMetrics( a_TextMetrics )

@@ -11,11 +11,6 @@ public:
     ThemeShowcaseScene( FontHandle a_Font, ITextMetrics* a_TextMetrics )
         : IDemoScene( a_TextMetrics )
         , DefaultFont( a_Font )
-    {}
-
-    ~ThemeShowcaseScene() override = default;
-
-    void Init() override
     {
         BuildThemes();
         ApplyTheme( 0 );

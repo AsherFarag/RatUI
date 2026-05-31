@@ -20,14 +20,12 @@ public:
     Scene& GetScene() { return m_Scene; }
     const Scene& GetScene() const { return m_Scene; }
 
-    virtual void Init() {}
     virtual void OnInputEvent( const InputEvent& a_Event ) {}
     virtual void Update( f32 a_DeltaTime ) {}
     virtual void Render( DrawList& a_DrawList ) {}
-    virtual void Shutdown() {}
 
 protected:
-    Scene m_Scene; 
+    Scene m_Scene;
 };
 
 class CircleWidget : public IWidget

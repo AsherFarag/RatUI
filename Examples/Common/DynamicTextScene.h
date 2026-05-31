@@ -20,14 +20,6 @@
  */
 class DynamicTextScene : public IDemoScene
 {
-public:
-    DynamicTextScene( FontHandle a_Font, ITextMetrics* a_TextMetrics )
-        : IDemoScene( a_TextMetrics )
-        , m_Font( a_Font )
-    {}
-
-    ~DynamicTextScene() override = default;
-
 private:
 
     struct TextStyle
@@ -665,7 +657,9 @@ private:
     // =========================================================================
 public:
 
-    void Init() override
+    DynamicTextScene( FontHandle a_Font, ITextMetrics* a_TextMetrics )
+        : IDemoScene( a_TextMetrics )
+        , m_Font( a_Font )
     {
         // Root
         DefaultTheme = MakeShared<Theme>( Themes::Dark() );
@@ -767,6 +761,4 @@ public:
     {
         m_Scene.Render( a_DrawList );
     }
-
-    void Shutdown() override {}
 };
