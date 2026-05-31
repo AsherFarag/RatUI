@@ -36,14 +36,14 @@ public:
     void OnPaint( DrawList& ) override            { ++PaintCount; }
 
     bool IsFocusable() const override             { return Focusable; }
-    void OnFocusReceived() override               { ++FocusReceivedCount; }
-    void OnFocusLost() override                   { ++FocusLostCount; }
+    void OnFocusReceived( const FocusEvent& ) override               { ++FocusReceivedCount; }
+    void OnFocusLost( const FocusEvent& ) override                   { ++FocusLostCount; }
 
-    void OnPointerEnter( const PointerEvent& ) override { ++PointerEnterCount; }
-    void OnPointerExit( const PointerEvent& ) override  { ++PointerExitCount; }
+    Reply OnPointerEnter( const PointerEvent& ) override { ++PointerEnterCount; return Reply::Unhandled(); }
+    Reply OnPointerExit( const PointerEvent& ) override  { ++PointerExitCount; return Reply::Unhandled(); }
 
-    bool OnPressed ( const ButtonEvent& ) override { ++PressedCount;  return ConsumePress; }
-    bool OnReleased( const ButtonEvent& ) override { ++ReleasedCount; return ConsumePress; }
+    Reply OnButtonPressed ( const ButtonEvent& ) override { ++PressedCount;  return Reply::Unhandled(); }
+    Reply OnButtonReleased( const ButtonEvent& ) override { ++ReleasedCount; return Reply::Unhandled(); }
 };
 
 /** Builds a mouse PointerEvent at the given position. */
