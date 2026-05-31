@@ -37,17 +37,27 @@ namespace RatUI
         RGBA8,
     };
 
+    /**
+	 * @brief Describes the filtering mode used when sampling a texture, which determines how the texture is sampled when it is scaled up or down.
+     */
     enum class ETextureFilter : u8
     {
         Nearest,
         Linear,
     };
 
+    /**
+	 * @brief Parameters that define how a texture should be sampled when rendering.
+     */
     struct TextureSampler
     {
 		ETextureFilter Filter{ ETextureFilter::Linear };
     };
 
+    /**
+	 * @brief Information about a texture resource, including its size, format, and sampling parameters.
+	 * Used for creating textures and querying texture properties from the renderer.
+     */
     struct TextureInfo
     {
 		Vec2u          Size;    ///< The width and height of the texture in pixels.

@@ -443,7 +443,7 @@ namespace RatUI
             {
                 const ShapedGlyph& sg = a_Text.Glyphs[g];
 
-                Optional<GlyphMetrics> gr = a_Atlas.GetOrRasterizeGlyph( a_Text.Font, sg.Codepoint );
+                Optional<GlyphMetrics> gr = a_Atlas.GetOrRasterizeGlyph( a_Text.Font, sg.GlyphIndex );
                 if ( !gr || gr->AtlasRect.Size[0] == 0 || gr->AtlasRect.Size[1] == 0 )
                 {
                     penX += ToPixel( sg.XAdvance, fontSize, a_DpiScale );

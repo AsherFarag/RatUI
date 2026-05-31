@@ -24,7 +24,7 @@ namespace RatUI::FreeType
         Optional<ShapedText> Shape( const PreparedText& a_Prepared, const TextLayoutStyle& a_Style, Vec2<Unit> a_MaxSize = { Limits<Unit>::max(), Limits<Unit>::max() } ) override;
 
         bool RasterizeGlyph(
-            FontHandle a_Font, codepoint a_Codepoint, u32 a_SdfPixelSize,
+            FontHandle a_Font, GlyphID a_GlyphIndex, u32 a_SdfPixelSize,
             const Color*& o_Pixels, u32& o_Width, u32& o_Height,
             Vec2<FontUnit>& o_Bearing, FontUnit& o_XAdvance
         ) override;

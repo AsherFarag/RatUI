@@ -223,7 +223,15 @@ namespace RatUI::FreeType
                     xAdvance += wordSpacing;
             }
 
-            EmplaceBack( o_Glyphs, infos[i].codepoint, xAdvance, yAdvance, xOffset, yOffset );
+
+			EmplaceBack( o_Glyphs, ShapedGlyph{
+                .GlyphIndex = GlyphID{ infos[i].codepoint }, // Harfbuzz codepoint becomes a glyph index once the text is shaped
+				.XAdvance = xAdvance,
+				.YAdvance = yAdvance,
+				.XOffset = xOffset,
+				.YOffset = yOffset
+			} );
+
             lineWidth += xAdvance;
         }
 

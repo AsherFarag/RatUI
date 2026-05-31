@@ -41,6 +41,11 @@ namespace RatUI
     class GlyphAtlas
     {
     public:
+        static constexpr Span<const codepoint> c_CommonASCIIGlyphs = U"ABCDEFGHIJKLMNOPQRSTUVWXYZ" 
+                                                                      "abcdefghijklmnopqrstuvwxyz"
+                                                                      "0123456789"
+                                                                      ".,!?-+/():;%&`\"*#=[]";
+
         GlyphAtlas( IRenderer& a_Renderer, ITextMetrics& a_TextMetrics,
                     const GlyphAtlasConfig& a_Config = {} )
             : m_Renderer   ( a_Renderer )
@@ -73,9 +78,9 @@ namespace RatUI
         /**
          * @brief
          */
-		Optional<GlyphMetrics> GetOrRasterizeGlyph( FontHandle a_Font, codepoint a_CP )
+		Optional<GlyphMetrics> GetOrRasterizeGlyph( FontHandle a_Font, GlyphID a_GlyphIndex )
         {
-            const GlyphKey key{ a_Font, a_CP };
+            const GlyphKey key{ a_Font, a_GlyphIndex };
 
             if ( const auto it = Find( m_GlyphMap, key ); it != End( m_GlyphMap ) )
                 return it->second;
@@ -94,7 +99,7 @@ namespace RatUI
 
             const u32 baseSizePx = static_cast<u32>( std::max( 1.0f, baseSize ) );
 
-            if ( !m_TextMetrics.RasterizeGlyph( a_Font, a_CP, baseSizePx,
+            if ( !m_TextMetrics.RasterizeGlyph( a_Font, a_GlyphIndex, baseSizePx,
                 pixels, width, height, bearing, xAdvance ) )
                 return NullOpt; // Rasterization failed (e.g. missing glyph in font).
 
@@ -122,6 +127,15 @@ namespace RatUI
             
             return NullOpt; // Failed to allocate space in the atlas.
         }
+
+		void LoadGlyphs( FontHandle a_Font, Span<const GlyphID> a_Glyphs )
+		{
+			// TODO: Can optimise this by batching rasterization and texture uploads, but for simplicity we will just do them one at a time for now.
+			for ( const GlyphID glyphID : a_Glyphs )
+			{
+				GetOrRasterizeGlyph( a_Font, glyphID );
+			}
+		}
 
     protected:
 
@@ -168,7 +182,7 @@ namespace RatUI
         struct GlyphKey
         {
             FontHandle Font;
-            codepoint  Codepoint;
+            GlyphID    GlyphIndex;
 
             bool operator==( const GlyphKey& a_Other ) const = default;
         };
@@ -180,7 +194,7 @@ namespace RatUI
                 // FNV-1a hash combine
                 std::size_t hash = 2166136261u;
                 hash = ( hash ^ std::hash<FontHandle>{}( a_Key.Font ) ) * 16777619u;
-                hash = ( hash ^ std::hash<codepoint>{}( a_Key.Codepoint ) ) * 16777619u;
+                hash = ( hash ^ std::hash<GlyphID>{}( a_Key.GlyphIndex ) ) * 16777619u;
                 return hash;
             }
         };

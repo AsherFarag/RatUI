@@ -103,23 +103,6 @@ protected:
 
         m_DrawList->Clear();
 		m_Scene->Render( *m_DrawList );
-
-		static TextureHandle tex = LoadTexture( "Resources/Textures/InventorySlot.png", { ETextureFilter::Nearest } );
-
-        const NineSlice slice = {
-			.Left = 4,
-			.Top = 5,
-			.Right = 3,
-			.Bottom = 3,
-            .Scale = { 5, 5 }
-        };
-
-         m_DrawList->AddSlicedRect( Rect<Unit>::FromMinMax( { 10_u, 10_u }, { 200_u, 50_u } ),
-                                      {
-                                      .Texture = tex,
-                                      .Slice = slice
-                                      } );
-
 		m_DrawList->Flush( a_Renderer );
     }
 

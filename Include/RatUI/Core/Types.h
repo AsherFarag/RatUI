@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <type_traits>
 
 namespace RatUI
 {
@@ -46,6 +47,12 @@ namespace RatUI
     inline constexpr bool HasFlag( T a_Value, T a_Flag )
     {
         return ( a_Value & a_Flag ) == a_Flag;
+    }
+
+    template<typename T>
+    inline constexpr auto ToUnderlying( T a_Enum ) -> std::underlying_type_t<T>
+    {
+        return static_cast<std::underlying_type_t<T>>( a_Enum );
     }
 
     /**

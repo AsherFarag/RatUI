@@ -155,7 +155,7 @@ namespace RatUI::FreeType
         return result;
     }
 
-    bool TextMetrics::RasterizeGlyph( FontHandle a_Font, codepoint a_Codepoint, u32 a_SdfPixelSize,
+    bool TextMetrics::RasterizeGlyph( FontHandle a_Font, GlyphID a_GlyphID, u32 a_SdfPixelSize,
                                       const Color*& o_Pixels, u32& o_Width, u32& o_Height,
                                       Vec2<FontUnit>& o_Bearing, FontUnit& o_XAdvance )
     {
@@ -177,7 +177,7 @@ namespace RatUI::FreeType
         msdfgen::Shape shape;
         f64 advance = 0.0;
 
-        if ( !msdfgen::loadGlyph( shape, msdfFont, msdfgen::GlyphIndex( a_Codepoint ), msdfgen::FONT_SCALING_EM_NORMALIZED, &advance ) )
+        if ( !msdfgen::loadGlyph( shape, msdfFont, msdfgen::GlyphIndex{ ToUnderlying( a_GlyphID ) }, msdfgen::FONT_SCALING_EM_NORMALIZED, &advance ) )
             return false;
 
         o_XAdvance = FontUnit{ static_cast<f32>( advance ) };
