@@ -1,6 +1,7 @@
 #pragma once
 #include "../Core.h"
 #include "Font.h"
+#include "Script.h"
 
 namespace RatUI
 {
@@ -163,6 +164,7 @@ namespace RatUI
 		Unit           LineSpacing  { 0_u }; ///< The additional spacing between lines of text, specified in points. Default is 0.0f.
 		u32            MaxLines       { 0 }; ///< The maximum number of lines to display. If set to 0, there is no limit and all lines will be displayed.
 
+        EScript        Script     { EScript::Invalid };
         ETextDirection Direction  { ETextDirection::Auto };
         TextWrap       Wrap       { TextWrap::Normal() }; 
         ETextOverflow  Overflow   { ETextOverflow::Clip };

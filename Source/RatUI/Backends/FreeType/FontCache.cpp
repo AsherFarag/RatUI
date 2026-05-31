@@ -182,7 +182,20 @@ namespace RatUI::FreeType
         hb_buffer_reset( buf );
 
         hb_buffer_add_utf8( buf, Data( a_TextUTF8 ), static_cast<int>( Size( a_TextUTF8 ) ), 0, -1 );
+
+        switch ( a_Layout.Direction )
+        {
+            case ETextDirection::Auto: break; // Let Harfbuzz guess the direction based on the first strong character
+            case ETextDirection::LTR: hb_buffer_set_direction( buf, HB_DIRECTION_LTR ); break;
+            case ETextDirection::RTL: hb_buffer_set_direction( buf, HB_DIRECTION_RTL ); break;
+        }
+
+        if ( a_Layout.Script != EScript::Invalid )
+            hb_buffer_set_script( buf, static_cast<hb_script_t>( a_Layout.Script ) );
+
+        //hb_buffer_set_language( buf, hb_language_get_default() ); // TODO: Expose this?
         hb_buffer_guess_segment_properties( buf );
+
         hb_shape( a_Font.GetHBFont(), buf, nullptr, 0 );
 
         u32 glyphCount = 0;
@@ -199,23 +212,29 @@ namespace RatUI::FreeType
         RATUI_ASSERT( ppem > 0.f, "Invalid font metrics: y_ppem must be > 0." );
 
         const FontUnit letterSpacing = ToFontUnit( a_Layout.LetterSpacing, fontSize );
-        const FontUnit wordSpacing = ToFontUnit( a_Layout.WordSpacing, fontSize );
+        const FontUnit wordSpacing   = ToFontUnit( a_Layout.WordSpacing, fontSize );
 
         FontUnit lineWidth = 0_fu;
 
-        constexpr u32 c_NoCluster = Limits<u32>::max();
-        u32 lastWordSpacingCluster = c_NoCluster;
+        u32 lastWordSpacingCluster = Limits<u32>::max();
 
         for ( u32 i = 0; i < glyphCount; ++i )
         {
             FontUnit xAdvance = FontUnit{ static_cast<f32>( positions[i].x_advance ) / emNormDiv };
             FontUnit yAdvance = FontUnit{ static_cast<f32>( positions[i].y_advance ) / emNormDiv };
-            FontUnit xOffset = FontUnit{ static_cast<f32>( positions[i].x_offset ) / emNormDiv };
-            FontUnit yOffset = FontUnit{ static_cast<f32>( positions[i].y_offset ) / emNormDiv };
+            FontUnit xOffset  = FontUnit{ static_cast<f32>( positions[i].x_offset ) / emNormDiv };
+            FontUnit yOffset  = FontUnit{ static_cast<f32>( positions[i].y_offset ) / emNormDiv };
 
-            if ( letterSpacing != 0_fu && i + 1 < glyphCount && infos[i].cluster != infos[i + 1].cluster )
+			// Only apply letter spacing if this glyph is not the last one in a cluster, 
+            // to avoid adding extra space between ligatures and other multi-codepoint clusters
+            if ( letterSpacing != 0_fu && 
+                 i + 1 < glyphCount && 
+                 infos[i].cluster != infos[i + 1].cluster )
                 xAdvance += letterSpacing;
 
+			// Only apply word spacing if this glyph is the last one in a cluster,
+            // and that cluster corresponds to a whitespace character, to avoid 
+            // adding extra space between words that are separated by multiple whitespace characters
             if ( wordSpacing != 0_fu && infos[i].cluster != lastWordSpacingCluster )
             {
                 lastWordSpacingCluster = infos[i].cluster;

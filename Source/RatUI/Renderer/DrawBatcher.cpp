@@ -366,38 +366,60 @@ namespace RatUI
     {
         if ( Empty( a_Text.Glyphs ) || Empty( a_Text.Lines ) )
             return;
-
-        const f32 atlasW = static_cast<f32>( a_Atlas.GetConfig().AtlasWidth );
-        const f32 atlasH = static_cast<f32>( a_Atlas.GetConfig().AtlasHeight );
+    
+        const f32 atlasW    = static_cast<f32>( a_Atlas.GetConfig().AtlasWidth );
+        const f32 atlasH    = static_cast<f32>( a_Atlas.GetConfig().AtlasHeight );
         const f32 rcpAtlasW = atlasW > 0.f ? 1.f / atlasW : 0.f;
         const f32 rcpAtlasH = atlasH > 0.f ? 1.f / atlasH : 0.f;
-
-        const Unit fontSize = a_Text.FontSize;
+    
+        const Unit  fontSize   = a_Text.FontSize;
         const Pixel textHeight = ToPixel( a_Text.TotalHeight, a_DpiScale );
-        const Pixel ascender = ToPixel( a_Text.Ascender, a_DpiScale );
-
-        const f32 baseSize = a_Atlas.GetConfig().BaseSize.ToFloat();
-        const f32 rcpBase = baseSize > 0.f ? 1.f / baseSize : 0.f;
+        const Pixel ascender   = ToPixel( a_Text.Ascender, a_DpiScale );
+    
+        const f32 baseSize   = a_Atlas.GetConfig().BaseSize.ToFloat();
+        const f32 rcpBase    = baseSize > 0.f ? 1.f / baseSize : 0.f;
         const f32 fontSizePx = ToPixel( fontSize, a_DpiScale ).ToFloat();
-
-        const Pixel layoutRight = a_LayoutRect.Origin[0] + a_LayoutRect.Size[0];
-        const f32 fadePct = std::clamp( a_Style.FadePercentage, 0.0f, 1.0f );
-        const Pixel fadeWidth = a_LayoutRect.Size[0] * fadePct;
-        const Pixel fadeStartX = layoutRight - fadeWidth;
-        const Pixel fadeEndX = layoutRight;
-
-        auto computeFadeAlpha = [&]( Pixel x ) -> u8
+    
+        const bool isSingleLine   = a_Text.LineCount() == 1;
+        const bool overflowsY     = textHeight > a_LayoutRect.Size[1];
+        const bool fadeHorizontal = isSingleLine;
+        const bool fadeVertical   = !isSingleLine && overflowsY;
+    
+        // Horizontal fade setup (single-line only)
+        const Pixel layoutRight = a_LayoutRect.Right();
+        const f32   fadePct     = fadeHorizontal ? std::clamp( a_Style.FadePercentage, 0.0f, 1.0f ) : 0.f;
+        const Pixel fadeStartX  = layoutRight - a_LayoutRect.Size[0] * fadePct;
+        const Pixel fadeEndX    = layoutRight;
+    
+        // Vertical fade setup (multi-line overflow only)
+        const Pixel layoutBottom  = a_LayoutRect.Bottom();
+        const f32   fadePctV      = fadeVertical ? std::clamp( a_Style.FadePercentage, 0.0f, 1.0f ) : 0.f;
+        const Pixel fadeStartY    = layoutBottom - a_LayoutRect.Size[1] * fadePctV;
+        const Pixel fadeEndY      = layoutBottom;
+    
+        auto computeFadeAlpha = [&]( Pixel x, Pixel y ) -> u8
         {
-            if ( fadePct <= 0.f || x <= fadeStartX )
-                return a_Style.FillColor[3];
-            if ( x >= fadeEndX )
-                return 0;
-
-            const f32 t = ( x - fadeStartX ).ToFloat() / ( fadeEndX - fadeStartX ).ToFloat();
-            const f32 alpha = ( 1.0f - t ) * static_cast<f32>( a_Style.FillColor[3] );
+            f32 alpha = static_cast<f32>( a_Style.FillColor[3] );
+    
+            if ( fadeHorizontal && fadePct > 0.f && x > fadeStartX )
+            {
+                if ( x >= fadeEndX )
+                    return 0;
+                const f32 t = ( x - fadeStartX ).ToFloat() / ( fadeEndX - fadeStartX ).ToFloat();
+                alpha = ( 1.0f - t ) * alpha;
+            }
+    
+            if ( fadeVertical && fadePctV > 0.f && y > fadeStartY )
+            {
+                if ( y >= fadeEndY )
+                    return 0;
+                const f32 t = ( y - fadeStartY ).ToFloat() / ( fadeEndY - fadeStartY ).ToFloat();
+                alpha = ( 1.0f - t ) * alpha;
+            }
+    
             return static_cast<u8>( std::clamp( alpha, 0.0f, 255.0f ) );
         };
-
+    
         Pixel baselineY = a_LayoutRect.Origin[1];
         switch ( a_Style.Baseline )
         {
@@ -415,13 +437,13 @@ namespace RatUI
             default:
                 break;
         }
-
+    
         Pixel penY = baselineY;
-
+    
         for ( u32 lineIdx = 0; lineIdx < a_Text.LineCount(); ++lineIdx )
         {
             const ShapedLine& line = a_Text.Lines[lineIdx];
-
+    
             Pixel lineX = a_LayoutRect.Origin[0];
             switch ( a_Style.Align )
             {
@@ -434,41 +456,44 @@ namespace RatUI
                 default:
                     break;
             }
-
+    
             Pixel penX = lineX;
-
+    
             u32 vertexBase = ( static_cast<u32>( Size( m_Vertices ) ) - Back( m_Batches ).VertexByteOffset ) / sizeof( TextVertex );
-
+    
             for ( u32 g = line.Start; g < line.End; ++g )
             {
                 const ShapedGlyph& sg = a_Text.Glyphs[g];
-
+    
                 Optional<GlyphMetrics> gr = a_Atlas.GetOrRasterizeGlyph( a_Text.Font, sg.GlyphIndex );
                 if ( !gr || gr->AtlasRect.Size[0] == 0 || gr->AtlasRect.Size[1] == 0 )
                 {
                     penX += ToPixel( sg.XAdvance, fontSize, a_DpiScale );
                     continue;
                 }
-
+    
                 const Pixel gx = penX + ToPixel( sg.XOffset + gr->Bearing[0], fontSize, a_DpiScale );
                 const Pixel gy = penY + ToPixel( sg.YOffset - gr->Bearing[1], fontSize, a_DpiScale );
                 const Pixel gw = static_cast<Pixel>( gr->AtlasRect.Size[0] ) * rcpBase * fontSizePx;
                 const Pixel gh = static_cast<Pixel>( gr->AtlasRect.Size[1] ) * rcpBase * fontSizePx;
-
+    
                 const f32 u0 = static_cast<f32>( gr->AtlasRect.Origin[0] ) * rcpAtlasW;
                 const f32 v0 = static_cast<f32>( gr->AtlasRect.Origin[1] ) * rcpAtlasH;
                 const f32 u1 = static_cast<f32>( gr->AtlasRect.Origin[0] + gr->AtlasRect.Size[0] ) * rcpAtlasW;
                 const f32 v1 = static_cast<f32>( gr->AtlasRect.Origin[1] + gr->AtlasRect.Size[1] ) * rcpAtlasH;
-
-                const f32 opacityA = computeFadeAlpha( gx ) / 255.0f;
-                const f32 opacityB = computeFadeAlpha( gx + gw ) / 255.0f;
-
+    
+                // Sample fade at all four corners to correctly interpolate across the glyph quad
+                const f32 opacityTL = computeFadeAlpha( gx,      gy      ) / 255.0f;
+                const f32 opacityTR = computeFadeAlpha( gx + gw, gy      ) / 255.0f;
+                const f32 opacityBL = computeFadeAlpha( gx,      gy + gh ) / 255.0f;
+                const f32 opacityBR = computeFadeAlpha( gx + gw, gy + gh ) / 255.0f;
+    
                 auto verts = ReserveVertices<TextVertex>( 4 );
-                verts[0] = TextVertex{ Vec2<Pixel>{ gx, gy }, opacityA, Vec2f{ u0, v0 } };
-                verts[1] = TextVertex{ Vec2<Pixel>{ gx + gw, gy }, opacityB, Vec2f{ u1, v0 } };
-                verts[2] = TextVertex{ Vec2<Pixel>{ gx, gy + gh }, opacityA, Vec2f{ u0, v1 } };
-                verts[3] = TextVertex{ Vec2<Pixel>{ gx + gw, gy + gh }, opacityB, Vec2f{ u1, v1 } };
-
+                verts[0] = TextVertex{ Vec2<Pixel>{ gx,      gy      }, opacityTL, Vec2f{ u0, v0 } };
+                verts[1] = TextVertex{ Vec2<Pixel>{ gx + gw, gy      }, opacityTR, Vec2f{ u1, v0 } };
+                verts[2] = TextVertex{ Vec2<Pixel>{ gx,      gy + gh }, opacityBL, Vec2f{ u0, v1 } };
+                verts[3] = TextVertex{ Vec2<Pixel>{ gx + gw, gy + gh }, opacityBR, Vec2f{ u1, v1 } };
+    
                 auto idx = ReserveIndices( 6 );
                 idx[0] = vertexBase + 0;
                 idx[1] = vertexBase + 1;
@@ -477,14 +502,14 @@ namespace RatUI
                 idx[4] = vertexBase + 3;
                 idx[5] = vertexBase + 2;
                 AddIndicesToCurrentBatch( 6 );
-
+    
                 penX += ToPixel( sg.XAdvance, fontSize, a_DpiScale );
                 vertexBase += 4;
             }
-
+    
             penY += ToPixel( a_Text.LineHeight, a_DpiScale );
         }
-
+    
         TryFlatten();
     }
 

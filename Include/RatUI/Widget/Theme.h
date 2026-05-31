@@ -73,11 +73,12 @@ namespace RatUI
         {}
     
         Theme( const Theme& a_Other )
-            : m_Parent   ( a_Other.m_Parent )
-            , m_Colors   ( a_Other.m_Colors )
-            , m_Roundings( a_Other.m_Roundings )
+            : m_Parent    ( a_Other.m_Parent )
+            , m_Colors    ( a_Other.m_Colors )
+            , m_Roundings ( a_Other.m_Roundings )
             , m_TextStyles( a_Other.m_TextStyles )
-            , m_Metrics  ( a_Other.m_Metrics )
+            , m_Metrics   ( a_Other.m_Metrics )
+            , m_Fonts     ( a_Other.m_Fonts )
             // m_Version intentionally starts at 0 for a fresh copy
         {}
     
@@ -90,11 +91,12 @@ namespace RatUI
                 RATUI_USER_ASSERT( a_Other.m_Parent.get() != this, 
                                    "Cannot assign a theme to one of its ancestors (circular parent chain)" );
 
-                m_Parent    = a_Other.m_Parent;
-                m_Colors    = a_Other.m_Colors;
-                m_Roundings = a_Other.m_Roundings;
+                m_Parent     = a_Other.m_Parent;
+                m_Colors     = a_Other.m_Colors;
+                m_Roundings  = a_Other.m_Roundings;
                 m_TextStyles = a_Other.m_TextStyles;
-                m_Metrics   = a_Other.m_Metrics;
+                m_Metrics    = a_Other.m_Metrics;
+				m_Fonts      = a_Other.m_Fonts;
                 ++m_Version; // assignment is a mutation of this theme
             }
 
@@ -112,6 +114,7 @@ namespace RatUI
                 m_Roundings  = std::move( a_Other.m_Roundings );
                 m_TextStyles = std::move( a_Other.m_TextStyles );
                 m_Metrics    = std::move( a_Other.m_Metrics );
+                m_Fonts	     = std::move( a_Other.m_Fonts );
                 ++m_Version;
             }
             return *this;
