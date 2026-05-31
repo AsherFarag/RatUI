@@ -17,6 +17,9 @@ file(GLOB_RECURSE RATUI_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/Source/*.cpp"
 )
 
+# TODO: I need to clean up the build system for this library and figure out what I want it to be
+list(FILTER RATUI_SOURCES EXCLUDE REGEX ".*/Backends/FreeType/.*")
+
 add_library(${PROJECT_NAME}
     ${RATUI_SOURCES}
 )
