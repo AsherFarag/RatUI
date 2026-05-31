@@ -13,6 +13,8 @@ using namespace RatUI;
 // Minimal test widget helpers
 // =============================================================================
 
+// TODO: Need to upgrade widget tests
+
 /** A simple widget that records the callbacks it receives. */
 class TrackingWidget : public IWidget
 {
@@ -36,6 +38,9 @@ public:
     void OnPaint( DrawList& ) override            { ++PaintCount; }
 
     bool IsFocusable() const override             { return Focusable; }
+    bool IsInteractable() const override          { return true; }
+    bool IsNavigationBoundary() const override    { return true; }
+
     void OnFocusReceived( const FocusEvent& ) override               { ++FocusReceivedCount; }
     void OnFocusLost( const FocusEvent& ) override                   { ++FocusLostCount; }
 
