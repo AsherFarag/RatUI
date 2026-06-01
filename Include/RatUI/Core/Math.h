@@ -1,5 +1,43 @@
 #pragma once
 
+/**
+ * @file Math.h
+ * @brief Provides vector, matrix, color, and rectangle types, along with common mathematical operations and constants.
+ * 
+ * To use your own math library, create a file named RatUIMathImpl.h that defines the following:
+ * @code
+ * // Example RatUIMathImpl.h to use GLM as the math library for RatUI
+ * namespace RatUI
+ * {
+ *   struct MathTraits
+ *   {
+ *    template<typename T, size Dim>
+ *    using Vec = glm::vec<Dim, T>;
+ * 
+ *    template<typename T, size Dim>
+ *    using Mat = glm::mat<Dim, Dim, T>;
+ * 
+ *    etc... (see MathTraits in this file for the full list of required types and members)
+ *   };
+ * }
+ * @endcode
+ * 
+ * Since vector members can be named differently across libraries (e.g., x/y/z/w vs X/Y/Z/W vs x()/y()/z()/w()), 
+ * RatUI expects the following minimal interface for vector types:
+ * - operator[](size_t)
+ * - operator+(Vec, Vec)
+ * - operator-(Vec, Vec)
+ * - operator*(Vec, Scalar)
+ * - operator/(Vec, Scalar)
+ * - operator*(Scalar, Vec)
+ * - operator/(Scalar, Vec)
+ * - constructible from individual scalar components (e.g., Vec3(x, y, z))
+ * 
+ * TODO: Math types can be tricky to access (row or column) so create a clean method and clean up all uses of them across the codebase.
+ * Required for matrices:
+ * - operator[](size_t) returning a column vector
+ */
+
 #include "Types.h"
 #include <cmath>
 #include <type_traits>
@@ -8,47 +46,43 @@
 #include <concepts>
 #include <numbers>
 
-// TODO: Might make more sense to have a Vec and Mat traits class with the specified operations but this is probably good enough for now. 
-
 #if defined(__has_include)
     #if __has_include("RatUIMathImpl.h")
         #include "RatUIMathImpl.h"
+        #define RATUI_MATH_IMPL
     #elif __has_include(<RatUIMathImpl.h>)
         #include <RatUIMathImpl.h>
+        #define RATUI_MATH_IMPL
     #endif
 #endif
 
-/**
- * If you want to use your own math library, define RATUI_MATH_IMPL and the following macros before including this header:
- * - RATUI_VEC_IMPL<T, Dim>: A template for a vector type with scalar components, where T is the scalar type and Dim is the dimensionality (e.g., 2, 3, or 4).
- * - RATUI_MATRIX_IMPL<T, Dim>: A template for a square matrix type with scalar components, where T is the scalar type and Dim is the dimensionality (e.g., 2, 3, or 4).
- * - RATUI_COLOR_IMPL: A type representing a color (e.g., RGBA), which should be constructible from 4 scalar components (e.g., r, g, b, a).
- * 
- * Required for RATUI_VEC_IMPL & RATUI_COLOR_IMPL:
- * - operator[](size_t)
- * - operator+(Vec, Vec)
- * - operator-(Vec, Vec)
- * - operator*(Vec, Scalar)
- * - operator/(Vec, Scalar)
- * - operator*(Scalar, Vec)
- * - operator/(Scalar, Vec)
- * - constructible from individual scalar components (e.g., Vec3(float x, float y, float z))
- * 
- * Required for RATUI_MATRIX_IMPL:
- * - operator[](size_t) returning a column vector
- * 
- * @note If you're using GLM, you'll need to do:
- * #define RATUI_VEC_IMPL(T, Dim) glm::vec<Dim, T>
- * #define RATUI_MATRIX_IMPL(T, Dim) glm::mat<Dim, Dim, T>
- */
 #ifndef RATUI_MATH_IMPL
 
-    #define RATUI_BUILTIN_MATH
+#include "../Extern/nicemath.h"
 
-    #include "../Extern/nicemath.h"
-    #define RATUI_VEC_IMPL ::nm::vec
-    #define RATUI_MATRIX_IMPL ::nm::mat
-    #define RATUI_COLOR_IMPL RATUI_VEC_IMPL<RatUI::f32, 4>
+namespace RatUI
+{
+    /**
+     * @brief Defines the mathematical types and traits used by RatUI. 
+     * By default, it uses the vec and mat types from the nicemath library, 
+     * but users can provide their own implementation by defining a custom MathTraits struct in a RatUIMathImpl.h file.
+     */
+    struct MathTraits
+    {
+        template<typename T, size Dim>
+        using Vec = ::nm::vec<T, Dim>;
+
+        template<typename T, size Dim>
+        using Mat = ::nm::mat<T, Dim>;
+
+        using Color = Vec<u8, 4>;
+
+        static constexpr bool c_ColumnMajor = true;
+
+        template<typename T>
+        static constexpr T c_Identity = T::identity(); 
+    };
+} // namespace RatUI
 
 #endif // RATUI_MATH_IMPL
 
@@ -88,10 +122,13 @@ namespace RatUI
         return std::abs( a_Left - a_Right ) <= a_Epsilon * std::max( std::abs( a_Left ), std::abs( a_Right ) );
     }
 
+    template<typename T>
+    constexpr T c_Identity = MathTraits::template c_Identity<T>;
+
     // === Vector Types ===
 
     template<typename T, size Dim>
-    using Vec = RATUI_VEC_IMPL<T, Dim>;
+    using Vec = MathTraits::template Vec<T, Dim>;
 
     template<typename T> using Vec2 = Vec<T, 2>;
     template<typename T> using Vec3 = Vec<T, 3>;
@@ -110,7 +147,7 @@ namespace RatUI
     // === Matrix Types ===
 
     template<typename T, size Dim>
-    using Mat = RATUI_MATRIX_IMPL<T, Dim>;
+    using Mat = MathTraits::template Mat<T, Dim>;
 
     template<typename T> using Mat2 = Mat<T, 2>;
     template<typename T> using Mat3 = Mat<T, 3>;
@@ -126,12 +163,9 @@ namespace RatUI
     using Mat3u = Mat<u32, 3>;
     using Mat4u = Mat<u32, 4>;
 
-    template<typename T> requires requires { T::identity(); }
-    constexpr T c_Identity = T::identity();
-
     // === Color ===
 
-    using Color = /* TODO: RATUI_COLOR_IMPL */ Vec4<u8>;
+    using Color = MathTraits::Color;
 
     /** @brief Creates a color from f32 RGBA components in the range [0, 1]. */
     constexpr Color FromColorF32( f32 a_Red, f32 a_Green, f32 a_Blue, f32 a_Alpha = 1.f )
