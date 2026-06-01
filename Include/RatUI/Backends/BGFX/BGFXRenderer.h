@@ -128,7 +128,7 @@ namespace RatUI::BGFX
         void SetViewport( u16 a_Width, u16 a_Height )
         {
             BuildOrthoProjection( a_Width, a_Height );
-            bgfx::setViewRect( m_ViewID, 0, 0, a_Width, a_Height );
+            bgfx::setViewRect( m_Config.ViewID, 0, 0, a_Width, a_Height );
         }
 
         void Execute( const DrawBatcher& a_Batcher ) override
@@ -193,14 +193,14 @@ namespace RatUI::BGFX
                     DispatchBatch( std::get<SDFDrawData>( batch.Data ) );
                     bgfx::setVertexBuffer( 0, &tvb );
                     bgfx::setIndexBuffer( &tib );
-                    bgfx::submit( m_ViewID, m_Programs.SDFProgram );
+                    bgfx::submit( m_Config.ViewID, m_Config.SDFProgram );
                 }
                 else
                 {
                     DispatchBatch( std::get<MSDFTextDrawData>( batch.Data ) );
                     bgfx::setVertexBuffer( 0, &tvb );
                     bgfx::setIndexBuffer( &tib );
-                    bgfx::submit( m_ViewID, m_Programs.TextProgram );
+                    bgfx::submit( m_Config.ViewID, m_Config.TextProgram );
                 }
             }
 
