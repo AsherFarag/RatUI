@@ -15,6 +15,40 @@
 
 namespace RatUI
 {
+    /**
+     * @brief Represents the resolved string data for a Text value, along with a version number for caching purposes.
+     * @warning 'Data' must remain valid as long as 'Version' is the latest version for the corresponding Text value. 
+     * If the Text value changes and a new ResolvedText is generated, any previously obtained 'Data' may become invalid and should not be used.
+     */
+    struct ResolvedText
+    {
+        StringView Data;  ///< The actual string data to be rendered, resolved from the original Text value. This is what will be used for layout and rendering.
+        u32 Version{ 0 }; ///< A version number that increments whenever the resolved string data changes for the same Text value. 
+                          ///< This can be used for caching purposes, to avoid re-layout and re-rendering when the text content hasn't actually changed.
+    };
+
+#ifndef RATUI_TEXT_IMPL
+
+    /**
+     * @brief Used by widgets such as TextWidget to store the actual text content.
+     * Text is treated as an opaque type that is only copied, moved, and converted to StringView via ResolveTextString(). 
+     * By default, this is just a String alias, but users can provide their own implementation by defining a custom Text type.
+     * This is useful for localisation systems that want to store text as keys or IDs and resolve them to actual strings at runtime, 
+     * while still allowing widgets to treat text as an opaque value.
+     */
+    struct Text
+    {
+        String m_Data;
+    };
+
+    /**
+     * @brief Converts a Text value to a ResolvedText, which contains the actual string data to be rendered and a version number for caching purposes.
+     * @note This function shouldn't be too heavy since it is called every frame for every TextWidget.
+     */
+    inline Optional<ResolvedText> ResolveText( const Text& a_Text )
+    {
+        return ResolvedText{ StringView{ a_Text.m_Data }, 0u };
+    } 
 
 #endif
 
