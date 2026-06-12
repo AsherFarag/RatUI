@@ -3,16 +3,6 @@
 #include "Font.h"
 #include "Script.h"
 
-#if defined(__has_include)
-    #if __has_include("RatUITextImpl.h")
-        #include "RatUITextImpl.h"
-        #define RATUI_TEXT_IMPL
-    #elif __has_include(<RatUITextImpl.h>)
-        #include <RatUITextImpl.h>
-        #define RATUI_TEXT_IMPL
-    #endif
-#endif
-
 namespace RatUI
 {
     /**
@@ -27,6 +17,20 @@ namespace RatUI
                           ///< This can be used for caching purposes, to avoid re-layout and re-rendering when the text content hasn't actually changed.
     };
 
+}
+
+#if defined(__has_include)
+    #if __has_include("RatUITextImpl.h")
+        #include "RatUITextImpl.h"
+        #define RATUI_TEXT_IMPL
+    #elif __has_include(<RatUITextImpl.h>)
+        #include <RatUITextImpl.h>
+        #define RATUI_TEXT_IMPL
+    #endif
+#endif
+
+namespace RatUI
+{
 #ifndef RATUI_TEXT_IMPL
 
     /**
