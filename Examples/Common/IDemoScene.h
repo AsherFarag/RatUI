@@ -8,6 +8,11 @@ using namespace RatUI;
 
 extern TextureHandle LoadTexture( const char* a_FilePath, TextureSampler a_Sampler = {} );
 
+inline Text MakeText( String a_String )
+{
+	return Text{ std::move( a_String ) };
+}
+
 /**
  * @brief Interface for demo scenes in the RatUI examples. 
  */

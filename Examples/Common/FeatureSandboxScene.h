@@ -81,9 +81,9 @@ public:
             textStyle.FillColor = Colors::AccentRose;
 
             // Add some text to the footer bar
-            WidgetID footerText = m_Scene.CreateWidget<TextWidget>( MainContentArea, DefaultTheme, 
+            WidgetID footerText = m_Scene.CreateWidget<TextWidget>( MainContentArea, DefaultTheme, MakeText(
                 "This is the main content area. It can contain the primary information or controls for the application.\n"
-                "Hello ifahjkfhaiofhoajfojaofjasojdioajodjaodjoas", 
+                "Hello ifahjkfhaiofhoajfojaofjasojdioajodjaodjoas" ), 
                 layStyle
             );
             auto* footerTextNode = m_Scene.Layouts.Get( m_Scene.GetWidget( footerText )->GetLayoutID() );
@@ -142,9 +142,9 @@ public:
             layStyle.Font = DefaultFont;
             layStyle.Size = 16_u;
             layStyle.Wrap = TextWrap::WrapWord();
-            WidgetID longText = m_Scene.CreateWidget<TextWidget>( secondaryContent, DefaultTheme, 
+            WidgetID longText = m_Scene.CreateWidget<TextWidget>( secondaryContent, DefaultTheme, MakeText(
                 "This is the secondary content area. It can contain supplementary information or controls that support the main content.\n"
-                "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.", 
+                "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat." ), 
                 layStyle
             );
             auto* longTextNode = m_Scene.Layouts.Get( m_Scene.GetWidget( longText )->GetLayoutID() );
@@ -169,11 +169,11 @@ public:
             layStyle.Wrap = TextWrap::WrapWord();
 
             // Add some text to the footer bar
-            WidgetID footerText = m_Scene.CreateWidget<TextWidget>( footerBar, DefaultTheme, 
+            WidgetID footerText = m_Scene.CreateWidget<TextWidget>( footerBar, DefaultTheme, MakeText(
                 "This is the footer bar. It can contain status messages, controls, or other information.\n"
                 "VAVAVAVA\n"
                 "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\n"
-                "0123456789\n", layStyle
+                "0123456789\n" ), layStyle
             );
             auto* footerTextNode = m_Scene.Layouts.Get( m_Scene.GetWidget( footerText )->GetLayoutID() );
 
@@ -282,7 +282,7 @@ public:
                 TextLayoutStyle itemTextStyle;
                 itemTextStyle.Font = DefaultFont;
                 itemTextStyle.Size = 14_u;
-                WidgetID itemText = m_Scene.CreateWidget<TextWidget>( item, DefaultTheme, "Scrollable Item " + std::to_string( i + 1 ), itemTextStyle );
+                WidgetID itemText = m_Scene.CreateWidget<TextWidget>( item, DefaultTheme, MakeText( "Scrollable Item " + std::to_string( i + 1 ) ), itemTextStyle );
                 auto* itemTextNode = m_Scene.Layouts.Get( m_Scene.GetWidget( itemText )->GetLayoutID() );
                 itemTextNode->Style.WidthMode  = ESizingMode::Content;
                 itemTextNode->Style.HeightMode = ESizingMode::Content;
@@ -308,7 +308,7 @@ public:
 			buttonNode->Style.HeightMode = ESizingMode::Fixed;
 
 			// Text for the button
-            WidgetID buttonText = m_Scene.CreateWidget<TextWidget>( buttonID, DefaultTheme, "Toggle V Scroll Mode", TextLayoutStyle{ .Font = DefaultFont, .Size = 16_u } );
+            WidgetID buttonText = m_Scene.CreateWidget<TextWidget>( buttonID, DefaultTheme, MakeText( "Toggle V Scroll Mode" ), TextLayoutStyle{ .Font = DefaultFont, .Size = 16_u } );
         }
 
                 // Button that toggles the scroll container's scroll mode between vertical and horizontal to demonstrate dynamic layout changes
@@ -329,7 +329,7 @@ public:
             buttonNode->Style.HeightMode = ESizingMode::Fixed;
 
             // Text for the button
-            WidgetID buttonText = m_Scene.CreateWidget<TextWidget>( buttonID, DefaultTheme, "Toggle H Scroll Mode", TextLayoutStyle{ .Font = DefaultFont, .Size = 16_u } );
+            WidgetID buttonText = m_Scene.CreateWidget<TextWidget>( buttonID, DefaultTheme, MakeText( "Toggle H Scroll Mode" ), TextLayoutStyle{ .Font = DefaultFont, .Size = 16_u } );
         }
         
     }

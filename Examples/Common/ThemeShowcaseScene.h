@@ -24,10 +24,10 @@ public:
             .SetSpacing( 12_u )
             .SetFocusScope( true );
 
-        WidgetID title = m_Scene.CreateWidget<TextWidget>( root, m_ActiveTheme, "Theme Showcase", MakeTextLayout( 30_u, ETextOverflow::Clip ) );
+        WidgetID title = m_Scene.CreateWidget<TextWidget>( root, m_ActiveTheme, MakeText( "Theme Showcase" ), MakeTextLayout( 30_u, ETextOverflow::Clip ) );
         GetNode( title )->Style.HeightMode = ESizingMode::Content;
 
-        m_StatusText = m_Scene.CreateWidget<TextWidget>( root, m_ActiveTheme, "", MakeTextLayout( 16_u, ETextOverflow::Clip ) );
+        m_StatusText = m_Scene.CreateWidget<TextWidget>( root, m_ActiveTheme, MakeText( "" ), MakeTextLayout( 16_u, ETextOverflow::Clip ) );
         GetNode( m_StatusText )->Style.HeightMode = ESizingMode::Content;
 
         WidgetID themeButtonRow = m_Scene.CreateWidget<PanelWidget>( root, m_ActiveTheme );
@@ -74,14 +74,14 @@ public:
             .SetFlexGrow( 1.f )
             .SetFocusScope( true );
 
-        WidgetID controlsTitle = m_Scene.CreateWidget<TextWidget>( controlsPanel, m_ActiveTheme, "Controls", MakeTextLayout( 20_u, ETextOverflow::Clip ) );
+        WidgetID controlsTitle = m_Scene.CreateWidget<TextWidget>( controlsPanel, m_ActiveTheme, MakeText( "Controls" ), MakeTextLayout( 20_u, ETextOverflow::Clip ) );
         GetNode( controlsTitle )->Style.HeightMode = ESizingMode::Content;
 
         CreateSliderCard( controlsPanel, "Master Volume", 0.65f, false );
         CreateSliderCard( controlsPanel, "Accent Strength", 0.30f, false );
         CreateSliderCard( controlsPanel, "Vertical Mix", 0.45f, true );
 
-        WidgetID previewTitle = m_Scene.CreateWidget<TextWidget>( previewPanel, m_ActiveTheme, "Preview", MakeTextLayout( 20_u, ETextOverflow::Clip ) );
+        WidgetID previewTitle = m_Scene.CreateWidget<TextWidget>( previewPanel, m_ActiveTheme, MakeText( "Preview" ), MakeTextLayout( 20_u, ETextOverflow::Clip ) );
         GetNode( previewTitle )->Style.HeightMode = ESizingMode::Content;
 
         WidgetID previewCard = m_Scene.CreateWidget<PanelWidget>( previewPanel, m_ActiveTheme );
@@ -95,7 +95,7 @@ public:
         WidgetID previewText = m_Scene.CreateWidget<TextWidget>(
             previewCard,
             m_ActiveTheme,
-            "This panel uses the active theme for panel fills, text color, button states, and slider visuals.",
+            MakeText( "This panel uses the active theme for panel fills, text color, button states, and slider visuals." ),
             MakeTextLayout( 16_u, ETextOverflow::Fade, TextWrap::WrapWord() ) );
         GetNode( previewText )->Style
             .SetWidthMode( ESizingMode::Flex )
@@ -106,7 +106,7 @@ public:
             WidgetID overflowText = m_Scene.CreateWidget<TextWidget>(
                 previewCard,
                 m_ActiveTheme,
-                "This is an example of a long text string that will exceed the width of the container and demonstrate how the active theme handles text overflow with a fade effect.",
+                MakeText( "This is an example of a long text string that will exceed the width of the container and demonstrate how the active theme handles text overflow with a fade effect." ),
                 MakeTextLayout( 16_u, ETextOverflow::Fade, TextWrap::WrapWord() ) );
             GetNode( overflowText )->Style
                 .SetWidthMode( ESizingMode::Fixed )
@@ -120,7 +120,7 @@ public:
             {
                 if ( auto* status = m_Scene.GetWidget<TextWidget>( m_StatusText ) )
                 {
-                    status->SetText( "Theme applied: " + m_ThemeNames[m_ActiveThemeIndex] + " (preview action clicked)" );
+                    status->SetText( { "Theme applied: " + m_ThemeNames[m_ActiveThemeIndex] + " (preview action clicked)" } );
                 }
             } );
         GetNode( actionButton )->Style
@@ -130,7 +130,7 @@ public:
             .SetFixedHeight( 40_u )
             .SetChildAlign( EAlignment::Center );
 
-        WidgetID actionButtonText = m_Scene.CreateWidget<TextWidget>( actionButton, m_ActiveTheme, "Preview Button", MakeTextLayout( 16_u, ETextOverflow::Clip ) );
+        WidgetID actionButtonText = m_Scene.CreateWidget<TextWidget>( actionButton, m_ActiveTheme, MakeText( "Preview Button" ), MakeTextLayout( 16_u, ETextOverflow::Clip ) );
         GetNode( actionButtonText )->Style.Visibility = EVisibility::HitTestInvisible;
 
         UpdateStatusText();
@@ -287,7 +287,7 @@ private:
         buttonNode->Style.HeightMode = ESizingMode::Flex;
         buttonNode->Style.ChildAlign = EAlignment::Center;
 
-        WidgetID text = m_Scene.CreateWidget<TextWidget>( button, m_ActiveTheme, a_Label, MakeTextLayout( 16_u, ETextOverflow::Clip ) );
+        WidgetID text = m_Scene.CreateWidget<TextWidget>( button, m_ActiveTheme, MakeText( a_Label ), MakeTextLayout( 16_u, ETextOverflow::Clip ) );
         GetNode( text )->Style.Visibility = EVisibility::HitTestInvisible;
     }
 
@@ -302,7 +302,7 @@ private:
         cardNode->Style.Padding = Edges::Uniform( 8_u );
         cardNode->Style.Spacing = 6_u;
 
-        WidgetID valueText = m_Scene.CreateWidget<TextWidget>( card, m_ActiveTheme, "", MakeTextLayout( 14_u, ETextOverflow::Clip ) );
+        WidgetID valueText = m_Scene.CreateWidget<TextWidget>( card, m_ActiveTheme, MakeText( "" ), MakeTextLayout( 14_u, ETextOverflow::Clip ) );
         GetNode( valueText )->Style.HeightMode = ESizingMode::Content;
 
         WidgetID slider = m_Scene.CreateWidget<SliderWidget>( card, m_ActiveTheme, 0.f, 1.f, a_Value );
@@ -326,7 +326,7 @@ private:
                 if ( auto* text = m_Scene.GetWidget<TextWidget>( valueText ) )
                 {
                     const int percent = static_cast<int>( std::round( a_CurrentValue * 100.f ) );
-                    text->SetText( a_Label + ": " + std::to_string( percent ) + "%" );
+                    text->SetText( { a_Label + ": " + std::to_string( percent ) + "%" } );
                 }
             } );
         }
@@ -335,6 +335,6 @@ private:
     void UpdateStatusText()
     {
         if ( auto* status = m_Scene.GetWidget<TextWidget>( m_StatusText ) )
-            status->SetText( "Theme applied: " + m_ThemeNames[m_ActiveThemeIndex] + " (use the buttons below to switch styles)" );
+            status->SetText( { "Theme applied: " + m_ThemeNames[m_ActiveThemeIndex] + " (use the buttons below to switch styles)" } );
     }
 };

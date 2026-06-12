@@ -11,7 +11,7 @@ namespace RatUI
     {
     public:
         TextWidget( Shared<const Theme> a_Theme,
-                    String a_Text = {},
+                    Text a_Text = {},
                     const TextLayoutStyle& a_Style = {} )
             : m_Theme      ( std::move( a_Theme ) )
             , m_Text       ( std::move( a_Text ) )
@@ -21,16 +21,20 @@ namespace RatUI
 
         ~TextWidget() override = default;
 
-        bool IsFocusable() const { return false; }
-        bool IsNavigationBoundary() const { return false; }
+        bool IsFocusable() const override { return false; }
+        bool IsNavigationBoundary() const override { return false; }
+
+        /** @brief Gets the current text content. */
+        const Text& GetText() const { return m_Text; }
 
         /**
          * @brief Replaces the text content.
          * Triggers full re-prepare + re-shape.
          */
-        void SetText( String a_Text )
+        void SetText( Text a_Text )
         {
             m_Text = std::move( a_Text );
+            m_ResolvedText = NullOpt;
             InvalidatePrepared();
         }
 
@@ -72,14 +76,29 @@ namespace RatUI
             ITextMetrics* metrics = GetScene().TextMetrics;
             a_Node.Layout.IntrinsicSize = { 0_u, 0_u };
 
-            if ( !metrics || Empty( m_Text ) )
+            if ( !metrics )
                 return;
+
+            // ---- Resolve phase ----
+            // ResolveText() is cheap and called every frame. The returned Version lets
+            // us detect localisation/binding changes without storing a full string copy.
+            const Optional<ResolvedText> resolved = ResolveText( m_Text );
+            if ( !resolved || resolved->Data.empty() )
+                return;
+
+            // If the resolved string changed (new version or first resolve), the
+            // prepared and shaped caches are both stale.
+            if ( !m_ResolvedText || resolved->Version != m_ResolvedText->Version )
+            {
+                m_ResolvedText = resolved;
+                InvalidatePrepared();
+            }
 
             // ---- Prepare phase ----
             // Re-run when text content or any layout style property changes.
             if ( !m_PreparedText )
             {
-                m_PreparedText = metrics->Prepare( m_Text, m_LayoutStyle );
+                m_PreparedText = metrics->Prepare( m_ResolvedText->Data, m_LayoutStyle );
                 if ( !m_PreparedText )
                 {
                     // Keep trying next frame.
@@ -91,7 +110,7 @@ namespace RatUI
             else if ( m_LayoutStyle != m_LastLayoutStyle )
             {
                 // Layout style changed since last prepare - full redo.
-                m_PreparedText = metrics->Prepare( m_Text, m_LayoutStyle );
+                m_PreparedText = metrics->Prepare( m_ResolvedText->Data, m_LayoutStyle );
                 if ( !m_PreparedText )
                     return;
                 m_LastLayoutStyle = m_LayoutStyle;
@@ -213,8 +232,11 @@ namespace RatUI
             m_ShapedWidth = Unit{ -1.f }; // sentinel, any real width will differ
         }
 
-        String                m_Text;
-        TextLayoutStyle       m_LayoutStyle;
+        Text                   m_Text;
+        /// Cached result of the last ResolveText() call.
+        /// Version is compared each frame to detect localisation/binding changes.
+        Optional<ResolvedText> m_ResolvedText;
+        TextLayoutStyle        m_LayoutStyle;
         Shared<const Theme>   m_Theme;
 
         /// Snapshot of m_LayoutStyle at the time of the last successful Prepare() call.
