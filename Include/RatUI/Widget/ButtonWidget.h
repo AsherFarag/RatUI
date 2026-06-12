@@ -14,11 +14,9 @@ namespace RatUI
         Callback<Scene&, WidgetID> OnClick; ///< Callback that is invoked when the button is clicked.
 
         ButtonBaseWidget() = default;
-        ButtonBaseWidget( Shared<const Theme> a_Theme, Callback<Scene&, WidgetID> a_OnClick )
+        ButtonBaseWidget( Callback<Scene&, WidgetID> a_OnClick )
             : OnClick( std::move( a_OnClick ) )
-        {
-            (void)a_Theme;
-        }
+        {}
 
         virtual ~ButtonBaseWidget() = default;
 
@@ -107,18 +105,12 @@ namespace RatUI
     public:
         ButtonWidget() = default;
 
-        ButtonWidget( Shared<const Theme> a_Theme )
-        {
-            m_Theme = std::move( a_Theme );
-        }
 
-        ButtonWidget( Shared<const Theme> a_Theme, Callback<Scene&, WidgetID> a_OnClick )
-            : ButtonBaseWidget( a_Theme, std::move( a_OnClick ) )
-        {
-            m_Theme = std::move( a_Theme );
-        }
+        ButtonWidget( ThemeHandle a_Theme, Callback<Scene&, WidgetID> a_OnClick = {} )
+			: ButtonBaseWidget( std::move( a_OnClick ) ), m_Theme( std::move( a_Theme ) )
+        {}
 
-        void SetTheme( Shared<const Theme> a_Theme )
+        void SetTheme( ThemeHandle a_Theme )
         {
             m_Theme = std::move( a_Theme );
         }
@@ -132,19 +124,45 @@ namespace RatUI
 
             const Rect<Unit>& rect = node->Layout.FinalRect;
 
-			// Fill color based on state: pressed > hovered > normal
-            const Color fill = m_IsPressed ? GetThemeColor( ThemeKey::Color::ButtonPressed, Colors::Surface500 )
-                                           : ( m_IsHovered 
-                                               ? GetThemeColor( ThemeKey::Color::ButtonHover, Colors::Surface600 )
-                                               : GetThemeColor( ThemeKey::Color::ButtonNormal, Colors::Surface700 ) );
+			// Fill brush based on state: pressed > hovered > normal
+            const Brush& fillBrush = m_IsPressed ? m_Theme.GetBrush( ThemeKey::Brush::ButtonPressed, SolidBrush{ Colors::Surface500 } )
+                                                 : ( m_IsHovered 
+                                                     ? m_Theme.GetBrush( ThemeKey::Brush::ButtonHover,  SolidBrush{ Colors::Surface600 } )
+                                                     : m_Theme.GetBrush( ThemeKey::Brush::ButtonNormal, SolidBrush{ Colors::Surface700 } ) );
 
-            a_DrawList.AddRect( rect,
+            if ( std::holds_alternative<SolidBrush>( fillBrush ) )
             {
-                .FillColor = fill,
-                .BorderColor = GetThemeColor( ThemeKey::Color::ButtonHover, Colors::Transparent ),
-                .BorderThickness = GetThemeMetric( ThemeKey::Metric::ButtonBorderThickness, 1_u ),
-                .Rounding = GetThemeRounding( ThemeKey::Rounding::Button, CornerRounding::None() )
-            } );
+                const SolidBrush& solid = std::get<SolidBrush>( fillBrush );
+                a_DrawList.AddRect( rect, 
+                {
+                    .FillColor = solid.Fill,
+                    .BorderColor = m_Theme.GetColor( ThemeKey::Color::ButtonBorder, Colors::Transparent ),
+                    .BorderThickness = m_Theme.GetMetric( ThemeKey::Metric::ButtonBorderThickness, 0_u ),
+                    .Rounding = m_Theme.GetRounding( ThemeKey::Rounding::Button, CornerRounding::None() )
+                } );
+            }
+            else if ( std::holds_alternative<TextureBrush>( fillBrush ) )
+            {
+                const TextureBrush& texture = std::get<TextureBrush>( fillBrush );
+                a_DrawList.AddRect( rect, 
+                {
+                    .FillColor = texture.Tint,
+                    .BorderColor = m_Theme.GetColor( ThemeKey::Color::ButtonBorder, Colors::Transparent ),
+                    .BorderThickness = m_Theme.GetMetric( ThemeKey::Metric::ButtonBorderThickness, 0_u ),
+                    .Rounding = m_Theme.GetRounding( ThemeKey::Rounding::Button, CornerRounding::None() ),
+                    .Texture = texture.Texture
+                } );
+            }
+            else if ( std::holds_alternative<NineSliceBrush>( fillBrush ) )
+            {
+                const NineSliceBrush& nineSlice = std::get<NineSliceBrush>( fillBrush );
+                a_DrawList.AddSlicedRect( rect, 
+                {
+                    .Texture = nineSlice.Texture,
+                    .Slice = nineSlice.Slice,
+                    .Tint = nineSlice.Tint,
+                } );
+            }
 
             // Draw focus ring 
             // TODO: Should this be a util or even handled here?
@@ -153,9 +171,9 @@ namespace RatUI
                 a_DrawList.AddRect( rect,
                 {
                     .FillColor = Colors::Transparent,
-                    .BorderColor = GetThemeColor( ThemeKey::Color::FocusOutline, Colors::White ),
-                    .BorderThickness = GetThemeMetric( ThemeKey::Metric::FocusOutlineThickness, 2_u ),
-                    .Rounding = GetThemeRounding( ThemeKey::Rounding::FocusOutline, CornerRounding::None() )
+                    .BorderColor = m_Theme.GetColor( ThemeKey::Color::FocusOutline, Colors::White ),
+                    .BorderThickness = m_Theme.GetMetric( ThemeKey::Metric::FocusOutlineThickness, 2_u ),
+                    .Rounding = m_Theme.GetRounding( ThemeKey::Rounding::FocusOutline, CornerRounding::None() )
                 } );
             }
 
@@ -168,23 +186,7 @@ namespace RatUI
         }
 
     private:
-        Shared<const Theme> m_Theme;
-
-        Color GetThemeColor( ThemeID a_ID, Color a_Default ) const
-        {
-            return m_Theme ? m_Theme->GetColor( a_ID, a_Default ) : a_Default;
-        }
-
-        CornerRounding GetThemeRounding( ThemeID a_ID, CornerRounding a_Default ) const
-        {
-            return m_Theme ? m_Theme->GetRounding( a_ID, a_Default ) : a_Default;
-        }
-
-        Unit GetThemeMetric( ThemeID a_ID, Unit a_Default ) const
-        {
-            return m_Theme ? m_Theme->GetMetric( a_ID, a_Default ) : a_Default;
-        }
-
+        ThemeHandle m_Theme;
     };
 
 } // namespace RatUI

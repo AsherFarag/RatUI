@@ -1,6 +1,7 @@
 #pragma once
 #include "../Core.h"
 #include "../Text/Text.h"
+#include "../Renderer/Brush.h"
 #include "../Layout/Layout.h" // TODO: Remove once CornerRounding is moved to a more appropriate header
 
 namespace RatUI
@@ -79,6 +80,7 @@ namespace RatUI
             , m_TextStyles( a_Other.m_TextStyles )
             , m_Metrics   ( a_Other.m_Metrics )
             , m_Fonts     ( a_Other.m_Fonts )
+            , m_Brushes   ( a_Other.m_Brushes )
             // m_Version intentionally starts at 0 for a fresh copy
         {}
     
@@ -97,6 +99,7 @@ namespace RatUI
                 m_TextStyles = a_Other.m_TextStyles;
                 m_Metrics    = a_Other.m_Metrics;
 				m_Fonts      = a_Other.m_Fonts;
+                m_Brushes    = a_Other.m_Brushes;
                 ++m_Version; // assignment is a mutation of this theme
             }
 
@@ -115,6 +118,7 @@ namespace RatUI
                 m_TextStyles = std::move( a_Other.m_TextStyles );
                 m_Metrics    = std::move( a_Other.m_Metrics );
                 m_Fonts	     = std::move( a_Other.m_Fonts );
+                m_Brushes	 = std::move( a_Other.m_Brushes );
                 ++m_Version;
             }
             return *this;
@@ -145,8 +149,6 @@ namespace RatUI
         //   Theme&             SetColor( ThemeID, T )                 // fluent
         //   Theme&             SetColors( std::initializer_list<...> )// bulk, merges
         //   const ValueMap<T>& GetColors() const
-        //
-        // The same pattern repeats for Rounding, TextStyle, Metric.
     
     #define RATUI_THEME_PROPERTY( Type, Singular, Plural, Member )                          \
         const Type& Get##Singular( ThemeID a_ID, const Type& a_Default = {} ) const         \
@@ -185,6 +187,7 @@ namespace RatUI
         RATUI_THEME_PROPERTY( TextRenderStyle, TextStyle, TextStyles, m_TextStyles )
         RATUI_THEME_PROPERTY( Unit,            Metric,    Metrics,    m_Metrics    )
         RATUI_THEME_PROPERTY( FontHandle,      Font,      Fonts,      m_Fonts      )
+        RATUI_THEME_PROPERTY( Brush,           Brush,     Brushes,    m_Brushes    )
     
     #undef RATUI_THEME_PROPERTY
     
@@ -198,6 +201,53 @@ namespace RatUI
         ValueMap<TextRenderStyle> m_TextStyles;
         ValueMap<Unit>            m_Metrics;
 		ValueMap<FontHandle>      m_Fonts;
+        ValueMap<Brush>           m_Brushes;
+    };
+
+    /**
+     * @brief A handle to a theme, which may or may not contain a valid theme pointer. 
+     * Provides convenient accessors that return default values when the pointer is null.
+     */
+    struct ThemeHandle
+    {
+        Shared<const Theme> Ptr;
+
+		ThemeHandle() = default;
+		ThemeHandle( Shared<const Theme> a_Theme ) : Ptr( std::move( a_Theme ) ) {}
+		ThemeHandle( const Shared<Theme>& a_Theme ) : Ptr( a_Theme ) {}
+
+        // -------------------------------------------------------------------------
+        // Per-type accessors  (generated via below)
+        // -------------------------------------------------------------------------
+        //
+        // For each type T, the following methods are generated:
+        //
+        //   const T&           GetColor( ThemeID, const T& default = {} ) const
+        //   const T*           TryGetColor( ThemeID ) const           // nullptr if absent
+        //   bool               HasColor( ThemeID ) const              // checks parent chain
+
+    #define THEME_HANDLE_METHODS( Type, Name )                                     \
+        const Type& Get##Name( ThemeID a_ID, const Type& a_Default = {} ) const    \
+        {                                                                          \
+            return Ptr ? Ptr->Get##Name( a_ID, a_Default ) : a_Default;            \
+        }                                                                          \
+        const Type* TryGet##Name( ThemeID a_ID ) const                             \
+        {                                                                          \
+            return Ptr ? Ptr->TryGet##Name( a_ID ) : nullptr;                      \
+        }                                                                          \
+        bool Has##Name( ThemeID a_ID ) const                                       \
+        {                                                                          \
+            return Ptr && Ptr->Has##Name( a_ID );                                  \
+        }
+        
+        THEME_HANDLE_METHODS( Color,           Color )
+        THEME_HANDLE_METHODS( CornerRounding,  Rounding )
+        THEME_HANDLE_METHODS( TextRenderStyle, TextStyle )
+        THEME_HANDLE_METHODS( Unit,            Metric )
+        THEME_HANDLE_METHODS( FontHandle,      Font )
+        THEME_HANDLE_METHODS( Brush,           Brush )
+
+    #undef THEME_HANDLE_METHODS
     };
 
     /**
@@ -223,12 +273,8 @@ namespace RatUI
             inline constexpr ThemeID FocusOutline = "FocusOutline"_theme;
 
             inline constexpr ThemeID ButtonBorder  = "Button.Border"_theme;
-            inline constexpr ThemeID ButtonNormal  = "Button.Normal"_theme;
-            inline constexpr ThemeID ButtonHover   = "Button.Hover"_theme;
-            inline constexpr ThemeID ButtonPressed = "Button.Pressed"_theme;
 
             inline constexpr ThemeID PanelBorder = "Panel.Border"_theme;
-            inline constexpr ThemeID PanelNormal = "Panel.Normal"_theme;
 
             inline constexpr ThemeID SliderTrack        = "Slider.Track"_theme;
             inline constexpr ThemeID SliderTrackFill    = "Slider.TrackFill"_theme;
@@ -264,6 +310,15 @@ namespace RatUI
         {
 			inline constexpr ThemeID Default = "Default"_theme;
 		}
+
+        namespace Brush
+        {
+            inline constexpr ThemeID ButtonNormal  = "Button.Normal"_theme;
+            inline constexpr ThemeID ButtonHover   = "Button.Hover"_theme;
+            inline constexpr ThemeID ButtonPressed = "Button.Pressed"_theme;
+
+            inline constexpr ThemeID PanelNormal   = "Panel.Normal"_theme;
+        }
     }
 
 } // namespace RatUI

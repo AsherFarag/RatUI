@@ -206,26 +206,24 @@ private:
         m_Themes[1] = MakeShared<Theme>( *Themes::Dark() );
         m_Themes[1]->SetColors( {
             { ThemeKey::Color::FocusOutline, Colors::DarkBlue },
-            { ThemeKey::Color::PanelNormal, Colors::LightGray },
-            { ThemeKey::Color::ButtonNormal, Colors::White },
-            { ThemeKey::Color::ButtonHover, Colors::PowderBlue },
-            { ThemeKey::Color::ButtonPressed, Colors::LightBlue },
             { ThemeKey::Color::SliderTrack, Colors::Silver },
             { ThemeKey::Color::SliderTrackFill, Colors::DarkBlue },
             { ThemeKey::Color::SliderThumb, Colors::AccentBlue },
             { ThemeKey::Color::SliderThumbHover, Colors::Blue },
             { ThemeKey::Color::SliderThumbPressed, Colors::DarkBlue }
         } );
+		m_Themes[1]->SetBrushes( {
+            { ThemeKey::Brush::PanelNormal,   SolidBrush{ Colors::LightGray } },
+            { ThemeKey::Brush::ButtonNormal,  SolidBrush{ Colors::White } },
+            { ThemeKey::Brush::ButtonHover,   SolidBrush{ Colors::PowderBlue } },
+            { ThemeKey::Brush::ButtonPressed, SolidBrush{ Colors::LightBlue } },
+		} );
         m_Themes[1]->SetTextStyle( ThemeKey::TextStyle::Default, TextRenderStyle{ .FillColor = Colors::Surface900 } );
 
 		// Neon
         m_Themes[2] = MakeShared<Theme>( *Themes::Dark() );
         m_Themes[2]->SetColors( {
             { ThemeKey::Color::FocusOutline, Colors::AccentRose },
-            { ThemeKey::Color::PanelNormal, FromColorF32( 0.07f, 0.03f, 0.10f ) },
-            { ThemeKey::Color::ButtonNormal, FromColorF32( 0.20f, 0.05f, 0.28f ) },
-            { ThemeKey::Color::ButtonHover, FromColorF32( 0.30f, 0.08f, 0.45f ) },
-            { ThemeKey::Color::ButtonPressed, FromColorF32( 0.12f, 0.45f, 0.42f ) },
             { ThemeKey::Color::SliderTrack, FromColorF32( 0.10f, 0.10f, 0.20f ) },
             { ThemeKey::Color::SliderTrackFill, Colors::AccentRose },
             { ThemeKey::Color::SliderThumb, Colors::AccentSky },
@@ -237,6 +235,12 @@ private:
             { ThemeKey::Rounding::Button, CornerRounding::Uniform( 10_u ) },
             { ThemeKey::Rounding::SliderTrack, CornerRounding::Uniform( 5_u ) },
             { ThemeKey::Rounding::SliderThumb, CornerRounding::Uniform( 8_u ) }
+        } );
+        m_Themes[2]->SetBrushes( {
+            { ThemeKey::Brush::PanelNormal,   SolidBrush{ FromColorF32( 0.07f, 0.03f, 0.10f ) } },
+            { ThemeKey::Brush::ButtonNormal,  SolidBrush{ FromColorF32( 0.20f, 0.05f, 0.28f ) } },
+            { ThemeKey::Brush::ButtonHover,   SolidBrush{ FromColorF32( 0.30f, 0.08f, 0.45f ) } },
+            { ThemeKey::Brush::ButtonPressed, SolidBrush{ FromColorF32( 0.12f, 0.45f, 0.42f ) } },
         } );
         m_Themes[2]->SetTextStyle( ThemeKey::TextStyle::Default, TextRenderStyle{ .FillColor = Colors::AccentSky } );
 

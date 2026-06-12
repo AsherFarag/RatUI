@@ -13,10 +13,6 @@ namespace RatUI
         SolidBrush& WithFill( Color a_Fill ) { Fill = a_Fill; return *this; }
     };
 
-    struct GradientBrush
-    {
-    };
-
     struct TextureBrush
     {
         TextureHandle Texture{};
@@ -41,6 +37,8 @@ namespace RatUI
      * @brief Brush is a type that encapsulates the information needed to fill shapes with color, gradients, or textures.
      */
 	using Brush = Variant<
-        SolidBrush, GradientBrush, TextureBrush, NineSliceBrush
+        SolidBrush, 
+        TextureBrush, 
+        NineSliceBrush
     >;
 }

@@ -11,14 +11,6 @@ namespace RatUI::Themes
 
             theme->SetColors( {
                 { ThemeKey::Color::FocusOutline, Colors::White },
-
-                // Panel
-                { ThemeKey::Color::PanelNormal, Colors::Surface700 },
-
-                // Button
-                { ThemeKey::Color::ButtonNormal,       Colors::Surface600 },
-                { ThemeKey::Color::ButtonHover,        Colors::Surface500 },
-                { ThemeKey::Color::ButtonPressed,      Colors::White },
                 
                 // Slider
                 { ThemeKey::Color::SliderThumb, Colors::AccentBlue },
@@ -36,6 +28,16 @@ namespace RatUI::Themes
             theme->SetMetrics( {
                 { ThemeKey::Metric::PanelBorderThickness, 1_u },
                 { ThemeKey::Metric::ButtonBorderThickness, 1_u }
+            } );
+
+            theme->SetBrushes( {
+                // Panel
+                { ThemeKey::Brush::PanelNormal,        SolidBrush{ Colors::Surface700 } },
+
+                // Button
+                { ThemeKey::Brush::ButtonNormal,       SolidBrush{ Colors::Surface600 } },
+                { ThemeKey::Brush::ButtonHover,        SolidBrush{ Colors::Surface500 } },
+                { ThemeKey::Brush::ButtonPressed,      SolidBrush{ Colors::White } },
             } );
 
             // TODO

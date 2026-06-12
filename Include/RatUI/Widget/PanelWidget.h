@@ -13,19 +13,18 @@ namespace RatUI
     public:
         PanelWidget() = default;
 
-        PanelWidget( Shared<const Theme> a_Theme )
+        PanelWidget( ThemeHandle a_Theme )
+            : m_Theme( std::move( a_Theme ) )
+        {}
+
+        void SetTheme( ThemeHandle a_Theme )
         {
             m_Theme = std::move( a_Theme );
         }
 
-        void SetTheme( Shared<const Theme> a_Theme )
-        {
-            m_Theme = std::move( a_Theme );
-        }
-
-        bool IsInteractable() const override { return false; }
-		bool IsFocusable() const override { return true; }
-        bool IsNavigationBoundary() const { return true; }
+        bool IsInteractable()       const override { return false; }
+		bool IsFocusable()          const override { return true; }
+        bool IsNavigationBoundary() const override { return true; }
 
         void OnPaint( DrawList& a_DrawList ) override
         {
@@ -36,22 +35,49 @@ namespace RatUI
 
             const Rect<Unit>& rect = node->Layout.FinalRect;
 
-            a_DrawList.AddRect( rect,
+            const Brush& panelBrush = m_Theme.GetBrush( ThemeKey::Brush::PanelNormal, SolidBrush{ Colors::Surface700 } );
+            if ( std::holds_alternative<SolidBrush>( panelBrush ) )
+            {
+                const SolidBrush& solid = std::get<SolidBrush>( panelBrush );
+                a_DrawList.AddRect( rect, 
                 {
-					.FillColor = GetThemeColor( ThemeKey::Color::PanelNormal, Colors::Surface700 ),
-					.BorderColor = GetThemeColor( ThemeKey::Color::PanelBorder, Colors::Transparent ),
-					.BorderThickness = GetThemeMetric( ThemeKey::Metric::PanelBorderThickness, 1_u ),
-					.Rounding = GetThemeRounding( ThemeKey::Rounding::Panel, CornerRounding::None() )
+                    .FillColor = solid.Fill,
+                    .BorderColor = m_Theme.GetColor( ThemeKey::Color::PanelBorder, Colors::Transparent ),
+                    .BorderThickness = m_Theme.GetMetric( ThemeKey::Metric::PanelBorderThickness, 0_u ),
+                    .Rounding = m_Theme.GetRounding( ThemeKey::Rounding::Panel, CornerRounding::None() )
                 } );
+            }
+            else if ( std::holds_alternative<TextureBrush>( panelBrush ) )
+            {
+                const TextureBrush& texture = std::get<TextureBrush>( panelBrush );
+                a_DrawList.AddRect( rect, 
+                {
+                    .FillColor = texture.Tint,
+                    .BorderColor = m_Theme.GetColor( ThemeKey::Color::PanelBorder, Colors::Transparent ),
+                    .BorderThickness = m_Theme.GetMetric( ThemeKey::Metric::PanelBorderThickness, 0_u ),
+                    .Rounding = m_Theme.GetRounding( ThemeKey::Rounding::Panel, CornerRounding::None() ),
+                    .Texture = texture.Texture
+                } );
+            }
+            else if ( std::holds_alternative<NineSliceBrush>( panelBrush ) )
+            {
+                const NineSliceBrush& nineSlice = std::get<NineSliceBrush>( panelBrush );
+                a_DrawList.AddSlicedRect( rect, 
+                {
+                    .Texture = nineSlice.Texture,
+                    .Slice = nineSlice.Slice,
+                    .Tint = nineSlice.Tint
+                } );
+            }
 
             if ( scene.GetFocusedWidget() == GetID() )
             {
                 a_DrawList.AddRect( rect,
                 {
 					.FillColor = Colors::Transparent,
-					.BorderColor = GetThemeColor( ThemeKey::Color::FocusOutline, Colors::White ),
-					.BorderThickness = GetThemeMetric( ThemeKey::Metric::FocusOutlineThickness, 2_u ),
-                    .Rounding = GetThemeRounding( ThemeKey::Rounding::FocusOutline, CornerRounding::None() )
+					.BorderColor = m_Theme.GetColor( ThemeKey::Color::FocusOutline, Colors::White ),
+					.BorderThickness = m_Theme.GetMetric( ThemeKey::Metric::FocusOutlineThickness, 2_u ),
+                    .Rounding = m_Theme.GetRounding( ThemeKey::Rounding::FocusOutline, CornerRounding::None() )
                 } );
             }
 
@@ -63,23 +89,8 @@ namespace RatUI
             a_DrawList.PopClipRect();
         }
 
-    private:
-        Shared<const Theme> m_Theme;
-
-        Color GetThemeColor( ThemeID a_ID, Color a_Default ) const
-        {
-            return m_Theme ? m_Theme->GetColor( a_ID, a_Default ) : a_Default;
-        }
-
-        CornerRounding GetThemeRounding( ThemeID a_ID, CornerRounding a_Default ) const
-        {
-            return m_Theme ? m_Theme->GetRounding( a_ID, a_Default ) : a_Default;
-        }
-
-        Unit GetThemeMetric( ThemeID a_ID, Unit a_Default ) const
-        {
-            return m_Theme ? m_Theme->GetMetric( a_ID, a_Default ) : a_Default;
-        }
+    protected:
+        ThemeHandle m_Theme;
     };
 
 } // namespace RatUI

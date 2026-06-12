@@ -75,7 +75,7 @@ private:
     Shared<Theme> MakePanelTheme( Color a_Color, CornerRounding a_Rounding = CornerRounding::None(), Unit a_BorderThickness = 2_u ) const
     {
         Shared<Theme> theme = MakeShared<Theme>( DefaultTheme );
-        theme->SetColor( ThemeKey::Color::PanelNormal, a_Color );
+        theme->SetBrush( ThemeKey::Brush::PanelNormal, SolidBrush{ a_Color } );
         theme->SetRounding( ThemeKey::Rounding::Panel, a_Rounding );
         theme->SetMetric( ThemeKey::Metric::PanelBorderThickness, a_BorderThickness );
         return theme;
