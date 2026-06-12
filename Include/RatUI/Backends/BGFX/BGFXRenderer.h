@@ -80,8 +80,8 @@ namespace RatUI::BGFX
 
         ~BGFXRenderer() override
         {
-            if ( m_WhitePixelTexture != TextureID::Null() )
-                DestroyTexture( m_WhitePixelTexture );
+            if ( m_WhitePixelTexture )
+                DestroyTexture( m_WhitePixelTexture.GetID() );
 
             for ( auto& [_, tex] : m_Textures )
             {
@@ -275,8 +275,8 @@ namespace RatUI::BGFX
             if ( bgfx::isValid( it->second.Handle ) )
                 bgfx::destroy( it->second.Handle );
 
-            if ( m_WhitePixelTexture == a_Texture )
-                m_WhitePixelTexture = TextureID::Null();
+            if ( m_WhitePixelTexture.GetID() == a_Texture)
+                m_WhitePixelTexture.Reset();
 
             m_Textures.erase( it );
         }
@@ -331,7 +331,7 @@ namespace RatUI::BGFX
 
         Mat3f m_Projection{};
 
-        TextureID m_WhitePixelTexture{ TextureID::Null() };
+        TextureHandle m_WhitePixelTexture{};
         uptr m_NextTextureID{ 1 };
         HashMap<uptr, TextureRecord> m_Textures;
 
@@ -385,15 +385,14 @@ namespace RatUI::BGFX
             }
             else
             {
-                if ( m_WhitePixelTexture == TextureID::Null() )
+                if ( !m_WhitePixelTexture )
                 {
-                    const u8 whitePixel[4] = { 255, 255, 255, 255 };
-                    TextureHandle created = CreateTexture( { .Size = { 1, 1 }, .Format = ETextureFormat::RGBA8 }, whitePixel );
-                    m_WhitePixelTexture = created.GetID();
+                    constexpr u8 whitePixel[4] = { 255, 255, 255, 255 };
+                    m_WhitePixelTexture = CreateTexture( { .Size = { 1, 1 }, .Format = ETextureFormat::RGBA8 }, whitePixel );
                 }
 
-                if ( IsValidTexture( m_WhitePixelTexture ) )
-                    tex = m_Textures.find( m_WhitePixelTexture.ID )->second.Handle;
+                if ( IsValidTexture( m_WhitePixelTexture.GetID() ) )
+                    tex = m_Textures.find( m_WhitePixelTexture.GetID().ID )->second.Handle;
             }
 
             if ( bgfx::isValid( tex ) )
@@ -472,7 +471,7 @@ namespace RatUI::BGFX
         {
             if ( !HasValue( a_ClipRect ) )
             {
-                bgfx::setScissor( 0, 0, 0, 0 );
+                bgfx::setScissor( 0, 0, UINT16_MAX, UINT16_MAX );
                 return;
             }
 
