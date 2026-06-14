@@ -41,6 +41,15 @@ namespace RatUI
         /** @brief Returns the layout identifier for this widget. */
         NodeID GetLayoutID() const { return m_LayoutID; }
 
+        IWidget* GetParentWidget() const
+        {
+            const LayoutNode& node = GetLayout();
+            return node.Parent() ? node.Parent()->Widget.get() : nullptr;
+        }
+
+        template<std::derived_from<IWidget> WidgetType>
+        WidgetType* GetParentWidgetAs() const { return dynamic_cast<WidgetType*>( GetParentWidget() ); }
+
         // - Lifecycle
 
         /** @brief Called immediately after the widget is constructed and associated with a layout node. */
