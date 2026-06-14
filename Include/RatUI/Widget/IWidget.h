@@ -34,6 +34,9 @@ namespace RatUI
               Scene& GetScene()       { RATUI_USER_ASSERT( m_Scene, "Call to GetScene() failed: widget is not associated with a scene." ); return *m_Scene; }
         const Scene& GetScene() const { RATUI_USER_ASSERT( m_Scene, "Call to GetScene() failed: widget is not associated with a scene." ); return *m_Scene; }
 
+        /** @brief Returns the unique identifier for this widget. */
+        WidgetID GetID() const { return m_ID; }
+
         /** @brief Returns the layout identifier for this widget. */
         NodeID GetLayoutID() const { return m_LayoutID; }
 
@@ -101,6 +104,7 @@ namespace RatUI
     protected:
         friend Scene;
 		Scene*   m_Scene{ nullptr };
+        WidgetID m_ID{};
         NodeID   m_LayoutID{};
     };
 

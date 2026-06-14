@@ -211,7 +211,7 @@ namespace RatUI
         static constexpr Reply Handled() { return Reply{ true }; }
 
         /** @brief Capture all future pointer events to this widget. */
-        constexpr Reply& CaptureMouse( NodeID a_Widget )
+        constexpr Reply& CaptureMouse( WidgetID a_Widget )
         {
             m_MouseCapture = a_Widget;
             m_RequestCapture = true;
@@ -226,7 +226,7 @@ namespace RatUI
         }
 
         /** @brief Set keyboard focus to the specified widget. */
-        constexpr Reply& SetFocus( NodeID a_Widget )
+        constexpr Reply& SetFocus( WidgetID a_Widget )
         {
             m_FocusWidget = a_Widget;
             return *this;
@@ -249,20 +249,20 @@ namespace RatUI
         constexpr bool IsHandled()          const { return m_Handled; }
         constexpr bool ShouldCaptureMouse() const { return m_RequestCapture; }
         constexpr bool ShouldReleaseMouse() const { return m_ReleaseMouse; }
-        constexpr bool ShouldSetFocus()     const { return m_FocusWidget != c_InvalidNodeID; }
+        constexpr bool ShouldSetFocus()     const { return m_FocusWidget != c_InvalidWidgetID; }
         constexpr bool ShouldClearFocus()   const { return m_ClearFocus; }
         constexpr bool IsDefaultPrevented() const { return m_PreventDefault; }
 
         /** @brief Get the widget that is currently capturing mouse events. */
-        constexpr NodeID GetMouseCaptureTarget() const { return m_MouseCapture; }
+        constexpr WidgetID GetMouseCaptureTarget() const { return m_MouseCapture; }
         /** @brief Get the widget that currently has keyboard focus. */
-        constexpr NodeID GetFocusTarget()        const { return m_FocusWidget; }
+        constexpr WidgetID GetFocusTarget()        const { return m_FocusWidget; }
 
     private:
         constexpr explicit Reply( bool a_Handled ) : m_Handled( a_Handled ) {}
 
-        NodeID m_MouseCapture     { c_InvalidNodeID };
-        NodeID m_FocusWidget      { c_InvalidNodeID };
+        WidgetID m_MouseCapture   { c_InvalidWidgetID };
+        WidgetID m_FocusWidget    { c_InvalidWidgetID };
         bool     m_Handled        : 1 { false };
         bool     m_RequestCapture : 1 { false };
         bool     m_ReleaseMouse   : 1 { false };

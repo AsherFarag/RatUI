@@ -112,14 +112,14 @@ namespace RatUI
             return NavReply{ EBoundaryRule::Stop };
         }
     
-        static NavReply Explicit( NodeID a_Target )
+        static NavReply Explicit( WidgetID a_Target )
         {
             NavReply r{ EBoundaryRule::Explicit };
             r.m_ExplicitTarget = a_Target;
             return r;
         }
     
-        static NavReply Custom( Callback<ENavAction, NodeID /*current*/> a_Handler )
+        static NavReply Custom( Callback<ENavAction, WidgetID /*current*/> a_Handler )
         {
             NavReply r{ EBoundaryRule::Custom };
             r.m_CustomHandler = std::move( a_Handler );
@@ -127,23 +127,23 @@ namespace RatUI
         }
     
         EBoundaryRule GetRule()           const { return m_Rule; }
-        NodeID      GetExplicitTarget() const { return m_ExplicitTarget; }
+        WidgetID      GetExplicitTarget() const { return m_ExplicitTarget; }
     
-        NodeID ResolveCustom( ENavAction a_Action, NodeID a_Current ) const
+        WidgetID ResolveCustom( ENavAction a_Action, WidgetID a_Current ) const
         {
             // TODO: I was stupid and thought Callback<> wouldnt need a return type. Upgrade Callback to support returns.
             if ( m_CustomHandler )
                 /*return*/ m_CustomHandler( a_Action, a_Current );
 
-            return c_InvalidNodeID;
+            return c_InvalidWidgetID;
         }
     
     private:
         explicit NavReply( EBoundaryRule a_Rule ) : m_Rule( a_Rule ) {}
     
-        Callback<ENavAction, NodeID> m_CustomHandler;
-        NodeID                       m_ExplicitTarget{ c_InvalidNodeID };
-        EBoundaryRule                m_Rule{ EBoundaryRule::Escape };
+        Callback<ENavAction, WidgetID>           m_CustomHandler;
+        WidgetID                                 m_ExplicitTarget{ c_InvalidWidgetID };
+        EBoundaryRule                            m_Rule{ EBoundaryRule::Escape };
     };
 
 } // namespace RatUI

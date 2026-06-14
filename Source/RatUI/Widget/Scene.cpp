@@ -56,7 +56,10 @@ namespace RatUI
 
     void Scene::UpdateLayout( Vec2<Unit> a_AvailableSize )
     {
-        LayoutNode* rootNode = Layouts.Get( RootWidget );
+        IWidget* root = GetWidget( RootWidget );
+        if ( !root )
+            return;
+        LayoutNode* rootNode = Layouts.Get( root->GetLayoutID() );
         if ( !rootNode )
             return;
 
@@ -64,10 +67,10 @@ namespace RatUI
         {
             bool anyChanged = false;
 
-            if ( node.Widget )
+            if ( IWidget* widget = GetWidget( node.Widget ) )
             {
                 const Vec2<Unit> oldIntrinsics = node.Layout.IntrinsicSize;
-                node.Widget->OnSyncLayout( node, parentSize );
+                widget->OnSyncLayout( node, parentSize );
                 anyChanged |= ( node.Layout.IntrinsicSize != oldIntrinsics );
             }
 
@@ -95,48 +98,47 @@ namespace RatUI
 
     void Scene::Render( DrawList& a_DrawList )
     {
-        if ( LayoutNode* rootNode = Layouts.Get( RootWidget ) )
-            if ( rootNode->Widget )
-                rootNode->Widget->OnPaint( a_DrawList );
+        if ( IWidget* root = GetWidget( RootWidget ) )
+            root->OnPaint( a_DrawList );
     }
 
-    void Scene::SetFocus( NodeID a_NodeID )
+    void Scene::SetFocus( WidgetID a_WidgetID )
     {
-        FocusEvent focusEvent; // TODO: Populate this with useful information?
+		FocusEvent focusEvent; // TODO: Populate this with useful information?
 
         // Callers should not need to check IsFocusable() before calling SetFocus().
-        if ( LayoutNode* targetNode = Layouts.Get( a_NodeID ) )
+        if ( IWidget* target = GetWidget( a_WidgetID ) )
         {
-            if ( targetNode->Widget && !targetNode->Widget->IsFocusable() )
+            if ( !target->IsFocusable() )
                 return;
         }
 
-        if ( LayoutNode* currentNode = Layouts.Get( m_FocusedWidget ) )
+        if ( IWidget* currentFocus = GetWidget( m_FocusedWidget ) )
         {
-            if ( m_FocusedWidget == a_NodeID )
+            if ( currentFocus->GetID() == a_WidgetID )
                 return;
 
-            if ( currentNode->Widget )
-                currentNode->Widget->OnFocusLost( focusEvent );
+            currentFocus->OnFocusLost( focusEvent );
         }
 
-        m_FocusedWidget = a_NodeID;
+        m_FocusedWidget = a_WidgetID;
 
-        if ( LayoutNode* newNode = Layouts.Get( m_FocusedWidget ) )
-            if ( newNode->Widget )
-                newNode->Widget->OnFocusReceived( focusEvent );
+        if ( IWidget* newFocus = GetWidget( m_FocusedWidget ) )
+            newFocus->OnFocusReceived( focusEvent );
     }
 
-    NavReply Scene::QueryBoundaryReply( ENavAction a_Action, NodeID a_Focused )
+    NavReply Scene::QueryBoundaryReply( ENavAction a_Action, WidgetID a_Focused )
     {
-        // Walk up from the focused node asking each navigation boundary widget.
-        LayoutNode* node = Layouts.Get( a_Focused );
-        while ( node )
+        // Walk up from the focused widget asking each navigation boundary widget.
+        IWidget* w = GetWidget( a_Focused );
+        while ( w )
         {
-            if ( node->Widget && node->Widget->IsNavigationBoundary() )
-                return node->Widget->OnNavigationBoundary( a_Action );
+            if ( w->IsNavigationBoundary() )
+                return w->OnNavigationBoundary( a_Action );
 
-            node = node->Parent();
+            LayoutNode* node = Layouts.Get( w->GetLayoutID() );
+            LayoutNode* parent = node ? node->Parent() : nullptr;
+            w = parent ? GetWidget( parent->Widget ) : nullptr;
         }
 
         return NavReply::Escape();
@@ -144,16 +146,20 @@ namespace RatUI
 
     void Scene::Navigate( ENavAction a_Action )
     {
-        const auto FocusFirstIn = [&]( NodeID a_ScopeID )
+        const auto FocusFirstIn = [&]( WidgetID a_ScopeID )
         {
-            LayoutNode* scopeNode = Layouts.Get( a_ScopeID );
+            IWidget* scopeWidget = GetWidget( a_ScopeID );
+            if ( !scopeWidget ) return;
+
+            LayoutNode* scopeNode = Layouts.Get( scopeWidget->GetLayoutID() );
             if ( !scopeNode ) return;
 
             for ( LayoutNode* child = scopeNode->FirstChild(); child; child = child->NextSibling() )
             {
-                if ( child->Widget && child->Widget->IsFocusable() )
+                IWidget* w = GetWidget( child->Widget );
+                if ( w && w->IsFocusable() )
                 {
-                    SetFocus( child->Widget->GetLayoutID() );
+                    SetFocus( child->Widget );
                     return;
                 }
             }
@@ -167,36 +173,41 @@ namespace RatUI
 
         if ( a_Action == ENavAction::ActivatePressed || a_Action == ENavAction::ActivateReleased )
         {
-            LayoutNode* focusedNode = Layouts.Get( m_FocusedWidget );
-            if ( !focusedNode || !focusedNode->Widget )
-                return;
-
-            if ( a_Action == ENavAction::ActivatePressed && focusedNode->Style.IsFocusScope )
+            WidgetID focused = GetFocusedWidget();
+            if ( IWidget* w = GetWidget( focused ) )
             {
-                PushNavScope( m_FocusedWidget );
-                FocusFirstIn( m_FocusedWidget );
-                return;
+                LayoutNode* node = Layouts.Get( w->GetLayoutID() );
+
+                if ( a_Action == ENavAction::ActivatePressed && node && node->Style.IsFocusScope )
+                {
+                    PushNavScope( focused );
+                    FocusFirstIn( focused );
+                    return;
+                }
+
+                const ButtonEvent ev{
+                    .Button = EButtonID::KeyEnter,
+                    .Pressed = ( a_Action == ENavAction::ActivatePressed ),
+                    .Released = ( a_Action == ENavAction::ActivateReleased ),
+                    .Held = ( a_Action == ENavAction::ActivatePressed ),
+                };
+
+                // TODO: Shouldnt be making fake events like this, should add something like IWidget::OnPressed/OnHovered etc??
+                Reply reply = a_Action == ENavAction::ActivatePressed
+                    ? w->OnButtonPressed( ev )
+                    : w->OnButtonReleased( ev );
+
+                ApplyReply( reply );
             }
-
-            const ButtonEvent ev{
-                .Button = EButtonID::KeyEnter,
-                .Pressed = ( a_Action == ENavAction::ActivatePressed ),
-                .Released = ( a_Action == ENavAction::ActivateReleased ),
-                .Held = ( a_Action == ENavAction::ActivatePressed ),
-            };
-
-            // TODO: Shouldnt be making fake events like this, should add something like IWidget::OnPressed/OnHovered etc??
-            Reply reply = a_Action == ENavAction::ActivatePressed
-                ? focusedNode->Widget->OnButtonPressed( ev )
-                : focusedNode->Widget->OnButtonReleased( ev );
-
-            ApplyReply( reply );
             return;
         }
 
-        NodeID      scopeID     = GetCurrentNavScope();
-        LayoutNode* scopeNode   = Layouts.Get( scopeID );
-        LayoutNode* focusedNode = Layouts.Get( m_FocusedWidget );
+        WidgetID    scopeID       = GetCurrentNavScope();
+        WidgetID    focused       = GetFocusedWidget();
+        IWidget*    scopeWidget   = GetWidget( scopeID );
+        LayoutNode* scopeNode     = scopeWidget ? Layouts.Get( scopeWidget->GetLayoutID() ) : nullptr;
+        IWidget*    focusedWidget = GetWidget( focused );
+        LayoutNode* focusedNode   = focusedWidget ? Layouts.Get( focusedWidget->GetLayoutID() ) : nullptr;
 
         if ( !scopeNode )
             return;
@@ -207,27 +218,28 @@ namespace RatUI
             return;
         }
 
-        // TODO: If I move navigation from LayoutNodes to Widgets, I should remove this.
-        // TODO: Though I do like not having explicit widget types for containers like VBox/HBox/Grid etc and still keep nav for them.
+        // TODO: If I move navigation from LayoutNodes to Widgets, I should remove ts
+		// TODO: Though I do like not having explicit widget types for containers like VBox/HBox/Grid etc and still keep nav for them.
 
         auto focusableNodes = LayoutChildRange{ scopeNode->FirstChild() }
             | std::views::filter( [&]( LayoutNode* node ) -> bool
             {
                 if ( !node ) return false;
+                IWidget* w = GetWidget( node->Widget );
                 // TODO: Probs dont need LayoutStyle::IsFocusScope anymore
-                return ( node->Widget && node->Widget->IsFocusable() ) || node->Style.IsFocusScope;
+                return w && ( w->IsFocusable() || node->Style.IsFocusScope );
             } );
 
         const LayoutNode* nextNode = FindNavigatableNode( a_Action, focusedNode, focusableNodes );
 
         if ( nextNode )
         {
-            SetFocus( nextNode->Widget->GetLayoutID() );
+            SetFocus( nextNode->Widget );
             return;
         }
 
         // No target found within the current scope - consult boundary policy.
-        const NavReply navReply = QueryBoundaryReply( a_Action, m_FocusedWidget );
+        const NavReply navReply = QueryBoundaryReply( a_Action, focused );
 
         switch ( navReply.GetRule() )
         {
@@ -246,19 +258,19 @@ namespace RatUI
 
             case NavReply::EBoundaryRule::Custom:
             {
-                NodeID target = navReply.ResolveCustom( a_Action, m_FocusedWidget );
-                if ( target != c_InvalidNodeID )
+                WidgetID target = navReply.ResolveCustom( a_Action, focused );
+                if ( target != c_InvalidWidgetID )
                     SetFocus( target );
                 break;
             }
         }
     }
 
-    void Scene::PushNavScope( NodeID a_ScopeID )
+    void Scene::PushNavScope( WidgetID a_ScopeID )
     {
         PushBack( m_NavStack, NavScope{
             .Scope = a_ScopeID,
-            .Restored = m_FocusedWidget,
+            .Restored = GetFocusedWidget(),
         } );
     }
 
@@ -269,43 +281,45 @@ namespace RatUI
         if ( Empty( m_NavStack ) )
             return;
 
-        NodeID restored = Back( m_NavStack ).Restored;
+        WidgetID restored = Back( m_NavStack ).Restored;
         PopBack( m_NavStack );
-
-        if ( restored != c_InvalidNodeID )
+        if ( restored != c_InvalidWidgetID )
             SetFocus( restored );
     }
 
-    IWidget* Scene::GetWidget( NodeID a_ID )
+    IWidget* Scene::GetWidget( WidgetID a_ID )
     {
-        LayoutNode* node = Layouts.Get( a_ID );
-        return node ? node->Widget.get() : nullptr;
+        if ( Unique<IWidget>* widget = Widgets.Get( a_ID ) )
+            return widget->get();
+
+        return nullptr;
     }
 
-    const IWidget* Scene::GetWidget( NodeID a_ID ) const
+    const IWidget* Scene::GetWidget( WidgetID a_ID ) const
     {
-        const LayoutNode* node = Layouts.Get( a_ID );
-        return node ? node->Widget.get() : nullptr;
+        if ( const Unique<IWidget>* widget = Widgets.Get( a_ID ) )
+            return widget->get();
+
+        return nullptr;
     }
 
-    bool Scene::DestroyWidget( NodeID a_NodeID )
+    bool Scene::DestroyWidget( WidgetID a_WidgetID )
     {
-        LayoutNode* node = Layouts.Get( a_NodeID );
+        IWidget* widget = GetWidget( a_WidgetID );
+        if ( !widget )
+            return false;
+
+        LayoutNode* node = Layouts.Get( widget->GetLayoutID() );
         if ( !node )
             return false;
 
         node->DetachFromParent();
 
-        node->ForEachChild( [&]( LayoutNode& child )
-        {
-            if ( child.Widget )
-                DestroyWidget( child.Widget->GetLayoutID() );
-        } );
+        node->ForEachChild( [&]( LayoutNode& child ) { DestroyWidget( child.Widget ); } );
 
-        if ( node->Widget )
-            node->Widget->OnDestroy();
-
-        Layouts.Deallocate( a_NodeID );
+        widget->OnDestroy();
+        Widgets.Deallocate( widget->GetID() );
+        Layouts.Deallocate( widget->GetLayoutID() );
 
         return true;
     }
@@ -313,38 +327,43 @@ namespace RatUI
     void Scene::Reset()
     {
         Layouts.Clear();
-        RootWidget      = c_InvalidNodeID;
-        m_HoveredWidget = c_InvalidNodeID;
+        Widgets.Clear();
+        RootWidget = c_InvalidWidgetID;
+        m_HoveredWidget = c_InvalidWidgetID;
         ClearFocus();
         Clear( m_NavStack );
     }
 
-    NodeID Scene::HitTest( NodeID a_ID, Vec2<Unit> a_LogicalPos )
+    WidgetID Scene::HitTest( WidgetID a_ID, Vec2<Unit> a_LogicalPos )
     {
-        LayoutNode* rootNode = Layouts.Get( a_ID );
-        if ( !rootNode )
-            return c_InvalidNodeID;
+        IWidget* rootWidget = GetWidget( a_ID );
+        if ( !rootWidget )
+            return c_InvalidWidgetID;
 
-        const auto hitTestNode = [&]( auto&& Self, LayoutNode* a_Node ) -> NodeID
+        LayoutNode* rootNode = Layouts.Get( rootWidget->GetLayoutID() );
+        if ( !rootNode )
+            return c_InvalidWidgetID;
+
+        const auto hitTestNode = [&]( auto&& Self, LayoutNode* a_Node ) -> WidgetID
         {
             if ( !a_Node )
-                return c_InvalidNodeID;
+                return c_InvalidWidgetID;
 
             if ( !a_Node->Layout.FinalRect.Contains( a_LogicalPos ) )
-                return c_InvalidNodeID;
+                return c_InvalidWidgetID;
 
-            NodeID result = c_InvalidNodeID;
+            WidgetID result = c_InvalidWidgetID;
 
             if ( Visibility::AreChildrenHitTestable( a_Node->Layout.Visibility ) )
             {
                 a_Node->ForEachChild( [&]( LayoutNode& child )
                 {
-                    NodeID childHit = Self( Self, &child );
-                    if ( childHit != c_InvalidNodeID )
+                    WidgetID childHit = Self( Self, &child );
+                    if ( childHit != c_InvalidWidgetID )
                         result = childHit;
                 });
 
-                if ( result != c_InvalidNodeID )
+                if ( result != c_InvalidWidgetID )
                     return result;
             }
 
@@ -353,13 +372,15 @@ namespace RatUI
             // AND the widget explicitly opts in via IsInteractable().
             // Non-interactive widgets (Panel, decorative containers, etc) fall
             // through so their interactable ancestor can receive the event instead.
-            if ( a_Node->Widget && Visibility::IsHitTestable( a_Node->Layout.Visibility ) )
+            if ( Visibility::IsHitTestable( a_Node->Layout.Visibility ) &&
+                 a_Node->Widget != c_InvalidWidgetID )
             {
-                if ( a_Node->Widget->IsInteractable() )
-                    return a_Node->Widget->GetLayoutID();
+                IWidget* w = GetWidget( a_Node->Widget );
+                if ( w && w->IsInteractable() )
+                    return a_Node->Widget;
             }
 
-            return c_InvalidNodeID;
+            return c_InvalidWidgetID;
         };
 
         return hitTestNode( hitTestNode, rootNode );
@@ -389,7 +410,7 @@ namespace RatUI
         // --- Scroll ---
         if ( a_Event.ScrollDelta[0] != 0_u || a_Event.ScrollDelta[1] != 0_u )
         {
-            NodeID scrollTarget = m_CapturedWidget != c_InvalidNodeID
+            WidgetID scrollTarget = m_CapturedWidget != c_InvalidWidgetID
                 ? m_CapturedWidget
                 : HitTest( RootWidget, a_Event.Position );
 
@@ -403,7 +424,7 @@ namespace RatUI
         }
 
         // --- Move (captured widget takes priority) ---
-        if ( m_CapturedWidget != c_InvalidNodeID )
+        if ( m_CapturedWidget != c_InvalidWidgetID )
         {
             if ( IWidget* w = GetWidget( m_CapturedWidget ) )
             {
@@ -414,7 +435,7 @@ namespace RatUI
         }
 
         // --- Hover tracking ---
-        NodeID hovered = HitTest( RootWidget, a_Event.Position );
+        WidgetID hovered = HitTest( RootWidget, a_Event.Position );
 
         if ( hovered != m_HoveredWidget )
         {
@@ -432,7 +453,7 @@ namespace RatUI
                 ApplyReply( reply );
             }
         }
-        else if ( hovered != c_InvalidNodeID )
+        else if ( hovered != c_InvalidWidgetID )
         {
             if ( IWidget* w = GetWidget( hovered ) )
             {
@@ -447,7 +468,7 @@ namespace RatUI
     bool Scene::ProcessButtonEvent( const ButtonEvent& a_Event )
     {
         // Captured widget gets all button events first during an active drag/press.
-        if ( m_CapturedWidget != c_InvalidNodeID )
+        if ( m_CapturedWidget != c_InvalidWidgetID )
         {
             if ( IWidget* w = GetWidget( m_CapturedWidget ) )
             {
@@ -482,9 +503,10 @@ namespace RatUI
 
         // Focused widget gets keyboard/gamepad events that the hovered widget
         // didn't consume. Skip if hovered == focused to avoid double-dispatch.
-        if ( m_FocusedWidget != m_HoveredWidget )
+        WidgetID focusedID = GetFocusedWidget();
+        if ( focusedID != m_HoveredWidget )
         {
-            if ( IWidget* focused = GetWidget( m_FocusedWidget ) )
+            if ( IWidget* focused = GetWidget( focusedID ) )
             {
                 Reply reply = a_Event.Pressed
                     ? focused->OnButtonPressed( a_Event )

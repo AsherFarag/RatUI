@@ -84,7 +84,7 @@ namespace RatUI
                 if ( node )
                 {
                     m_IsDragging = true;
-                    GetScene().CapturePointer( GetLayoutID() );
+                    GetScene().CapturePointer( GetID() );
                     UpdateFromPointer( node->Layout.FinalRect, m_LastPointerPos );
                 }
 

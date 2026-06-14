@@ -70,7 +70,7 @@ namespace RatUI
                 } );
             }
 
-            if ( scene.GetFocusedNode() == GetLayoutID() )
+            if ( scene.GetFocusedWidget() == GetID() )
             {
                 a_DrawList.AddRect( rect,
                 {

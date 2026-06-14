@@ -54,7 +54,7 @@ public:
         const Rect<Unit>& rect = node->Layout.FinalRect;
         Vec2<Unit> center = rect.Center();
 
-        if ( scene.GetFocusedNode() == GetLayoutID() )
+        if ( scene.GetFocusedWidget() == GetID() )
         {
             a_DrawList.AddCircle( center, Radius,
             {

@@ -11,11 +11,10 @@ namespace RatUI
     class ButtonBaseWidget : public IWidget
     {
     public:
-		using OnClickCallback = Callback<ButtonBaseWidget&>;
-        OnClickCallback OnClick; ///< Callback that is invoked when the button is clicked.
+        Callback<Scene&, WidgetID> OnClick; ///< Callback that is invoked when the button is clicked.
 
         ButtonBaseWidget() = default;
-        ButtonBaseWidget( OnClickCallback a_OnClick )
+        ButtonBaseWidget( Callback<Scene&, WidgetID> a_OnClick )
             : OnClick( std::move( a_OnClick ) )
         {}
 
@@ -50,7 +49,7 @@ namespace RatUI
             m_IsPressed = false;
 
             if ( wasPressed )
-                Invoke( OnClick, *this );
+                Invoke( OnClick, GetScene(), GetID() );
 
             return Reply::Handled();
         }
@@ -106,7 +105,8 @@ namespace RatUI
     public:
         ButtonWidget() = default;
 
-        ButtonWidget( ThemeHandle a_Theme, OnClickCallback a_OnClick = {} )
+
+        ButtonWidget( ThemeHandle a_Theme, Callback<Scene&, WidgetID> a_OnClick = {} )
 			: ButtonBaseWidget( std::move( a_OnClick ) ), m_Theme( std::move( a_Theme ) )
         {}
 
@@ -166,7 +166,7 @@ namespace RatUI
 
             // Draw focus ring 
             // TODO: Should this be a util or even handled here?
-            if ( scene.GetFocusedNode() == GetLayoutID() )
+            if ( scene.GetFocusedWidget() == GetID() )
             {
                 a_DrawList.AddRect( rect,
                 {

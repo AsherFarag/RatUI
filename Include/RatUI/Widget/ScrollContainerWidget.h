@@ -163,10 +163,10 @@ namespace RatUI
         NodeID   m_ContentNodeID{ c_InvalidNodeID }; ///< Flex node that user children are parented to.
 
         // Scrollbar widget IDs
-        NodeID m_VScrollbarID{ c_InvalidNodeID };
-        NodeID m_HScrollbarID{ c_InvalidNodeID };
+        WidgetID m_VScrollbarID{ c_InvalidWidgetID };
+        WidgetID m_HScrollbarID{ c_InvalidWidgetID };
 
-		void ShowScrollbar( NodeID a_ScrollbarID, bool a_Hidden = false )
+		void ShowScrollbar( WidgetID a_ScrollbarID, bool a_Hidden = false )
 		{
 			if ( IWidget* scrollbar = GetScene().GetWidget( a_ScrollbarID ) )
 			{
@@ -259,8 +259,8 @@ namespace RatUI
 
             // --- Vertical scrollbar ---
             {
-                SliderWidget* vScroll = scene.CreateWidget<SliderWidget>( m_ContentRowID );
-				m_VScrollbarID        = vScroll->GetLayoutID();
+                m_VScrollbarID        = scene.CreateWidget<SliderWidget>( m_ContentRowID );
+                SliderWidget* vScroll = scene.GetWidget<SliderWidget>( m_VScrollbarID );
                 LayoutNode* vNode     = scene.Layouts.Get( vScroll->GetLayoutID() );
 
                 vNode->Style.WidthMode  = ESizingMode::Fixed;
@@ -272,8 +272,8 @@ namespace RatUI
 
             // --- Horizontal scrollbar ---
             {
-                SliderWidget* hScroll = scene.CreateWidget<SliderWidget>( GetLayoutID() );
-                m_HScrollbarID		  = hScroll->GetLayoutID();
+                m_HScrollbarID        = scene.CreateWidget<SliderWidget>( GetID() );
+                SliderWidget* hScroll = scene.GetWidget<SliderWidget>( m_HScrollbarID );
                 LayoutNode* hNode     = scene.Layouts.Get( hScroll->GetLayoutID() );
 
                 hNode->Style.WidthMode   = ESizingMode::Flex;
