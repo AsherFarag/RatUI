@@ -35,22 +35,18 @@ namespace RatUI
 
         SliderWidget() = default;
 
-        SliderWidget( Shared<const Theme> a_Theme )
-        {
-            m_Theme = std::move( a_Theme );
-        }
+        SliderWidget( ThemeHandle a_Theme )
+            : m_Theme( std::move( a_Theme ) ) 
+        {}
 
-        SliderWidget( Shared<const Theme> a_Theme, f32 a_Min, f32 a_Max, f32 a_InitialValue = 0.f )
-            : Min( a_Min ), Max( a_Max )
+        SliderWidget( ThemeHandle a_Theme, f32 a_Min, f32 a_Max, f32 a_InitialValue = 0.f )
+            : Min( a_Min ), Max( a_Max ), m_Theme( std::move( a_Theme ) )
         {
             Value.Set( std::clamp( a_InitialValue, a_Min, a_Max ) );
-            m_Theme = std::move( a_Theme );
         }
 
-        void SetTheme( Shared<const Theme> a_Theme )
-        {
-            m_Theme = std::move( a_Theme );
-        }
+        const ThemeHandle& GetTheme() const { return m_Theme; }
+        void SetTheme( ThemeHandle a_Theme ) { m_Theme = std::move( a_Theme ); }
 
         bool IsInteractable() const override { return true; }
         bool IsFocusable()    const override { return true; }
@@ -178,13 +174,13 @@ namespace RatUI
         bool m_IsDragging     { false };
         bool m_IsHovered      { false };
         bool m_IsThumbPressed { false };
-        Vec2<Unit> m_LastPointerPos{ 0_u, 0_u };
-        Shared<const Theme> m_Theme;
+        Vec2<Unit>  m_LastPointerPos{ 0_u, 0_u };
+        ThemeHandle m_Theme;
 
         /** @brief Returns the track rect centred inside @p a_Rect. */
         Rect<Unit> GetTrackRect( Rect<Unit> a_Rect ) const
         {
-			const Unit trackThickness = GetThemeMetric( ThemeKey::Metric::SliderTrackThickness, 4_u );
+			const Unit trackThickness = m_Theme.GetMetric( ThemeKey::Metric::SliderTrackThickness, 4_u );
             if ( Orientation == EOrientation::Horizontal )
             {
                 const Unit cy = a_Rect.Origin[1] + a_Rect.Size[1] * 0.5f;
@@ -237,11 +233,11 @@ namespace RatUI
 
         void PaintTrack( DrawList& a_DrawList, const Rect<Unit>& a_Rect ) const
         {
-            const Rect<Unit> track = GetTrackRect( a_Rect );
-            const Unit trackThickness = GetThemeMetric( ThemeKey::Metric::SliderTrackThickness, 4_u );
-            const Color trackColor = GetThemeColor( ThemeKey::Color::SliderTrack, Colors::Surface600 );
-            const Color trackFillColor = GetThemeColor( ThemeKey::Color::SliderTrackFill, Colors::AccentBlue );
-            const CornerRounding trackRounding = GetThemeRounding( ThemeKey::Rounding::SliderTrack, CornerRounding::Uniform( 2_u ) );
+            const Rect<Unit> track             = GetTrackRect( a_Rect );
+            const Unit trackThickness          = m_Theme.GetMetric( ThemeKey::Metric::SliderTrackThickness, 4_u );
+            const Color trackColor             = m_Theme.GetColor( ThemeKey::Color::SliderTrack, Colors::Transparent );
+            const Color trackFillColor         = m_Theme.GetColor( ThemeKey::Color::SliderTrackFill, Colors::Transparent );
+            const CornerRounding trackRounding = m_Theme.GetRounding( ThemeKey::Rounding::SliderTrack, CornerRounding::Uniform( 0_u ) );
 
             // Background track
             a_DrawList.AddRect( track,
@@ -273,12 +269,12 @@ namespace RatUI
 
         void PaintThumb( DrawList& a_DrawList, const Rect<Unit>& a_Rect ) const
         {
-            const Rect<Unit> thumb = GetThumbRect( a_Rect );
-            const Vec2<Unit> thumbSize = GetThemeThumbSize( a_Rect );
-            const Color thumbColor = GetThemeColor( ThemeKey::Color::SliderThumb, Colors::White );
-            const Color thumbHoverColor = GetThemeColor( ThemeKey::Color::SliderThumbHover, Colors::LightGray );
-            const Color thumbPressColor = GetThemeColor( ThemeKey::Color::SliderThumbPressed, Colors::Gray );
-            const CornerRounding thumbRounding = GetThemeRounding( ThemeKey::Rounding::SliderThumb, CornerRounding::Uniform( 8_u ) );
+            const Rect<Unit> thumb             = GetThumbRect( a_Rect );
+            const Vec2<Unit> thumbSize         = GetThemeThumbSize( a_Rect );
+            const Color thumbColor             = m_Theme.GetColor( ThemeKey::Color::SliderThumb, Colors::White );
+            const Color thumbHoverColor        = m_Theme.GetColor( ThemeKey::Color::SliderThumbHover, Colors::LightGray );
+            const Color thumbPressColor        = m_Theme.GetColor( ThemeKey::Color::SliderThumbPressed, Colors::Gray );
+            const CornerRounding thumbRounding = m_Theme.GetRounding( ThemeKey::Rounding::SliderThumb, CornerRounding::Uniform( 8_u ) );
 
             const Color fill = m_IsThumbPressed ? thumbPressColor
                              : m_IsHovered      ? thumbHoverColor
@@ -337,12 +333,12 @@ namespace RatUI
             if ( Orientation == EOrientation::Horizontal )
             {
                 const Unit scaledSize = Unit( a_Rect.Width().ToFloat() * clampedScale );
-                thumbSize[0] = std::max( GetThemeMetric( ThemeKey::Metric::SliderMinThumbSize, 8_u ), std::min( a_Rect.Width(), scaledSize ) );
+                thumbSize[0] = std::max( m_Theme.GetMetric( ThemeKey::Metric::SliderMinThumbSize, 8_u ), std::min( a_Rect.Width(), scaledSize ) );
             }
             else
             {
                 const Unit scaledSize = Unit( a_Rect.Height().ToFloat() * clampedScale );
-                thumbSize[1] = std::max( GetThemeMetric( ThemeKey::Metric::SliderMinThumbSize, 8_u ), std::min( a_Rect.Height(), scaledSize ) );
+                thumbSize[1] = std::max( m_Theme.GetMetric( ThemeKey::Metric::SliderMinThumbSize, 8_u ), std::min( a_Rect.Height(), scaledSize ) );
             }
 
             return thumbSize;
@@ -351,21 +347,6 @@ namespace RatUI
         Vec2<Unit> GetThemeThumbSize( const Rect<Unit>& ) const
         {
             return { 16_u, 16_u };
-        }
-
-        Color GetThemeColor( ThemeID a_ID, Color a_Default ) const
-        {
-            return m_Theme ? m_Theme->GetColor( a_ID, a_Default ) : a_Default;
-        }
-
-        CornerRounding GetThemeRounding( ThemeID a_ID, CornerRounding a_Default ) const
-        {
-            return m_Theme ? m_Theme->GetRounding( a_ID, a_Default ) : a_Default;
-        }
-
-        Unit GetThemeMetric( ThemeID a_ID, Unit a_Default ) const
-        {
-            return m_Theme ? m_Theme->GetMetric( a_ID, a_Default ) : a_Default;
         }
     };
 

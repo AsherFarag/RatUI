@@ -216,6 +216,8 @@ namespace RatUI
 		ThemeHandle( Shared<const Theme> a_Theme ) : Ptr( std::move( a_Theme ) ) {}
 		ThemeHandle( const Shared<Theme>& a_Theme ) : Ptr( a_Theme ) {}
 
+		operator bool() const { return Ptr != nullptr; }
+
         // -------------------------------------------------------------------------
         // Per-type accessors  (generated via below)
         // -------------------------------------------------------------------------

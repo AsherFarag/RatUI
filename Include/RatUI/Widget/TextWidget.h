@@ -10,7 +10,7 @@ namespace RatUI
     class TextWidget : public IWidget
     {
     public:
-        TextWidget( Shared<const Theme> a_Theme,
+        TextWidget( ThemeHandle a_Theme,
                     Text a_Text = {},
                     const TextLayoutStyle& a_Style = {} )
             : m_Theme      ( std::move( a_Theme ) )
@@ -48,10 +48,14 @@ namespace RatUI
             InvalidatePrepared();
         }
 
-        void SetTheme( Shared<const Theme> a_Theme )
+        void SetTheme( ThemeHandle a_Theme )
         {
             m_Theme = std::move( a_Theme );
+            // Theme changes can affect layout (e.g., font changes), so we need to invalidate prepare and shape caches.
+            InvalidatePrepared();
         }
+
+        const ThemeHandle& GetTheme() const { return m_Theme; }
 
         // =====================================================================
         // IWidget overrides
@@ -60,18 +64,14 @@ namespace RatUI
         void OnSyncLayout( LayoutNode& a_Node, Vec2<Unit> a_AvailableSize ) override
         {
             // TODO: We need a cleaner way to detect theme changes that affect layout like fonts. This doesnt make sense to check here
-            if ( m_Theme )
-            {
-				if ( const FontHandle* font = m_Theme->TryGetFont( ThemeKey::Font::Default ) )
+			if ( const FontHandle* font = m_Theme.TryGetFont( ThemeKey::Font::Default ) )
+			{
+				if ( m_LayoutStyle.Font != *font )
 				{
-					if ( m_LayoutStyle.Font != *font )
-					{
-						m_LayoutStyle.Font = *font;
-						InvalidatePrepared();
-                        InvalidateShaped();
-					}
+					m_LayoutStyle.Font = *font;
+					InvalidatePrepared();
 				}
-            }
+			}
 
             ITextMetrics* metrics = GetScene().TextMetrics;
             a_Node.Layout.IntrinsicSize = { 0_u, 0_u };
@@ -187,7 +187,7 @@ namespace RatUI
             // Suppress the fade percentage when not in Fade overflow mode so the
             // MSDF shader doesn't accidentally fade glyphs in Clip/Ellipsis mode.
             TextRenderStyle effectiveStyle{};
-            if ( const auto* textStyle = m_Theme->TryGetTextStyle( ThemeKey::TextStyle::Default ) )
+            if ( const auto* textStyle = m_Theme.TryGetTextStyle( ThemeKey::TextStyle::Default ) )
                 effectiveStyle = *textStyle;
             else
                 return; // No default text style in theme - can't render legibly, so bail out.
@@ -237,7 +237,7 @@ namespace RatUI
         /// Version is compared each frame to detect localisation/binding changes.
         Optional<ResolvedText> m_ResolvedText;
         TextLayoutStyle        m_LayoutStyle;
-        Shared<const Theme>   m_Theme;
+        ThemeHandle            m_Theme;
 
         /// Snapshot of m_LayoutStyle at the time of the last successful Prepare() call.
         /// Used to detect which fields changed and whether re-preparation is needed.
