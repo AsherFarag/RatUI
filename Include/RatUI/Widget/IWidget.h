@@ -34,6 +34,25 @@ namespace RatUI
               Scene& GetScene()       { RATUI_USER_ASSERT( m_Scene, "Call to GetScene() failed: widget is not associated with a scene." ); return *m_Scene; }
         const Scene& GetScene() const { RATUI_USER_ASSERT( m_Scene, "Call to GetScene() failed: widget is not associated with a scene." ); return *m_Scene; }
 
+        /** @brief Returns a reference to the layout node associated with this widget. */
+        LayoutNode& GetLayout() 
+        { 
+            // @note This should never fail because a widget should always be associated with a valid layout node for its entire lifetime. 
+            // If this assertion fails, it indicates a critical bug in the widget lifecycle management 
+            // (e.g., a widget being used after its layout node was destroyed).
+            RATUI_ASSERT( GetScene().Layouts.IsValid( m_LayoutID ), 
+                "Call to GetLayout() failed: widget is not associated with a valid layout node." ); 
+            return *GetScene().Layouts.Get( m_LayoutID ); 
+        }
+
+        /** @brief Returns a reference to the layout node associated with this widget. */
+        const LayoutNode& GetLayout() const 
+        { 
+            RATUI_ASSERT( GetScene().Layouts.IsValid( m_LayoutID ), 
+                "Call to GetLayout() failed: widget is not associated with a valid layout node." ); 
+            return *GetScene().Layouts.Get( m_LayoutID ); 
+        }
+
         /** @brief Returns the layout identifier for this widget. */
         NodeID GetLayoutID() const { return m_LayoutID; }
 
