@@ -5,8 +5,7 @@
 #include <functional>
 #include <filesystem>
 
-#include "../Common/FeatureSandboxScene.h"
-#include "../Common/DynamicTextScene.h"
+//#include "../Common/DynamicTextScene.h"
 #include "../Common/ThemeShowcaseScene.h"
 
 #define STB_IMAGE_IMPLEMENTATION

@@ -479,12 +479,7 @@ namespace RatUI
         LayoutResult Layout{}; ///< The cached layout result for this widget computed during the layout process.
         u32 NumChildren{ 0 };
 
-        union
-        {
-            // TODO: Might be better to just replace this with Unique<IWidget>, this would add a lot of benefits
-            WidgetID Widget;          ///< The ID of the widget associated with this layout node.
-			void* UserData = nullptr; ///< Incase LayoutNode is not being used with the IWidget system, this can store arbitrary user data.
-        };
+        Unique<class IWidget> Widget;
 
         /** @brief Hierachy access */
 

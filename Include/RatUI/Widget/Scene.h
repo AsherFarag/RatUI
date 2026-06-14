@@ -23,9 +23,9 @@ namespace RatUI
      * Scene scene;
      * 
      * // In your initialization code:
-     * WidgetID root = scene.CreateRootWidget<ContainerWidget>();
-     * WidgetID child1 = scene.CreateWidget<ButtonWidget>( root );
-     * WidgetID child2 = scene.CreateWidget<TextWidget>( root );
+     * NodeID root = scene.CreateRootWidget<ContainerWidget>();
+     * NodeID child1 = scene.CreateWidget<ButtonWidget>( root );
+     * NodeID child2 = scene.CreateWidget<TextWidget>( root );
      * 
      * // In your main loop:
      * scene.ProcessInput( GetMousePosition(), IsMouseDown(), GetUIScale() );
@@ -43,8 +43,7 @@ namespace RatUI
         Scene& operator=( Scene&& ) = default;
 
         LayoutNodePool Layouts{};     ///< Pool of layout nodes representing the hierarchical structure and layout information of widgets in the scene.
-        WidgetPool     Widgets{};     ///< Pool of widgets in the scene, each associated with a layout node via the WidgetID and LayoutID.
-        WidgetID       RootWidget{};  ///< The WidgetID of the root widget in the scene, which serves as the entry point for layout and rendering.
+        NodeID         RootWidget{};  ///< The NodeID of the root widget in the scene, which serves as the entry point for layout and rendering.
         ITextMetrics*  TextMetrics{}; ///< Pointer to a text metrics provider used for measuring text during layout, set by the user.
 
         // - Scene Management
@@ -66,58 +65,49 @@ namespace RatUI
 
         // - Focus Management
 
-        /** @brief Returns the WidgetID of the currently focused widget, or c_InvalidPoolID if no widget is focused. */
-        WidgetID GetFocusedWidget() const { return m_FocusedWidget; }
+        /** @brief Returns the NodeID of the currently focused widget, or c_InvalidPoolID if no widget is focused. */
+        NodeID GetFocusedNode() const { return m_FocusedWidget; }
 
         /** @brief Sets the focus to the specified widget, if it is focusable. */ 
-        void SetFocus( WidgetID a_WidgetID );
+        void SetFocus( NodeID a_Node );
 
         /** @brief Clears the focus from the current focused widget. */
-        void ClearFocus() { SetFocus( c_InvalidWidgetID ); }
+        void ClearFocus() { SetFocus( c_InvalidNodeID ); }
 
-        void CapturePointer( WidgetID a_WidgetID ) { m_CapturedWidget = a_WidgetID; }
+        void CapturePointer( NodeID a_Node ) { m_CapturedWidget = a_Node; }
 
-        void ReleasePointerCapture() { m_CapturedWidget = c_InvalidWidgetID; }
+        void ReleasePointerCapture() { m_CapturedWidget = c_InvalidNodeID; }
 
-        WidgetID GetCapturedWidget() const { return m_CapturedWidget; }
+        NodeID GetCapturedWidget() const { return m_CapturedWidget; }
 
         // - Navigation
 
         void Navigate( ENavAction a_Action );
 
-        void PushNavScope( WidgetID a_ScopeID );
+        void PushNavScope( NodeID a_ScopeID );
         void PopNavScope();
-        WidgetID GetCurrentNavScope() const { return Empty( m_NavStack ) ? RootWidget : Back( m_NavStack ).Scope; }
+        NodeID GetCurrentNavScope() const { return Empty( m_NavStack ) ? RootWidget : Back( m_NavStack ).Scope; }
 
         // - Widget Management
 
         template<std::derived_from<IWidget> WidgetType, typename... Args>
-        WidgetID CreateWidget( NodeID a_ParentID, Args&&... a_Args );
+        WidgetType* CreateWidget( NodeID a_ParentID, Args&&... a_Args );
 
         template<std::derived_from<IWidget> WidgetType, typename... Args>
-        WidgetID CreateRootWidget( Args&&... a_Args );
-
-        template<std::derived_from<IWidget> WidgetType, typename... Args>
-        WidgetID CreateWidget( WidgetID a_ParentID, Args&&... a_Args )
-        {
-			if ( IWidget* parentWidget = GetWidget( a_ParentID ) )
-				return CreateWidget<WidgetType>( parentWidget->GetLayoutID(), std::forward<Args>( a_Args )... );
-
-			return c_InvalidWidgetID;
-        }
+        WidgetType* CreateRootWidget( Args&&... a_Args );
 
         /** @brief Destroys the widget with the specified ID, including its children. */
-        bool DestroyWidget( WidgetID a_WidgetID );
+        bool DestroyWidget( NodeID a_WidgetID );
 
-        RATUI_NODISCARD IWidget* GetWidget( WidgetID a_ID );
+        RATUI_NODISCARD IWidget* GetWidget( NodeID a_ID );
 
-        RATUI_NODISCARD const IWidget* GetWidget( WidgetID a_ID ) const;
+        RATUI_NODISCARD const IWidget* GetWidget( NodeID a_ID ) const;
 
         template<std::derived_from<IWidget> WidgetType>
-        RATUI_NODISCARD WidgetType* GetWidget( WidgetID a_ID ) { return dynamic_cast<WidgetType*>( GetWidget( a_ID ) ); }
+        RATUI_NODISCARD WidgetType* GetWidget( NodeID a_ID ) { return dynamic_cast<WidgetType*>( GetWidget( a_ID ) ); }
 
 		template<std::derived_from<IWidget> WidgetType>
-        RATUI_NODISCARD const WidgetType* GetWidget( WidgetID a_ID ) const { return dynamic_cast<const WidgetType*>( GetWidget( a_ID ) ); }
+        RATUI_NODISCARD const WidgetType* GetWidget( NodeID a_ID ) const { return dynamic_cast<const WidgetType*>( GetWidget( a_ID ) ); }
 
         template<std::invocable<IWidget&> Func>
         void ForEachChildWidget( NodeID a_NodeID, Func&& a_Func );
@@ -130,21 +120,21 @@ namespace RatUI
 
     protected:
 		void ApplyReply( const Reply& a_Reply );
-        NavReply QueryBoundaryReply( ENavAction a_Action, WidgetID a_Focused );
+        NavReply QueryBoundaryReply( ENavAction a_Action, NodeID a_Focused );
 
         bool ProcessPointerEvent( const PointerEvent& a_Event );
         bool ProcessButtonEvent( const ButtonEvent& a_Event );
-        WidgetID HitTest( WidgetID a_ID, Vec2<Unit> a_LogicalPos );
+        NodeID HitTest( NodeID a_ID, Vec2<Unit> a_LogicalPos );
 
-        WidgetID m_FocusedWidget{ c_InvalidWidgetID };
-        WidgetID m_HoveredWidget{ c_InvalidWidgetID };
-        WidgetID m_CapturedWidget{ c_InvalidWidgetID };
+        NodeID m_FocusedWidget{ c_InvalidNodeID };
+        NodeID m_HoveredWidget{ c_InvalidNodeID };
+        NodeID m_CapturedWidget{ c_InvalidNodeID };
         PointerEvent m_LastPointerEvent{}; ///< The last pointer event received, used for hit testing and hover state management.
 
         struct NavScope
         {
-            WidgetID Scope{ c_InvalidWidgetID };    ///< The container widget
-            WidgetID Restored{ c_InvalidWidgetID }; ///< The widget to restore on pop
+            NodeID Scope{ c_InvalidNodeID };    ///< The container widget
+            NodeID Restored{ c_InvalidNodeID }; ///< The widget to restore on pop
         };
         Array<NavScope> m_NavStack{}; ///< Stack of navigation scopes used to manage focus during keyboard/gamepad navigation, allowing for nested navigation contexts.
     };
@@ -153,32 +143,24 @@ namespace RatUI
 
 
     template<std::derived_from<IWidget> WidgetType, typename... Args>
-    WidgetID Scene::CreateRootWidget( Args&&... a_Args )
+    WidgetType* Scene::CreateRootWidget( Args&&... a_Args )
     {
-        WidgetID id = CreateWidget<WidgetType>( c_InvalidNodeID, std::forward<Args>( a_Args )... );
-        RootWidget = id;
-        return id;
+        WidgetType* widget = CreateWidget<WidgetType>( c_InvalidNodeID, std::forward<Args>( a_Args )... );
+		RootWidget = widget->GetLayoutID();
+		return widget;
     }
 
     template<std::derived_from<IWidget> WidgetType, typename... Args>
-    WidgetID Scene::CreateWidget( NodeID a_ParentID, Args&&... a_Args )
+    WidgetType* Scene::CreateWidget( NodeID a_ParentID, Args&&... a_Args )
     {
-		Unique<IWidget> widgetPtr = MakeUnique<WidgetType>( std::forward<Args>( a_Args )... );
-		IWidget* widget = widgetPtr.get();
-
         // Allocate layout node and widget
-        NodeID     nodeID   = Layouts.Allocate();
-		WidgetID   widgetID = Widgets.Allocate( std::move( widgetPtr ) );
+        NodeID nodeID    = Layouts.Allocate();
+        LayoutNode* node = Layouts.Get( nodeID );
+		node->Widget     = MakeUnique<WidgetType>( std::forward<Args>( a_Args )... );
 
-        LayoutNode* node   = Layouts.Get( nodeID );
-
-        // Set scene pointer for the widget
-        widget->m_Scene = this;
-
-        // Wire widget <-> node
-        widget->m_ID       = widgetID;
-        widget->m_LayoutID = nodeID;
-        node->Widget       = widgetID;
+		// Wire up back-references for the widget
+        node->Widget->m_Scene    = this;
+        node->Widget->m_LayoutID = nodeID;
 
 		if ( a_ParentID != c_InvalidNodeID )
         {
@@ -187,9 +169,10 @@ namespace RatUI
         }
 
         // Call construct after fully initialized and linked into hierarchy, in case widget logic depends on that
-        widget->OnConstruct();
+        WidgetType& widget = static_cast<WidgetType&>( *node->Widget );
+        widget.OnConstruct();
 
-        return widgetID;
+        return &widget;
     }
 
     template<std::invocable<IWidget&> Func>
@@ -200,8 +183,7 @@ namespace RatUI
 
         node->ForEachChild( [&]( LayoutNode& childNode )
         {
-            IWidget* childWidget = GetWidget( childNode.Widget );
-            if ( childWidget ) a_Func( *childWidget );
+            if ( childNode.Widget ) a_Func( *childNode.Widget );
         } );
     }
 
@@ -213,8 +195,7 @@ namespace RatUI
 
         node->ForEachChild( [&]( const LayoutNode& childNode )
         {
-            const IWidget* childWidget = GetWidget( childNode.Widget );
-            if ( childWidget ) a_Func( *childWidget );
+            if ( childNode.Widget ) a_Func( *childNode.Widget );
         } );
     }
 
