@@ -1,4 +1,5 @@
 #include <RatUI/Widget/IWidget.h>
+#include <RatUI/Widget/Scene.h>
 
 namespace RatUI
 {
