@@ -26,11 +26,6 @@ RatUI
  ```
 
 ## Requirements
-RatUI is a header-only C++20 library, so all you need to do is:
-
-1. Copy '**Include/RatUI/**' into your project  
-
-TODO: Implement default backends and mention them here
 
 **For examples and tests:**
 - C++20‑compatible compiler (GCC, Clang, MSVC)
