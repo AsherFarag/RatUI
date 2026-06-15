@@ -222,6 +222,14 @@ namespace RatUI
             }
         }
 
+        // ========================
+        // Debug
+        // ========================
+
+        bool IsDebugEnabled() const { return m_DebugEnabled; }
+
+        void SetDebugEnabled( bool a_Enabled ) { m_DebugEnabled = a_Enabled; }
+
     protected:
         static constexpr size  c_MaxStackDepth = 64; 
 
@@ -235,6 +243,8 @@ namespace RatUI
         f32 m_DPIScale{ 1.f };
         i32 m_CurrentLayer{ 0 };
         std::map<i32, DrawBatcher> m_Batchers; // TODO: Add RatUI::Map
+
+        bool m_DebugEnabled{ false };
 
         DrawBatcher& GetBatcherForLayer( i32 a_Layer ) { return m_Batchers[a_Layer]; }
         DrawBatcher& GetCurrentBatcher() { return GetBatcherForLayer( m_CurrentLayer ); }

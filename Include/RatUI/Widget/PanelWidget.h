@@ -28,12 +28,9 @@ namespace RatUI
 
         void OnPaint( DrawList& a_DrawList ) override
         {
-            Scene& scene = GetScene();
-            const LayoutNode* node = scene.Layouts.Get( GetLayoutID() );
-            if ( !node || !Visibility::IsRendered( node->Layout.Visibility ) )
-                return;
-
-            const Rect<Unit>& rect = node->Layout.FinalRect;
+			Scene& scene = GetScene();
+            const LayoutNode& node = GetLayout();
+            const Rect<Unit>& rect = node.Layout.FinalRect;
 
             const Brush& panelBrush = m_Theme.GetBrush( ThemeKey::Brush::PanelNormal, SolidBrush{ Colors::Surface700 } );
             if ( std::holds_alternative<SolidBrush>( panelBrush ) )
@@ -81,12 +78,10 @@ namespace RatUI
                 } );
             }
 
-            a_DrawList.PushClipRect( rect );
             scene.ForEachChildWidget( GetLayoutID(), [&]( IWidget& a_Child )
             {
-                a_Child.OnPaint( a_DrawList );
+                a_Child.Paint( a_DrawList );
             } );
-            a_DrawList.PopClipRect();
         }
 
     protected:

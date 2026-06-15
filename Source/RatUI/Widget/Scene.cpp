@@ -97,7 +97,7 @@ namespace RatUI
     {
         if ( LayoutNode* rootNode = Layouts.Get( RootWidget ) )
             if ( rootNode->Widget )
-                rootNode->Widget->OnPaint( a_DrawList );
+                rootNode->Widget->Paint( a_DrawList );
     }
 
     void Scene::SetFocus( NodeID a_NodeID )

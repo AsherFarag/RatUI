@@ -149,6 +149,6 @@ namespace RatUI
 
     protected:
         HashMap<AnimationID, AnimationClip> m_Clips;
-    }
+    };
 
 } // namespace RatUI

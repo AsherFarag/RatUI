@@ -94,10 +94,7 @@ namespace RatUI
         void OnPaint( DrawList& a_DrawList ) override
         {
             Scene& scene = GetScene();
-            const LayoutNode* node = scene.Layouts.Get( GetLayoutID() );
-            if ( !node || !Visibility::IsRendered( node->Layout.Visibility ) )
-                return;
-
+            const LayoutNode& node = GetLayout();
             UpdateScrollMetrics();
 
             // Draw content with clipping and translation based on scroll offset
@@ -119,7 +116,7 @@ namespace RatUI
 
                 scene.ForEachChildWidget( m_ContentNodeID, [&]( IWidget& a_Child )
                 {
-                    a_Child.OnPaint( a_DrawList );
+                    a_Child.Paint( a_DrawList );
                 } );
 
                 if ( hasTranslation )
@@ -131,12 +128,12 @@ namespace RatUI
             // Draw scrollbars if needed
             if ( IWidget* vScrollbar = scene.GetWidget( m_VScrollbarID ) )
             {
-                vScrollbar->OnPaint( a_DrawList );
+                vScrollbar->Paint( a_DrawList );
             }
 
             if ( IWidget* hScrollbar = scene.GetWidget( m_HScrollbarID ) )
             {
-                hScrollbar->OnPaint( a_DrawList );
+                hScrollbar->Paint( a_DrawList );
             }
         }
 

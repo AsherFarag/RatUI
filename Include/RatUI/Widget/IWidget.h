@@ -4,6 +4,7 @@
 #include "../Input/Navigation.h"
 #include "../Layout/Layout.h"
 #include "../Renderer/DrawList.h"
+#include "WidgetMixins.h"
 
 namespace RatUI
 {
@@ -20,7 +21,7 @@ namespace RatUI
      * Widgets are responsible for rendering themselves and handling input events. 
      * They are organized in a tree structure, with each widget having a corresponding layout node.
      */
-    class IWidget
+    class IWidget : public DefaultWidgetMixins
     {
     public:
         IWidget() = default;
@@ -61,8 +62,19 @@ namespace RatUI
         /** @brief Called during the layout process, allowing the widget to update its layout properties or perform calculations based on its children. */
         virtual void OnSyncLayout( LayoutNode& a_Node, Vec2<Unit> a_AvailableSize ) {}
 
-        /** @brief Called when the widget should render itself and its children. */
-        virtual void OnPaint( DrawList& a_DrawList ) {}
+        void Paint( DrawList& a_DrawList )
+        {
+            LayoutNode& node = GetLayout();
+            if ( !Visibility::IsRendered( node.Layout.Visibility ) )
+                return;
+
+            if ( !CanPaint( node ) )
+                return;
+
+            WidgetMixins::PrePaint( a_DrawList, node );
+            OnPaint( a_DrawList );
+            WidgetMixins::PostPaint( a_DrawList, node );
+        }
 
         // - Capabilities
 
@@ -110,6 +122,10 @@ namespace RatUI
 		/** @brief */
         // TODO: Should I make a_Action a struct with more info and for api stability?
 		virtual NavReply OnNavigationBoundary( ENavAction a_Action ) { return NavReply::Escape(); }
+
+    protected:
+        /** @brief Called when the widget should render itself. */
+        virtual void OnPaint( DrawList& a_DrawList ) {}
 
     protected:
         friend Scene;

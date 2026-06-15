@@ -174,15 +174,12 @@ namespace RatUI
                 return;
 
             Scene& scene = GetScene();
-            LayoutNode* node = scene.Layouts.Get( GetLayoutID() );
-
-            if ( !node || !Visibility::IsRendered( node->Layout.Visibility ) )
-                return;
+            const LayoutNode& node = GetLayout();
                 
             if ( !m_ShapedText )
                 return;
 
-            const Rect<Unit> textRect = node->Style.Padding.Apply( node->Layout.FinalRect );
+            const Rect<Unit> textRect = node.Style.Padding.Apply( node.Layout.FinalRect );
 
             // Suppress the fade percentage when not in Fade overflow mode so the
             // MSDF shader doesn't accidentally fade glyphs in Clip/Ellipsis mode.

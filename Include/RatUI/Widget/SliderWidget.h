@@ -53,12 +53,7 @@ namespace RatUI
 
         void OnPaint( DrawList& a_DrawList ) override
         {
-            const Scene& scene = GetScene();
-            const LayoutNode* node = scene.Layouts.Get( GetLayoutID() );
-            if ( !node || !Visibility::IsRendered( node->Layout.Visibility ) )
-                return;
-
-            const Rect<Unit>& rect = node->Layout.FinalRect;
+            const Rect<Unit>& rect = GetLayout().Layout.FinalRect;
 
             PaintTrack( a_DrawList, rect );
             PaintThumb( a_DrawList, rect );
@@ -76,14 +71,10 @@ namespace RatUI
             // Mouse button begins a drag
             if ( a_Event.Button == EButtonID::MouseLeft )
             {
-                const LayoutNode* node = GetScene().Layouts.Get( GetLayoutID() );
-                if ( node )
-                {
-                    m_IsDragging = true;
-                    GetScene().CapturePointer( GetLayoutID() );
-                    UpdateFromPointer( node->Layout.FinalRect, m_LastPointerPos );
-                }
-
+                m_IsDragging = true;
+                GetScene().CapturePointer( GetLayoutID() );
+                UpdateFromPointer( GetLayout().Layout.FinalRect, m_LastPointerPos );
+                
                 return Reply::Handled();
             }
 
