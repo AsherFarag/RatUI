@@ -135,9 +135,9 @@ namespace RatUI
      */
     using DefaultWidgetMixins = WidgetMixins<
         RenderTransformMixin, 
-        AnimationMixin,
+        AnimationMixin
         #if RATUI_DEBUG
-            DebugMixin
+        , DebugMixin
         #endif
     >;
 
