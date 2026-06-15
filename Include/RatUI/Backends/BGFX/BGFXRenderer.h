@@ -80,8 +80,7 @@ namespace RatUI::BGFX
 
         ~BGFXRenderer() override
         {
-            if ( m_WhitePixelTexture )
-                DestroyTexture( m_WhitePixelTexture.GetID() );
+            m_WhitePixelTexture.Reset();
 
             for ( auto& [_, tex] : m_Textures )
             {
@@ -274,9 +273,6 @@ namespace RatUI::BGFX
 
             if ( bgfx::isValid( it->second.Handle ) )
                 bgfx::destroy( it->second.Handle );
-
-            if ( m_WhitePixelTexture.GetID() == a_Texture)
-                m_WhitePixelTexture.Reset();
 
             m_Textures.erase( it );
         }
