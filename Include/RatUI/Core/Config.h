@@ -24,6 +24,14 @@
 
 // === Configuration Options ===
 
+#if !defined(RATUI_DEBUG)
+    #if defined(_DEBUG) || !defined(NDEBUG)
+        #define RATUI_DEBUG 1
+    #else
+        #define RATUI_DEBUG 0
+    #endif
+#endif
+
 #ifndef RATUI_NODISCARD
     #define RATUI_NODISCARD [[nodiscard]]
 #endif
