@@ -167,11 +167,11 @@ namespace RatUI
         Vec2<Unit>   Delta{ 0_u, 0_u };
         EPointerType Type{ EPointerType::Unknown };
 
-        u32        PointerID{ 0 };          // TouchID or PenID or 0 for mouse
-        Vec2<Unit> ScrollDelta{ 0_u, 0_u }; // Mouse
-        f32        Pressure{ 0.f };         // Touch/pen pressure (0.0 to 1.0)
-		Degreesf   TiltX{ 0.f };            // Pen tilt X in degrees
-		Degreesf   TiltY{ 0.f };            // Pen tilt Y in degrees
+        u32        PointerID{ 0 };          ///< TouchID or PenID or 0 for mouse
+        Vec2<Unit> ScrollDelta{ 0_u, 0_u }; ///< Mouse
+        f32        Pressure{ 0.f };         ///< Touch/pen pressure (0.0 to 1.0)
+		Degrees    TiltX{ 0.f };            ///< Pen tilt X in degrees
+		Degrees    TiltY{ 0.f };            ///< Pen tilt Y in degrees
 
         constexpr bool IsMouse() const { return Type == EPointerType::Mouse; }
         constexpr bool IsTouch() const { return Type == EPointerType::Touch; }

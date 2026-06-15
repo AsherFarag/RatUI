@@ -445,6 +445,10 @@ namespace RatUI
         constexpr LayoutStyle& SetPercentHeight( f32 a_PercentHeight ) { PercentHeight = a_PercentHeight; return *this; }
         constexpr LayoutStyle& SetFlexGrow( f32 a_FlexGrow ) { FlexGrow = a_FlexGrow; return *this; }
         constexpr LayoutStyle& SetSizeConstraints( Constraints a_SizeConstraints ) { SizeConstraints = a_SizeConstraints; return *this; }
+
+		constexpr LayoutStyle& WithFixedWidth( Unit a_FixedWidth ) { return SetWidthMode( ESizingMode::Fixed ).SetFixedWidth( a_FixedWidth ); }
+		constexpr LayoutStyle& WithFixedHeight( Unit a_FixedHeight ) { return SetHeightMode( ESizingMode::Fixed ).SetFixedHeight( a_FixedHeight ); }
+		constexpr LayoutStyle& WithFixedSize( Unit a_FixedWidth, Unit a_FixedHeight ) { return WithFixedWidth( a_FixedWidth ).WithFixedHeight( a_FixedHeight ); }
     };
 
     /**
