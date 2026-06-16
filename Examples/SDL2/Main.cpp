@@ -7,6 +7,7 @@
 
 //#include "../Common/DynamicTextScene.h"
 #include "../Common/ThemeShowcaseScene.h"
+#include <RatUI/Animation/Animation.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "../Common/stb_image.h"
@@ -40,6 +41,8 @@ protected:
 
 	f32 m_UIScale{ 1.f };
 
+	f32 m_DeltaSeconds{ 0.f };
+
     bool OnInitialize() override
     {
         g_Renderer = GetRenderer();
@@ -63,7 +66,7 @@ protected:
     {
         static f32 prevTime = 0.f;
 		const f32 currTime = SDL_GetTicks();
-        const f32 deltaTime = ( currTime - prevTime ) / 1000.f;
+        m_DeltaSeconds = ( currTime - prevTime ) / 1000.f;
         prevTime = currTime;
 
 		//m_UIScale = 1.f + 0.5f * std::sin( currTime / 1000.f ); // Oscillate UI scale between  and 1.5 over time.
@@ -73,7 +76,27 @@ protected:
             return;
         }
 
-        m_Scene->Update( deltaTime );
+        m_Scene->Update( m_DeltaSeconds );
+
+        static AnimationPlayer anim;
+		if ( static bool animInitialized = false; !animInitialized )
+		{
+			anim.AddClip( "UIScale"_id, AnimationClip{}
+                .AddTrack( 0.0f, 1.0f, []( f32 val ) { std::cout << "Val = " << val << std::endl; } )
+                .WithOnStart( []() { std::cout << "Animation started\n"; } )
+                .WithOnLoop( []() { std::cout << "Animation looped\n"; } )
+                .WithOnComplete( []() { std::cout << "Animation completed\n"; } )
+                .WithDelay( 2.5f )
+                .WithDuration( 1.f )
+				.WithEasing( EaseLinear{} )
+				.WithPlaybackMode( EPlaybackMode::PingPong )
+                .Play()
+            );
+
+			animInitialized = true;
+		}
+
+		anim.Tick( m_DeltaSeconds );
 
         // Update the layout with the current window size as the available space.
         i32 windowWidth, windowHeight;
@@ -100,7 +123,7 @@ protected:
         m_DrawList->SetDPIScale( dpiscale * m_UIScale );
 
         m_DrawList->Clear();
-		m_Scene->Render( *m_DrawList );
+		m_Scene->Render( *m_DrawList, m_DeltaSeconds );
 		m_DrawList->Flush( a_Renderer );
     }
 

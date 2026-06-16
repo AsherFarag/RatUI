@@ -26,7 +26,7 @@ namespace RatUI
 		bool IsFocusable()          const override { return true; }
         bool IsNavigationBoundary() const override { return true; }
 
-        void OnPaint( DrawList& a_DrawList ) override
+        void OnPaint( const PaintEvent& a_Event ) override
         {
 			Scene& scene = GetScene();
             const LayoutNode& node = GetLayout();
@@ -36,7 +36,7 @@ namespace RatUI
             if ( std::holds_alternative<SolidBrush>( panelBrush ) )
             {
                 const SolidBrush& solid = std::get<SolidBrush>( panelBrush );
-                a_DrawList.AddRect( rect, 
+                a_Event.DrawList.AddRect( rect, 
                 {
                     .FillColor = solid.Fill,
                     .BorderColor = m_Theme.GetColor( ThemeKey::Color::PanelBorder, Colors::Transparent ),
@@ -47,7 +47,7 @@ namespace RatUI
             else if ( std::holds_alternative<TextureBrush>( panelBrush ) )
             {
                 const TextureBrush& texture = std::get<TextureBrush>( panelBrush );
-                a_DrawList.AddRect( rect, 
+                a_Event.DrawList.AddRect( rect, 
                 {
                     .FillColor = texture.Tint,
                     .BorderColor = m_Theme.GetColor( ThemeKey::Color::PanelBorder, Colors::Transparent ),
@@ -59,7 +59,7 @@ namespace RatUI
             else if ( std::holds_alternative<NineSliceBrush>( panelBrush ) )
             {
                 const NineSliceBrush& nineSlice = std::get<NineSliceBrush>( panelBrush );
-                a_DrawList.AddSlicedRect( rect, 
+                a_Event.DrawList.AddSlicedRect( rect, 
                 {
                     .Texture = nineSlice.Texture,
                     .Slice = nineSlice.Slice,
@@ -69,7 +69,7 @@ namespace RatUI
 
             if ( scene.GetFocusedNode() == GetLayoutID() )
             {
-                a_DrawList.AddRect( rect,
+                a_Event.DrawList.AddRect( rect,
                 {
 					.FillColor = Colors::Transparent,
 					.BorderColor = m_Theme.GetColor( ThemeKey::Color::FocusOutline, Colors::White ),
@@ -78,10 +78,7 @@ namespace RatUI
                 } );
             }
 
-            scene.ForEachChildWidget( GetLayoutID(), [&]( IWidget& a_Child )
-            {
-                a_Child.Paint( a_DrawList );
-            } );
+            PaintChildren( a_Event );
         }
 
     protected:

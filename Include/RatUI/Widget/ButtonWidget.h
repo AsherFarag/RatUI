@@ -55,14 +55,6 @@ namespace RatUI
             return Reply::Handled();
         }
 
-        void OnPaint( DrawList& a_DrawList ) override
-        {
-            GetScene().ForEachChildWidget( GetLayoutID(), [&](IWidget& a_Child)
-            {
-                a_Child.Paint( a_DrawList );
-            } );
-        }
-
         Reply OnPointerEnter( const PointerEvent& a_Event ) override
         {
             m_IsHovered = true;
@@ -110,7 +102,7 @@ namespace RatUI
             m_Theme = std::move( a_Theme );
         }
 
-        void OnPaint( DrawList& a_DrawList ) override
+        void OnPaint( const PaintEvent& a_Event ) override
         {
             Scene& scene = GetScene();
             const LayoutNode& node = GetLayout();
@@ -126,7 +118,7 @@ namespace RatUI
             if ( std::holds_alternative<SolidBrush>( fillBrush ) )
             {
                 const SolidBrush& solid = std::get<SolidBrush>( fillBrush );
-                a_DrawList.AddRect( rect, 
+                a_Event.DrawList.AddRect( rect, 
                 {
                     .FillColor = solid.Fill,
                     .BorderColor = m_Theme.GetColor( ThemeKey::Color::ButtonBorder, Colors::Transparent ),
@@ -137,7 +129,7 @@ namespace RatUI
             else if ( std::holds_alternative<TextureBrush>( fillBrush ) )
             {
                 const TextureBrush& texture = std::get<TextureBrush>( fillBrush );
-                a_DrawList.AddRect( rect, 
+                a_Event.DrawList.AddRect( rect, 
                 {
                     .FillColor = texture.Tint,
                     .BorderColor = m_Theme.GetColor( ThemeKey::Color::ButtonBorder, Colors::Transparent ),
@@ -149,7 +141,7 @@ namespace RatUI
             else if ( std::holds_alternative<NineSliceBrush>( fillBrush ) )
             {
                 const NineSliceBrush& nineSlice = std::get<NineSliceBrush>( fillBrush );
-                a_DrawList.AddSlicedRect( rect, 
+                a_Event.DrawList.AddSlicedRect( rect, 
                 {
                     .Texture = nineSlice.Texture,
                     .Slice = nineSlice.Slice,
@@ -161,7 +153,7 @@ namespace RatUI
             // TODO: Should this be a util or even handled here?
             if ( scene.GetFocusedNode() == GetLayoutID() )
             {
-                a_DrawList.AddRect( rect,
+                a_Event.DrawList.AddRect( rect,
                 {
                     .FillColor = Colors::Transparent,
                     .BorderColor = m_Theme.GetColor( ThemeKey::Color::FocusOutline, Colors::White ),
@@ -170,10 +162,7 @@ namespace RatUI
                 } );
             }
 
-            scene.ForEachChildWidget( GetLayoutID(), [&]( IWidget& a_Child )
-            {
-                a_Child.Paint( a_DrawList );
-            } );
+            PaintChildren( a_Event );
         }
 
     private:

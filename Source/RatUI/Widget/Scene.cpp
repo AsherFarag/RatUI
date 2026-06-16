@@ -93,11 +93,11 @@ namespace RatUI
         ProcessPointerEvent( m_LastPointerEvent );
     }
 
-    void Scene::Render( DrawList& a_DrawList )
+    void Scene::Render( DrawList& a_DrawList, f32 a_DeltaSeconds )
     {
         if ( LayoutNode* rootNode = Layouts.Get( RootWidget ) )
             if ( rootNode->Widget )
-                rootNode->Widget->Paint( a_DrawList );
+				rootNode->Widget->Paint( PaintEvent{ a_DrawList, a_DeltaSeconds } );
     }
 
     void Scene::SetFocus( NodeID a_NodeID )

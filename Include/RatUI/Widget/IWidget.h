@@ -10,17 +10,6 @@ namespace RatUI
 {
     class Scene;
 
-    struct FocusEvent 
-    {
-        // TODO: Add more stuff here
-        // TODO: Should this be in a different file?
-    };
-
-    struct TextInputEvent
-    {
-        codepoint Character{}; ///< The Unicode code point of the character that was input.
-    };
-
     /**
      * @brief The base class for all UI elements.
      * Widgets are responsible for rendering themselves and handling input events. 
@@ -67,7 +56,7 @@ namespace RatUI
         /** @brief Called during the layout process, allowing the widget to update its layout properties or perform calculations based on its children. */
         virtual void OnSyncLayout( LayoutNode& a_Node, Vec2<Unit> a_AvailableSize ) {}
 
-        void Paint( DrawList& a_DrawList )
+        void Paint( const PaintEvent& a_Event )
         {
             LayoutNode& node = GetLayout();
             if ( !Visibility::IsRendered( node.Layout.Visibility ) )
@@ -76,9 +65,9 @@ namespace RatUI
             if ( !CanPaint( node ) )
                 return;
 
-            WidgetMixins::PrePaint( a_DrawList, node );
-            OnPaint( a_DrawList );
-            WidgetMixins::PostPaint( a_DrawList, node );
+            WidgetMixins::PrePaint( a_Event, node );
+            OnPaint( a_Event );
+            WidgetMixins::PostPaint( a_Event, node );
         }
 
         // - Capabilities
@@ -132,17 +121,17 @@ namespace RatUI
 
     protected:
         /** @brief Called when the widget should render itself. */
-        virtual void OnPaint( DrawList& a_DrawList )
+        virtual void OnPaint( const PaintEvent& a_Event )
         {
-            PaintChildren( a_DrawList );
+            PaintChildren( a_Event );
         }
 
-        void PaintChildren( DrawList& a_DrawList )
+        void PaintChildren( const PaintEvent& a_Event )
         {
             GetLayout().ForEachChild( [&]( LayoutNode& childNode )
             {
                 if ( childNode.Widget )
-                    childNode.Widget->Paint( a_DrawList );
+                    childNode.Widget->Paint( a_Event );
             } );
         }
 

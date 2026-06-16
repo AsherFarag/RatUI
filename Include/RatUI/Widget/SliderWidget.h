@@ -51,12 +51,12 @@ namespace RatUI
         bool IsInteractable() const override { return true; }
         bool IsFocusable()    const override { return true; }
 
-        void OnPaint( DrawList& a_DrawList ) override
+        void OnPaint( const PaintEvent& a_Event ) override
         {
             const Rect<Unit>& rect = GetLayout().Layout.FinalRect;
 
-            PaintTrack( a_DrawList, rect );
-            PaintThumb( a_DrawList, rect );
+            PaintTrack( a_Event.DrawList, rect );
+            PaintThumb( a_Event.DrawList, rect );
         }
 
         // =====================================================================

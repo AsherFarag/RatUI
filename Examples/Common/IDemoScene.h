@@ -27,7 +27,7 @@ public:
 
     virtual void OnInputEvent( const InputEvent& a_Event ) {}
     virtual void Update( f32 a_DeltaTime ) {}
-    virtual void Render( DrawList& a_DrawList ) {}
+    virtual void Render( DrawList& a_DrawList, f32 a_DeltaSeconds ) {}
 
 protected:
     Scene m_Scene;
@@ -44,7 +44,7 @@ public:
         , FillColor( a_Color )
     {}
 
-    void OnPaint( DrawList& a_DrawList ) override
+    void OnPaint( const PaintEvent& a_Event ) override
     {
         Scene& scene = GetScene();
         const LayoutNode* node = scene.Layouts.Get( GetLayoutID() );
@@ -56,7 +56,7 @@ public:
 
         if ( scene.GetFocusedNode() == GetLayoutID() )
         {
-            a_DrawList.AddCircle( center, Radius,
+            a_Event.DrawList.AddCircle( center, Radius,
             {
                 .FillColor = FillColor,
                 .BorderColor = Colors::White,
@@ -65,7 +65,7 @@ public:
         }
         else
         {
-            a_DrawList.AddCircle( center, Radius,
+            a_Event.DrawList.AddCircle( center, Radius,
             {
                 .FillColor = FillColor,
             } );

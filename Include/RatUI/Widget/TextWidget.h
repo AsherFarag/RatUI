@@ -168,7 +168,7 @@ namespace RatUI
             a_Node.Layout.IntrinsicSize = { m_ShapedText->MaxWidth, m_ShapedText->TotalHeight };
         }
 
-        void OnPaint( DrawList& a_DrawList ) override
+        void OnPaint( const PaintEvent& a_Event ) override
         {
             if ( !m_Theme )
                 return;
@@ -200,14 +200,14 @@ namespace RatUI
                 case ETextOverflow::Clip:
                 case ETextOverflow::Fade:
                 {
-                    //a_DrawList.PushClipRect( textRect );
-                    a_DrawList.AddText( *m_ShapedText, effectiveStyle, textRect );
-                    //a_DrawList.PopClipRect();
+                    //a_Event.DrawList.PushClipRect( textRect );
+                    a_Event.DrawList.AddText( *m_ShapedText, effectiveStyle, textRect );
+                    //a_Event.DrawList.PopClipRect();
                     break;
                 }
                 default:
                 {
-                    a_DrawList.AddText( *m_ShapedText, effectiveStyle, textRect );
+                    a_Event.DrawList.AddText( *m_ShapedText, effectiveStyle, textRect );
                     break;
                 }
             }

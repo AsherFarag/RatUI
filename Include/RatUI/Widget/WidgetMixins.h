@@ -1,10 +1,28 @@
 #pragma once
+#include "../Animation/Animation.h"
 #include "../Layout/Layout.h"
 #include "../Renderer/RenderTransform.h"
 #include "../Renderer/DrawList.h"
 
 namespace RatUI
 {
+    struct FocusEvent 
+    {
+        // TODO: Add more stuff here
+        // TODO: Should this be in a different file?
+    };
+
+    struct TextInputEvent
+    {
+        codepoint Character{}; ///< The Unicode code point of the character that was input.
+    };
+
+    struct PaintEvent
+    {
+        DrawList& DrawList;     ///< The draw list to which the widget should add its rendering commands.
+        f32       DeltaSeconds; ///< The time in seconds since the last paint event, useful for animations and time-based effects.
+    };
+
     /**
      * @brief WidgetMixinBase is a base class for all widget mixins. 
      * Mixins are a way to compose additional functionality into widgets, 
@@ -24,14 +42,14 @@ namespace RatUI
          * @param a_DrawList The draw list that will be used for rendering the widget. Mixins can push transforms, set styles, etc. on this draw list.
          * @param a_Node The layout node associated with the widget being painted, providing access to layout information and properties.
          */
-        void PrePaint( DrawList&, LayoutNode& ) {}
+        void PrePaint( const PaintEvent&, LayoutNode& ) {}
 
         /** 
          * @brief Called after 'OnPaint' is called on the widget, allowing the mixin to clean up any state or perform additional drawing. 
          * @param a_DrawList The draw list that was used for rendering the widget. Mixins can use this to pop transforms, draw debug information, etc.
          * @param a_Node The layout node associated with the widget being painted, providing access to layout information and properties.
          */
-        void PostPaint( DrawList&, LayoutNode& ) {}
+        void PostPaint( const PaintEvent&, LayoutNode& ) {}
     };
 
     /**
@@ -49,14 +67,14 @@ namespace RatUI
             return ( ... && Mixins::CanPaint( node ) );
         }
 
-        void PrePaint( DrawList& a_DrawList, LayoutNode& a_Node )
+        void PrePaint( const PaintEvent& a_Event, LayoutNode& a_Node )
         {
-            ( Mixins::PrePaint( a_DrawList, a_Node ), ... );
+            ( Mixins::PrePaint( a_Event, a_Node ), ... );
         }
 
-        void PostPaint( DrawList& a_DrawList, LayoutNode& a_Node )
+        void PostPaint( const PaintEvent& a_Event, LayoutNode& a_Node )
         {
-            ( Mixins::PostPaint( a_DrawList, a_Node ), ... );
+            ( Mixins::PostPaint( a_Event, a_Node ), ... );
         }
 
     };
@@ -70,20 +88,20 @@ namespace RatUI
     {
         RenderTransform Transform{};
 
-        void PrePaint( DrawList& a_DrawList, LayoutNode& a_Node )
+        void PrePaint( const PaintEvent& a_Event, LayoutNode& a_Node )
         {
             if ( !Transform.IsIdentity() )
             {
-                a_DrawList.PushTransform( Transform.ToMatrix( a_Node.Layout.FinalRect ) );
+                a_Event.DrawList.PushTransform( Transform.ToMatrix( a_Node.Layout.FinalRect ) );
                 m_Pushed++;
             }  
         }
 
-        void PostPaint( DrawList& a_DrawList, LayoutNode& a_Node )
+        void PostPaint( const PaintEvent& a_Event, LayoutNode& a_Node )
         {
             if ( m_Pushed > 0 )
             {
-                a_DrawList.PopTransform();
+                a_Event.DrawList.PopTransform();
                 m_Pushed--;
                 RATUI_USER_ASSERT( m_Pushed >= 0, "Mismatched Push/PopTransform calls in RenderTransformMixin." );
             }
@@ -95,7 +113,12 @@ namespace RatUI
 
     struct AnimationMixin : WidgetMixinBase
     {
-        // TODO: Finish the animation system
+        AnimationPlayer Animator;
+
+        void PrePaint( const PaintEvent& a_Event, LayoutNode& a_Node )
+        {
+            Animator.Tick( a_Event.DeltaSeconds );
+        }
     };
 
     /**
@@ -107,22 +130,22 @@ namespace RatUI
     {
         String DebugName; ///< An optional name for the widget that can be displayed in debug mode to help identify it.
 
-        void PostPaint( DrawList& a_DrawList, LayoutNode& a_Node )
+        void PostPaint( const PaintEvent& a_Event, LayoutNode& a_Node )
         {
-            if ( !a_DrawList.IsDebugEnabled() )
+            if ( !a_Event.DrawList.IsDebugEnabled() )
                 return;
 
 			constexpr Color c_BoundsColor = Colors::Red;
 
             // Draw bounds
-            a_DrawList.AddRect( a_Node.Layout.FinalRect,
+            a_Event.DrawList.AddRect( a_Node.Layout.FinalRect,
             {
                 .BorderColor = c_BoundsColor,
                 .BorderThickness = 1_u
             } );
 
             // Draw center point
-			a_DrawList.AddCircle( a_Node.Layout.FinalRect.Center(), 4_u,
+			a_Event.DrawList.AddCircle( a_Node.Layout.FinalRect.Center(), 4_u,
 			{
 				.FillColor = c_BoundsColor
 			} );

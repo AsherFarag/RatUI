@@ -60,8 +60,9 @@ namespace RatUI
         /**
          * @brief Renders the scene by invoking the OnPaint method of the root widget, which recursively renders all child widgets.
          * @param a_DrawList The draw list to which rendering commands should be added.
+		 * @param a_DeltaSeconds The time elapsed since the last frame, which can be used for animations or time-based effects during rendering.
          */
-		void Render( DrawList& a_DrawList );
+		void Render( DrawList& a_DrawList, f32 a_DeltaSeconds );
 
         // - Focus Management
 

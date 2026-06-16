@@ -91,7 +91,7 @@ namespace RatUI
 
         bool IsFocusable() const override { return true; }
 
-        void OnPaint( DrawList& a_DrawList ) override
+        void OnPaint( const PaintEvent& a_Event ) override
         {
             Scene& scene = GetScene();
             const LayoutNode& node = GetLayout();
@@ -100,7 +100,7 @@ namespace RatUI
             // Draw content with clipping and translation based on scroll offset
             {
                 const Rect<Unit> contentRect = scene.Layouts.Get( m_ContentNodeID )->Layout.FinalRect;
-                a_DrawList.PushClipRect( contentRect );
+                a_Event.DrawList.PushClipRect( contentRect );
 
                 const bool hasTranslation = !IsApproxEqual( m_ScrollOffset[0].ToFloat(), 0.f ) ||
                     !IsApproxEqual( m_ScrollOffset[1].ToFloat(), 0.f );
@@ -111,29 +111,26 @@ namespace RatUI
                           Vec3<Unit>{ 1_u, 0_u, 0_u },
                           Vec3<Unit>{ 0_u, 1_u, 0_u },
                           Vec3<Unit>{ -m_ScrollOffset[0], -m_ScrollOffset[1], 1_u } );
-                    a_DrawList.PushTransform( translation );
+                    a_Event.DrawList.PushTransform( translation );
                 }
 
-                scene.ForEachChildWidget( m_ContentNodeID, [&]( IWidget& a_Child )
-                {
-                    a_Child.Paint( a_DrawList );
-                } );
+                PaintChildren( a_Event );
 
                 if ( hasTranslation )
-                    a_DrawList.PopTransform();
+                    a_Event.DrawList.PopTransform();
 
-                a_DrawList.PopClipRect();
+                a_Event.DrawList.PopClipRect();
             }
 
             // Draw scrollbars if needed
             if ( IWidget* vScrollbar = scene.GetWidget( m_VScrollbarID ) )
             {
-                vScrollbar->Paint( a_DrawList );
+                vScrollbar->Paint( a_Event );
             }
 
             if ( IWidget* hScrollbar = scene.GetWidget( m_HScrollbarID ) )
             {
-                hScrollbar->Paint( a_DrawList );
+                hScrollbar->Paint( a_Event );
             }
         }
 

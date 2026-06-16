@@ -1,7 +1,7 @@
 #pragma once
 #include "IDemoScene.h"
 #include <RatUI/Widget/SliderWidget.h>
-
+#include <RatUI/Widget/InputTextWidget.h>
 #include <array>
 #include <cmath>
 
@@ -132,6 +132,10 @@ public:
         TextWidget* actionButtonText = m_Scene.CreateWidget<TextWidget>( actionButton->GetLayoutID(), m_ActiveTheme, MakeText( "Preview Button" ), MakeTextLayout( 16_u, ETextOverflow::Clip ) );
         GetNode( actionButtonText )->Style.Visibility = EVisibility::HitTestInvisible;
 
+		TextEditWidget* inputText = m_Scene.CreateWidget<TextEditWidget>( controlsPanel->GetLayoutID(), m_ActiveTheme );
+        inputText->GetLayout().Style
+            .WithFixedSize( 200_u, 30_u );
+
         UpdateStatusText();
     }
 
@@ -154,15 +158,14 @@ public:
                     break;
                 default: break;
             }
-            return;
         }
 
         m_Scene.DispatchInputEvent( a_Event );
     }
 
-    void Render( DrawList& a_DrawList ) override
+	void Render( DrawList& a_DrawList, f32 a_DeltaSeconds ) override
     {
-        m_Scene.Render( a_DrawList );
+        m_Scene.Render( a_DrawList, a_DeltaSeconds );
     }
 
 private:
