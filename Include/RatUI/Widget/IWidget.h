@@ -16,6 +16,11 @@ namespace RatUI
         // TODO: Should this be in a different file?
     };
 
+    struct TextInputEvent
+    {
+        codepoint Character{}; ///< The Unicode code point of the character that was input.
+    }
+
     /**
      * @brief The base class for all UI elements.
      * Widgets are responsible for rendering themselves and handling input events. 
@@ -117,6 +122,8 @@ namespace RatUI
         /** @brief Called when an input button is released while this widget is focused. */
         virtual Reply OnButtonReleased( const ButtonEvent& a_Event ) { return Reply::Unhandled(); }
 
+        virtual Reply OnTextInput( const TextInputEvent& a_Event ) { return Reply::Unhandled(); }
+
 		// - Navigation: Only called for widgets that return true from IsNavigationBoundary()
 
 		/** @brief */
@@ -125,7 +132,19 @@ namespace RatUI
 
     protected:
         /** @brief Called when the widget should render itself. */
-        virtual void OnPaint( DrawList& a_DrawList ) {}
+        virtual void OnPaint( DrawList& a_DrawList )
+        {
+            PaintChildren( a_DrawList );
+        }
+
+        void PaintChildren( DrawList& a_DrawList )
+        {
+            GetLayout().ForEachChild( [&]( LayoutNode& childNode )
+            {
+                if ( childNode.Widget )
+                    childNode.Widget->Paint( a_DrawList );
+            } );
+        }
 
     protected:
         friend Scene;

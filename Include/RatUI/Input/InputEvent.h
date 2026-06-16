@@ -158,6 +158,81 @@ namespace RatUI
         XRMenu,
     };
 
+	inline constexpr bool IsAlpha( EButtonID a_Button )
+	{
+		return a_Button >= EButtonID::KeyA && a_Button <= EButtonID::KeyZ;
+	}
+
+	inline constexpr bool IsDigit( EButtonID a_Button )
+	{
+		return a_Button >= EButtonID::Key0 && a_Button <= EButtonID::Key9;
+	}
+
+	inline constexpr bool IsAlphanumeric( EButtonID a_Button )
+	{
+		return IsAlpha( a_Button ) || IsDigit( a_Button );
+	}
+
+    struct KeyCharPair
+    {
+        char Normal{};
+        char Shifted{};
+    };
+
+    inline constexpr auto KeyMap = []()
+    {
+        FixedArray<KeyCharPair, 256> map{};
+
+        // Letters
+        for ( u32 i = 0; i < 26; ++i )
+        {
+            map[(u32)EButtonID::KeyA + i] =
+            {
+                static_cast<char>( 'a' + i ),
+                static_cast<char>( 'A' + i )
+            };
+        }
+
+        // Digits
+        constexpr char shiftedDigits[] =
+        {
+            ')', '!', '@', '#', '$',
+            '%', '^', '&', '*', '('
+        };
+
+        for ( u32 i = 0; i < 10; ++i )
+        {
+            map[(u32)EButtonID::Key0 + i] =
+            {
+                static_cast<char>( '0' + i ),
+                shiftedDigits[i]
+            };
+        }
+
+        // Common whitespace / control keys
+        map[(u32)EButtonID::KeySpace]     = { ' ' , ' ' };
+        map[(u32)EButtonID::KeyTab]       = { '\t', '\t' };
+        map[(u32)EButtonID::KeyEnter]     = { '\n', '\n' };
+        map[(u32)EButtonID::KeyBackspace] = { '\b', '\b' };
+
+        return map;
+    }( );
+
+    inline constexpr Optional<char> ToChar( EButtonID button, bool shift = false )
+    {
+        const auto index = static_cast<u32>( button );
+
+		if ( index >= Size( KeyMap ) )
+            return NullOpt;
+
+        const auto& pair = KeyMap[index];
+
+        if ( pair.Normal == '\0' )
+            return NullOpt;
+
+        return shift ? pair.Shifted : pair.Normal;
+    }
+
     /**
      * @brief Pointer input event, which can come from a mouse, touch, or pen device. Contains position, movement delta, and device-specific data.
      */
