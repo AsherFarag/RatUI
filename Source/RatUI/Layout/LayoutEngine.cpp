@@ -354,11 +354,17 @@ namespace
 
             Vec2<Unit> childSize = ResolveChildArrangeSize( child, a_Inner.Size );
 
-            if ( child.Style.WidthMode  == ESizingMode::Flex ) childSize[0] = a_Inner.Size[0];
-            if ( child.Style.HeightMode == ESizingMode::Flex ) childSize[1] = a_Inner.Size[1];
+            if (child.Style.WidthMode == ESizingMode::Flex) childSize[0] = std::max( 0_u, a_Inner.Size[0] - child.Style.Margin.Horizontal() );
+            if (child.Style.HeightMode == ESizingMode::Flex) childSize[1] = std::max( 0_u, a_Inner.Size[1] - child.Style.Margin.Vertical() );
 
-            Rect<Unit> childRect = AlignRect( childSize, a_Inner, ResolveAlign( child, a_Node ) );
-            childRect = ApplyMargin( childRect, child.Style.Margin );
+            // Align within the margin-inset container space
+            const Rect<Unit> marginInnerRect{
+                .Origin = { a_Inner.Origin[0] + child.Style.Margin.Left, a_Inner.Origin[1] + child.Style.Margin.Top },
+                .Size   = { std::max( 0_u, a_Inner.Size[0] - child.Style.Margin.Horizontal() ),
+                            std::max( 0_u, a_Inner.Size[1] - child.Style.Margin.Vertical() ) }
+            };
+
+            Rect<Unit> childRect = AlignRect( childSize, marginInnerRect, ResolveAlign( child, a_Node ) );
             ArrangeLayoutNode( child, childRect );
         });
     }
@@ -442,8 +448,10 @@ namespace
             const EAlignment align = ResolveAlign( child, a_Node );
 
             // Cross-axis flex/stretch fills the full cross-axis extent.
-            if (  isHz && ( HasFlag( align, EAlignment::VStretch ) || child.Style.HeightMode == ESizingMode::Flex ) ) childSize[1] = a_Inner.Size[1];
-            if ( !isHz && ( HasFlag( align, EAlignment::HStretch ) || child.Style.WidthMode  == ESizingMode::Flex ) ) childSize[0] = a_Inner.Size[0];
+            if (isHz && (HasFlag( align, EAlignment::VStretch ) || child.Style.HeightMode == ESizingMode::Flex))
+                childSize[1] = std::max( 0_u, a_Inner.Size[1] - child.Style.Margin.Vertical() );
+            if (!isHz && (HasFlag( align, EAlignment::HStretch ) || child.Style.WidthMode == ESizingMode::Flex))
+                childSize[0] = std::max( 0_u, a_Inner.Size[0] - child.Style.Margin.Horizontal() );
 
             Rect<Unit> childRect;
 
