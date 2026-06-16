@@ -19,7 +19,7 @@ namespace RatUI
     struct TextInputEvent
     {
         codepoint Character{}; ///< The Unicode code point of the character that was input.
-    }
+    };
 
     /**
      * @brief The base class for all UI elements.
