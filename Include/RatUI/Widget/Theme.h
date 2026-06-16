@@ -5,58 +5,7 @@
 #include "../Layout/Layout.h" // TODO: Remove once CornerRounding is moved to a more appropriate header
 
 namespace RatUI
-{
-    /**
-     * @brief Represents a hash of a theme property name, used for efficient lookup of theme values.
-     * ThemeIDs are generated from string names using a consistent hash function.
-     */
-    struct ThemeID
-    {
-        u64         Hash{ 0 };
-        const char* Name{ nullptr }; ///< Optional: String the hash was generated from, used for debugging purposes. This must be set manually.
-
-        constexpr auto operator<=>( const ThemeID& ) const = default;
-
-        constexpr ThemeID() = default;
-        constexpr explicit ThemeID( u64 a_Hash ) : Hash( a_Hash ) {}
-        constexpr explicit ThemeID( StringView a_Name )
-        {
-            // Simple FNV-1a hash implementation for generating theme IDs from string names.
-            // We avoid using std::hash on strings because it is not guaranteed to be consistent across different runs or platforms,
-            // which would make theme IDs unreliable.
-            // TODO: Since we prefer safer hashes over speed for theme IDs (the idea is to cache them),
-            // investigate other hash functions.
-            u64 hash = 14695981039346656037ull; // FNV offset basis
-            for ( char c : a_Name )
-            {
-                hash ^= static_cast<u64>( c );
-                hash *= 1099511628211ull; // FNV prime
-            }
-            Hash = hash;
-        }
-    };
-
-    namespace Literals
-    {
-        /**
-         * @brief User-defined literal for creating ThemeIDs from string literals. Usage: "MyWidget.StyleVar"_theme
-         */
-        constexpr ThemeID operator"" _theme( const char* a_String, size_t a_Length )
-        {
-            ThemeID id( StringView( a_String, a_Length ) );
-            id.Name = a_String; // Store the string pointer for debugging (we assume string literals have static storage duration, so this is safe)
-            return id;
-        }
-    } // namespace Literals
-
-    struct ThemeIDHash
-    {
-        size_t operator()( const ThemeID& a_ID ) const
-        {
-            return std::hash<u64>{}( a_ID.Hash );
-        }
-    };
-    
+{   
     /**
      * @brief A collection of typed theme properties (colors, metrics, etc.)
      * that can optionally inherit from a parent, cascading lookups up the chain.
@@ -65,7 +14,7 @@ namespace RatUI
     {
     public:
         template<typename T>
-        using ValueMap = HashMap<ThemeID, T, ThemeIDHash, std::equal_to<ThemeID>>;
+        using ValueMap = HashMap<StringID, T, StringIDHash, std::equal_to<StringID>>;
     
         Theme() = default;
 
@@ -143,37 +92,37 @@ namespace RatUI
         //
         // For each type T, the following methods are generated:
         //
-        //   const T&           GetColor( ThemeID, const T& default = {} ) const
-        //   const T*           TryGetColor( ThemeID ) const           // nullptr if absent
-        //   bool               HasColor( ThemeID ) const              // checks parent chain
-        //   Theme&             SetColor( ThemeID, T )                 // fluent
+        //   const T&           GetColor( StringID, const T& default = {} ) const
+        //   const T*           TryGetColor( StringID ) const           // nullptr if absent
+        //   bool               HasColor( StringID ) const              // checks parent chain
+        //   Theme&             SetColor( StringID, T )                 // fluent
         //   Theme&             SetColors( std::initializer_list<...> )// bulk, merges
         //   const ValueMap<T>& GetColors() const
     
     #define RATUI_THEME_PROPERTY( Type, Singular, Plural, Member )                          \
-        const Type& Get##Singular( ThemeID a_ID, const Type& a_Default = {} ) const         \
+        const Type& Get##Singular( StringID a_ID, const Type& a_Default = {} ) const         \
         {                                                                                   \
             if ( const Type* v = TryGet##Singular( a_ID ) ) return *v;                      \
             return a_Default;                                                               \
         }                                                                                   \
-        const Type* TryGet##Singular( ThemeID a_ID ) const                                  \
+        const Type* TryGet##Singular( StringID a_ID ) const                                  \
         {                                                                                   \
             if ( auto it = Find( Member, a_ID ); it != End( Member ) )                      \
                 return &it->second;                                                         \
             return m_Parent ? m_Parent->TryGet##Singular( a_ID ) : nullptr;                 \
         }                                                                                   \
-        bool Has##Singular( ThemeID a_ID ) const                                            \
+        bool Has##Singular( StringID a_ID ) const                                            \
         {                                                                                   \
             if ( Find( Member, a_ID ) != End( Member ) ) return true;                       \
             return m_Parent && m_Parent->Has##Singular( a_ID );                             \
         }                                                                                   \
-        Theme& Set##Singular( ThemeID a_ID, Type a_Value )                                  \
+        Theme& Set##Singular( StringID a_ID, Type a_Value )                                  \
         {                                                                                   \
             Member[a_ID] = std::move( a_Value );                                            \
             ++m_Version;                                                                    \
             return *this;                                                                   \
         }                                                                                   \
-        Theme& Set##Plural( std::initializer_list<std::pair<const ThemeID, Type>> a_List )  \
+        Theme& Set##Plural( std::initializer_list<std::pair<const StringID, Type>> a_List )  \
         {                                                                                   \
             for ( auto& [id, val] : a_List )                                                \
                 Member[id] = std::move( val );                                              \
@@ -224,20 +173,20 @@ namespace RatUI
         //
         // For each type T, the following methods are generated:
         //
-        //   const T&           GetColor( ThemeID, const T& default = {} ) const
-        //   const T*           TryGetColor( ThemeID ) const           // nullptr if absent
-        //   bool               HasColor( ThemeID ) const              // checks parent chain
+        //   const T&           GetColor( StringID, const T& default = {} ) const
+        //   const T*           TryGetColor( StringID ) const           // nullptr if absent
+        //   bool               HasColor( StringID ) const              // checks parent chain
 
     #define THEME_HANDLE_METHODS( Type, Name )                                     \
-        const Type& Get##Name( ThemeID a_ID, const Type& a_Default = {} ) const    \
+        const Type& Get##Name( StringID a_ID, const Type& a_Default = {} ) const    \
         {                                                                          \
             return Ptr ? Ptr->Get##Name( a_ID, a_Default ) : a_Default;            \
         }                                                                          \
-        const Type* TryGet##Name( ThemeID a_ID ) const                             \
+        const Type* TryGet##Name( StringID a_ID ) const                             \
         {                                                                          \
             return Ptr ? Ptr->TryGet##Name( a_ID ) : nullptr;                      \
         }                                                                          \
-        bool Has##Name( ThemeID a_ID ) const                                       \
+        bool Has##Name( StringID a_ID ) const                                       \
         {                                                                          \
             return Ptr && Ptr->Has##Name( a_ID );                                  \
         }
@@ -272,54 +221,54 @@ namespace RatUI
     {
         namespace Color
         {
-            inline constexpr ThemeID FocusOutline = "FocusOutline"_theme;
+            inline constexpr StringID FocusOutline = "FocusOutline"_id;
 
-            inline constexpr ThemeID ButtonBorder  = "Button.Border"_theme;
+            inline constexpr StringID ButtonBorder  = "Button.Border"_id;
 
-            inline constexpr ThemeID PanelBorder = "Panel.Border"_theme;
+            inline constexpr StringID PanelBorder = "Panel.Border"_id;
 
-            inline constexpr ThemeID SliderTrack        = "Slider.Track"_theme;
-            inline constexpr ThemeID SliderTrackFill    = "Slider.TrackFill"_theme;
-            inline constexpr ThemeID SliderThumb        = "Slider.Thumb"_theme;
-            inline constexpr ThemeID SliderThumbHover   = "Slider.ThumbHover"_theme;
-            inline constexpr ThemeID SliderThumbPressed = "Slider.ThumbPressed"_theme;
+            inline constexpr StringID SliderTrack        = "Slider.Track"_id;
+            inline constexpr StringID SliderTrackFill    = "Slider.TrackFill"_id;
+            inline constexpr StringID SliderThumb        = "Slider.Thumb"_id;
+            inline constexpr StringID SliderThumbHover   = "Slider.ThumbHover"_id;
+            inline constexpr StringID SliderThumbPressed = "Slider.ThumbPressed"_id;
         }
 
         namespace Rounding
         {
-            inline constexpr ThemeID FocusOutline = "FocusOutline"_theme;
-            inline constexpr ThemeID Button       = "Button"_theme;
-            inline constexpr ThemeID Panel        = "Panel"_theme;
-            inline constexpr ThemeID SliderTrack  = "Slider.Track"_theme;
-            inline constexpr ThemeID SliderThumb  = "Slider.Thumb"_theme;
+            inline constexpr StringID FocusOutline = "FocusOutline"_id;
+            inline constexpr StringID Button       = "Button"_id;
+            inline constexpr StringID Panel        = "Panel"_id;
+            inline constexpr StringID SliderTrack  = "Slider.Track"_id;
+            inline constexpr StringID SliderThumb  = "Slider.Thumb"_id;
         }
 
         namespace TextStyle
         {
-            inline constexpr ThemeID Default = "Default"_theme;
+            inline constexpr StringID Default = "Default"_id;
         }
 
         namespace Metric
         {
-			inline constexpr ThemeID FocusOutlineThickness = "FocusOutlineThickness"_theme;
-            inline constexpr ThemeID ButtonBorderThickness = "Button.BorderThickness"_theme;
-            inline constexpr ThemeID PanelBorderThickness  = "Panel.BorderThickness"_theme;
-            inline constexpr ThemeID SliderTrackThickness  = "Slider.TrackThickness"_theme;
-            inline constexpr ThemeID SliderMinThumbSize    = "Slider.MinThumbSize"_theme;
+			inline constexpr StringID FocusOutlineThickness = "FocusOutlineThickness"_id;
+            inline constexpr StringID ButtonBorderThickness = "Button.BorderThickness"_id;
+            inline constexpr StringID PanelBorderThickness  = "Panel.BorderThickness"_id;
+            inline constexpr StringID SliderTrackThickness  = "Slider.TrackThickness"_id;
+            inline constexpr StringID SliderMinThumbSize    = "Slider.MinThumbSize"_id;
         }
 
 		namespace Font 
         {
-			inline constexpr ThemeID Default = "Default"_theme;
+			inline constexpr StringID Default = "Default"_id;
 		}
 
         namespace Brush
         {
-            inline constexpr ThemeID ButtonNormal  = "Button.Normal"_theme;
-            inline constexpr ThemeID ButtonHover   = "Button.Hover"_theme;
-            inline constexpr ThemeID ButtonPressed = "Button.Pressed"_theme;
+            inline constexpr StringID ButtonNormal  = "Button.Normal"_id;
+            inline constexpr StringID ButtonHover   = "Button.Hover"_id;
+            inline constexpr StringID ButtonPressed = "Button.Pressed"_id;
 
-            inline constexpr ThemeID PanelNormal   = "Panel.Normal"_theme;
+            inline constexpr StringID PanelNormal   = "Panel.Normal"_id;
         }
     }
 
