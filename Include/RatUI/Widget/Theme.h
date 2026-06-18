@@ -100,12 +100,12 @@ namespace RatUI
         //   const ValueMap<T>& GetColors() const
     
     #define RATUI_THEME_PROPERTY( Type, Singular, Plural, Member )                          \
-        const Type& Get##Singular( StringID a_ID, const Type& a_Default = {} ) const         \
+        const Type& Get##Singular( StringID a_ID, const Type& a_Default = {} ) const        \
         {                                                                                   \
             if ( const Type* v = TryGet##Singular( a_ID ) ) return *v;                      \
             return a_Default;                                                               \
         }                                                                                   \
-        const Type* TryGet##Singular( StringID a_ID ) const                                  \
+        const Type* TryGet##Singular( StringID a_ID ) const                                 \
         {                                                                                   \
             if ( auto it = Find( Member, a_ID ); it != End( Member ) )                      \
                 return &it->second;                                                         \
@@ -116,16 +116,16 @@ namespace RatUI
             if ( Find( Member, a_ID ) != End( Member ) ) return true;                       \
             return m_Parent && m_Parent->Has##Singular( a_ID );                             \
         }                                                                                   \
-        Theme& Set##Singular( StringID a_ID, Type a_Value )                                  \
+        Theme& Set##Singular( StringID a_ID, Type a_Value )                                 \
         {                                                                                   \
             Member[a_ID] = std::move( a_Value );                                            \
             ++m_Version;                                                                    \
             return *this;                                                                   \
         }                                                                                   \
-        Theme& Set##Plural( std::initializer_list<std::pair<const StringID, Type>> a_List )  \
+        Theme& Set##Plural( std::initializer_list<std::pair<const StringID, Type>> a_List ) \
         {                                                                                   \
             for ( auto& [id, val] : a_List )                                                \
-                Member[id] = std::move( val );                                              \
+                Member[id] = val;                                                           \
             ++m_Version;                                                                    \
             return *this;                                                                   \
         }                                                                                   \

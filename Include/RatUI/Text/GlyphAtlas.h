@@ -41,10 +41,10 @@ namespace RatUI
     class GlyphAtlas
     {
     public:
-        static constexpr Span<const codepoint> c_CommonASCIIGlyphs = U"ABCDEFGHIJKLMNOPQRSTUVWXYZ" 
-                                                                      "abcdefghijklmnopqrstuvwxyz"
-                                                                      "0123456789"
-                                                                      ".,!?-+/():;%&`\"*#=[]";
+        static constexpr StringView c_CommonASCIIGlyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" 
+                                                          "abcdefghijklmnopqrstuvwxyz"
+                                                          "0123456789"
+                                                          ".,!?-+/():;%&`\"*#=[]";
 
         GlyphAtlas( IRenderer& a_Renderer, 
                     ITextMetrics& a_TextMetrics,
@@ -129,13 +129,20 @@ namespace RatUI
             return NullOpt; // Failed to allocate space in the atlas.
         }
 
-		void LoadGlyphs( FontHandle a_Font, Span<const GlyphID> a_Glyphs )
+		void LoadGlyphs( FontHandle a_Font, StringView a_Codepoints )
 		{
-			// TODO: Can optimise this by batching rasterization and texture uploads, but for simplicity we will just do them one at a time for now.
-			for ( const GlyphID glyphID : a_Glyphs )
-			{
-				GetOrRasterizeGlyph( a_Font, glyphID );
-			}
+            auto prepared = m_TextMetrics.Prepare( a_Font, TextLayoutStyle{ .Font = a_Font } );
+            if ( !prepared )
+                return; // Failed to prepare text (e.g. invalid font).
+
+            auto shaped = m_TextMetrics.Shape( *prepared, TextLayoutStyle{ .Font = a_Font } );
+            if ( !shaped )
+                return; // Failed to shape text.
+
+            for ( const ShapedGlyph& glyph : shaped->Glyphs )
+            {
+                GetOrRasterizeGlyph( a_Font, glyph.GlyphIndex );
+            }
 		}
 
     protected:
