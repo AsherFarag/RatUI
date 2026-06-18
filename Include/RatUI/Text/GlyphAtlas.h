@@ -131,7 +131,7 @@ namespace RatUI
 
 		void LoadGlyphs( FontHandle a_Font, StringView a_Codepoints )
 		{
-            auto prepared = m_TextMetrics.Prepare( a_Font, TextLayoutStyle{ .Font = a_Font } );
+            auto prepared = m_TextMetrics.Prepare( a_Codepoints, TextLayoutStyle{ .Font = a_Font } );
             if ( !prepared )
                 return; // Failed to prepare text (e.g. invalid font).
 
