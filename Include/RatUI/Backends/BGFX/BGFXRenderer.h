@@ -57,15 +57,15 @@ namespace RatUI::BGFX
 
             m_SDFLayout
                 .begin()
-                .add( bgfx::Attrib::Position, 2, bgfx::AttribType::Float )
-                .add( bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float )
-                .add( bgfx::Attrib::TexCoord1, 2, bgfx::AttribType::Float )
-                .add( bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true )
-                .add( bgfx::Attrib::Color1, 4, bgfx::AttribType::Uint8, true )
-                .add( bgfx::Attrib::TexCoord2, 1, bgfx::AttribType::Float )
-                .add( bgfx::Attrib::TexCoord3, 2, bgfx::AttribType::Float )
-                .add( bgfx::Attrib::TexCoord4, 1, bgfx::AttribType::Float )
-                .add( bgfx::Attrib::TexCoord5, 1, bgfx::AttribType::Float )
+                .add( bgfx::Attrib::Position,  2, bgfx::AttribType::Float )        // Position  (offset  0)
+                .add( bgfx::Attrib::TexCoord1, 2, bgfx::AttribType::Float )        // LocalPos  (offset  8)
+                .add( bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float )        // UV        (offset 16)
+                .add( bgfx::Attrib::Color0,    4, bgfx::AttribType::Uint8, true )  // FillColor
+                .add( bgfx::Attrib::Color1,    4, bgfx::AttribType::Uint8, true )  // BorderColor
+                .add( bgfx::Attrib::TexCoord2, 1, bgfx::AttribType::Float )        // BorderThickness
+                .add( bgfx::Attrib::TexCoord3, 2, bgfx::AttribType::Float )        // HalfSize
+                .add( bgfx::Attrib::TexCoord4, 1, bgfx::AttribType::Float )        // CornerRadius
+                .add( bgfx::Attrib::TexCoord5, 1, bgfx::AttribType::Float )        // Softness
                 .end();
 
             m_TextLayout
