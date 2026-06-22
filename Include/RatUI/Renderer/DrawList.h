@@ -208,7 +208,7 @@ namespace RatUI
 			// Clear all batches. 
 			// If a batcher has no batches, we can remove it from the map to save memory, 
             // since we expect the number of active layers to be small and not all layers to be used every frame.
-			for ( auto it = m_Batchers.begin(); it != m_Batchers.end(); ++it )
+			for ( auto it = m_Batchers.begin(); it != m_Batchers.end(); )
             {
 				auto& batcher = it->second; // TODO: Need Container util here
 
@@ -219,6 +219,7 @@ namespace RatUI
                 }
 
                 batcher.Clear();
+                ++it;
             }
         }
 
