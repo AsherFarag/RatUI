@@ -98,7 +98,7 @@ namespace RatUI
         WidgetType* CreateRootWidget( Args&&... a_Args );
 
         /** @brief Destroys the widget with the specified ID, including its children. */
-        bool DestroyWidget( NodeID a_WidgetID );
+        bool DestroyWidget( NodeID a_WidgetID ) { PushBack( m_ToDestory, a_WidgetID ); return true; }
 
         RATUI_NODISCARD IWidget* GetWidget( NodeID a_ID );
 
@@ -127,10 +127,40 @@ namespace RatUI
         bool ProcessButtonEvent( const ButtonEvent& a_Event );
         NodeID HitTest( NodeID a_ID, Vec2<Unit> a_LogicalPos );
 
+        void DestoyWidgetImmediately( NodeID a_NodeID )
+        {
+            LayoutNode* node = Layouts.Get( a_NodeID );
+            if (!node) return;
+
+            node->DetachFromParent();
+
+            node->ForEachChild( [&]( LayoutNode& child ) {
+                if (child.Widget)
+                    DestoyWidgetImmediately( child.Widget->GetLayoutID() );
+            } );
+
+            if (node->Widget)
+                node->Widget->OnDestroy();
+
+            Layouts.Deallocate( a_NodeID );
+        }
+
+        void CleanupDestroyedWidgets()
+        {
+            for (NodeID nodeID : m_ToDestory)
+            {
+                DestoyWidgetImmediately( nodeID );
+            }
+
+            Clear( m_ToDestory );
+        }
+
         NodeID m_FocusedWidget{ c_InvalidNodeID };
         NodeID m_HoveredWidget{ c_InvalidNodeID };
         NodeID m_CapturedWidget{ c_InvalidNodeID };
         PointerEvent m_LastPointerEvent{}; ///< The last pointer event received, used for hit testing and hover state management.
+
+        Array<NodeID> m_ToDestory;
 
         struct NavScope
         {

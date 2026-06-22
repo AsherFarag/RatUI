@@ -56,6 +56,8 @@ namespace RatUI
 
     void Scene::UpdateLayout( Vec2<Unit> a_AvailableSize )
     {
+        CleanupDestroyedWidgets();
+
         LayoutNode* rootNode = Layouts.Get( RootWidget );
         if ( !rootNode )
             return;
@@ -95,6 +97,8 @@ namespace RatUI
 
     void Scene::Render( DrawList& a_DrawList, f32 a_DeltaSeconds )
     {
+        CleanupDestroyedWidgets();
+
         if ( LayoutNode* rootNode = Layouts.Get( RootWidget ) )
             if ( rootNode->Widget )
 				rootNode->Widget->Paint( PaintEvent{ a_DrawList, a_DeltaSeconds } );
@@ -286,28 +290,6 @@ namespace RatUI
     {
         const LayoutNode* node = Layouts.Get( a_ID );
         return node ? node->Widget.get() : nullptr;
-    }
-
-    bool Scene::DestroyWidget( NodeID a_NodeID )
-    {
-        LayoutNode* node = Layouts.Get( a_NodeID );
-        if ( !node )
-            return false;
-
-        node->DetachFromParent();
-
-        node->ForEachChild( [&]( LayoutNode& child )
-        {
-            if ( child.Widget )
-                DestroyWidget( child.Widget->GetLayoutID() );
-        } );
-
-        if ( node->Widget )
-            node->Widget->OnDestroy();
-
-        Layouts.Deallocate( a_NodeID );
-
-        return true;
     }
 
     void Scene::Reset()
