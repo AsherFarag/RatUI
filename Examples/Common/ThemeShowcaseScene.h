@@ -132,10 +132,6 @@ public:
         TextWidget* actionButtonText = m_Scene.CreateWidget<TextWidget>( actionButton->GetLayoutID(), m_ActiveTheme, MakeText( "Preview Button" ), MakeTextLayout( 16_u, ETextOverflow::Clip ) );
         GetNode( actionButtonText )->Style.Visibility = EVisibility::HitTestInvisible;
 
-		TextEditWidget* inputText = m_Scene.CreateWidget<TextEditWidget>( controlsPanel->GetLayoutID(), m_ActiveTheme );
-        inputText->GetLayout().Style
-            .WithFixedSize( 200_u, 30_u );
-
         UpdateStatusText();
     }
 

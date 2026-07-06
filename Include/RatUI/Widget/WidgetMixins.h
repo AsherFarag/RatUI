@@ -12,11 +12,6 @@ namespace RatUI
         // TODO: Should this be in a different file?
     };
 
-    struct TextInputEvent
-    {
-        codepoint Character{}; ///< The Unicode code point of the character that was input.
-    };
-
     struct PaintEvent
     {
         DrawList& DrawList;     ///< The draw list to which the widget should add its rendering commands.

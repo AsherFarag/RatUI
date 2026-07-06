@@ -18,6 +18,106 @@ using namespace RatUI::Literals;
 
 static IRenderer* g_Renderer = nullptr;
 
+#include <RatUI/Text/TextEdit.h>
+#include <cassert>
+
+void TestTextEditModel()
+{
+    //-------------------------------------------------------------------------
+    // Basic insertion
+    //-------------------------------------------------------------------------
+
+    TextEditModel model;
+
+    assert( model.GetTextBuffer().empty() );
+    assert( model.Caret() == 0 );
+    assert( model.Anchor() == 0 );
+
+    assert( model.Insert( U"Hello" ) );
+    assert( model.GetTextBuffer() == U"Hello" );
+    assert( model.Caret() == 5 );
+    assert( model.Anchor() == 5 );
+
+    //-------------------------------------------------------------------------
+    // Caret movement
+    //-------------------------------------------------------------------------
+
+    model.MoveLeft();
+    assert( model.Caret() == 4 );
+
+    model.MoveRight();
+    assert( model.Caret() == 5 );
+
+    model.MoveHome();
+    assert( model.Caret() == 0 );
+
+    model.MoveEnd();
+    assert( model.Caret() == 5 );
+
+    //-------------------------------------------------------------------------
+    // Insert in middle
+    //-------------------------------------------------------------------------
+
+    model.SetCaret( 2 );
+    assert( model.Insert( U"XX" ) );
+
+    assert( model.GetTextBuffer() == U"HeXXllo" );
+    assert( model.Caret() == 4 );
+
+    //-------------------------------------------------------------------------
+    // Backspace
+    //-------------------------------------------------------------------------
+
+    assert( model.Backspace() );
+    assert( model.GetTextBuffer() == U"HeXllo" );
+
+    //-------------------------------------------------------------------------
+    // Delete
+    //-------------------------------------------------------------------------
+
+    model.SetCaret( 2 );
+    assert( model.Delete() );
+    assert( model.GetTextBuffer() == U"Hello" );
+
+    //-------------------------------------------------------------------------
+    // Selection replacement
+    //-------------------------------------------------------------------------
+
+    model.SelectAll();
+    assert( model.HasSelection() );
+
+    assert( model.ReplaceSelection( U"World" ) );
+
+    assert( model.GetTextBuffer() == U"World" );
+    assert( !model.HasSelection() );
+    assert( model.Caret() == 5 );
+
+    //-------------------------------------------------------------------------
+    // Undo / Redo
+    //-------------------------------------------------------------------------
+
+    assert( model.Undo() );
+    assert( model.GetTextBuffer() == U"Hello" );
+
+    assert( model.Redo() );
+    assert( model.GetTextBuffer() == U"World" );
+
+    //-------------------------------------------------------------------------
+    // Multiline movement
+    //-------------------------------------------------------------------------
+
+    model.SetTextBuffer( U"abc\n123\nXYZ" );
+
+    model.MoveHome();
+    assert( model.Caret() == 0 );
+
+    model.MoveDown();
+    model.MoveDown();
+    model.MoveUp();
+
+	assert( model.Caret() == 4 ); // Should be at the start of the second line
+}
+
 /**
  * @brief The RatUI Sandbox application.
  *
@@ -78,26 +178,6 @@ protected:
 
         m_Scene->Update( m_DeltaSeconds );
 
-        static AnimationPlayer anim;
-		if ( static bool animInitialized = false; !animInitialized )
-		{
-			anim.AddClip( "UIScale"_id, AnimationClip{}
-                .AddTrack( 0.0f, 1.0f, []( f32 val ) { std::cout << "Val = " << val << std::endl; } )
-                .WithOnStart( []() { std::cout << "Animation started\n"; } )
-                .WithOnLoop( []() { std::cout << "Animation looped\n"; } )
-                .WithOnComplete( []() { std::cout << "Animation completed\n"; } )
-                .WithDelay( 2.5f )
-                .WithDuration( 1.f )
-				.WithEasing( EaseLinear{} )
-				.WithPlaybackMode( EPlaybackMode::PingPong )
-                .Play()
-            );
-
-			animInitialized = true;
-		}
-
-		anim.Tick( m_DeltaSeconds );
-
         // Update the layout with the current window size as the available space.
         i32 windowWidth, windowHeight;
         SDL_GetWindowSize( GetWindow(), &windowWidth, &windowHeight );
@@ -150,6 +230,7 @@ protected:
 
 int main( int argc, char** argv )
 {
+    TestTextEditModel();
     SandboxApp app;
     return app.Run() ? 0 : 1;
 }

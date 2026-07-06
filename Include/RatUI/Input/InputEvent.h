@@ -264,6 +264,16 @@ namespace RatUI
         bool Held{ false };      ///< True every frame the button is held down (including the pressed and released frames).
     };
 
+    // TODO: Clean this up
+    struct TextInputEvent
+    {
+        //codepoint Character{}; ///< The Unicode code point of the character that was input.
+        EButtonID Button{ EButtonID::Unknown };
+        bool Shift{ false };
+        bool Ctrl{ false };
+        bool Alt{ false };
+    };
+
     /**
      * @brief General input event that can represent either a pointer event (mouse/touch/pen) or a button event (keyboard/gamepad).
      */
