@@ -13,11 +13,16 @@ namespace RatUI
      * @param a_Time The interpolation parameter, typically in the range [0, 1]. Values outside this range will extrapolate.
      * @return The interpolated value between a_A and a_B based on a_Time.
      */
-	template<typename T>
-    RATUI_NODISCARD constexpr T Lerp( const T& a_A, const T& a_B, f32 a_Time )
-    {
-        return a_A + (a_B - a_A) * a_Time;
-    }
+	template<typename T> 
+    RATUI_NODISCARD constexpr T Lerp( const T& a_A, const T& a_B, f32 a_Time );
+
+    template<typename T> requires
+        requires( T a, T b, f32 t ) { { a + ( b - a ) * t } -> std::convertible_to<T>; }
+	RATUI_NODISCARD constexpr inline
+	T Lerp( const T& a_A, const T& a_B, f32 a_Time )
+	{
+		return a_A + ( a_B - a_A ) * a_Time;
+	}
 
     template<>
     RATUI_NODISCARD constexpr inline 

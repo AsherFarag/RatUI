@@ -60,18 +60,6 @@
 
 #include "../Extern/nicemath.h"
 
-namespace nm
-{
-    template<typename S, unsigned N>
-    constexpr vec<S, N> operator*(const vec<S, N>& a_Left, float a_Scalar)
-    {
-        vec<S, N> result;
-        for (size_t i = 0; i < N; ++i)
-            result[i] = a_Left[i] * a_Scalar;
-        return result;
-    }
-}
-
 namespace RatUI
 {
     /**
