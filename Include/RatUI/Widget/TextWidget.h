@@ -176,13 +176,13 @@ namespace RatUI
                 case ETextOverflow::Fade:
                 {
                     //a_Event.DrawList.PushClipRect( textRect );
-                    a_Event.DrawList.AddText( *m_ShapedText, effectiveStyle, textRect );
+                    a_Event.Drawer.AddText( *m_ShapedText, effectiveStyle, textRect );
                     //a_Event.DrawList.PopClipRect();
                     break;
                 }
                 default:
                 {
-                    a_Event.DrawList.AddText( *m_ShapedText, effectiveStyle, textRect );
+                    a_Event.Drawer.AddText( *m_ShapedText, effectiveStyle, textRect );
                     break;
                 }
             }

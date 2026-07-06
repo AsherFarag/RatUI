@@ -100,7 +100,7 @@ namespace RatUI
             // Draw content with clipping and translation based on scroll offset
             {
                 const Rect<Unit> contentRect = scene.Layouts.Get( m_ContentNodeID )->Layout.FinalRect;
-                a_Event.DrawList.PushClipRect( contentRect );
+                a_Event.Drawer.PushClipRect( contentRect );
 
                 const bool hasTranslation = !IsApproxEqual( m_ScrollOffset[0].ToFloat(), 0.f ) ||
                     !IsApproxEqual( m_ScrollOffset[1].ToFloat(), 0.f );
@@ -111,15 +111,15 @@ namespace RatUI
                           Vec3<Unit>{ 1_u, 0_u, 0_u },
                           Vec3<Unit>{ 0_u, 1_u, 0_u },
                           Vec3<Unit>{ -m_ScrollOffset[0], -m_ScrollOffset[1], 1_u } );
-                    a_Event.DrawList.PushTransform( translation );
+                    a_Event.Drawer.PushTransform( translation );
                 }
 
                 PaintChildren( a_Event );
 
                 if ( hasTranslation )
-                    a_Event.DrawList.PopTransform();
+                    a_Event.Drawer.PopTransform();
 
-                a_Event.DrawList.PopClipRect();
+                a_Event.Drawer.PopClipRect();
             }
 
             // Draw scrollbars if needed

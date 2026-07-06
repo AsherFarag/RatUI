@@ -101,8 +101,8 @@ namespace RatUI
                 }
             }
 
-            PaintTrack( a_Event.DrawList, rect );
-            PaintThumb( a_Event.DrawList, rect );
+            PaintTrack( a_Event.Drawer, rect );
+            PaintThumb( a_Event.Drawer, rect );
         }
 
         // --------------------------------------------------------------------

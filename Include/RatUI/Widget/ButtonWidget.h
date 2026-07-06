@@ -135,7 +135,7 @@ namespace RatUI
             if ( std::holds_alternative<SolidBrush>( fillBrush ) )
             {
                 const SolidBrush& solid = std::get<SolidBrush>( fillBrush );
-                a_Event.DrawList.AddRect( rect, 
+                a_Event.Drawer.AddRect( rect, 
                 {
                     .FillColor = solid.Fill,
                     .BorderColor = BorderColor,
@@ -146,7 +146,7 @@ namespace RatUI
             else if ( std::holds_alternative<TextureBrush>( fillBrush ) )
             {
                 const TextureBrush& texture = std::get<TextureBrush>( fillBrush );
-                a_Event.DrawList.AddRect( rect, 
+                a_Event.Drawer.AddRect( rect, 
                 {
                     .FillColor = texture.Tint,
                     .BorderColor = BorderColor,
@@ -158,7 +158,7 @@ namespace RatUI
             else if ( std::holds_alternative<NineSliceBrush>( fillBrush ) )
             {
                 const NineSliceBrush& nineSlice = std::get<NineSliceBrush>( fillBrush );
-                a_Event.DrawList.AddSlicedRect( rect, 
+                a_Event.Drawer.AddSlicedRect( rect, 
                 {
                     .Texture = nineSlice.Texture,
                     .Slice = nineSlice.Slice,
@@ -170,7 +170,7 @@ namespace RatUI
             // TODO: Should this be a util or even handled here?
             if ( scene.GetFocusedNode() == GetLayoutID() )
             {
-                a_Event.DrawList.AddRect( rect,
+                a_Event.Drawer.AddRect( rect,
                 {
                     .FillColor = Colors::Transparent,
                     .BorderColor = BorderColor,

@@ -50,7 +50,7 @@ namespace RatUI
             if ( std::holds_alternative<SolidBrush>( FillBrush ) )
             {
                 const SolidBrush& solid = std::get<SolidBrush>( FillBrush );
-                a_Event.DrawList.AddRect( rect, 
+                a_Event.Drawer.AddRect( rect, 
                 {
                     .FillColor = solid.Fill,
                     .BorderColor = BorderColor,
@@ -61,7 +61,7 @@ namespace RatUI
             else if ( std::holds_alternative<TextureBrush>( FillBrush ) )
             {
                 const TextureBrush& texture = std::get<TextureBrush>( FillBrush );
-                a_Event.DrawList.AddRect( rect, 
+                a_Event.Drawer.AddRect( rect, 
                 {
                     .FillColor = texture.Tint,
                     .BorderColor = BorderColor,
@@ -73,7 +73,7 @@ namespace RatUI
             else if ( std::holds_alternative<NineSliceBrush>( FillBrush ) )
             {
                 const NineSliceBrush& nineSlice = std::get<NineSliceBrush>( FillBrush );
-                a_Event.DrawList.AddSlicedRect( rect, 
+                a_Event.Drawer.AddSlicedRect( rect, 
                 {
                     .Texture = nineSlice.Texture,
                     .Slice = nineSlice.Slice,
@@ -83,7 +83,7 @@ namespace RatUI
 
             if ( scene.GetFocusedNode() == GetLayoutID() )
             {
-                a_Event.DrawList.AddRect( rect,
+                a_Event.Drawer.AddRect( rect,
                 {
 					.FillColor = Colors::Transparent,
 					.BorderColor = BorderColor,

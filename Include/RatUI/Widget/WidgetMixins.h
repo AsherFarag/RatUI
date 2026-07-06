@@ -15,7 +15,7 @@ namespace RatUI
 
     struct PaintEvent
     {
-        DrawList& DrawList;     ///< The draw list to which the widget should add its rendering commands.
+        DrawList& Drawer;       ///< The draw list to which the widget should add its rendering commands.
         f32       DeltaSeconds; ///< The time in seconds since the last paint event, useful for animations and time-based effects.
     };
 
@@ -87,7 +87,7 @@ namespace RatUI
         {
             if ( !Transform.IsIdentity() )
             {
-                a_Event.DrawList.PushTransform( Transform.ToMatrix( a_Node.Layout.FinalRect ) );
+                a_Event.Drawer.PushTransform( Transform.ToMatrix( a_Node.Layout.FinalRect ) );
                 m_Pushed++;
             }  
         }
@@ -96,7 +96,7 @@ namespace RatUI
         {
             if ( m_Pushed > 0 )
             {
-                a_Event.DrawList.PopTransform();
+                a_Event.Drawer.PopTransform();
                 m_Pushed--;
                 RATUI_USER_ASSERT( m_Pushed >= 0, "Mismatched Push/PopTransform calls in RenderTransformMixin." );
             }
@@ -137,20 +137,20 @@ namespace RatUI
 
         void PostPaint( const PaintEvent& a_Event, LayoutNode& a_Node )
         {
-            if ( !a_Event.DrawList.IsDebugEnabled() )
+            if ( !a_Event.Drawer.IsDebugEnabled() )
                 return;
 
 			constexpr Color c_BoundsColor = Colors::Red;
 
             // Draw bounds
-            a_Event.DrawList.AddRect( a_Node.Layout.FinalRect,
+            a_Event.Drawer.AddRect( a_Node.Layout.FinalRect,
             {
                 .BorderColor = c_BoundsColor,
                 .BorderThickness = 1_u
             } );
 
             // Draw center point
-			a_Event.DrawList.AddCircle( a_Node.Layout.FinalRect.Center(), 4_u,
+			a_Event.Drawer.AddCircle( a_Node.Layout.FinalRect.Center(), 4_u,
 			{
 				.FillColor = c_BoundsColor
 			} );

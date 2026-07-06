@@ -56,7 +56,7 @@ public:
 
         if ( scene.GetFocusedNode() == GetLayoutID() )
         {
-            a_Event.DrawList.AddCircle( center, Radius,
+            a_Event.Drawer.AddCircle( center, Radius,
             {
                 .FillColor = FillColor,
                 .BorderColor = Colors::White,
@@ -65,7 +65,7 @@ public:
         }
         else
         {
-            a_Event.DrawList.AddCircle( center, Radius,
+            a_Event.Drawer.AddCircle( center, Radius,
             {
                 .FillColor = FillColor,
             } );
