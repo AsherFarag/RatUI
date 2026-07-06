@@ -69,10 +69,10 @@ namespace RatUI
      */
     struct MathTraits
     {
-        template<typename T, size Dim>
+        template<typename T, unsigned Dim>
         using Vec = ::nm::vec<T, Dim>;
 
-        template<typename T, size Dim>
+        template<typename T, unsigned Dim>
         using Mat = ::nm::mat<T, Dim>;
 
         using Color = Vec<u8, 4>;
@@ -127,7 +127,7 @@ namespace RatUI
 
     // === Vector Types ===
 
-    template<typename T, size Dim>
+    template<typename T, unsigned Dim>
     using Vec = MathTraits::template Vec<T, Dim>;
 
     template<typename T> using Vec2 = Vec<T, 2>;
@@ -146,7 +146,7 @@ namespace RatUI
 
     // === Matrix Types ===
 
-    template<typename T, size Dim>
+    template<typename T, unsigned Dim>
     using Mat = MathTraits::template Mat<T, Dim>;
 
     template<typename T> using Mat2 = Mat<T, 2>;

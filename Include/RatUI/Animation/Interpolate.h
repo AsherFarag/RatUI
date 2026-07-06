@@ -35,23 +35,23 @@ namespace RatUI
         };
     }
 
-    template<typename Scalar, size N>
+    template<typename Scalar, unsigned N>
     RATUI_NODISCARD constexpr inline
     Vec<Scalar, N> Lerp( Vec<Scalar, N> a_A, Vec<Scalar, N> a_B, f32 a_Time )
     {
 		Vec<Scalar, N> result;
-		for ( size i = 0; i < N; ++i )
+		for ( unsigned i = 0; i < N; ++i )
 			result[i] = Lerp( a_A[i], a_B[i], a_Time );
 		return result;
     }
 
-    template<typename Scalar, size N>
+    template<typename Scalar, unsigned N>
     RATUI_NODISCARD constexpr inline 
     Mat<Scalar, N> Lerp( const Mat<Scalar, N>& a_A, const Mat<Scalar, N>& a_B, f32 a_Time )
     {
         Mat<Scalar, N> result;
-        for ( size i = 0; i < N; ++i )
-            for ( size j = 0; j < N; ++j )
+        for ( unsigned i = 0; i < N; ++i )
+            for ( unsigned j = 0; j < N; ++j )
                 result[i][j] = Lerp( a_A[i][j], a_B[i][j], a_Time );
         return result;
     }
