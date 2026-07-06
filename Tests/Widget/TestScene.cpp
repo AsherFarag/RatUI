@@ -35,7 +35,7 @@ public:
 
     void OnConstruct() override                   { ++ConstructCount; }
     void OnDestroy() override                     { ++DestroyCount; }
-    void OnPaint( DrawList& ) override            { ++PaintCount; }
+    void OnPaint( const PaintEvent& a_Event ) override            { ++PaintCount; PaintChildren( a_Event ); }
 
     bool IsFocusable() const override             { return Focusable; }
     bool IsInteractable() const override          { return true; }
@@ -69,6 +69,16 @@ static InputEvent MakeMousePress( bool a_Pressed )
     };
 }
 
+static NodeID CreateRootTracking( Scene& a_Scene )
+{
+    return a_Scene.CreateRootWidget<TrackingWidget>()->GetLayoutID();
+}
+
+static NodeID CreateChildTracking( Scene& a_Scene, NodeID a_Parent )
+{
+    return a_Scene.CreateWidget<TrackingWidget>( a_Parent )->GetLayoutID();
+}
+
 // =============================================================================
 // CreateRootWidget / CreateWidget
 // =============================================================================
@@ -76,9 +86,9 @@ static InputEvent MakeMousePress( bool a_Pressed )
 TEST_CASE( "CreateRootWidget sets RootWidget and calls OnConstruct", "[scene]" )
 {
     Scene scene;
-    WidgetID id = scene.CreateRootWidget<TrackingWidget>();
+    NodeID id = CreateRootTracking( scene );
 
-    REQUIRE( id != c_InvalidWidgetID );
+    REQUIRE( id != c_InvalidNodeID );
     REQUIRE( scene.RootWidget == id );
 
     TrackingWidget* w = scene.GetWidget<TrackingWidget>( id );
@@ -89,8 +99,8 @@ TEST_CASE( "CreateRootWidget sets RootWidget and calls OnConstruct", "[scene]" )
 TEST_CASE( "CreateWidget attaches child to parent layout node", "[scene]" )
 {
     Scene scene;
-    WidgetID rootID  = scene.CreateRootWidget<TrackingWidget>();
-    WidgetID childID = scene.CreateWidget<TrackingWidget>( rootID );
+    NodeID rootID  = CreateRootTracking( scene );
+    NodeID childID = CreateChildTracking( scene, rootID  );
 
     IWidget* root  = scene.GetWidget( rootID );
     IWidget* child = scene.GetWidget( childID );
@@ -110,8 +120,8 @@ TEST_CASE( "CreateWidget attaches child to parent layout node", "[scene]" )
 TEST_CASE( "CreateWidget calls OnConstruct on each created widget", "[scene]" )
 {
     Scene scene;
-    WidgetID rootID  = scene.CreateRootWidget<TrackingWidget>();
-    WidgetID childID = scene.CreateWidget<TrackingWidget>( rootID );
+    NodeID rootID  = CreateRootTracking( scene );
+    NodeID childID = CreateChildTracking( scene, rootID  );
 
     REQUIRE( scene.GetWidget<TrackingWidget>( rootID  )->ConstructCount == 1 );
     REQUIRE( scene.GetWidget<TrackingWidget>( childID )->ConstructCount == 1 );
@@ -124,17 +134,17 @@ TEST_CASE( "CreateWidget calls OnConstruct on each created widget", "[scene]" )
 TEST_CASE( "GetWidget returns nullptr for invalid ID", "[scene]" )
 {
     Scene scene;
-    REQUIRE( scene.GetWidget( c_InvalidWidgetID ) == nullptr );
+    REQUIRE( scene.GetWidget( c_InvalidNodeID ) == nullptr );
 }
 
 TEST_CASE( "GetWidget<Type> returns typed pointer for matching type", "[scene]" )
 {
     Scene scene;
-    WidgetID id = scene.CreateRootWidget<TrackingWidget>();
+    NodeID id = CreateRootTracking( scene );
 
     TrackingWidget* typed = scene.GetWidget<TrackingWidget>( id );
     REQUIRE( typed != nullptr );
-    REQUIRE( typed->GetID() == id );
+    REQUIRE( typed->GetLayoutID() == id );
 }
 
 // =============================================================================
@@ -144,28 +154,33 @@ TEST_CASE( "GetWidget<Type> returns typed pointer for matching type", "[scene]" 
 TEST_CASE( "DestroyWidget calls OnDestroy and invalidates the ID", "[scene]" )
 {
     Scene scene;
-    WidgetID id = scene.CreateRootWidget<TrackingWidget>();
+    NodeID id = CreateRootTracking( scene );
     TrackingWidget* raw = scene.GetWidget<TrackingWidget>( id );
     REQUIRE( raw != nullptr );
 
     bool destroyed = scene.DestroyWidget( id );
     REQUIRE( destroyed );
+    scene.UpdateLayout( ToUnitVec2( Vec2f{ 100.0f, 100.0f } ) );
     REQUIRE( scene.GetWidget( id ) == nullptr );
 }
 
-TEST_CASE( "DestroyWidget returns false for an invalid ID", "[scene]" )
+TEST_CASE( "DestroyWidget returns true for an invalid ID and is a no-op", "[scene]" )
 {
     Scene scene;
-    REQUIRE( scene.DestroyWidget( c_InvalidWidgetID ) == false );
+    NodeID rootID = CreateRootTracking( scene );
+    REQUIRE( scene.DestroyWidget( c_InvalidNodeID ) == true );
+    scene.UpdateLayout( ToUnitVec2( Vec2f{ 100.0f, 100.0f } ) );
+    REQUIRE( scene.GetWidget( rootID ) != nullptr );
 }
 
 TEST_CASE( "DestroyWidget recursively destroys child widgets", "[scene]" )
 {
     Scene scene;
-    WidgetID rootID  = scene.CreateRootWidget<TrackingWidget>();
-    WidgetID childID = scene.CreateWidget<TrackingWidget>( rootID );
+    NodeID rootID  = CreateRootTracking( scene );
+    NodeID childID = CreateChildTracking( scene, rootID  );
 
     scene.DestroyWidget( rootID );
+    scene.UpdateLayout( ToUnitVec2( Vec2f{ 100.0f, 100.0f } ) );
 
     REQUIRE( scene.GetWidget( rootID  ) == nullptr );
     REQUIRE( scene.GetWidget( childID ) == nullptr );
@@ -178,12 +193,12 @@ TEST_CASE( "DestroyWidget recursively destroys child widgets", "[scene]" )
 TEST_CASE( "ForEachChildWidget iterates each direct child widget", "[scene]" )
 {
     Scene scene;
-    WidgetID rootID   = scene.CreateRootWidget<TrackingWidget>();
-    WidgetID childID1 = scene.CreateWidget<TrackingWidget>( rootID );
-    WidgetID childID2 = scene.CreateWidget<TrackingWidget>( rootID );
+    NodeID rootID   = CreateRootTracking( scene );
+    NodeID childID1 = CreateChildTracking( scene, rootID  );
+    NodeID childID2 = CreateChildTracking( scene, rootID  );
 
-    Array<WidgetID> seen{};
-    scene.ForEachChildWidget( scene.GetWidget( rootID )->GetLayoutID(), [&]( IWidget& w ) { PushBack( seen, w.GetID() ); } );
+    Array<NodeID> seen{};
+    scene.ForEachChildWidget( scene.GetWidget( rootID )->GetLayoutID(), [&]( IWidget& w ) { PushBack( seen, w.GetLayoutID() ); } );
 
     REQUIRE( Size( seen ) == 2 );
     REQUIRE( seen[ 0 ] == childID1 );
@@ -197,7 +212,7 @@ TEST_CASE( "ForEachChildWidget iterates each direct child widget", "[scene]" )
 TEST_CASE( "UpdateLayout assigns a non-zero FinalRect to the root when root is fixed-sized", "[scene]" )
 {
     Scene scene;
-    WidgetID rootID = scene.CreateRootWidget<TrackingWidget>();
+    NodeID rootID = CreateRootTracking( scene );
 
     LayoutNode* rootNode = scene.Layouts.Get( scene.GetWidget( rootID )->GetLayoutID() );
     REQUIRE( rootNode != nullptr );
@@ -216,9 +231,9 @@ TEST_CASE( "UpdateLayout assigns a non-zero FinalRect to the root when root is f
 TEST_CASE( "UpdateLayout positions child widgets in a horizontal layout", "[scene]" )
 {
     Scene scene;
-    WidgetID rootID   = scene.CreateRootWidget<TrackingWidget>();
-    WidgetID childID1 = scene.CreateWidget<TrackingWidget>( rootID );
-    WidgetID childID2 = scene.CreateWidget<TrackingWidget>( rootID );
+    NodeID rootID   = CreateRootTracking( scene );
+    NodeID childID1 = CreateChildTracking( scene, rootID  );
+    NodeID childID2 = CreateChildTracking( scene, rootID  );
 
     LayoutNode* rootNode = scene.Layouts.Get( scene.GetWidget( rootID )->GetLayoutID() );
     rootNode->Style.LayoutType  = ELayoutType::Horizontal;
@@ -263,19 +278,19 @@ TEST_CASE( "UpdateLayout with no root widget is a no-op", "[scene]" )
 TEST_CASE( "GetFocusedWidget returns invalid ID when nothing is focused", "[scene][focus]" )
 {
     Scene scene;
-    REQUIRE( scene.GetFocusedWidget() == c_InvalidWidgetID );
+    REQUIRE( scene.GetFocusedNode() == c_InvalidNodeID );
 }
 
 TEST_CASE( "SetFocus calls OnFocusReceived on newly focused widget", "[scene][focus]" )
 {
     Scene scene;
-    WidgetID rootID = scene.CreateRootWidget<TrackingWidget>();
+    NodeID rootID = CreateRootTracking( scene );
     TrackingWidget* w = scene.GetWidget<TrackingWidget>( rootID );
     w->Focusable = true;
 
     scene.SetFocus( rootID );
 
-    REQUIRE( scene.GetFocusedWidget() == rootID );
+    REQUIRE( scene.GetFocusedNode() == rootID );
     REQUIRE( w->FocusReceivedCount == 1 );
     REQUIRE( w->FocusLostCount     == 0 );
 }
@@ -283,8 +298,8 @@ TEST_CASE( "SetFocus calls OnFocusReceived on newly focused widget", "[scene][fo
 TEST_CASE( "SetFocus calls OnFocusLost on the previously focused widget", "[scene][focus]" )
 {
     Scene scene;
-    WidgetID id1 = scene.CreateRootWidget<TrackingWidget>();
-    WidgetID id2 = scene.CreateWidget<TrackingWidget>( id1 );
+    NodeID id1 = CreateRootTracking( scene );
+    NodeID id2 = CreateChildTracking( scene, id1  );
 
     TrackingWidget* w1 = scene.GetWidget<TrackingWidget>( id1 );
     TrackingWidget* w2 = scene.GetWidget<TrackingWidget>( id2 );
@@ -296,26 +311,26 @@ TEST_CASE( "SetFocus calls OnFocusLost on the previously focused widget", "[scen
 
     REQUIRE( w1->FocusLostCount     == 1 );
     REQUIRE( w2->FocusReceivedCount == 1 );
-    REQUIRE( scene.GetFocusedWidget() == id2 );
+    REQUIRE( scene.GetFocusedNode() == id2 );
 }
 
 TEST_CASE( "ClearFocus removes the current focused widget", "[scene][focus]" )
 {
     Scene scene;
-    WidgetID id = scene.CreateRootWidget<TrackingWidget>();
+    NodeID id = CreateRootTracking( scene );
     scene.GetWidget<TrackingWidget>( id )->Focusable = true;
 
     scene.SetFocus( id );
-    REQUIRE( scene.GetFocusedWidget() == id );
+    REQUIRE( scene.GetFocusedNode() == id );
 
     scene.ClearFocus();
-    REQUIRE( scene.GetFocusedWidget() == c_InvalidWidgetID );
+    REQUIRE( scene.GetFocusedNode() == c_InvalidNodeID );
 }
 
 TEST_CASE( "SetFocus is idempotent when called twice with the same ID", "[scene][focus]" )
 {
     Scene scene;
-    WidgetID id = scene.CreateRootWidget<TrackingWidget>();
+    NodeID id = CreateRootTracking( scene );
     scene.GetWidget<TrackingWidget>( id )->Focusable = true;
 
     scene.SetFocus( id );
@@ -331,7 +346,7 @@ TEST_CASE( "SetFocus is idempotent when called twice with the same ID", "[scene]
 TEST_CASE( "DispatchInputEvent pointer over root triggers OnPointerEnter", "[scene][input]" )
 {
     Scene scene;
-    WidgetID rootID = scene.CreateRootWidget<TrackingWidget>();
+    NodeID rootID = CreateRootTracking( scene );
 
     LayoutNode* node = scene.Layouts.Get( scene.GetWidget( rootID )->GetLayoutID() );
     node->Style.WidthMode   = ESizingMode::Fixed;
@@ -350,7 +365,7 @@ TEST_CASE( "DispatchInputEvent pointer over root triggers OnPointerEnter", "[sce
 TEST_CASE( "DispatchInputEvent pointer leaving widget triggers OnPointerExit", "[scene][input]" )
 {
     Scene scene;
-    WidgetID rootID = scene.CreateRootWidget<TrackingWidget>();
+    NodeID rootID = CreateRootTracking( scene );
 
     LayoutNode* node = scene.Layouts.Get( scene.GetWidget( rootID )->GetLayoutID() );
     node->Style.WidthMode   = ESizingMode::Fixed;
@@ -372,7 +387,7 @@ TEST_CASE( "DispatchInputEvent pointer leaving widget triggers OnPointerExit", "
 TEST_CASE( "DispatchInputEvent button press dispatches to hovered widget", "[scene][input]" )
 {
     Scene scene;
-    WidgetID rootID = scene.CreateRootWidget<TrackingWidget>();
+    NodeID rootID = CreateRootTracking( scene );
 
     LayoutNode* node = scene.Layouts.Get( scene.GetWidget( rootID )->GetLayoutID() );
     node->Style.WidthMode   = ESizingMode::Fixed;
@@ -394,7 +409,7 @@ TEST_CASE( "DispatchInputEvent button press dispatches to hovered widget", "[sce
 TEST_CASE( "DispatchInputEvent button press dispatches to focused widget when nothing hovered", "[scene][input]" )
 {
     Scene scene;
-    WidgetID rootID = scene.CreateRootWidget<TrackingWidget>();
+    NodeID rootID = CreateRootTracking( scene );
     TrackingWidget* w = scene.GetWidget<TrackingWidget>( rootID );
     w->Focusable = true;
 
@@ -413,15 +428,15 @@ TEST_CASE( "DispatchInputEvent button press dispatches to focused widget when no
 TEST_CASE( "GetCurrentNavScope returns RootWidget when nav stack is empty", "[scene][nav]" )
 {
     Scene scene;
-    WidgetID rootID = scene.CreateRootWidget<TrackingWidget>();
+    NodeID rootID = CreateRootTracking( scene );
     REQUIRE( scene.GetCurrentNavScope() == rootID );
 }
 
 TEST_CASE( "PushNavScope adds a scope to the nav stack", "[scene][nav]" )
 {
     Scene scene;
-    WidgetID rootID  = scene.CreateRootWidget<TrackingWidget>();
-    WidgetID childID = scene.CreateWidget<TrackingWidget>( rootID );
+    NodeID rootID  = CreateRootTracking( scene );
+    NodeID childID = CreateChildTracking( scene, rootID  );
 
     scene.PushNavScope( childID );
 
@@ -431,8 +446,8 @@ TEST_CASE( "PushNavScope adds a scope to the nav stack", "[scene][nav]" )
 TEST_CASE( "PopNavScope removes the top scope and restores previous focus", "[scene][nav]" )
 {
     Scene scene;
-    WidgetID rootID  = scene.CreateRootWidget<TrackingWidget>();
-    WidgetID childID = scene.CreateWidget<TrackingWidget>( rootID );
+    NodeID rootID  = CreateRootTracking( scene );
+    NodeID childID = CreateChildTracking( scene, rootID  );
 
     scene.GetWidget<TrackingWidget>( rootID )->Focusable = true;
     scene.SetFocus( rootID );
@@ -442,13 +457,13 @@ TEST_CASE( "PopNavScope removes the top scope and restores previous focus", "[sc
 
     scene.PopNavScope();
     REQUIRE( scene.GetCurrentNavScope() == rootID );
-    REQUIRE( scene.GetFocusedWidget() == rootID );
+    REQUIRE( scene.GetFocusedNode() == rootID );
 }
 
 TEST_CASE( "PopNavScope on empty nav stack is a no-op", "[scene][nav]" )
 {
     Scene scene;
-    scene.CreateRootWidget<TrackingWidget>();
+    CreateRootTracking( scene );
     scene.PopNavScope(); // should not crash
     REQUIRE( scene.GetCurrentNavScope() == scene.RootWidget );
 }
@@ -460,23 +475,23 @@ TEST_CASE( "PopNavScope on empty nav stack is a no-op", "[scene][nav]" )
 TEST_CASE( "Navigate focuses the first focusable child when no widget is focused", "[scene][nav]" )
 {
     Scene scene;
-    WidgetID rootID  = scene.CreateRootWidget<TrackingWidget>();
-    WidgetID childID = scene.CreateWidget<TrackingWidget>( rootID );
+    NodeID rootID  = CreateRootTracking( scene );
+    NodeID childID = CreateChildTracking( scene, rootID  );
 
     scene.GetWidget<TrackingWidget>( childID )->Focusable = true;
 
     scene.Navigate( ENavAction::MoveRight );
 
-    REQUIRE( scene.GetFocusedWidget() == childID );
+    REQUIRE( scene.GetFocusedNode() == childID );
 }
 
 TEST_CASE( "Navigate MoveRight advances focus from first to second sibling", "[scene][nav]" )
 {
     // Place two children side-by-side so MoveRight can find the second one.
     Scene scene;
-    WidgetID rootID   = scene.CreateRootWidget<TrackingWidget>();
-    WidgetID childID1 = scene.CreateWidget<TrackingWidget>( rootID );
-    WidgetID childID2 = scene.CreateWidget<TrackingWidget>( rootID );
+    NodeID rootID   = CreateRootTracking( scene );
+    NodeID childID1 = CreateChildTracking( scene, rootID  );
+    NodeID childID2 = CreateChildTracking( scene, rootID  );
 
     scene.GetWidget<TrackingWidget>( childID1 )->Focusable = true;
     scene.GetWidget<TrackingWidget>( childID2 )->Focusable = true;
@@ -505,14 +520,14 @@ TEST_CASE( "Navigate MoveRight advances focus from first to second sibling", "[s
     scene.SetFocus( childID1 );
     scene.Navigate( ENavAction::MoveRight );
 
-    REQUIRE( scene.GetFocusedWidget() == childID2 );
+    REQUIRE( scene.GetFocusedNode() == childID2 );
 }
 
 TEST_CASE( "Navigate Cancel pops the nav scope", "[scene][nav]" )
 {
     Scene scene;
-    WidgetID rootID  = scene.CreateRootWidget<TrackingWidget>();
-    WidgetID childID = scene.CreateWidget<TrackingWidget>( rootID );
+    NodeID rootID  = CreateRootTracking( scene );
+    NodeID childID = CreateChildTracking( scene, rootID  );
 
     scene.PushNavScope( childID );
     REQUIRE( scene.GetCurrentNavScope() == childID );
@@ -528,17 +543,17 @@ TEST_CASE( "Navigate Cancel pops the nav scope", "[scene][nav]" )
 TEST_CASE( "Reset clears all widgets and resets state", "[scene]" )
 {
     Scene scene;
-    WidgetID rootID  = scene.CreateRootWidget<TrackingWidget>();
-    WidgetID childID = scene.CreateWidget<TrackingWidget>( rootID );
+    NodeID rootID  = CreateRootTracking( scene );
+    NodeID childID = CreateChildTracking( scene, rootID  );
 
     scene.GetWidget<TrackingWidget>( rootID )->Focusable = true;
     scene.SetFocus( rootID );
 
     scene.Reset();
 
-    REQUIRE( scene.RootWidget == c_InvalidWidgetID );
-    REQUIRE( scene.GetFocusedWidget() == c_InvalidWidgetID );
+    REQUIRE( scene.RootWidget == c_InvalidNodeID );
+    REQUIRE( scene.GetFocusedNode() == c_InvalidNodeID );
     REQUIRE( scene.GetWidget( rootID  ) == nullptr );
     REQUIRE( scene.GetWidget( childID ) == nullptr );
-    REQUIRE( scene.GetCurrentNavScope() == c_InvalidWidgetID );
+    REQUIRE( scene.GetCurrentNavScope() == c_InvalidNodeID );
 }
