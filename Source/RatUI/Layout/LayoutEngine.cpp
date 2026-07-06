@@ -284,7 +284,7 @@ namespace
         return a_ParentPos;
     }
 
-    static RATUI_NODISCARD Rect<Unit> ApplyMargin( Rect<Unit> a_Rect, const Edges& a_Margin )
+    RATUI_NODISCARD static Rect<Unit> ApplyMargin( Rect<Unit> a_Rect, const Edges& a_Margin )
     {
         a_Rect.Origin[0] += a_Margin.Left;
         a_Rect.Origin[1] += a_Margin.Top;
