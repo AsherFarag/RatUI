@@ -62,7 +62,7 @@
 
 namespace nm
 {
-    template<size_t N>
+    template<typename S, unsigned N>
     constexpr vec<S, N> operator*(const vec<S, N>& a_Left, float a_Scalar)
     {
         vec<S, N> result;
