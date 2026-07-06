@@ -5,7 +5,19 @@
 #include "../Layout/Layout.h" // TODO: Remove once CornerRounding is moved to a more appropriate header
 
 namespace RatUI
-{   
+{
+    /**
+     * @brief Apply @p x to each of the theme property types.
+     * Type, Singular, Plural
+     */
+    #define RATUI_THEME_PROPERTIES(X) \
+        X(Color,           Color,     Colors     ) \
+        X(CornerRounding,  Rounding,  Roundings  ) \
+        X(TextRenderStyle, TextStyle, TextStyles ) \
+        X(Unit,            Metric,    Metrics    ) \
+        X(FontHandle,      Font,      Fonts      ) \
+        X(Brush,           Brush,     Brushes    )
+
     /**
      * @brief A collection of typed theme properties (colors, metrics, etc.)
      * that can optionally inherit from a parent, cascading lookups up the chain.
@@ -17,38 +29,19 @@ namespace RatUI
         using ValueMap = HashMap<StringID, T, StringIDHash, std::equal_to<StringID>>;
     
         Theme() = default;
-
-        explicit Theme( Shared<const Theme> a_Parent )
-            : m_Parent( std::move( a_Parent ) )
+        Theme( const Theme& a_Other ) { CopyFrom( a_Other ); }
+        Theme( Theme&& ) noexcept = default;
+        explicit Theme( Shared<const Theme> a_Parent ) 
+            : m_Parent( std::move( a_Parent ) ) 
         {}
-    
-        Theme( const Theme& a_Other )
-            : m_Parent    ( a_Other.m_Parent )
-            , m_Colors    ( a_Other.m_Colors )
-            , m_Roundings ( a_Other.m_Roundings )
-            , m_TextStyles( a_Other.m_TextStyles )
-            , m_Metrics   ( a_Other.m_Metrics )
-            , m_Fonts     ( a_Other.m_Fonts )
-            , m_Brushes   ( a_Other.m_Brushes )
-            // m_Version intentionally starts at 0 for a fresh copy
-        {}
-    
-        Theme( Theme&& ) = default;
     
         Theme& operator=( const Theme& a_Other )
         {
             if ( this != &a_Other )
             {
-                RATUI_USER_ASSERT( a_Other.m_Parent.get() != this, 
+                RATUI_USER_ASSERT( ValidateParentChain( a_Other.m_Parent.get() ), 
                                    "Cannot assign a theme to one of its ancestors (circular parent chain)" );
-
-                m_Parent     = a_Other.m_Parent;
-                m_Colors     = a_Other.m_Colors;
-                m_Roundings  = a_Other.m_Roundings;
-                m_TextStyles = a_Other.m_TextStyles;
-                m_Metrics    = a_Other.m_Metrics;
-				m_Fonts      = a_Other.m_Fonts;
-                m_Brushes    = a_Other.m_Brushes;
+                CopyFrom( a_Other );
                 ++m_Version; // assignment is a mutation of this theme
             }
 
@@ -59,15 +52,9 @@ namespace RatUI
         {
             if ( this != &a_Other )
             {
-                RATUI_USER_ASSERT( a_Other.m_Parent.get() != this, 
+                RATUI_USER_ASSERT( ValidateParentChain( a_Other.m_Parent.get() ), 
                                    "Cannot assign a theme to one of its ancestors (circular parent chain)" );
-                m_Parent     = std::move( a_Other.m_Parent );
-                m_Colors     = std::move( a_Other.m_Colors );
-                m_Roundings  = std::move( a_Other.m_Roundings );
-                m_TextStyles = std::move( a_Other.m_TextStyles );
-                m_Metrics    = std::move( a_Other.m_Metrics );
-                m_Fonts	     = std::move( a_Other.m_Fonts );
-                m_Brushes	 = std::move( a_Other.m_Brushes );
+                MoveFrom( std::move( a_Other ) );
                 ++m_Version;
             }
             return *this;
@@ -84,7 +71,23 @@ namespace RatUI
          * Monotonically increasing counter, incremented on every write to this
          * theme (not its parent). Use as a cache-invalidation signal.
          */
-        u32 GetVersion() const { return m_Version; }
+        u64 GetVersion() const { return m_Version; }
+
+        /**
+         * @brief Validates that the given parent theme is not an ancestor of this theme, preventing circular references.
+         */
+        bool ValidateParentChain(const Theme* a_Parent) const
+        {
+            while (a_Parent)
+            {
+                if (a_Parent == this)
+                    return false;
+            
+                a_Parent = a_Parent->m_Parent.get();
+            }
+        
+            return true;
+        }
     
         // -------------------------------------------------------------------------
         // Per-type accessors  (generated via below)
@@ -93,13 +96,12 @@ namespace RatUI
         // For each type T, the following methods are generated:
         //
         //   const T&           GetColor( StringID, const T& default = {} ) const
-        //   const T*           TryGetColor( StringID ) const           // nullptr if absent
-        //   bool               HasColor( StringID ) const              // checks parent chain
-        //   Theme&             SetColor( StringID, T )                 // fluent
-        //   Theme&             SetColors( std::initializer_list<...> )// bulk, merges
+        //   const T*           TryGetColor( StringID ) const           
+        //   Theme&             SetColor( StringID, T )                 
+        //   Theme&             SetColors( std::initializer_list<...> )
         //   const ValueMap<T>& GetColors() const
     
-    #define RATUI_THEME_PROPERTY( Type, Singular, Plural, Member )                          \
+    #define RATUI_THEME_METHODS( Type, Singular, Plural )                                   \
         const Type& Get##Singular( StringID a_ID, const Type& a_Default = {} ) const        \
         {                                                                                   \
             if ( const Type* v = TryGet##Singular( a_ID ) ) return *v;                      \
@@ -107,65 +109,159 @@ namespace RatUI
         }                                                                                   \
         const Type* TryGet##Singular( StringID a_ID ) const                                 \
         {                                                                                   \
-            if ( auto it = Find( Member, a_ID ); it != End( Member ) )                      \
+            if ( auto it = Find( m_##Plural, a_ID ); it != End( m_##Plural ) )              \
                 return &it->second;                                                         \
             return m_Parent ? m_Parent->TryGet##Singular( a_ID ) : nullptr;                 \
         }                                                                                   \
-        bool Has##Singular( StringID a_ID ) const                                            \
-        {                                                                                   \
-            if ( Find( Member, a_ID ) != End( Member ) ) return true;                       \
-            return m_Parent && m_Parent->Has##Singular( a_ID );                             \
-        }                                                                                   \
         Theme& Set##Singular( StringID a_ID, Type a_Value )                                 \
         {                                                                                   \
-            Member[a_ID] = std::move( a_Value );                                            \
+            m_##Plural[a_ID] = std::move( a_Value );                                        \
             ++m_Version;                                                                    \
             return *this;                                                                   \
         }                                                                                   \
         Theme& Set##Plural( std::initializer_list<std::pair<const StringID, Type>> a_List ) \
         {                                                                                   \
             for ( auto& [id, val] : a_List )                                                \
-                Member[id] = val;                                                           \
+                m_##Plural[id] = val;                                                       \
             ++m_Version;                                                                    \
             return *this;                                                                   \
         }                                                                                   \
-        const ValueMap<Type>& Get##Plural() const { return Member; }
+        const ValueMap<Type>& Get##Plural() const { return m_##Plural; }
+
+        RATUI_THEME_PROPERTIES( RATUI_THEME_METHODS )
     
-        RATUI_THEME_PROPERTY( Color,           Color,     Colors,     m_Colors     )
-        RATUI_THEME_PROPERTY( CornerRounding,  Rounding,  Roundings,  m_Roundings  )
-        RATUI_THEME_PROPERTY( TextRenderStyle, TextStyle, TextStyles, m_TextStyles )
-        RATUI_THEME_PROPERTY( Unit,            Metric,    Metrics,    m_Metrics    )
-        RATUI_THEME_PROPERTY( FontHandle,      Font,      Fonts,      m_Fonts      )
-        RATUI_THEME_PROPERTY( Brush,           Brush,     Brushes,    m_Brushes    )
+    #undef RATUI_THEME_METHODS
     
-    #undef RATUI_THEME_PROPERTY
-    
-    protected:
+    private:
+        void CopyFrom( const Theme& a_Other )
+        {
+            m_Parent = a_Other.m_Parent;
+        #define COPY_VALUE_MAP( Type, Singular, Plural ) m_##Plural = a_Other.m_##Plural;
+            RATUI_THEME_PROPERTIES( COPY_VALUE_MAP )
+        #undef COPY_VALUE_MAP
+        }
+
+        void MoveFrom( Theme&& a_Other )
+        {
+            m_Parent = std::move( a_Other.m_Parent );
+        #define MOVE_VALUE_MAP( Type, Singular, Plural ) m_##Plural = std::move( a_Other.m_##Plural );
+            RATUI_THEME_PROPERTIES( MOVE_VALUE_MAP )
+        #undef MOVE_VALUE_MAP
+        }
+
         Shared<const Theme> m_Parent;
-    
-        u32 m_Version { 0 };
-    
-        ValueMap<Color>           m_Colors;
-        ValueMap<CornerRounding>  m_Roundings;
-        ValueMap<TextRenderStyle> m_TextStyles;
-        ValueMap<Unit>            m_Metrics;
-		ValueMap<FontHandle>      m_Fonts;
-        ValueMap<Brush>           m_Brushes;
+        u64 m_Version { 0 };
+
+    #define DECLARE_VALUE_MAP( Type, Singular, Plural ) ValueMap<Type> m_##Plural;
+        RATUI_THEME_PROPERTIES( DECLARE_VALUE_MAP )
+    #undef DECLARE_VALUE_MAP
     };
 
     /**
      * @brief A handle to a theme, which may or may not contain a valid theme pointer. 
      * Provides convenient accessors that return default values when the pointer is null.
      */
-    struct ThemeHandle
+    class ThemeHandle
     {
-        Shared<const Theme> Ptr;
-
+    public:
 		ThemeHandle() = default;
-		ThemeHandle( Shared<const Theme> a_Theme ) : Ptr( std::move( a_Theme ) ) {}
-		ThemeHandle( const Shared<Theme>& a_Theme ) : Ptr( a_Theme ) {}
+		ThemeHandle( Shared<const Theme> a_Theme ) noexcept 
+            : m_Ptr( std::move( a_Theme ) ), m_Version( ~0ull ) 
+        {}
+        ThemeHandle( Shared<Theme> a_Theme ) noexcept
+            : m_Ptr( std::move( a_Theme ) ), m_Version( ~0ull )
+        {}
+        ThemeHandle( const ThemeHandle& a_Other )           
+            : m_Ptr( a_Other.m_Ptr ), m_Version( ~0ull ) 
+        {}
+        ThemeHandle( ThemeHandle&& a_Other ) noexcept 
+            : m_Ptr( std::move( a_Other.m_Ptr ) ), m_Version( ~0ull ) 
+        { 
+            a_Other.Invalidate();
+        }
 
-		operator bool() const { return Ptr != nullptr; }
+        ThemeHandle& operator=( const ThemeHandle& a_Other )
+        {
+            if ( this == &a_Other ) return *this;
+            Reset( a_Other.m_Ptr );
+            return *this;
+        }
+
+        ThemeHandle& operator=( ThemeHandle&& a_Other ) noexcept
+        {
+            if ( this == &a_Other ) return *this;
+            Reset( std::move( a_Other.m_Ptr ) );
+            a_Other.Invalidate();
+            return *this;
+        }
+
+        ThemeHandle& operator=( Shared<const Theme> a_Theme )
+        {
+            Reset( std::move( a_Theme ) );
+            return *this;
+        }
+
+        ThemeHandle& operator=( Shared<Theme> a_Theme )
+        {
+            Reset( std::move( a_Theme ) );
+            return *this;
+        }
+
+        /**
+         * @brief Checks if the handle currently points to a valid theme.
+         * @return True if the handle is valid, false otherwise.
+         */
+        RATUI_NODISCARD bool IsValid() const 
+        { 
+            return m_Ptr != nullptr; 
+        }
+
+        RATUI_NODISCARD bool IsOutdated() const 
+        { 
+            return m_Ptr && m_Ptr->GetVersion() != m_Version; 
+        }
+
+        /**
+         * @brief Invalidates the cached version number, forcing the next call to Update() to return true.
+         */
+        void Invalidate() 
+        { 
+            m_Version = ~0ull; 
+        }
+
+        /**
+         * @brief Resets the handle to an empty state, clearing the underlying theme pointer and invalidating the cached version number.
+         */
+        void Reset( Shared<const Theme> a_Theme = nullptr ) 
+        { 
+            m_Ptr = std::move( a_Theme ); 
+            Invalidate(); 
+        }
+
+        /**
+         * @brief Checks if the underlying theme has changed since the last time this handle was updated.
+         * This is useful for caching purposes, to determine if any theme-dependent values need to be recalculated.
+         * If the theme has changed, this method updates the cached version number to the current version of the theme.
+         * @return True if the theme has changed, false otherwise.
+         * 
+         * @example
+         * if ( themeHandle.Update() )
+         * {
+         *    BorderThickness = themeHandle.GetMetric( ... );
+         * }
+         */
+        bool Update()
+        {
+            if ( m_Ptr && m_Ptr->GetVersion() != m_Version )
+            {
+                m_Version = m_Ptr->GetVersion();
+                return true;
+            }
+
+            return false;
+        }
+
+        operator bool() const { return IsValid(); }
 
         // -------------------------------------------------------------------------
         // Per-type accessors  (generated via below)
@@ -174,31 +270,26 @@ namespace RatUI
         // For each type T, the following methods are generated:
         //
         //   const T&           GetColor( StringID, const T& default = {} ) const
-        //   const T*           TryGetColor( StringID ) const           // nullptr if absent
-        //   bool               HasColor( StringID ) const              // checks parent chain
+        //   const T*           TryGetColor( StringID ) const           
+        //   bool               HasColor( StringID ) const              
 
-    #define THEME_HANDLE_METHODS( Type, Name )                                     \
-        const Type& Get##Name( StringID a_ID, const Type& a_Default = {} ) const    \
-        {                                                                          \
-            return Ptr ? Ptr->Get##Name( a_ID, a_Default ) : a_Default;            \
-        }                                                                          \
-        const Type* TryGet##Name( StringID a_ID ) const                             \
-        {                                                                          \
-            return Ptr ? Ptr->TryGet##Name( a_ID ) : nullptr;                      \
-        }                                                                          \
-        bool Has##Name( StringID a_ID ) const                                       \
-        {                                                                          \
-            return Ptr && Ptr->Has##Name( a_ID );                                  \
+    #define RATUI_THEME_METHODS( Type, Name, Plural )                                              \
+        RATUI_NODISCARD const Type& Get##Name( StringID a_ID, const Type& a_Default = {} ) const   \
+        {                                                                                          \
+            return m_Ptr ? m_Ptr->Get##Name( a_ID, a_Default ) : a_Default;                        \
+        }                                                                                          \
+        RATUI_NODISCARD const Type* TryGet##Name( StringID a_ID ) const                            \
+        {                                                                                          \
+            return m_Ptr ? m_Ptr->TryGet##Name( a_ID ) : nullptr;                                  \
         }
         
-        THEME_HANDLE_METHODS( Color,           Color )
-        THEME_HANDLE_METHODS( CornerRounding,  Rounding )
-        THEME_HANDLE_METHODS( TextRenderStyle, TextStyle )
-        THEME_HANDLE_METHODS( Unit,            Metric )
-        THEME_HANDLE_METHODS( FontHandle,      Font )
-        THEME_HANDLE_METHODS( Brush,           Brush )
+        RATUI_THEME_PROPERTIES( RATUI_THEME_METHODS )
 
-    #undef THEME_HANDLE_METHODS
+    #undef RATUI_THEME_METHODS
+
+    private:
+        Shared<const Theme> m_Ptr;
+        u64 m_Version{ ~0ull }; ///< Cached version of the theme, used to detect changes in the underlying theme.
     };
 
     /**

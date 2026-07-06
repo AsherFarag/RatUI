@@ -13,14 +13,18 @@ namespace RatUI
     public:
         PanelWidget() = default;
 
-        PanelWidget( ThemeHandle a_Theme )
-            : m_Theme( std::move( a_Theme ) )
-        {}
+        // --------------------------------------------------------------------
+        // Render Properties
+        // --------------------------------------------------------------------
 
-        void SetTheme( ThemeHandle a_Theme )
-        {
-            m_Theme = std::move( a_Theme );
-        }
+        Brush FillBrush{ SolidBrush{ Colors::Surface700 } }; ///< The brush used to fill the panel's background
+        Color BorderColor{ Colors::Transparent };            ///< The color of the panel's border
+        Unit  BorderThickness{ 0_u };                        ///< The thickness of the panel's border
+        CornerRounding Rounding{ CornerRounding::None() };   ///< The corner rounding
+
+        // --------------------------------------------------------------------
+        // IWidget Overrides
+        // --------------------------------------------------------------------
 
         bool IsInteractable()       const override { return false; }
 		bool IsFocusable()          const override { return true; }
@@ -32,33 +36,43 @@ namespace RatUI
             const LayoutNode& node = GetLayout();
             const Rect<Unit>& rect = node.Layout.FinalRect;
 
-            const Brush& panelBrush = m_Theme.GetBrush( ThemeKey::Brush::PanelNormal, SolidBrush{ Colors::Surface700 } );
-            if ( std::holds_alternative<SolidBrush>( panelBrush ) )
+            if constexpr ( HasMixin<ThemeMixin> )
             {
-                const SolidBrush& solid = std::get<SolidBrush>( panelBrush );
+                if ( Theme.Update() )
+                {
+                    FillBrush = Theme.GetBrush( ThemeKey::Brush::PanelNormal, FillBrush );
+                    BorderColor = Theme.GetColor( ThemeKey::Color::PanelBorder, BorderColor );
+                    BorderThickness = Theme.GetMetric( ThemeKey::Metric::PanelBorderThickness, BorderThickness );
+                    Rounding = Theme.GetRounding( ThemeKey::Rounding::Panel, Rounding );
+                }
+            }
+
+            if ( std::holds_alternative<SolidBrush>( FillBrush ) )
+            {
+                const SolidBrush& solid = std::get<SolidBrush>( FillBrush );
                 a_Event.DrawList.AddRect( rect, 
                 {
                     .FillColor = solid.Fill,
-                    .BorderColor = m_Theme.GetColor( ThemeKey::Color::PanelBorder, Colors::Transparent ),
-                    .BorderThickness = m_Theme.GetMetric( ThemeKey::Metric::PanelBorderThickness, 0_u ),
-                    .Rounding = m_Theme.GetRounding( ThemeKey::Rounding::Panel, CornerRounding::None() )
+                    .BorderColor = BorderColor,
+                    .BorderThickness = BorderThickness,
+                    .Rounding = Rounding
                 } );
             }
-            else if ( std::holds_alternative<TextureBrush>( panelBrush ) )
+            else if ( std::holds_alternative<TextureBrush>( FillBrush ) )
             {
-                const TextureBrush& texture = std::get<TextureBrush>( panelBrush );
+                const TextureBrush& texture = std::get<TextureBrush>( FillBrush );
                 a_Event.DrawList.AddRect( rect, 
                 {
                     .FillColor = texture.Tint,
-                    .BorderColor = m_Theme.GetColor( ThemeKey::Color::PanelBorder, Colors::Transparent ),
-                    .BorderThickness = m_Theme.GetMetric( ThemeKey::Metric::PanelBorderThickness, 0_u ),
-                    .Rounding = m_Theme.GetRounding( ThemeKey::Rounding::Panel, CornerRounding::None() ),
+                    .BorderColor = BorderColor,
+                    .BorderThickness = BorderThickness,
+                    .Rounding = Rounding,
                     .Texture = texture.Texture
                 } );
             }
-            else if ( std::holds_alternative<NineSliceBrush>( panelBrush ) )
+            else if ( std::holds_alternative<NineSliceBrush>( FillBrush ) )
             {
-                const NineSliceBrush& nineSlice = std::get<NineSliceBrush>( panelBrush );
+                const NineSliceBrush& nineSlice = std::get<NineSliceBrush>( FillBrush );
                 a_Event.DrawList.AddSlicedRect( rect, 
                 {
                     .Texture = nineSlice.Texture,
@@ -72,17 +86,14 @@ namespace RatUI
                 a_Event.DrawList.AddRect( rect,
                 {
 					.FillColor = Colors::Transparent,
-					.BorderColor = m_Theme.GetColor( ThemeKey::Color::FocusOutline, Colors::White ),
-					.BorderThickness = m_Theme.GetMetric( ThemeKey::Metric::FocusOutlineThickness, 2_u ),
-                    .Rounding = m_Theme.GetRounding( ThemeKey::Rounding::FocusOutline, CornerRounding::None() )
+					.BorderColor = BorderColor,
+					.BorderThickness = BorderThickness,
+                    .Rounding = Rounding
                 } );
             }
 
             PaintChildren( a_Event );
         }
-
-    protected:
-        ThemeHandle m_Theme;
     };
 
 } // namespace RatUI

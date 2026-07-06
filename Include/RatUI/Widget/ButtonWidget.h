@@ -91,29 +91,46 @@ namespace RatUI
     class ButtonWidget : public ButtonBaseWidget
     {
     public:
-        ButtonWidget() = default;
-
-        ButtonWidget( ThemeHandle a_Theme, OnClickCallback a_OnClick = {} )
-			: ButtonBaseWidget( std::move( a_OnClick ) ), m_Theme( std::move( a_Theme ) )
+        ButtonWidget( OnClickCallback a_OnClick = {} )
+			: ButtonBaseWidget( std::move( a_OnClick ) )
         {}
 
-        void SetTheme( ThemeHandle a_Theme )
-        {
-            m_Theme = std::move( a_Theme );
-        }
+        // --------------------------------------------------------------------
+        // Render Properties
+        // --------------------------------------------------------------------
+
+        Brush NormalBrush{ SolidBrush{ Colors::Surface700 } };  ///< The brush used to fill the button's background in its normal state
+        Brush HoverBrush{ SolidBrush{ Colors::Surface600 } };   ///< The brush used to fill the button's background when hovered
+        Brush PressedBrush{ SolidBrush{ Colors::Surface500 } }; ///< The brush used to fill the button's background when pressed
+        Color BorderColor{ Colors::Transparent };               ///< The color of the panel's border
+        Unit  BorderThickness{ 0_u };                           ///< The thickness of the panel's border
+        CornerRounding Rounding{ CornerRounding::None() };      ///< The corner rounding
+
+        // --------------------------------------------------------------------
+        // IWidget Overrides
+        // --------------------------------------------------------------------
 
         void OnPaint( const PaintEvent& a_Event ) override
         {
             Scene& scene = GetScene();
             const LayoutNode& node = GetLayout();
-
             const Rect<Unit>& rect = node.Layout.FinalRect;
 
+            if constexpr ( HasMixin<ThemeMixin> )
+            {
+                if ( Theme.Update() )
+                {
+                    NormalBrush = Theme.GetBrush( ThemeKey::Brush::ButtonNormal, NormalBrush );
+                    HoverBrush = Theme.GetBrush( ThemeKey::Brush::ButtonHover, HoverBrush );
+                    PressedBrush = Theme.GetBrush( ThemeKey::Brush::ButtonPressed, PressedBrush );
+                    BorderColor = Theme.GetColor( ThemeKey::Color::ButtonBorder, BorderColor );
+                    BorderThickness = Theme.GetMetric( ThemeKey::Metric::ButtonBorderThickness, BorderThickness );
+                    Rounding = Theme.GetRounding( ThemeKey::Rounding::Button, Rounding );
+                }
+            }
+
 			// Fill brush based on state: pressed > hovered > normal
-            const Brush& fillBrush = m_IsPressed ? m_Theme.GetBrush( ThemeKey::Brush::ButtonPressed, SolidBrush{ Colors::Surface500 } )
-                                                 : ( m_IsHovered 
-                                                     ? m_Theme.GetBrush( ThemeKey::Brush::ButtonHover,  SolidBrush{ Colors::Surface600 } )
-                                                     : m_Theme.GetBrush( ThemeKey::Brush::ButtonNormal, SolidBrush{ Colors::Surface700 } ) );
+            const Brush& fillBrush = m_IsPressed ? PressedBrush : ( m_IsHovered ? HoverBrush : NormalBrush );
 
             if ( std::holds_alternative<SolidBrush>( fillBrush ) )
             {
@@ -121,9 +138,9 @@ namespace RatUI
                 a_Event.DrawList.AddRect( rect, 
                 {
                     .FillColor = solid.Fill,
-                    .BorderColor = m_Theme.GetColor( ThemeKey::Color::ButtonBorder, Colors::Transparent ),
-                    .BorderThickness = m_Theme.GetMetric( ThemeKey::Metric::ButtonBorderThickness, 0_u ),
-                    .Rounding = m_Theme.GetRounding( ThemeKey::Rounding::Button, CornerRounding::None() )
+                    .BorderColor = BorderColor,
+                    .BorderThickness = BorderThickness,
+                    .Rounding = Rounding
                 } );
             }
             else if ( std::holds_alternative<TextureBrush>( fillBrush ) )
@@ -132,9 +149,9 @@ namespace RatUI
                 a_Event.DrawList.AddRect( rect, 
                 {
                     .FillColor = texture.Tint,
-                    .BorderColor = m_Theme.GetColor( ThemeKey::Color::ButtonBorder, Colors::Transparent ),
-                    .BorderThickness = m_Theme.GetMetric( ThemeKey::Metric::ButtonBorderThickness, 0_u ),
-                    .Rounding = m_Theme.GetRounding( ThemeKey::Rounding::Button, CornerRounding::None() ),
+                    .BorderColor = BorderColor,
+                    .BorderThickness = BorderThickness,
+                    .Rounding = Rounding,
                     .Texture = texture.Texture
                 } );
             }
@@ -156,17 +173,14 @@ namespace RatUI
                 a_Event.DrawList.AddRect( rect,
                 {
                     .FillColor = Colors::Transparent,
-                    .BorderColor = m_Theme.GetColor( ThemeKey::Color::FocusOutline, Colors::White ),
-                    .BorderThickness = m_Theme.GetMetric( ThemeKey::Metric::FocusOutlineThickness, 2_u ),
-                    .Rounding = m_Theme.GetRounding( ThemeKey::Rounding::FocusOutline, CornerRounding::None() )
+                    .BorderColor = BorderColor,
+                    .BorderThickness = BorderThickness,
+                    .Rounding = Rounding
                 } );
             }
 
             PaintChildren( a_Event );
         }
-
-    private:
-        ThemeHandle m_Theme;
     };
 
 } // namespace RatUI

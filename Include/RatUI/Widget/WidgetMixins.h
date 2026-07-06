@@ -3,6 +3,7 @@
 #include "../Layout/Layout.h"
 #include "../Renderer/RenderTransform.h"
 #include "../Renderer/DrawList.h"
+#include "Theme.h"
 
 namespace RatUI
 {
@@ -71,7 +72,6 @@ namespace RatUI
         {
             ( Mixins::PostPaint( a_Event, a_Node ), ... );
         }
-
     };
 
     /**
@@ -106,6 +106,11 @@ namespace RatUI
         i32 m_Pushed{ 0 };
     };
 
+    /**
+     * @brief Adds animation capabilities to a widget.
+     * It maintains an AnimationPlayer instance that is ticked during the PrePaint phase, 
+     * allowing any animations associated with the widget to progress over time.
+     */
     struct AnimationMixin : WidgetMixinBase
     {
         AnimationPlayer Animator;
@@ -114,6 +119,11 @@ namespace RatUI
         {
             Animator.Tick( a_Event.DeltaSeconds );
         }
+    };
+
+    struct ThemeMixin : WidgetMixinBase
+    {
+        ThemeHandle Theme;
     };
 
     /**
@@ -153,7 +163,8 @@ namespace RatUI
      */
     using DefaultWidgetMixins = WidgetMixins<
         RenderTransformMixin, 
-        AnimationMixin
+        AnimationMixin,
+        ThemeMixin
         #if RATUI_DEBUG
         , DebugMixin
         #endif

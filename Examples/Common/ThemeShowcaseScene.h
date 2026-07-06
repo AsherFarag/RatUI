@@ -2,6 +2,7 @@
 #include "IDemoScene.h"
 #include <RatUI/Widget/SliderWidget.h>
 #include <RatUI/Widget/InputTextWidget.h>
+#include <RatUI/Widget/WidgetBuilder.h>
 #include <array>
 #include <cmath>
 
@@ -15,7 +16,8 @@ public:
         BuildThemes();
         ApplyTheme( 0 );
 
-        PanelWidget* root = m_Scene.CreateRootWidget<PanelWidget>( m_ActiveTheme );
+        PanelWidget* root = m_Scene.CreateRootWidget<PanelWidget>();
+        root->Theme = m_ActiveTheme;
         GetNode( root )->Style
             .SetLayoutType( ELayoutType::Vertical )
             .SetWidthMode( ESizingMode::Flex )
@@ -24,13 +26,16 @@ public:
             .SetSpacing( 12_u )
             .SetFocusScope( true );
 
-        TextWidget* title = m_Scene.CreateWidget<TextWidget>( root->GetLayoutID(), m_ActiveTheme, MakeText( "Theme Showcase" ), MakeTextLayout( 30_u, ETextOverflow::Clip ) );
+        TextWidget* title = m_Scene.CreateWidget<TextWidget>( root->GetLayoutID(), MakeText( "Theme Showcase" ), MakeTextLayout( 30_u, ETextOverflow::Clip ) );
+        title->Theme = m_ActiveTheme;
         GetNode( title )->Style.HeightMode = ESizingMode::Content;
 
-        m_StatusText = m_Scene.CreateWidget<TextWidget>( root->GetLayoutID(), m_ActiveTheme, MakeText( "" ), MakeTextLayout( 16_u, ETextOverflow::Clip ) );
+        m_StatusText = m_Scene.CreateWidget<TextWidget>( root->GetLayoutID(), MakeText( "" ), MakeTextLayout( 16_u, ETextOverflow::Clip ) );
+        m_StatusText->Theme = m_ActiveTheme;
         GetNode( m_StatusText )->Style.HeightMode = ESizingMode::Content;
 
-        PanelWidget* themeButtonRow = m_Scene.CreateWidget<PanelWidget>( root->GetLayoutID(), m_ActiveTheme );
+        PanelWidget* themeButtonRow = m_Scene.CreateWidget<PanelWidget>( root->GetLayoutID() );
+		themeButtonRow->Theme = m_ActiveTheme;
         GetNode( themeButtonRow )->Style
             .SetLayoutType( ELayoutType::Horizontal )
             .SetWidthMode( ESizingMode::Flex )
@@ -45,7 +50,8 @@ public:
         CreateThemeButton( themeButtonRow, "Neon", 2 );
         CreateThemeButton( themeButtonRow, "Minecraft", 3 );
 
-        PanelWidget* contentRow = m_Scene.CreateWidget<PanelWidget>( root->GetLayoutID(), m_ActiveTheme );
+        PanelWidget* contentRow = m_Scene.CreateWidget<PanelWidget>( root->GetLayoutID() );
+        contentRow->Theme = m_ActiveTheme;
         GetNode( contentRow )->Style
             .SetLayoutType( ELayoutType::Horizontal )
             .SetWidthMode( ESizingMode::Flex )
@@ -54,7 +60,8 @@ public:
             .SetSpacing( 12_u )
             .SetFocusScope( true );
 
-        PanelWidget* controlsPanel = m_Scene.CreateWidget<PanelWidget>( contentRow->GetLayoutID(), m_ActiveTheme );
+        PanelWidget* controlsPanel = m_Scene.CreateWidget<PanelWidget>( contentRow->GetLayoutID() );
+        controlsPanel->Theme = m_ActiveTheme;
         GetNode( controlsPanel )->Style
             .SetLayoutType( ELayoutType::Vertical )
             .SetWidthMode( ESizingMode::Flex )
@@ -64,7 +71,8 @@ public:
             .SetFlexGrow( 1.f )
             .SetFocusScope( true );
 
-        PanelWidget* previewPanel = m_Scene.CreateWidget<PanelWidget>( contentRow->GetLayoutID(), m_ActiveTheme );
+        PanelWidget* previewPanel = m_Scene.CreateWidget<PanelWidget>( contentRow->GetLayoutID() );
+        previewPanel->Theme = m_ActiveTheme;
         GetNode( previewPanel )->Style
             .SetLayoutType( ELayoutType::Vertical )
             .SetWidthMode( ESizingMode::Flex )
@@ -74,17 +82,20 @@ public:
             .SetFlexGrow( 1.f )
             .SetFocusScope( true );
 
-        TextWidget* controlsTitle = m_Scene.CreateWidget<TextWidget>( controlsPanel->GetLayoutID(), m_ActiveTheme, MakeText( "Controls" ), MakeTextLayout( 20_u, ETextOverflow::Clip ) );
+        TextWidget* controlsTitle = m_Scene.CreateWidget<TextWidget>( controlsPanel->GetLayoutID(), MakeText( "Controls" ), MakeTextLayout( 20_u, ETextOverflow::Clip ) );
+        controlsTitle->Theme = m_ActiveTheme;
         GetNode( controlsTitle )->Style.HeightMode = ESizingMode::Content;
 
         CreateSliderCard( controlsPanel, "Master Volume",    0.65f, false );
         CreateSliderCard( controlsPanel, "Accent Strength",  0.30f, false );
         CreateSliderCard( controlsPanel, "Vertical Mix",     0.45f, true  );
 
-        TextWidget* previewTitle = m_Scene.CreateWidget<TextWidget>( previewPanel->GetLayoutID(), m_ActiveTheme, MakeText( "Preview" ), MakeTextLayout( 20_u, ETextOverflow::Clip ) );
+        TextWidget* previewTitle = m_Scene.CreateWidget<TextWidget>( previewPanel->GetLayoutID(), MakeText( "Preview" ), MakeTextLayout( 20_u, ETextOverflow::Clip ) );
+        previewTitle->Theme = m_ActiveTheme;
         GetNode( previewTitle )->Style.HeightMode = ESizingMode::Content;
 
-        PanelWidget* previewCard = m_Scene.CreateWidget<PanelWidget>( previewPanel->GetLayoutID(), m_ActiveTheme );
+        PanelWidget* previewCard = m_Scene.CreateWidget<PanelWidget>( previewPanel->GetLayoutID() );
+        previewCard->Theme = m_ActiveTheme;
         GetNode( previewCard )->Style
             .SetLayoutType( ELayoutType::Vertical )
             .SetWidthMode( ESizingMode::Flex )
@@ -94,9 +105,9 @@ public:
 
         TextWidget* previewText = m_Scene.CreateWidget<TextWidget>(
             previewCard->GetLayoutID(),
-            m_ActiveTheme,
             MakeText( "This panel uses the active theme for panel fills, text color, button states, and slider visuals." ),
             MakeTextLayout( 16_u, ETextOverflow::Fade, TextWrap::WrapWord() ) );
+        previewText->Theme = m_ActiveTheme;
         GetNode( previewText )->Style
             .SetWidthMode( ESizingMode::Flex )
             .SetHeightMode( ESizingMode::Content );
@@ -106,9 +117,9 @@ public:
         {
             TextWidget* overflowText = m_Scene.CreateWidget<TextWidget>(
                 previewCard->GetLayoutID(),
-                m_ActiveTheme,
                 MakeText( "This is an example of a long text string that will exceed the width of the container and demonstrate how the active theme handles text overflow with a fade effect." ),
                 MakeTextLayout( 16_u, ETextOverflow::Fade, TextWrap::WrapWord() ) );
+            overflowText->Theme = m_ActiveTheme;
             GetNode( overflowText )->Style
                 .SetWidthMode( ESizingMode::Fixed )
                 .SetFixedWidth( 100_u )
@@ -116,12 +127,13 @@ public:
                 .SetFixedHeight( 100_u );
         }
 
-        ButtonWidget* actionButton = m_Scene.CreateWidget<ButtonWidget>( previewCard->GetLayoutID(), m_ActiveTheme,
+        ButtonWidget* actionButton = m_Scene.CreateWidget<ButtonWidget>( previewCard->GetLayoutID(),
 			[this]( ButtonBaseWidget& )
             {
                 if ( m_StatusText )
                     m_StatusText->SetText( { "Theme applied: " + m_ThemeNames[m_ActiveThemeIndex] + " (preview action clicked)" } );
             } );
+        actionButton->Theme = m_ActiveTheme;
         GetNode( actionButton )->Style
             .SetWidthMode( ESizingMode::Fixed )
             .SetFixedWidth( 280_u )
@@ -129,7 +141,8 @@ public:
             .SetFixedHeight( 40_u )
             .SetChildAlign( EAlignment::Center );
 
-        TextWidget* actionButtonText = m_Scene.CreateWidget<TextWidget>( actionButton->GetLayoutID(), m_ActiveTheme, MakeText( "Preview Button" ), MakeTextLayout( 16_u, ETextOverflow::Clip ) );
+        TextWidget* actionButtonText = m_Scene.CreateWidget<TextWidget>( actionButton->GetLayoutID(), MakeText( "Preview Button" ), MakeTextLayout( 16_u, ETextOverflow::Clip ) );
+        actionButtonText->Theme = m_ActiveTheme;
         GetNode( actionButtonText )->Style.Visibility = EVisibility::HitTestInvisible;
 
         UpdateStatusText();
@@ -273,25 +286,31 @@ private:
 
     void CreateThemeButton( PanelWidget* a_Parent, const String& a_Label, size a_ThemeIndex )
     {
-        ButtonWidget* button = m_Scene.CreateWidget<ButtonWidget>( a_Parent->GetLayoutID(), m_ActiveTheme,
-            [this, a_ThemeIndex]( ButtonBaseWidget& )
-            {
-                ApplyTheme( a_ThemeIndex );
-            } );
+        Builder<ButtonWidget> builder( m_Scene, a_Parent->GetLayoutID(),
+        [this, a_ThemeIndex]( ButtonBaseWidget& )
+        {
+            ApplyTheme( a_ThemeIndex );
+        } );
 
-        LayoutNode* buttonNode = GetNode( button );
-        buttonNode->Style.WidthMode  = ESizingMode::Fixed;
-        buttonNode->Style.FixedWidth = 130_u;
-        buttonNode->Style.HeightMode = ESizingMode::Flex;
-        buttonNode->Style.ChildAlign = EAlignment::Center;
-
-        TextWidget* text = m_Scene.CreateWidget<TextWidget>( button->GetLayoutID(), m_ActiveTheme, MakeText( a_Label ), MakeTextLayout( 16_u, ETextOverflow::Clip ) );
-        GetNode( text )->Style.Visibility = EVisibility::HitTestInvisible;
+        builder
+            .WithTheme( m_ActiveTheme )
+            .WithLayout( LayoutStyle{}
+                .WithFixedWidth( 130_u )
+                .SetHeightMode( ESizingMode::Flex )
+                .SetChildAlign( EAlignment::Center )
+		    ).AddChild<TextWidget>( 
+                [this, a_Label]( Builder<TextWidget>& b )
+                {
+                    b.WithTheme( m_ActiveTheme )
+                     .WithLayout( LayoutStyle{}.SetVisibility( EVisibility::HitTestInvisible ) );
+                }, MakeText( a_Label ), MakeTextLayout( 16_u, ETextOverflow::Clip ) 
+            );
     }
 
     void CreateSliderCard( PanelWidget* a_Parent, const String& a_Label, f32 a_Value, bool a_Vertical )
     {
-        PanelWidget* card = m_Scene.CreateWidget<PanelWidget>( a_Parent->GetLayoutID(), m_ActiveTheme );
+        PanelWidget* card = m_Scene.CreateWidget<PanelWidget>( a_Parent->GetLayoutID() );
+        card->Theme = m_ActiveTheme;
         LayoutNode* cardNode = GetNode( card );
         cardNode->Style.LayoutType  = ELayoutType::Vertical;
         cardNode->Style.WidthMode   = ESizingMode::Flex;
@@ -300,10 +319,12 @@ private:
         cardNode->Style.Padding     = Edges::Uniform( 8_u );
         cardNode->Style.Spacing     = 6_u;
 
-        TextWidget* valueText = m_Scene.CreateWidget<TextWidget>( card->GetLayoutID(), m_ActiveTheme, MakeText( "" ), MakeTextLayout( 14_u, ETextOverflow::Clip ) );
+        TextWidget* valueText = m_Scene.CreateWidget<TextWidget>( card->GetLayoutID(), MakeText( "" ), MakeTextLayout( 14_u, ETextOverflow::Clip ) );
+        valueText->Theme = m_ActiveTheme;
         GetNode( valueText )->Style.HeightMode = ESizingMode::Content;
 
-        SliderWidget* sliderWidget = m_Scene.CreateWidget<SliderWidget>( card->GetLayoutID(), m_ActiveTheme, 0.f, 1.f, a_Value );
+        SliderWidget* sliderWidget = m_Scene.CreateWidget<SliderWidget>( card->GetLayoutID(), 0.f, 1.f, a_Value );
+        sliderWidget->Theme = m_ActiveTheme;
         LayoutNode* sliderNode = GetNode( sliderWidget );
         sliderNode->Style.WidthMode   = ESizingMode::Flex;
         sliderNode->Style.HeightMode  = ESizingMode::Fixed;

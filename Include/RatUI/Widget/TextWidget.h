@@ -10,19 +10,19 @@ namespace RatUI
     class TextWidget : public IWidget
     {
     public:
-        TextWidget( ThemeHandle a_Theme,
-                    Text a_Text = {},
-                    const TextLayoutStyle& a_Style = {} )
-            : m_Theme      ( std::move( a_Theme ) )
-            , m_Text       ( std::move( a_Text ) )
+
+        // --------------------------------------------------------------------
+        // Render Properties
+        // --------------------------------------------------------------------
+
+        TextRenderStyle RenderStyle{};
+
+        TextWidget( Text a_Text = {}, const TextLayoutStyle& a_Style = {} )
+            : m_Text       ( std::move( a_Text ) )
             , m_LayoutStyle( a_Style )
-        {
-        }
+        {}
 
         ~TextWidget() override = default;
-
-        bool IsFocusable() const override { return false; }
-        bool IsNavigationBoundary() const override { return false; }
 
         /** @brief Gets the current text content. */
         const Text& GetText() const { return m_Text; }
@@ -48,30 +48,13 @@ namespace RatUI
             InvalidatePrepared();
         }
 
-        void SetTheme( ThemeHandle a_Theme )
-        {
-            m_Theme = std::move( a_Theme );
-            // Theme changes can affect layout (e.g., font changes), so we need to invalidate prepare and shape caches.
-            InvalidatePrepared();
-        }
-
-        const ThemeHandle& GetTheme() const { return m_Theme; }
-
-        // =====================================================================
+        // --------------------------------------------------------------------
         // IWidget overrides
-        // =====================================================================
+        // --------------------------------------------------------------------
 
         void OnSyncLayout( LayoutNode& a_Node, Vec2<Unit> a_AvailableSize ) override
         {
-            // TODO: We need a cleaner way to detect theme changes that affect layout like fonts. This doesnt make sense to check here
-			if ( const FontHandle* font = m_Theme.TryGetFont( ThemeKey::Font::Default ) )
-			{
-				if ( m_LayoutStyle.Font != *font )
-				{
-					m_LayoutStyle.Font = *font;
-					InvalidatePrepared();
-				}
-			}
+            HandleThemeUpdate();
 
             ITextMetrics* metrics = GetScene().TextMetrics;
             a_Node.Layout.IntrinsicSize = { 0_u, 0_u };
@@ -170,26 +153,18 @@ namespace RatUI
 
         void OnPaint( const PaintEvent& a_Event ) override
         {
-            if ( !m_Theme )
+            HandleThemeUpdate();
+
+            if ( !m_ShapedText )
                 return;
 
             Scene& scene = GetScene();
             const LayoutNode& node = GetLayout();
-                
-            if ( !m_ShapedText )
-                return;
-
             const Rect<Unit> textRect = node.Style.Padding.Apply( node.Layout.FinalRect );
 
             // Suppress the fade percentage when not in Fade overflow mode so the
             // MSDF shader doesn't accidentally fade glyphs in Clip/Ellipsis mode.
-            TextRenderStyle effectiveStyle{};
-            if ( const auto* textStyle = m_Theme.TryGetTextStyle( ThemeKey::TextStyle::Default ) )
-                effectiveStyle = *textStyle;
-            else
-                return; // No default text style in theme - can't render legibly, so bail out.
-
-
+            TextRenderStyle effectiveStyle = RenderStyle;
             effectiveStyle.FadePercentage  =
                 ( m_LayoutStyle.Overflow == ETextOverflow::Fade )
 				? effectiveStyle.FadePercentage
@@ -214,6 +189,25 @@ namespace RatUI
         }
 
     protected:
+        void HandleThemeUpdate()
+        {
+            if constexpr ( HasMixin<ThemeMixin> )
+            {
+                if ( Theme.Update() )
+                {
+                    RenderStyle = Theme.GetTextStyle( ThemeKey::TextStyle::Default, RenderStyle );
+
+                    if ( const FontHandle* font = Theme.TryGetFont( ThemeKey::Font::Default ) )
+                    {
+                        if ( m_LayoutStyle.Font != *font )
+                        {
+                            m_LayoutStyle.Font = *font;
+                            InvalidatePrepared();
+                        }
+                    }
+                }
+            }
+        }
 
         // ---- Cache invalidation helpers ----
 
@@ -234,7 +228,6 @@ namespace RatUI
         /// Version is compared each frame to detect localisation/binding changes.
         Optional<ResolvedText> m_ResolvedText;
         TextLayoutStyle        m_LayoutStyle;
-        ThemeHandle            m_Theme;
 
         /// Snapshot of m_LayoutStyle at the time of the last successful Prepare() call.
         /// Used to detect which fields changed and whether re-preparation is needed.
