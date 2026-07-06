@@ -5,17 +5,6 @@
 
 namespace RatUI
 {
-    /**
-     * @brief Linearly interpolates between two values of type T based on the given time parameter.
-     * @tparam T The type of values to interpolate. Must support addition, subtraction, and multiplication by a float.
-     * @param a_A The starting value (corresponding to time = 0).
-     * @param a_B The ending value (corresponding to time = 1).
-     * @param a_Time The interpolation parameter, typically in the range [0, 1]. Values outside this range will extrapolate.
-     * @return The interpolated value between a_A and a_B based on a_Time.
-     */
-	template<typename T> 
-    RATUI_NODISCARD constexpr T Lerp( const T& a_A, const T& a_B, f32 a_Time );
-
     template<typename T> requires
         requires( T a, T b, f32 t ) { { a + ( b - a ) * t } -> std::convertible_to<T>; }
 	RATUI_NODISCARD constexpr inline
@@ -24,7 +13,6 @@ namespace RatUI
 		return a_A + ( a_B - a_A ) * a_Time;
 	}
 
-    template<>
     RATUI_NODISCARD constexpr inline 
     Color Lerp(const Color& a_A, const Color& a_B, f32 a_Time)
     {
@@ -36,7 +24,6 @@ namespace RatUI
         };
     }
 
-    template<>
     RATUI_NODISCARD constexpr inline 
     CornerRounding Lerp(const CornerRounding& a_A, const CornerRounding& a_B, f32 a_Time)
     {
@@ -69,7 +56,6 @@ namespace RatUI
         return result;
     }
 
-    template<>
     RATUI_NODISCARD constexpr inline 
     RenderTransform Lerp( const RenderTransform& a_A, const RenderTransform& a_B, f32 a_Time )
     {
