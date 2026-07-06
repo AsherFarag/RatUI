@@ -1,4 +1,5 @@
 #pragma once
+#include "Config.h"
 #include <cstddef>
 #include <cstdint>
 #include <limits>

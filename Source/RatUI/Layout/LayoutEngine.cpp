@@ -2,14 +2,13 @@
 
 namespace RatUI
 {
-    namespace
-    {
+namespace
+{
         struct GridDimensions
         {
             u32 Columns;
             u32 Rows;
         };
-    } // namespace
 
     /**
      * @brief Resolves the final arranged size of a child on both axes,
@@ -82,6 +81,8 @@ namespace RatUI
 
         return a_Node.Layout.Visibility;
     }
+
+} // namespace
 
     // =========================================================================
     // Measure
@@ -244,6 +245,9 @@ namespace RatUI
     // Alignment helpers
     // =========================================================================
 
+namespace
+{
+
     static EAlignment ResolveAlign( const LayoutNode& a_Child, const LayoutNode& a_Parent )
     {
         return a_Child.Style.SelfAlign != EAlignment::Inherit
@@ -278,6 +282,17 @@ namespace RatUI
         if ( center ) return a_ParentPos + ( a_ParentSize - a_ChildSize ) * 0.5f;
         if ( end    ) return a_ParentPos +   a_ParentSize - a_ChildSize;
         return a_ParentPos;
+    }
+
+    RATUI_NODISCARD static Rect<Unit> ApplyMargin( Rect<Unit> a_Rect, const Edges& a_Margin )
+    {
+        a_Rect.Origin[0] += a_Margin.Left;
+        a_Rect.Origin[1] += a_Margin.Top;
+        a_Rect.Size[0]   -= a_Margin.Horizontal();
+        a_Rect.Size[1]   -= a_Margin.Vertical();
+        a_Rect.Size[0]    = std::max( 0_u, a_Rect.Size[0] );
+        a_Rect.Size[1]    = std::max( 0_u, a_Rect.Size[1] );
+        return a_Rect;
     }
 
     // =========================================================================
@@ -339,10 +354,17 @@ namespace RatUI
 
             Vec2<Unit> childSize = ResolveChildArrangeSize( child, a_Inner.Size );
 
-            if ( child.Style.WidthMode  == ESizingMode::Flex ) childSize[0] = a_Inner.Size[0];
-            if ( child.Style.HeightMode == ESizingMode::Flex ) childSize[1] = a_Inner.Size[1];
+            if (child.Style.WidthMode == ESizingMode::Flex) childSize[0] = std::max( 0_u, a_Inner.Size[0] - child.Style.Margin.Horizontal() );
+            if (child.Style.HeightMode == ESizingMode::Flex) childSize[1] = std::max( 0_u, a_Inner.Size[1] - child.Style.Margin.Vertical() );
 
-            const Rect<Unit> childRect = AlignRect( childSize, a_Inner, ResolveAlign( child, a_Node ) );
+            // Align within the margin-inset container space
+            const Rect<Unit> marginInnerRect{
+                .Origin = { a_Inner.Origin[0] + child.Style.Margin.Left, a_Inner.Origin[1] + child.Style.Margin.Top },
+                .Size   = { std::max( 0_u, a_Inner.Size[0] - child.Style.Margin.Horizontal() ),
+                            std::max( 0_u, a_Inner.Size[1] - child.Style.Margin.Vertical() ) }
+            };
+
+            Rect<Unit> childRect = AlignRect( childSize, marginInnerRect, ResolveAlign( child, a_Node ) );
             ArrangeLayoutNode( child, childRect );
         });
     }
@@ -426,8 +448,10 @@ namespace RatUI
             const EAlignment align = ResolveAlign( child, a_Node );
 
             // Cross-axis flex/stretch fills the full cross-axis extent.
-            if (  isHz && ( HasFlag( align, EAlignment::VStretch ) || child.Style.HeightMode == ESizingMode::Flex ) ) childSize[1] = a_Inner.Size[1];
-            if ( !isHz && ( HasFlag( align, EAlignment::HStretch ) || child.Style.WidthMode  == ESizingMode::Flex ) ) childSize[0] = a_Inner.Size[0];
+            if (isHz && (HasFlag( align, EAlignment::VStretch ) || child.Style.HeightMode == ESizingMode::Flex))
+                childSize[1] = std::max( 0_u, a_Inner.Size[1] - child.Style.Margin.Vertical() );
+            if (!isHz && (HasFlag( align, EAlignment::HStretch ) || child.Style.WidthMode == ESizingMode::Flex))
+                childSize[0] = std::max( 0_u, a_Inner.Size[0] - child.Style.Margin.Horizontal() );
 
             Rect<Unit> childRect;
 
@@ -444,13 +468,7 @@ namespace RatUI
 
             childRect.Size = childSize;
 
-            // Apply margins (inset the rect, not offset the origin).
-            childRect.Origin[0] += child.Style.Margin.Left;
-            childRect.Origin[1] += child.Style.Margin.Top;
-            childRect.Size[0]   -= child.Style.Margin.Horizontal();
-            childRect.Size[1]   -= child.Style.Margin.Vertical();
-            childRect.Size[0]    = std::max( 0_u, childRect.Size[0] );
-            childRect.Size[1]    = std::max( 0_u, childRect.Size[1] );
+            childRect = ApplyMargin( childRect, child.Style.Margin );
 
             const Unit advance = isHz
                 ? childSize[0] + child.Style.Margin.Horizontal()
@@ -579,6 +597,8 @@ namespace RatUI
             ArrangeLayoutNode( child, childRect );
         }
     }
+
+} // namespace
 
     void ArrangeLayoutNode( LayoutNode& a_Node, Rect<Unit> a_AllocatedRect )
     {

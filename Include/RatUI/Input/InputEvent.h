@@ -158,6 +158,81 @@ namespace RatUI
         XRMenu,
     };
 
+	inline constexpr bool IsAlpha( EButtonID a_Button )
+	{
+		return a_Button >= EButtonID::KeyA && a_Button <= EButtonID::KeyZ;
+	}
+
+	inline constexpr bool IsDigit( EButtonID a_Button )
+	{
+		return a_Button >= EButtonID::Key0 && a_Button <= EButtonID::Key9;
+	}
+
+	inline constexpr bool IsAlphanumeric( EButtonID a_Button )
+	{
+		return IsAlpha( a_Button ) || IsDigit( a_Button );
+	}
+
+    struct KeyCharPair
+    {
+        char Normal{};
+        char Shifted{};
+    };
+
+    inline constexpr auto KeyMap = []()
+    {
+        FixedArray<KeyCharPair, 256> map{};
+
+        // Letters
+        for ( u32 i = 0; i < 26; ++i )
+        {
+            map[(u32)EButtonID::KeyA + i] =
+            {
+                static_cast<char>( 'a' + i ),
+                static_cast<char>( 'A' + i )
+            };
+        }
+
+        // Digits
+        constexpr char shiftedDigits[] =
+        {
+            ')', '!', '@', '#', '$',
+            '%', '^', '&', '*', '('
+        };
+
+        for ( u32 i = 0; i < 10; ++i )
+        {
+            map[(u32)EButtonID::Key0 + i] =
+            {
+                static_cast<char>( '0' + i ),
+                shiftedDigits[i]
+            };
+        }
+
+        // Common whitespace / control keys
+        map[(u32)EButtonID::KeySpace]     = { ' ' , ' ' };
+        map[(u32)EButtonID::KeyTab]       = { '\t', '\t' };
+        map[(u32)EButtonID::KeyEnter]     = { '\n', '\n' };
+        map[(u32)EButtonID::KeyBackspace] = { '\b', '\b' };
+
+        return map;
+    }( );
+
+    inline constexpr Optional<char> ToChar( EButtonID button, bool shift = false )
+    {
+        const auto index = static_cast<u32>( button );
+
+		if ( index >= Size( KeyMap ) )
+            return NullOpt;
+
+        const auto& pair = KeyMap[index];
+
+        if ( pair.Normal == '\0' )
+            return NullOpt;
+
+        return shift ? pair.Shifted : pair.Normal;
+    }
+
     /**
      * @brief Pointer input event, which can come from a mouse, touch, or pen device. Contains position, movement delta, and device-specific data.
      */
@@ -167,11 +242,11 @@ namespace RatUI
         Vec2<Unit>   Delta{ 0_u, 0_u };
         EPointerType Type{ EPointerType::Unknown };
 
-        u32        PointerID{ 0 };          // TouchID or PenID or 0 for mouse
-        Vec2<Unit> ScrollDelta{ 0_u, 0_u }; // Mouse
-        f32        Pressure{ 0.f };         // Touch/pen pressure (0.0 to 1.0)
-		Degreesf   TiltX{ 0.f };            // Pen tilt X in degrees
-		Degreesf   TiltY{ 0.f };            // Pen tilt Y in degrees
+        u32        PointerID{ 0 };          ///< TouchID or PenID or 0 for mouse
+        Vec2<Unit> ScrollDelta{ 0_u, 0_u }; ///< Mouse
+        f32        Pressure{ 0.f };         ///< Touch/pen pressure (0.0 to 1.0)
+		Degrees    TiltX{ 0.f };            ///< Pen tilt X in degrees
+		Degrees    TiltY{ 0.f };            ///< Pen tilt Y in degrees
 
         constexpr bool IsMouse() const { return Type == EPointerType::Mouse; }
         constexpr bool IsTouch() const { return Type == EPointerType::Touch; }
@@ -187,6 +262,16 @@ namespace RatUI
         bool Pressed{ false };   ///< True on the frame the button was pressed.
         bool Released{ false };  ///< True on the frame the button was released.
         bool Held{ false };      ///< True every frame the button is held down (including the pressed and released frames).
+    };
+
+    // TODO: Clean this up
+    struct TextInputEvent
+    {
+        //codepoint Character{}; ///< The Unicode code point of the character that was input.
+        EButtonID Button{ EButtonID::Unknown };
+        bool Shift{ false };
+        bool Ctrl{ false };
+        bool Alt{ false };
     };
 
     /**
@@ -211,7 +296,7 @@ namespace RatUI
         static constexpr Reply Handled() { return Reply{ true }; }
 
         /** @brief Capture all future pointer events to this widget. */
-        constexpr Reply& CaptureMouse( WidgetID a_Widget )
+        constexpr Reply& CaptureMouse( NodeID a_Widget )
         {
             m_MouseCapture = a_Widget;
             m_RequestCapture = true;
@@ -226,7 +311,7 @@ namespace RatUI
         }
 
         /** @brief Set keyboard focus to the specified widget. */
-        constexpr Reply& SetFocus( WidgetID a_Widget )
+        constexpr Reply& SetFocus( NodeID a_Widget )
         {
             m_FocusWidget = a_Widget;
             return *this;
@@ -249,20 +334,20 @@ namespace RatUI
         constexpr bool IsHandled()          const { return m_Handled; }
         constexpr bool ShouldCaptureMouse() const { return m_RequestCapture; }
         constexpr bool ShouldReleaseMouse() const { return m_ReleaseMouse; }
-        constexpr bool ShouldSetFocus()     const { return m_FocusWidget != c_InvalidWidgetID; }
+        constexpr bool ShouldSetFocus()     const { return m_FocusWidget != c_InvalidNodeID; }
         constexpr bool ShouldClearFocus()   const { return m_ClearFocus; }
         constexpr bool IsDefaultPrevented() const { return m_PreventDefault; }
 
         /** @brief Get the widget that is currently capturing mouse events. */
-        constexpr WidgetID GetMouseCaptureTarget() const { return m_MouseCapture; }
+        constexpr NodeID GetMouseCaptureTarget() const { return m_MouseCapture; }
         /** @brief Get the widget that currently has keyboard focus. */
-        constexpr WidgetID GetFocusTarget()        const { return m_FocusWidget; }
+        constexpr NodeID GetFocusTarget()        const { return m_FocusWidget; }
 
     private:
         constexpr explicit Reply( bool a_Handled ) : m_Handled( a_Handled ) {}
 
-        WidgetID m_MouseCapture   { c_InvalidWidgetID };
-        WidgetID m_FocusWidget    { c_InvalidWidgetID };
+        NodeID m_MouseCapture     { c_InvalidNodeID };
+        NodeID m_FocusWidget      { c_InvalidNodeID };
         bool     m_Handled        : 1 { false };
         bool     m_RequestCapture : 1 { false };
         bool     m_ReleaseMouse   : 1 { false };

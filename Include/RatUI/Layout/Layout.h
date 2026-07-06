@@ -445,6 +445,10 @@ namespace RatUI
         constexpr LayoutStyle& SetPercentHeight( f32 a_PercentHeight ) { PercentHeight = a_PercentHeight; return *this; }
         constexpr LayoutStyle& SetFlexGrow( f32 a_FlexGrow ) { FlexGrow = a_FlexGrow; return *this; }
         constexpr LayoutStyle& SetSizeConstraints( Constraints a_SizeConstraints ) { SizeConstraints = a_SizeConstraints; return *this; }
+
+		constexpr LayoutStyle& WithFixedWidth( Unit a_FixedWidth ) { return SetWidthMode( ESizingMode::Fixed ).SetFixedWidth( a_FixedWidth ); }
+		constexpr LayoutStyle& WithFixedHeight( Unit a_FixedHeight ) { return SetHeightMode( ESizingMode::Fixed ).SetFixedHeight( a_FixedHeight ); }
+		constexpr LayoutStyle& WithFixedSize( Unit a_FixedWidth, Unit a_FixedHeight ) { return WithFixedWidth( a_FixedWidth ).WithFixedHeight( a_FixedHeight ); }
     };
 
     /**
@@ -479,12 +483,7 @@ namespace RatUI
         LayoutResult Layout{}; ///< The cached layout result for this widget computed during the layout process.
         u32 NumChildren{ 0 };
 
-        union
-        {
-            // TODO: Might be better to just replace this with Unique<IWidget>, this would add a lot of benefits
-            WidgetID Widget;          ///< The ID of the widget associated with this layout node.
-			void* UserData = nullptr; ///< Incase LayoutNode is not being used with the IWidget system, this can store arbitrary user data.
-        };
+        Unique<class IWidget> Widget;
 
         /** @brief Hierachy access */
 

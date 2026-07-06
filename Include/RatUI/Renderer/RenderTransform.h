@@ -11,11 +11,11 @@ namespace RatUI
      */
     struct RenderTransform
     {
-        Vec2<Unit>    Translation{ 0_u, 0_u };    ///< The amount to translate the rendered content by. In pixels.
-        Vec2<Unit>    Scale{ 1_u, 1_u };          ///< The amount to scale the rendered content by. 1x means no scaling, 2x means double size, etc.
-        Vec2<Unit>    Pivot{ 0.5_u, 0.5_u };      ///< The pivot point around which to apply the transformations. (0, 0) Top-left corner, (1, 1) bottom-right corner, etc.
-        Radians<Unit> SkewX{ 0_u }, SkewY{ 0_u }; ///< The amount to shear the rendered content by along the X and Y axes, respectively.
-        Radians<Unit> Angle{ 0_u };               ///< The angle to rotate the rendered content by. Clockwise direction.
+        Vec2<Unit> Translation{ 0_u, 0_u };    ///< The amount to translate the rendered content by. In pixels.
+        Vec2<f32>  Scale{ 1.f, 1.f };          ///< The amount to scale the rendered content by. 1x means no scaling, 2x means double size, etc.
+        Vec2<f32>  Pivot{ 0.5f, 0.5f };        ///< The pivot point around which to apply the transformations. (0, 0) Top-left corner, (1, 1) bottom-right corner, etc.
+        Radians    SkewX{ 0.f }, SkewY{ 0.f }; ///< The amount to shear the rendered content by along the X and Y axes, respectively. Range from -89 to 89 degrees is valid.
+        Radians    Rotation{ 0.f };            ///< The angle to rotate the rendered content by. Clockwise direction.
 
         constexpr bool operator==( const RenderTransform& ) const = default;
 
@@ -66,8 +66,8 @@ namespace RatUI
             );
 
             // --- Scale ---
-            const Unit sx = Scale[0];
-            const Unit sy = Scale[1];
+            const Unit sx{ Scale[0] };
+            const Unit sy{ Scale[1] };
             const Mat3<Unit> scale = Mat3<Unit>::from_columns(
                 Vec3<Unit>{ sx, 0_u, 0_u },
                 Vec3<Unit>{ 0_u, sy, 0_u },
@@ -75,8 +75,8 @@ namespace RatUI
             );
 
             // --- Rotation (clockwise, Y-down) ---
-            const Unit c{ std::cos( Angle.Value.ToFloat() ) };
-            const Unit s{ std::sin( Angle.Value.ToFloat() ) };
+            const Unit c{ std::cos( Rotation.Value ) };
+            const Unit s{ std::sin( Rotation.Value ) };
             const Mat3<Unit> rot = Mat3<Unit>::from_columns(
                 Vec3<Unit>{  c, s, 0_u },
                 Vec3<Unit>{ -s, c, 0_u },
@@ -84,8 +84,8 @@ namespace RatUI
             );
 
             // --- Skew ---
-            const Unit kx{ std::tan( SkewX.Value.ToFloat() ) };
-            const Unit ky{ std::tan( SkewY.Value.ToFloat() ) };
+            const Unit kx{ std::tan( SkewX.Value ) };
+            const Unit ky{ std::tan( SkewY.Value ) };
             const Mat3<Unit> skew = Mat3<Unit>::from_columns(
                 Vec3<Unit>{ 1_u, ky, 0_u },
                 Vec3<Unit>{ kx, 1_u, 0_u },

@@ -139,8 +139,8 @@ struct std::formatter<RatUI::Constraints>
 
 // === Units.inl ===
 
-template<typename T>
-struct std::formatter<RatUI::Radians<T>>
+template<>
+struct std::formatter<RatUI::Radians>
 {
     constexpr auto parse(std::format_parse_context& ctx)
     {
@@ -148,14 +148,14 @@ struct std::formatter<RatUI::Radians<T>>
     }
 
     template<typename FormatContext>
-    auto format(const RatUI::Radians<T>& value, FormatContext& ctx) const
+    auto format(const RatUI::Radians& value, FormatContext& ctx) const
     {
         return std::format_to(ctx.out(), "{} radians", value.Value);
     }
 };
 
-template<typename T>
-struct std::formatter<RatUI::Degrees<T>>
+template<>
+struct std::formatter<RatUI::Degrees>
 {
     constexpr auto parse(std::format_parse_context& ctx)
     {
@@ -163,7 +163,7 @@ struct std::formatter<RatUI::Degrees<T>>
     }
 
     template<typename FormatContext>
-    auto format(const RatUI::Degrees<T>& value, FormatContext& ctx) const
+    auto format(const RatUI::Degrees& value, FormatContext& ctx) const
     {
         return std::format_to(ctx.out(), "{} degrees", value.Value);
     }

@@ -1,7 +1,8 @@
 #pragma once
 #include "IDemoScene.h"
 #include <RatUI/Widget/SliderWidget.h>
-
+#include <RatUI/Widget/InputTextWidget.h>
+#include <RatUI/Widget/WidgetBuilder.h>
 #include <array>
 #include <cmath>
 
@@ -15,7 +16,8 @@ public:
         BuildThemes();
         ApplyTheme( 0 );
 
-        WidgetID root = m_Scene.CreateRootWidget<PanelWidget>( m_ActiveTheme );
+        PanelWidget* root = m_Scene.CreateRootWidget<PanelWidget>();
+        root->Theme = m_ActiveTheme;
         GetNode( root )->Style
             .SetLayoutType( ELayoutType::Vertical )
             .SetWidthMode( ESizingMode::Flex )
@@ -24,13 +26,16 @@ public:
             .SetSpacing( 12_u )
             .SetFocusScope( true );
 
-        WidgetID title = m_Scene.CreateWidget<TextWidget>( root, m_ActiveTheme, MakeText( "Theme Showcase" ), MakeTextLayout( 30_u, ETextOverflow::Clip ) );
+        TextWidget* title = m_Scene.CreateWidget<TextWidget>( root->GetLayoutID(), MakeText( "Theme Showcase" ), MakeTextLayout( 30_u, ETextOverflow::Clip ) );
+        title->Theme = m_ActiveTheme;
         GetNode( title )->Style.HeightMode = ESizingMode::Content;
 
-        m_StatusText = m_Scene.CreateWidget<TextWidget>( root, m_ActiveTheme, MakeText( "" ), MakeTextLayout( 16_u, ETextOverflow::Clip ) );
+        m_StatusText = m_Scene.CreateWidget<TextWidget>( root->GetLayoutID(), MakeText( "" ), MakeTextLayout( 16_u, ETextOverflow::Clip ) );
+        m_StatusText->Theme = m_ActiveTheme;
         GetNode( m_StatusText )->Style.HeightMode = ESizingMode::Content;
 
-        WidgetID themeButtonRow = m_Scene.CreateWidget<PanelWidget>( root, m_ActiveTheme );
+        PanelWidget* themeButtonRow = m_Scene.CreateWidget<PanelWidget>( root->GetLayoutID() );
+		themeButtonRow->Theme = m_ActiveTheme;
         GetNode( themeButtonRow )->Style
             .SetLayoutType( ELayoutType::Horizontal )
             .SetWidthMode( ESizingMode::Flex )
@@ -43,9 +48,10 @@ public:
         CreateThemeButton( themeButtonRow, "Dark", 0 );
         CreateThemeButton( themeButtonRow, "Light", 1 );
         CreateThemeButton( themeButtonRow, "Neon", 2 );
-		CreateThemeButton( themeButtonRow, "Minecraft", 3 );
+        CreateThemeButton( themeButtonRow, "Minecraft", 3 );
 
-        WidgetID contentRow = m_Scene.CreateWidget<PanelWidget>( root, m_ActiveTheme );
+        PanelWidget* contentRow = m_Scene.CreateWidget<PanelWidget>( root->GetLayoutID() );
+        contentRow->Theme = m_ActiveTheme;
         GetNode( contentRow )->Style
             .SetLayoutType( ELayoutType::Horizontal )
             .SetWidthMode( ESizingMode::Flex )
@@ -54,7 +60,8 @@ public:
             .SetSpacing( 12_u )
             .SetFocusScope( true );
 
-        WidgetID controlsPanel = m_Scene.CreateWidget<PanelWidget>( contentRow, m_ActiveTheme );
+        PanelWidget* controlsPanel = m_Scene.CreateWidget<PanelWidget>( contentRow->GetLayoutID() );
+        controlsPanel->Theme = m_ActiveTheme;
         GetNode( controlsPanel )->Style
             .SetLayoutType( ELayoutType::Vertical )
             .SetWidthMode( ESizingMode::Flex )
@@ -64,9 +71,10 @@ public:
             .SetFlexGrow( 1.f )
             .SetFocusScope( true );
 
-        WidgetID previewPanel = m_Scene.CreateWidget<PanelWidget>( contentRow, m_ActiveTheme );
+        PanelWidget* previewPanel = m_Scene.CreateWidget<PanelWidget>( contentRow->GetLayoutID() );
+        previewPanel->Theme = m_ActiveTheme;
         GetNode( previewPanel )->Style
-			.SetLayoutType( ELayoutType::Vertical )
+            .SetLayoutType( ELayoutType::Vertical )
             .SetWidthMode( ESizingMode::Flex )
             .SetHeightMode( ESizingMode::Flex )
             .SetPadding( Edges::Uniform( 12_u ) )
@@ -74,17 +82,20 @@ public:
             .SetFlexGrow( 1.f )
             .SetFocusScope( true );
 
-        WidgetID controlsTitle = m_Scene.CreateWidget<TextWidget>( controlsPanel, m_ActiveTheme, MakeText( "Controls" ), MakeTextLayout( 20_u, ETextOverflow::Clip ) );
+        TextWidget* controlsTitle = m_Scene.CreateWidget<TextWidget>( controlsPanel->GetLayoutID(), MakeText( "Controls" ), MakeTextLayout( 20_u, ETextOverflow::Clip ) );
+        controlsTitle->Theme = m_ActiveTheme;
         GetNode( controlsTitle )->Style.HeightMode = ESizingMode::Content;
 
-        CreateSliderCard( controlsPanel, "Master Volume", 0.65f, false );
-        CreateSliderCard( controlsPanel, "Accent Strength", 0.30f, false );
-        CreateSliderCard( controlsPanel, "Vertical Mix", 0.45f, true );
+        CreateSliderCard( controlsPanel, "Master Volume",    0.65f, false );
+        CreateSliderCard( controlsPanel, "Accent Strength",  0.30f, false );
+        CreateSliderCard( controlsPanel, "Vertical Mix",     0.45f, true  );
 
-        WidgetID previewTitle = m_Scene.CreateWidget<TextWidget>( previewPanel, m_ActiveTheme, MakeText( "Preview" ), MakeTextLayout( 20_u, ETextOverflow::Clip ) );
+        TextWidget* previewTitle = m_Scene.CreateWidget<TextWidget>( previewPanel->GetLayoutID(), MakeText( "Preview" ), MakeTextLayout( 20_u, ETextOverflow::Clip ) );
+        previewTitle->Theme = m_ActiveTheme;
         GetNode( previewTitle )->Style.HeightMode = ESizingMode::Content;
 
-        WidgetID previewCard = m_Scene.CreateWidget<PanelWidget>( previewPanel, m_ActiveTheme );
+        PanelWidget* previewCard = m_Scene.CreateWidget<PanelWidget>( previewPanel->GetLayoutID() );
+        previewCard->Theme = m_ActiveTheme;
         GetNode( previewCard )->Style
             .SetLayoutType( ELayoutType::Vertical )
             .SetWidthMode( ESizingMode::Flex )
@@ -92,22 +103,23 @@ public:
             .SetPadding( Edges::Uniform( 10_u ) )
             .SetSpacing( 8_u );
 
-        WidgetID previewText = m_Scene.CreateWidget<TextWidget>(
-            previewCard,
-            m_ActiveTheme,
+        TextWidget* previewText = m_Scene.CreateWidget<TextWidget>(
+            previewCard->GetLayoutID(),
             MakeText( "This panel uses the active theme for panel fills, text color, button states, and slider visuals." ),
             MakeTextLayout( 16_u, ETextOverflow::Fade, TextWrap::WrapWord() ) );
+        previewText->Theme = m_ActiveTheme;
         GetNode( previewText )->Style
             .SetWidthMode( ESizingMode::Flex )
             .SetHeightMode( ESizingMode::Content );
 
-		// Add TextWidget with vertical overflow to demonstrate text overflow handling in the active theme. This will intentionally overflow to show the fade effect.
+        // Add TextWidget with vertical overflow to demonstrate text overflow handling in the active theme.
+        // This will intentionally overflow to show the fade effect.
         {
-            WidgetID overflowText = m_Scene.CreateWidget<TextWidget>(
-                previewCard,
-                m_ActiveTheme,
+            TextWidget* overflowText = m_Scene.CreateWidget<TextWidget>(
+                previewCard->GetLayoutID(),
                 MakeText( "This is an example of a long text string that will exceed the width of the container and demonstrate how the active theme handles text overflow with a fade effect." ),
                 MakeTextLayout( 16_u, ETextOverflow::Fade, TextWrap::WrapWord() ) );
+            overflowText->Theme = m_ActiveTheme;
             GetNode( overflowText )->Style
                 .SetWidthMode( ESizingMode::Fixed )
                 .SetFixedWidth( 100_u )
@@ -115,14 +127,13 @@ public:
                 .SetFixedHeight( 100_u );
         }
 
-        WidgetID actionButton = m_Scene.CreateWidget<ButtonWidget>( previewCard, m_ActiveTheme,
-            [this]( Scene&, WidgetID )
+        ButtonWidget* actionButton = m_Scene.CreateWidget<ButtonWidget>( previewCard->GetLayoutID(),
+			[this]( ButtonBaseWidget& )
             {
-                if ( auto* status = m_Scene.GetWidget<TextWidget>( m_StatusText ) )
-                {
-                    status->SetText( { "Theme applied: " + m_ThemeNames[m_ActiveThemeIndex] + " (preview action clicked)" } );
-                }
+                if ( m_StatusText )
+                    m_StatusText->SetText( { "Theme applied: " + m_ThemeNames[m_ActiveThemeIndex] + " (preview action clicked)" } );
             } );
+        actionButton->Theme = m_ActiveTheme;
         GetNode( actionButton )->Style
             .SetWidthMode( ESizingMode::Fixed )
             .SetFixedWidth( 280_u )
@@ -130,7 +141,8 @@ public:
             .SetFixedHeight( 40_u )
             .SetChildAlign( EAlignment::Center );
 
-        WidgetID actionButtonText = m_Scene.CreateWidget<TextWidget>( actionButton, m_ActiveTheme, MakeText( "Preview Button" ), MakeTextLayout( 16_u, ETextOverflow::Clip ) );
+        TextWidget* actionButtonText = m_Scene.CreateWidget<TextWidget>( actionButton->GetLayoutID(), MakeText( "Preview Button" ), MakeTextLayout( 16_u, ETextOverflow::Clip ) );
+        actionButtonText->Theme = m_ActiveTheme;
         GetNode( actionButtonText )->Style.Visibility = EVisibility::HitTestInvisible;
 
         UpdateStatusText();
@@ -155,86 +167,84 @@ public:
                     break;
                 default: break;
             }
-            return;
         }
 
         m_Scene.DispatchInputEvent( a_Event );
     }
 
-    void Render( DrawList& a_DrawList ) override
+	void Render( DrawList& a_DrawList, f32 a_DeltaSeconds ) override
     {
-        m_Scene.Render( a_DrawList );
+        m_Scene.Render( a_DrawList, a_DeltaSeconds );
     }
 
 private:
-    FontHandle DefaultFont;
+    FontHandle    DefaultFont;
     Shared<Theme> m_Themes[4];
     Shared<Theme> m_ActiveTheme;
-    size m_ActiveThemeIndex{ 0 };
+    size          m_ActiveThemeIndex{ 0 };
 
-	std::array<String, 4> m_ThemeNames{ "Dark", "Light", "Neon", "Minecraft" };
-    WidgetID m_StatusText{ c_InvalidWidgetID };
+    std::array<String, 4> m_ThemeNames{ "Dark", "Light", "Neon", "Minecraft" };
+    TextWidget* m_StatusText{ nullptr }; ///< Cached pointer — valid for the lifetime of the scene.
 
     TextLayoutStyle MakeTextLayout( Unit a_Size, ETextOverflow a_Overflow, TextWrap a_Wrap = TextWrap::NoWrap() ) const
     {
         TextLayoutStyle style{};
-        style.Font = DefaultFont;
-        style.Size = a_Size;
+        style.Font     = DefaultFont;
+        style.Size     = a_Size;
         style.Overflow = a_Overflow;
-        style.Wrap = a_Wrap;
+        style.Wrap     = a_Wrap;
         return style;
     }
 
-    LayoutNode* GetNode( WidgetID a_WidgetID )
+    LayoutNode* GetNode( IWidget* a_Widget )
     {
-        IWidget* widget = m_Scene.GetWidget( a_WidgetID );
-        return widget ? m_Scene.Layouts.Get( widget->GetLayoutID() ) : nullptr;
+        return a_Widget ? m_Scene.Layouts.Get( a_Widget->GetLayoutID() ) : nullptr;
     }
 
     void BuildThemes()
     {
-		// Dark
+        // Dark
         m_Themes[0] = MakeShared<Theme>( *Themes::Dark() );
         m_Themes[0]->SetColors( {
-            { ThemeKey::Color::SliderThumbHover, Colors::LightBlue },
-            { ThemeKey::Color::SliderThumbPressed, Colors::AccentBlue },
-            { ThemeKey::Color::SliderTrackFill, Colors::AccentBlue }
+            { ThemeKey::Color::SliderThumbHover,    Colors::LightBlue  },
+            { ThemeKey::Color::SliderThumbPressed,  Colors::AccentBlue },
+            { ThemeKey::Color::SliderTrackFill,     Colors::AccentBlue }
         } );
         m_Themes[0]->SetTextStyle( ThemeKey::TextStyle::Default, TextRenderStyle{ .FillColor = Colors::White } );
 
-		// Light
+        // Light
         m_Themes[1] = MakeShared<Theme>( *Themes::Dark() );
         m_Themes[1]->SetColors( {
-            { ThemeKey::Color::FocusOutline, Colors::DarkBlue },
-            { ThemeKey::Color::SliderTrack, Colors::Silver },
-            { ThemeKey::Color::SliderTrackFill, Colors::DarkBlue },
-            { ThemeKey::Color::SliderThumb, Colors::AccentBlue },
-            { ThemeKey::Color::SliderThumbHover, Colors::Blue },
-            { ThemeKey::Color::SliderThumbPressed, Colors::DarkBlue }
+            { ThemeKey::Color::FocusOutline,        Colors::DarkBlue   },
+            { ThemeKey::Color::SliderTrack,         Colors::Silver     },
+            { ThemeKey::Color::SliderTrackFill,     Colors::DarkBlue   },
+            { ThemeKey::Color::SliderThumb,         Colors::AccentBlue },
+            { ThemeKey::Color::SliderThumbHover,    Colors::Blue       },
+            { ThemeKey::Color::SliderThumbPressed,  Colors::DarkBlue   }
         } );
-		m_Themes[1]->SetBrushes( {
-            { ThemeKey::Brush::PanelNormal,   SolidBrush{ Colors::LightGray } },
-            { ThemeKey::Brush::ButtonNormal,  SolidBrush{ Colors::White } },
+        m_Themes[1]->SetBrushes( {
+            { ThemeKey::Brush::PanelNormal,   SolidBrush{ Colors::LightGray  } },
+            { ThemeKey::Brush::ButtonNormal,  SolidBrush{ Colors::White      } },
             { ThemeKey::Brush::ButtonHover,   SolidBrush{ Colors::PowderBlue } },
-            { ThemeKey::Brush::ButtonPressed, SolidBrush{ Colors::LightBlue } },
-		} );
+            { ThemeKey::Brush::ButtonPressed, SolidBrush{ Colors::LightBlue  } },
+        } );
         m_Themes[1]->SetTextStyle( ThemeKey::TextStyle::Default, TextRenderStyle{ .FillColor = Colors::Surface900 } );
 
-		// Neon
+        // Neon
         m_Themes[2] = MakeShared<Theme>( *Themes::Dark() );
         m_Themes[2]->SetColors( {
-            { ThemeKey::Color::FocusOutline, Colors::AccentRose },
-            { ThemeKey::Color::SliderTrack, FromColorF32( 0.10f, 0.10f, 0.20f ) },
-            { ThemeKey::Color::SliderTrackFill, Colors::AccentRose },
-            { ThemeKey::Color::SliderThumb, Colors::AccentSky },
-            { ThemeKey::Color::SliderThumbHover, Colors::LightCyan },
-            { ThemeKey::Color::SliderThumbPressed, Colors::AccentRose }
+            { ThemeKey::Color::FocusOutline,        Colors::AccentRose                      },
+            { ThemeKey::Color::SliderTrack,         FromColorF32( 0.10f, 0.10f, 0.20f )    },
+            { ThemeKey::Color::SliderTrackFill,     Colors::AccentRose                      },
+            { ThemeKey::Color::SliderThumb,         Colors::AccentSky                       },
+            { ThemeKey::Color::SliderThumbHover,    Colors::LightCyan                       },
+            { ThemeKey::Color::SliderThumbPressed,  Colors::AccentRose                      }
         } );
         m_Themes[2]->SetRoundings( {
-            { ThemeKey::Rounding::Panel, CornerRounding::Uniform( 12_u ) },
-            { ThemeKey::Rounding::Button, CornerRounding::Uniform( 10_u ) },
-            { ThemeKey::Rounding::SliderTrack, CornerRounding::Uniform( 5_u ) },
-            { ThemeKey::Rounding::SliderThumb, CornerRounding::Uniform( 8_u ) }
+            { ThemeKey::Rounding::Panel,        CornerRounding::Uniform( 12_u ) },
+            { ThemeKey::Rounding::Button,       CornerRounding::Uniform( 10_u ) },
+            { ThemeKey::Rounding::SliderTrack,  CornerRounding::Uniform(  5_u ) },
+            { ThemeKey::Rounding::SliderThumb,  CornerRounding::Uniform(  8_u ) }
         } );
         m_Themes[2]->SetBrushes( {
             { ThemeKey::Brush::PanelNormal,   SolidBrush{ FromColorF32( 0.07f, 0.03f, 0.10f ) } },
@@ -244,27 +254,24 @@ private:
         } );
         m_Themes[2]->SetTextStyle( ThemeKey::TextStyle::Default, TextRenderStyle{ .FillColor = Colors::AccentSky } );
 
-		for ( auto& theme : m_Themes )
-		{
-			if ( theme )
-				theme->SetFont( ThemeKey::Font::Default, DefaultFont );
-		}
-
-        // Minecraft
-		m_Themes[3] = MakeShared<Theme>( *m_Themes[0] );
-        m_Themes[3]->SetFont( ThemeKey::Font::Default, FontHandle{ 2 } );
-        for ( const auto& [key, value] : m_Themes[3]->GetRoundings() )
+        for ( auto& theme : m_Themes )
         {
-			m_Themes[3]->SetRounding( key, CornerRounding::None() ); // override all roundings to be 0 (sharp corners)
+            if ( theme )
+                theme->SetFont( ThemeKey::Font::Default, DefaultFont );
         }
 
-        // Set slider fill to green and thumbs to gray white like minecraft bedrock
-		m_Themes[3]->SetColors( {
-            { ThemeKey::Color::SliderTrackFill, FromColorF32( 0.1f, 0.5f, 0.1f ) },
-			{ ThemeKey::Color::SliderThumb, FromColorF32( 0.9f, 0.9f, 0.9f ) },
-			{ ThemeKey::Color::SliderThumbHover, FromColorF32( 0.8f, 0.8f, 0.8f ) },
-			{ ThemeKey::Color::SliderThumbPressed, FromColorF32( 1.f, 1.f, 1.f ) }
-		} );
+        // Minecraft
+        m_Themes[3] = MakeShared<Theme>( *m_Themes[0] );
+        m_Themes[3]->SetFont( ThemeKey::Font::Default, FontHandle{ 2 } );
+        for ( const auto& [key, value] : m_Themes[3]->GetRoundings() )
+            m_Themes[3]->SetRounding( key, CornerRounding::None() ); // Override all roundings to sharp corners.
+
+        m_Themes[3]->SetColors( {
+            { ThemeKey::Color::SliderTrackFill,    FromColorF32( 0.1f, 0.5f, 0.1f ) },
+            { ThemeKey::Color::SliderThumb,        FromColorF32( 0.9f, 0.9f, 0.9f ) },
+            { ThemeKey::Color::SliderThumbHover,   FromColorF32( 0.8f, 0.8f, 0.8f ) },
+            { ThemeKey::Color::SliderThumbPressed, FromColorF32( 1.f,  1.f,  1.f  ) }
+        } );
 
         m_ActiveTheme = MakeShared<Theme>( *m_Themes[0] );
     }
@@ -277,68 +284,69 @@ private:
         UpdateStatusText();
     }
 
-    void CreateThemeButton( WidgetID a_Parent, const String& a_Label, size a_ThemeIndex )
+    void CreateThemeButton( PanelWidget* a_Parent, const String& a_Label, size a_ThemeIndex )
     {
-        WidgetID button = m_Scene.CreateWidget<ButtonWidget>( a_Parent, m_ActiveTheme,
-            [this, a_ThemeIndex]( Scene&, WidgetID )
-            {
-                ApplyTheme( a_ThemeIndex );
-            } );
+        Builder<ButtonWidget> builder( m_Scene, a_Parent->GetLayoutID(),
+        [this, a_ThemeIndex]( ButtonBaseWidget& )
+        {
+            ApplyTheme( a_ThemeIndex );
+        } );
 
-        LayoutNode* buttonNode = GetNode( button );
-        buttonNode->Style.WidthMode = ESizingMode::Fixed;
-        buttonNode->Style.FixedWidth = 130_u;
-        buttonNode->Style.HeightMode = ESizingMode::Flex;
-        buttonNode->Style.ChildAlign = EAlignment::Center;
-
-        WidgetID text = m_Scene.CreateWidget<TextWidget>( button, m_ActiveTheme, MakeText( a_Label ), MakeTextLayout( 16_u, ETextOverflow::Clip ) );
-        GetNode( text )->Style.Visibility = EVisibility::HitTestInvisible;
+        builder
+            .WithTheme( m_ActiveTheme )
+            .WithLayout( LayoutStyle{}
+                .WithFixedWidth( 130_u )
+                .SetHeightMode( ESizingMode::Flex )
+                .SetChildAlign( EAlignment::Center )
+		    ).AddChild<TextWidget>( 
+                [this, a_Label]( Builder<TextWidget>& b )
+                {
+                    b.WithTheme( m_ActiveTheme )
+                     .WithLayout( LayoutStyle{}.SetVisibility( EVisibility::HitTestInvisible ) );
+                }, MakeText( a_Label ), MakeTextLayout( 16_u, ETextOverflow::Clip ) 
+            );
     }
 
-    void CreateSliderCard( WidgetID a_Parent, const String& a_Label, f32 a_Value, bool a_Vertical )
+    void CreateSliderCard( PanelWidget* a_Parent, const String& a_Label, f32 a_Value, bool a_Vertical )
     {
-        WidgetID card = m_Scene.CreateWidget<PanelWidget>( a_Parent, m_ActiveTheme );
+        PanelWidget* card = m_Scene.CreateWidget<PanelWidget>( a_Parent->GetLayoutID() );
+        card->Theme = m_ActiveTheme;
         LayoutNode* cardNode = GetNode( card );
-        cardNode->Style.LayoutType = ELayoutType::Vertical;
-        cardNode->Style.WidthMode = ESizingMode::Flex;
-        cardNode->Style.HeightMode = ESizingMode::Fixed;
+        cardNode->Style.LayoutType  = ELayoutType::Vertical;
+        cardNode->Style.WidthMode   = ESizingMode::Flex;
+        cardNode->Style.HeightMode  = ESizingMode::Fixed;
         cardNode->Style.FixedHeight = a_Vertical ? 180_u : 86_u;
-        cardNode->Style.Padding = Edges::Uniform( 8_u );
-        cardNode->Style.Spacing = 6_u;
+        cardNode->Style.Padding     = Edges::Uniform( 8_u );
+        cardNode->Style.Spacing     = 6_u;
 
-        WidgetID valueText = m_Scene.CreateWidget<TextWidget>( card, m_ActiveTheme, MakeText( "" ), MakeTextLayout( 14_u, ETextOverflow::Clip ) );
+        TextWidget* valueText = m_Scene.CreateWidget<TextWidget>( card->GetLayoutID(), MakeText( "" ), MakeTextLayout( 14_u, ETextOverflow::Clip ) );
+        valueText->Theme = m_ActiveTheme;
         GetNode( valueText )->Style.HeightMode = ESizingMode::Content;
 
-        WidgetID slider = m_Scene.CreateWidget<SliderWidget>( card, m_ActiveTheme, 0.f, 1.f, a_Value );
-        SliderWidget* sliderWidget = m_Scene.GetWidget<SliderWidget>( slider );
-        LayoutNode* sliderNode = GetNode( slider );
-        sliderNode->Style.WidthMode = ESizingMode::Flex;
-        sliderNode->Style.HeightMode = ESizingMode::Fixed;
+        SliderWidget* sliderWidget = m_Scene.CreateWidget<SliderWidget>( card->GetLayoutID(), 0.f, 1.f, a_Value );
+        sliderWidget->Theme = m_ActiveTheme;
+        LayoutNode* sliderNode = GetNode( sliderWidget );
+        sliderNode->Style.WidthMode   = ESizingMode::Flex;
+        sliderNode->Style.HeightMode  = ESizingMode::Fixed;
         sliderNode->Style.FixedHeight = a_Vertical ? 120_u : 28_u;
 
-        if ( a_Vertical && sliderWidget )
+        if ( a_Vertical )
         {
-            sliderWidget->Orientation = EOrientation::Vertical;
-            sliderNode->Style.FixedWidth = 36_u;
-            sliderNode->Style.WidthMode = ESizingMode::Fixed;
+            sliderWidget->Orientation     = EOrientation::Vertical;
+            sliderNode->Style.FixedWidth  = 36_u;
+            sliderNode->Style.WidthMode   = ESizingMode::Fixed;
         }
 
-        if ( sliderWidget )
+        sliderWidget->Value.Subscribe( [this, valueText, a_Label]( const f32& a_CurrentValue )
         {
-            sliderWidget->Value.Subscribe( [this, valueText, a_Label]( const f32& a_CurrentValue )
-            {
-                if ( auto* text = m_Scene.GetWidget<TextWidget>( valueText ) )
-                {
-                    const int percent = static_cast<int>( std::round( a_CurrentValue * 100.f ) );
-                    text->SetText( { a_Label + ": " + std::to_string( percent ) + "%" } );
-                }
-            } );
-        }
+            const int percent = static_cast<int>( std::round( a_CurrentValue * 100.f ) );
+            valueText->SetText( { a_Label + ": " + std::to_string( percent ) + "%" } );
+        } );
     }
 
     void UpdateStatusText()
     {
-        if ( auto* status = m_Scene.GetWidget<TextWidget>( m_StatusText ) )
-            status->SetText( { "Theme applied: " + m_ThemeNames[m_ActiveThemeIndex] + " (use the buttons below to switch styles)" } );
+        if ( m_StatusText )
+            m_StatusText->SetText( { "Theme applied: " + m_ThemeNames[m_ActiveThemeIndex] + " (use the buttons below to switch styles)" } );
     }
 };

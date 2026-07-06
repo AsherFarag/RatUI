@@ -18,12 +18,12 @@ namespace RatUI
          * @param a_Style The text style that controls font, size, wrapping mode, letter spacing, etc.
          * @return A PreparedText value ready to pass to Measure() and to the renderer.
          */
-        virtual Optional<PreparedText> Prepare( StringView a_Text, const TextLayoutStyle& a_Style ) = 0;
+        RATUI_NODISCARD virtual Optional<PreparedText> Prepare( StringView a_Text, const TextLayoutStyle& a_Style ) = 0;
 
         /**
 		 * @brief Builds optimised render data (glyph quads, line metadata, etc.) from the prepared text and style.
          */
-		virtual Optional<ShapedText> Shape( const PreparedText& a_Prepared, const TextLayoutStyle& a_Style, Vec2<Unit> a_MaxSize = { Limits<Unit>::max(), Limits<Unit>::max() } ) = 0;
+		RATUI_NODISCARD virtual Optional<ShapedText> Shape( const PreparedText& a_Prepared, const TextLayoutStyle& a_Style, Vec2<Unit> a_MaxSize = { Limits<Unit>::max(), Limits<Unit>::max() } ) = 0;
 
         /**
          * @brief Rasterizes a single glyph as an MTSDF (RGBA8, 4 bytes per texel) and returns

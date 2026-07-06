@@ -104,32 +104,27 @@ namespace RatUI
     template<typename T>
     concept UnitType = std::derived_from<T, UnitBase<typename T::TagType>>;
 
-    template<typename T>
     struct Degrees;
 
     /**
      * @brief A unit representing radians.
      * @note _rad literals for this type are defined in the Literals namespace, e.g., 3.14159_rad.
      */
-    template<typename T>
     struct Radians
     {
-        using ValueType = T;
+        using ValueType = f32;
 
-        T Value; ///< The value of the angle in radians.
+        ValueType Value; ///< The value of the angle in radians.
 
         // === Constructors ===
 
-        constexpr Radians() : Value( static_cast<T>( 0 ) ) {}
-        constexpr explicit Radians( T a_Value ) : Value( a_Value ) {}
-        constexpr explicit Radians( Degrees<T> a_Degrees );
-
-        template<typename U>
-        constexpr Radians( Radians<U> a_Other ) : Value( static_cast<T>( a_Other.Value ) ) {}
+        constexpr Radians() : Value( static_cast<ValueType>( 0 ) ) {}
+        constexpr explicit Radians( ValueType a_Value ) : Value( a_Value ) {}
+        constexpr explicit Radians( Degrees a_Degrees );
 
         // === Conversion Operators ===
 
-        constexpr explicit operator Degrees<T>() const;
+        constexpr explicit operator Degrees() const;
 
         // === Comparison Operators ===
 
@@ -138,39 +133,34 @@ namespace RatUI
 
         // === Arithmetic Operators ===
 
-        constexpr Radians operator-() const { return Radians{ -Value }; }
-        constexpr Radians operator+( Radians a_Other ) const { return Radians{ Value + a_Other.Value }; }
-        constexpr Radians operator-( Radians a_Other ) const { return Radians{ Value - a_Other.Value }; }
-        constexpr Radians operator*( T a_Scalar ) const { return Radians{ Value * a_Scalar }; }
-        constexpr Radians operator/( T a_Scalar ) const { return Radians{ Value / a_Scalar }; }
-        constexpr Radians& operator+=( Radians a_Other ) { Value += a_Other.Value; return *this; }
-        constexpr Radians& operator-=( Radians a_Other ) { Value -= a_Other.Value; return *this; }
-        constexpr Radians& operator*=( T a_Scalar ) { Value *= a_Scalar; return *this; }
-        constexpr Radians& operator/=( T a_Scalar ) { Value /= a_Scalar; return *this; }
+        constexpr Radians  operator-()                      const { return Radians{ -Value }; }
+        constexpr Radians  operator+( Radians a_Other )     const { return Radians{ Value + a_Other.Value }; }
+        constexpr Radians  operator-( Radians a_Other )     const { return Radians{ Value - a_Other.Value }; }
+        constexpr Radians  operator*( ValueType a_Scalar )  const { return Radians{ Value * a_Scalar }; }
+        constexpr Radians  operator/( ValueType a_Scalar )  const { return Radians{ Value / a_Scalar }; }
+        constexpr Radians& operator+=( Radians a_Other )          { Value += a_Other.Value; return *this; }
+        constexpr Radians& operator-=( Radians a_Other )          { Value -= a_Other.Value; return *this; }
+        constexpr Radians& operator*=( ValueType a_Scalar )       { Value *= a_Scalar; return *this; }
+        constexpr Radians& operator/=( ValueType a_Scalar )       { Value /= a_Scalar; return *this; }
     };
 
-    template<typename T>
-    constexpr Radians<T> operator*( T a_Scalar, Radians<T> a_Radians ) { return a_Radians * a_Scalar; }
+    constexpr Radians operator*( Radians::ValueType a_Scalar, Radians a_Radians ) { return a_Radians * a_Scalar; }
 
-    template<typename T>
     struct Degrees
     {
-        using ValueType = T;
+        using ValueType = f32;
 
-        T Value; ///< The value of the angle in degrees.
+        ValueType Value; ///< The value of the angle in degrees.
 
         // === Constructors ===
 
-        constexpr Degrees() : Value( static_cast<T>( 0 ) ) {}
-        constexpr explicit Degrees( T a_Value ) : Value( a_Value ) {}
-        constexpr explicit Degrees( Radians<T> a_Radians ) : Value( RadToDeg( a_Radians.Value ) ) {}
-
-        template<typename U>
-        constexpr Degrees( Degrees<U> a_Other ) : Value( static_cast<T>( a_Other.Value ) ) {}
+        constexpr          Degrees()                    : Value( static_cast<ValueType>( 0 ) ) {}
+        constexpr explicit Degrees( ValueType a_Value ) : Value( a_Value ) {}
+        constexpr explicit Degrees( Radians a_Radians ) : Value( RadToDeg( a_Radians.Value ) ) {}
 
         // === Conversion Operators ===
 
-        constexpr explicit operator Radians<T>() const { return Radians<T>{ DegToRad( Value ) }; }
+        constexpr explicit operator Radians() const { return Radians{ DegToRad( Value ) }; }
 
         // === Comparison Operators ===
 
@@ -179,38 +169,35 @@ namespace RatUI
 
         // === Arithmetic Operators ===
 
-        constexpr Degrees operator-() const { return Degrees{ -Value }; }
-        constexpr Degrees operator+( Degrees a_Other ) const { return Degrees{ Value + a_Other.Value }; }
-        constexpr Degrees operator-( Degrees a_Other ) const { return Degrees{ Value - a_Other.Value }; }
-        constexpr Degrees operator*( T a_Scalar ) const { return Degrees{ Value * a_Scalar }; }
-        constexpr Degrees operator/( T a_Scalar ) const { return Degrees{ Value / a_Scalar }; }
-        constexpr Degrees& operator+=( Degrees a_Other ) { Value += a_Other.Value; return *this; }
-        constexpr Degrees& operator-=( Degrees a_Other ) { Value -= a_Other.Value; return *this; }
-        constexpr Degrees& operator*=( T a_Scalar ) { Value *= a_Scalar; return *this; }
-        constexpr Degrees& operator/=( T a_Scalar ) { Value /= a_Scalar; return *this; }
+        constexpr Degrees  operator-()                      const { return Degrees{ -Value }; }
+        constexpr Degrees  operator+( Degrees a_Other )     const { return Degrees{ Value + a_Other.Value }; }
+        constexpr Degrees  operator-( Degrees a_Other )     const { return Degrees{ Value - a_Other.Value }; }
+        constexpr Degrees  operator*( ValueType a_Scalar )  const { return Degrees{ Value * a_Scalar }; }
+        constexpr Degrees  operator/( ValueType a_Scalar )  const { return Degrees{ Value / a_Scalar }; }
+        constexpr Degrees& operator+=( Degrees a_Other )          { Value += a_Other.Value; return *this; }
+        constexpr Degrees& operator-=( Degrees a_Other )          { Value -= a_Other.Value; return *this; }
+        constexpr Degrees& operator*=( ValueType a_Scalar )       { Value *= a_Scalar; return *this; }
+        constexpr Degrees& operator/=( ValueType a_Scalar )       { Value /= a_Scalar; return *this; }
     };
 
-    template<typename T>
-    constexpr Degrees<T> operator*( T a_Scalar, Degrees<T> a_Degrees ) { return a_Degrees * a_Scalar; }
-
-    using Degreesf = Degrees<f32>;
-    using Radiansf = Radians<f32>;
+    constexpr Degrees operator*( Degrees::ValueType a_Scalar, Degrees a_Degrees ) { return a_Degrees * a_Scalar; }
 
     /**
      * @brief A namespace containing literals for RatUI units.
      */
-    namespace Literals {
-        constexpr Radians<f64> operator"" _rad( long double a_Value ) { return Radians<f64>{ static_cast<f64>( a_Value ) }; }
-        constexpr Degrees<f64> operator"" _deg( long double a_Value ) { return Degrees<f64>{ static_cast<f64>( a_Value ) }; }
-        constexpr Radians<f64> operator"" _rad( unsigned long long a_Value ) { return Radians<f64>{ static_cast<f64>( a_Value ) }; }
-        constexpr Degrees<f64> operator"" _deg( unsigned long long a_Value ) { return Degrees<f64>{ static_cast<f64>( a_Value ) }; }
+    namespace Literals 
+    {
+        constexpr Radians operator""_rad( long double a_Value )        { return Radians{ static_cast<Radians::ValueType>( a_Value ) }; }
+        constexpr Degrees operator""_deg( long double a_Value )        { return Degrees{ static_cast<Degrees::ValueType>( a_Value ) }; }
+        constexpr Radians operator""_rad( unsigned long long a_Value ) { return Radians{ static_cast<Radians::ValueType>( a_Value ) }; }
+        constexpr Degrees operator""_deg( unsigned long long a_Value ) { return Degrees{ static_cast<Degrees::ValueType>( a_Value ) }; }
 
-        constexpr FontUnit     operator"" _fu( long double a_Value ) { return FontUnit{ static_cast<f32>( a_Value ) }; }
-        constexpr FontUnit     operator"" _fu( unsigned long long a_Value ) { return FontUnit{ static_cast<f32>( a_Value ) }; }
-        constexpr Unit         operator"" _u( long double a_Value ) { return Unit{ static_cast<f32>( a_Value ) }; }
-        constexpr Unit         operator"" _u( unsigned long long a_Value ) { return Unit{ static_cast<f32>( a_Value ) }; }
-        constexpr Pixel        operator"" _px( unsigned long long a_Value ) { return Pixel{ static_cast<f32>( a_Value ) }; }
-        constexpr Pixel        operator"" _px( long double a_Value ) { return Pixel{ static_cast<f32>( a_Value ) }; }
+        constexpr FontUnit operator""_fu( long double a_Value )        { return FontUnit{ static_cast<FontUnit::ValueType>( a_Value ) }; }
+        constexpr FontUnit operator""_fu( unsigned long long a_Value ) { return FontUnit{ static_cast<FontUnit::ValueType>( a_Value ) }; }
+        constexpr Unit     operator""_u( long double a_Value )         { return Unit{ static_cast<Unit::ValueType>( a_Value ) }; }
+        constexpr Unit     operator""_u( unsigned long long a_Value )  { return Unit{ static_cast<Unit::ValueType>( a_Value ) }; }
+        constexpr Pixel    operator""_px( unsigned long long a_Value ) { return Pixel{ static_cast<Pixel::ValueType>( a_Value ) }; }
+        constexpr Pixel    operator""_px( long double a_Value )        { return Pixel{ static_cast<Pixel::ValueType>( a_Value ) }; }
     }
 
     using namespace Literals;
@@ -219,15 +206,13 @@ namespace RatUI
     // Inline Implementations
     // =========================================================
 
-    template<typename T>
-    constexpr Radians<T>::Radians( Degrees<T> a_Degrees )
+    constexpr Radians::Radians( Degrees a_Degrees )
         : Value( DegToRad( a_Degrees.Value ) )
     {}
 
-    template<typename T>
-    constexpr Radians<T>::operator Degrees<T>() const
+    constexpr Radians::operator Degrees() const
     {
-        return Degrees<T>{ RadToDeg( Value ) };
+        return Degrees{ RadToDeg( Value ) };
     }
 
 } // namespace RatUI

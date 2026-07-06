@@ -96,7 +96,7 @@ namespace RatUI
         f32 operator()( f32 a_Time ) const noexcept
         {
             // Overshooting spring easing function based on the formula from https://easings.net/#easeOutElastic
-            constexpr f32 c4 = ( 2.f * Math::Pi<f32> ) / 3.f;
+            constexpr f32 c4 = ( 2.f * Pi<f32> ) / 3.f;
 
             if ( a_Time == 0.f ) return 0.f;
             if ( a_Time == 1.f ) return 1.f;

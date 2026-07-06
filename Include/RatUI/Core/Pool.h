@@ -218,7 +218,4 @@ namespace RatUI
     using NodeID = typename Pool<class LayoutNode>::PoolID;
 	static constexpr NodeID c_InvalidNodeID{};
 
-    using WidgetID = typename Pool<Unique<class IWidget>>::PoolID;
-    static constexpr WidgetID c_InvalidWidgetID{};
-
 } // namespace RatUI

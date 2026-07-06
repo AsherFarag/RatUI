@@ -91,19 +91,16 @@ namespace RatUI
 
         bool IsFocusable() const override { return true; }
 
-        void OnPaint( DrawList& a_DrawList ) override
+        void OnPaint( const PaintEvent& a_Event ) override
         {
             Scene& scene = GetScene();
-            const LayoutNode* node = scene.Layouts.Get( GetLayoutID() );
-            if ( !node || !Visibility::IsRendered( node->Layout.Visibility ) )
-                return;
-
+            const LayoutNode& node = GetLayout();
             UpdateScrollMetrics();
 
             // Draw content with clipping and translation based on scroll offset
             {
                 const Rect<Unit> contentRect = scene.Layouts.Get( m_ContentNodeID )->Layout.FinalRect;
-                a_DrawList.PushClipRect( contentRect );
+                a_Event.Drawer.PushClipRect( contentRect );
 
                 const bool hasTranslation = !IsApproxEqual( m_ScrollOffset[0].ToFloat(), 0.f ) ||
                     !IsApproxEqual( m_ScrollOffset[1].ToFloat(), 0.f );
@@ -114,29 +111,26 @@ namespace RatUI
                           Vec3<Unit>{ 1_u, 0_u, 0_u },
                           Vec3<Unit>{ 0_u, 1_u, 0_u },
                           Vec3<Unit>{ -m_ScrollOffset[0], -m_ScrollOffset[1], 1_u } );
-                    a_DrawList.PushTransform( translation );
+                    a_Event.Drawer.PushTransform( translation );
                 }
 
-                scene.ForEachChildWidget( m_ContentNodeID, [&]( IWidget& a_Child )
-                {
-                    a_Child.OnPaint( a_DrawList );
-                } );
+                PaintChildren( a_Event );
 
                 if ( hasTranslation )
-                    a_DrawList.PopTransform();
+                    a_Event.Drawer.PopTransform();
 
-                a_DrawList.PopClipRect();
+                a_Event.Drawer.PopClipRect();
             }
 
             // Draw scrollbars if needed
             if ( IWidget* vScrollbar = scene.GetWidget( m_VScrollbarID ) )
             {
-                vScrollbar->OnPaint( a_DrawList );
+                vScrollbar->Paint( a_Event );
             }
 
             if ( IWidget* hScrollbar = scene.GetWidget( m_HScrollbarID ) )
             {
-                hScrollbar->OnPaint( a_DrawList );
+                hScrollbar->Paint( a_Event );
             }
         }
 
@@ -163,10 +157,10 @@ namespace RatUI
         NodeID   m_ContentNodeID{ c_InvalidNodeID }; ///< Flex node that user children are parented to.
 
         // Scrollbar widget IDs
-        WidgetID m_VScrollbarID{ c_InvalidWidgetID };
-        WidgetID m_HScrollbarID{ c_InvalidWidgetID };
+        NodeID m_VScrollbarID{ c_InvalidNodeID };
+        NodeID m_HScrollbarID{ c_InvalidNodeID };
 
-		void ShowScrollbar( WidgetID a_ScrollbarID, bool a_Hidden = false )
+		void ShowScrollbar( NodeID a_ScrollbarID, bool a_Hidden = false )
 		{
 			if ( IWidget* scrollbar = GetScene().GetWidget( a_ScrollbarID ) )
 			{
@@ -259,8 +253,8 @@ namespace RatUI
 
             // --- Vertical scrollbar ---
             {
-                m_VScrollbarID        = scene.CreateWidget<SliderWidget>( m_ContentRowID );
-                SliderWidget* vScroll = scene.GetWidget<SliderWidget>( m_VScrollbarID );
+                SliderWidget* vScroll = scene.CreateWidget<SliderWidget>( m_ContentRowID );
+				m_VScrollbarID        = vScroll->GetLayoutID();
                 LayoutNode* vNode     = scene.Layouts.Get( vScroll->GetLayoutID() );
 
                 vNode->Style.WidthMode  = ESizingMode::Fixed;
@@ -272,8 +266,8 @@ namespace RatUI
 
             // --- Horizontal scrollbar ---
             {
-                m_HScrollbarID        = scene.CreateWidget<SliderWidget>( GetID() );
-                SliderWidget* hScroll = scene.GetWidget<SliderWidget>( m_HScrollbarID );
+                SliderWidget* hScroll = scene.CreateWidget<SliderWidget>( GetLayoutID() );
+                m_HScrollbarID		  = hScroll->GetLayoutID();
                 LayoutNode* hNode     = scene.Layouts.Get( hScroll->GetLayoutID() );
 
                 hNode->Style.WidthMode   = ESizingMode::Flex;

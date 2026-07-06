@@ -4,23 +4,18 @@
 #include "../Input/Navigation.h"
 #include "../Layout/Layout.h"
 #include "../Renderer/DrawList.h"
+#include "WidgetMixins.h"
 
 namespace RatUI
 {
     class Scene;
-
-    struct FocusEvent 
-    {
-        // TODO: Add more stuff here
-        // TODO: Should this be in a different file?
-    };
 
     /**
      * @brief The base class for all UI elements.
      * Widgets are responsible for rendering themselves and handling input events. 
      * They are organized in a tree structure, with each widget having a corresponding layout node.
      */
-    class IWidget
+    class IWidget : public DefaultWidgetMixins
     {
     public:
         IWidget() = default;
@@ -34,11 +29,21 @@ namespace RatUI
               Scene& GetScene()       { RATUI_USER_ASSERT( m_Scene, "Call to GetScene() failed: widget is not associated with a scene." ); return *m_Scene; }
         const Scene& GetScene() const { RATUI_USER_ASSERT( m_Scene, "Call to GetScene() failed: widget is not associated with a scene." ); return *m_Scene; }
 
-        /** @brief Returns the unique identifier for this widget. */
-        WidgetID GetID() const { return m_ID; }
+        /** @brief Returns a reference to the layout node associated with this widget. */
+              LayoutNode& GetLayout();
+        const LayoutNode& GetLayout() const;
 
         /** @brief Returns the layout identifier for this widget. */
         NodeID GetLayoutID() const { return m_LayoutID; }
+
+        IWidget* GetParentWidget() const
+        {
+            const LayoutNode& node = GetLayout();
+            return node.Parent() ? node.Parent()->Widget.get() : nullptr;
+        }
+
+        template<std::derived_from<IWidget> WidgetType>
+        WidgetType* GetParentWidgetAs() const { return dynamic_cast<WidgetType*>( GetParentWidget() ); }
 
         // - Lifecycle
 
@@ -51,8 +56,19 @@ namespace RatUI
         /** @brief Called during the layout process, allowing the widget to update its layout properties or perform calculations based on its children. */
         virtual void OnSyncLayout( LayoutNode& a_Node, Vec2<Unit> a_AvailableSize ) {}
 
-        /** @brief Called when the widget should render itself and its children. */
-        virtual void OnPaint( DrawList& a_DrawList ) {}
+        void Paint( const PaintEvent& a_Event )
+        {
+            LayoutNode& node = GetLayout();
+            if ( !Visibility::IsRendered( node.Layout.Visibility ) )
+                return;
+
+            if ( !CanPaint( node ) )
+                return;
+
+            WidgetMixins::PrePaint( a_Event, node );
+            OnPaint( a_Event );
+            WidgetMixins::PostPaint( a_Event, node );
+        }
 
         // - Capabilities
 
@@ -95,6 +111,8 @@ namespace RatUI
         /** @brief Called when an input button is released while this widget is focused. */
         virtual Reply OnButtonReleased( const ButtonEvent& a_Event ) { return Reply::Unhandled(); }
 
+        virtual Reply OnTextInput( const TextInputEvent& a_Event ) { return Reply::Unhandled(); }
+
 		// - Navigation: Only called for widgets that return true from IsNavigationBoundary()
 
 		/** @brief */
@@ -102,9 +120,24 @@ namespace RatUI
 		virtual NavReply OnNavigationBoundary( ENavAction a_Action ) { return NavReply::Escape(); }
 
     protected:
+        /** @brief Called when the widget should render itself. */
+        virtual void OnPaint( const PaintEvent& a_Event )
+        {
+            PaintChildren( a_Event );
+        }
+
+        void PaintChildren( const PaintEvent& a_Event )
+        {
+            GetLayout().ForEachChild( [&]( LayoutNode& childNode )
+            {
+                if ( childNode.Widget )
+                    childNode.Widget->Paint( a_Event );
+            } );
+        }
+
+    protected:
         friend Scene;
 		Scene*   m_Scene{ nullptr };
-        WidgetID m_ID{};
         NodeID   m_LayoutID{};
     };
 

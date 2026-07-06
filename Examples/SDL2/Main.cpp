@@ -5,9 +5,9 @@
 #include <functional>
 #include <filesystem>
 
-#include "../Common/FeatureSandboxScene.h"
-#include "../Common/DynamicTextScene.h"
+//#include "../Common/DynamicTextScene.h"
 #include "../Common/ThemeShowcaseScene.h"
+#include <RatUI/Animation/Animation.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "../Common/stb_image.h"
@@ -17,6 +17,106 @@ using namespace RatUI;
 using namespace RatUI::Literals;
 
 static IRenderer* g_Renderer = nullptr;
+
+#include <RatUI/Text/TextEdit.h>
+#include <cassert>
+
+void TestTextEditModel()
+{
+    //-------------------------------------------------------------------------
+    // Basic insertion
+    //-------------------------------------------------------------------------
+
+    TextEditModel model;
+
+    assert( model.GetTextBuffer().empty() );
+    assert( model.Caret() == 0 );
+    assert( model.Anchor() == 0 );
+
+    assert( model.Insert( U"Hello" ) );
+    assert( model.GetTextBuffer() == U"Hello" );
+    assert( model.Caret() == 5 );
+    assert( model.Anchor() == 5 );
+
+    //-------------------------------------------------------------------------
+    // Caret movement
+    //-------------------------------------------------------------------------
+
+    model.MoveLeft();
+    assert( model.Caret() == 4 );
+
+    model.MoveRight();
+    assert( model.Caret() == 5 );
+
+    model.MoveHome();
+    assert( model.Caret() == 0 );
+
+    model.MoveEnd();
+    assert( model.Caret() == 5 );
+
+    //-------------------------------------------------------------------------
+    // Insert in middle
+    //-------------------------------------------------------------------------
+
+    model.SetCaret( 2 );
+    assert( model.Insert( U"XX" ) );
+
+    assert( model.GetTextBuffer() == U"HeXXllo" );
+    assert( model.Caret() == 4 );
+
+    //-------------------------------------------------------------------------
+    // Backspace
+    //-------------------------------------------------------------------------
+
+    assert( model.Backspace() );
+    assert( model.GetTextBuffer() == U"HeXllo" );
+
+    //-------------------------------------------------------------------------
+    // Delete
+    //-------------------------------------------------------------------------
+
+    model.SetCaret( 2 );
+    assert( model.Delete() );
+    assert( model.GetTextBuffer() == U"Hello" );
+
+    //-------------------------------------------------------------------------
+    // Selection replacement
+    //-------------------------------------------------------------------------
+
+    model.SelectAll();
+    assert( model.HasSelection() );
+
+    assert( model.ReplaceSelection( U"World" ) );
+
+    assert( model.GetTextBuffer() == U"World" );
+    assert( !model.HasSelection() );
+    assert( model.Caret() == 5 );
+
+    //-------------------------------------------------------------------------
+    // Undo / Redo
+    //-------------------------------------------------------------------------
+
+    assert( model.Undo() );
+    assert( model.GetTextBuffer() == U"Hello" );
+
+    assert( model.Redo() );
+    assert( model.GetTextBuffer() == U"World" );
+
+    //-------------------------------------------------------------------------
+    // Multiline movement
+    //-------------------------------------------------------------------------
+
+    model.SetTextBuffer( U"abc\n123\nXYZ" );
+
+    model.MoveHome();
+    assert( model.Caret() == 0 );
+
+    model.MoveDown();
+    model.MoveDown();
+    model.MoveUp();
+
+	assert( model.Caret() == 4 ); // Should be at the start of the second line
+}
 
 /**
  * @brief The RatUI Sandbox application.
@@ -41,6 +141,8 @@ protected:
 
 	f32 m_UIScale{ 1.f };
 
+	f32 m_DeltaSeconds{ 0.f };
+
     bool OnInitialize() override
     {
         g_Renderer = GetRenderer();
@@ -64,7 +166,7 @@ protected:
     {
         static f32 prevTime = 0.f;
 		const f32 currTime = SDL_GetTicks();
-        const f32 deltaTime = ( currTime - prevTime ) / 1000.f;
+        m_DeltaSeconds = ( currTime - prevTime ) / 1000.f;
         prevTime = currTime;
 
 		//m_UIScale = 1.f + 0.5f * std::sin( currTime / 1000.f ); // Oscillate UI scale between  and 1.5 over time.
@@ -74,7 +176,7 @@ protected:
             return;
         }
 
-        m_Scene->Update( deltaTime );
+        m_Scene->Update( m_DeltaSeconds );
 
         // Update the layout with the current window size as the available space.
         i32 windowWidth, windowHeight;
@@ -101,7 +203,7 @@ protected:
         m_DrawList->SetDPIScale( dpiscale * m_UIScale );
 
         m_DrawList->Clear();
-		m_Scene->Render( *m_DrawList );
+		m_Scene->Render( *m_DrawList, m_DeltaSeconds );
 		m_DrawList->Flush( a_Renderer );
     }
 
@@ -128,6 +230,7 @@ protected:
 
 int main( int argc, char** argv )
 {
+    TestTextEditModel();
     SandboxApp app;
     return app.Run() ? 0 : 1;
 }
