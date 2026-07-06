@@ -187,17 +187,17 @@ namespace RatUI
      */
     namespace Literals 
     {
-        constexpr Radians operator"" _rad( long double a_Value )        { return Radians{ static_cast<Radians::ValueType>( a_Value ) }; }
-        constexpr Degrees operator"" _deg( long double a_Value )        { return Degrees{ static_cast<Degrees::ValueType>( a_Value ) }; }
-        constexpr Radians operator"" _rad( unsigned long long a_Value ) { return Radians{ static_cast<Radians::ValueType>( a_Value ) }; }
-        constexpr Degrees operator"" _deg( unsigned long long a_Value ) { return Degrees{ static_cast<Degrees::ValueType>( a_Value ) }; }
+        constexpr Radians operator""_rad( long double a_Value )        { return Radians{ static_cast<Radians::ValueType>( a_Value ) }; }
+        constexpr Degrees operator""_deg( long double a_Value )        { return Degrees{ static_cast<Degrees::ValueType>( a_Value ) }; }
+        constexpr Radians operator""_rad( unsigned long long a_Value ) { return Radians{ static_cast<Radians::ValueType>( a_Value ) }; }
+        constexpr Degrees operator""_deg( unsigned long long a_Value ) { return Degrees{ static_cast<Degrees::ValueType>( a_Value ) }; }
 
-        constexpr FontUnit operator"" _fu( long double a_Value )        { return FontUnit{ static_cast<FontUnit::ValueType>( a_Value ) }; }
-        constexpr FontUnit operator"" _fu( unsigned long long a_Value ) { return FontUnit{ static_cast<FontUnit::ValueType>( a_Value ) }; }
-        constexpr Unit     operator"" _u( long double a_Value )         { return Unit{ static_cast<Unit::ValueType>( a_Value ) }; }
-        constexpr Unit     operator"" _u( unsigned long long a_Value )  { return Unit{ static_cast<Unit::ValueType>( a_Value ) }; }
-        constexpr Pixel    operator"" _px( unsigned long long a_Value ) { return Pixel{ static_cast<Pixel::ValueType>( a_Value ) }; }
-        constexpr Pixel    operator"" _px( long double a_Value )        { return Pixel{ static_cast<Pixel::ValueType>( a_Value ) }; }
+        constexpr FontUnit operator""_fu( long double a_Value )        { return FontUnit{ static_cast<FontUnit::ValueType>( a_Value ) }; }
+        constexpr FontUnit operator""_fu( unsigned long long a_Value ) { return FontUnit{ static_cast<FontUnit::ValueType>( a_Value ) }; }
+        constexpr Unit     operator""_u( long double a_Value )         { return Unit{ static_cast<Unit::ValueType>( a_Value ) }; }
+        constexpr Unit     operator""_u( unsigned long long a_Value )  { return Unit{ static_cast<Unit::ValueType>( a_Value ) }; }
+        constexpr Pixel    operator""_px( unsigned long long a_Value ) { return Pixel{ static_cast<Pixel::ValueType>( a_Value ) }; }
+        constexpr Pixel    operator""_px( long double a_Value )        { return Pixel{ static_cast<Pixel::ValueType>( a_Value ) }; }
     }
 
     using namespace Literals;

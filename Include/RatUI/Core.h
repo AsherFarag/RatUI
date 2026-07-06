@@ -8,6 +8,7 @@
 #include "Core/Config.h"
 #include "Core/Macro.h"
 #include "Core/Types.h"
+#include "Core/StringID.h"
 #include "Core/Callback.h"
 #include "Core/Containers.h"
 #include "Core/Debug.h"
