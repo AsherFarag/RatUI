@@ -7,13 +7,15 @@ namespace RatUI
         if ( !Layout.IsDirty )
         {
             Layout.IsDirty = true;
-            if ( m_Parent ) m_Parent->MarkDescendantDirty();
+            if ( m_Parent ) 
+                m_Parent->MarkDescendantDirty();
         }
     }
     
     void LayoutNode::MarkDescendantDirty()
     {
-        if ( Layout.IsDescendantDirty ) return; // Already marked as having a dirty descendant, so we can stop here.
+        if ( Layout.IsDescendantDirty ) 
+            return; // Already marked as having a dirty descendant, so we can stop here.
 
         Layout.IsDescendantDirty = true;
 
@@ -22,16 +24,12 @@ namespace RatUI
 
         while ( parent )
         {
-            if ( !parent->Layout.IsDescendantDirty )
-            {
-                parent->Layout.IsDescendantDirty = true;
-                current = parent;
-                parent = parent->m_Parent;
-            }
-            else
-            {
-                break; // Ancestors are already marked as having a dirty descendant, so we can stop here.
-            }
+            if ( parent->Layout.IsDescendantDirty )
+                break; // Already marked as having a dirty descendant, so we can stop here.
+
+            parent->Layout.IsDescendantDirty = true;
+            current = parent;
+            parent = parent->m_Parent;
         }
     }
 
