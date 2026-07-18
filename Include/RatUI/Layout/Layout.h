@@ -134,10 +134,10 @@ namespace RatUI
      */
 	enum class EVisibility : u8
     {
-        None = 0,
-        Render = 1 << 0, ///< The element is rendered and visible.
-        Layout = 1 << 1, ///< The element participates in layout calculations and occupies space.
-        SelfHitTest = 1 << 2, ///< The element can be hit-tested (e.g., for mouse interactions) based on its own geometry.
+        None            = 0,
+        Render          = 1 << 0, ///< The element is rendered and visible.
+        Layout          = 1 << 1, ///< The element participates in layout calculations and occupies space.
+        SelfHitTest     = 1 << 2, ///< The element can be hit-tested (e.g., for mouse interactions) based on its own geometry.
         ChildrenHitTest = 1 << 3, ///< The element's children can be hit-tested, even if the element itself is not (e.g., for invisible containers that still allow interaction with their children).
 
         /** @brief Visible and hit-testable. Participates in layout and rendering. */
@@ -253,24 +253,6 @@ namespace RatUI
                                            a_Rect.Max() - Vec2<Unit>{ Right, Bottom } );
         }
 
-        /** @brief Combines two Edges by adding their respective values together. */
-        constexpr Edges operator+( const Edges& a_Other ) const
-        {
-            return { Top + a_Other.Top, Right + a_Other.Right, Bottom + a_Other.Bottom, Left + a_Other.Left };
-		}
-
-        /** @brief Scales the edge insets by a scalar value, multiplying each edge by the specified factor. */
-        constexpr Edges operator*( f32 a_Scalar ) const
-        {
-            return { Top * a_Scalar, Right * a_Scalar, Bottom * a_Scalar, Left * a_Scalar };
-		}
-
-        /** @brief Scales the edge insets by a scalar value, dividing each edge by the specified factor. */
-        constexpr Edges operator/( f32 a_Scalar ) const
-        {
-            return { Top / a_Scalar, Right / a_Scalar, Bottom / a_Scalar, Left / a_Scalar };
-        }
-
 		/** @brief Initializes all edges to the same value. */
 		constexpr Edges( Unit a_UniformValue = 0_u ) : Top( a_UniformValue ), Right( a_UniformValue ), Bottom( a_UniformValue ), Left( a_UniformValue ) {}
 
@@ -288,6 +270,24 @@ namespace RatUI
 
         /** @brief Initializes each edge individually. */
         static constexpr Edges Asymmetric( Unit a_Top, Unit a_Right, Unit a_Bottom, Unit a_Left ) { return { a_Top, a_Right, a_Bottom, a_Left }; }
+
+        /** @brief Combines two Edges by adding their respective values together. */
+        constexpr Edges operator+( const Edges& a_Other ) const
+        {
+            return { Top + a_Other.Top, Right + a_Other.Right, Bottom + a_Other.Bottom, Left + a_Other.Left };
+		}
+
+        /** @brief Scales the edge insets by a scalar value, multiplying each edge by the specified factor. */
+        constexpr Edges operator*( f32 a_Scalar ) const
+        {
+            return { Top * a_Scalar, Right * a_Scalar, Bottom * a_Scalar, Left * a_Scalar };
+		}
+
+        /** @brief Scales the edge insets by a scalar value, dividing each edge by the specified factor. */
+        constexpr Edges operator/( f32 a_Scalar ) const
+        {
+            return { Top / a_Scalar, Right / a_Scalar, Bottom / a_Scalar, Left / a_Scalar };
+        }
     };
 
     /**
@@ -334,42 +334,22 @@ namespace RatUI
 
         constexpr CornerRounding operator+( Unit a_Amount ) const
         {
-            return {
-                TopLeft + a_Amount,
-                TopRight + a_Amount,
-                BottomLeft + a_Amount,
-                BottomRight + a_Amount
-            };
+            return { TopLeft + a_Amount, TopRight + a_Amount, BottomLeft + a_Amount, BottomRight + a_Amount };
         }
 
         constexpr CornerRounding operator-( Unit a_Amount ) const
         {
-            return {
-                TopLeft - a_Amount,
-                TopRight - a_Amount,
-                BottomLeft - a_Amount,
-                BottomRight - a_Amount
-            };
+            return { TopLeft - a_Amount, TopRight - a_Amount, BottomLeft - a_Amount, BottomRight - a_Amount };
         }
 
         constexpr CornerRounding operator*( Unit a_Scalar ) const
         {
-            return {
-                TopLeft * a_Scalar,
-                TopRight * a_Scalar,
-                BottomLeft * a_Scalar,
-                BottomRight * a_Scalar
-            };
+            return { TopLeft * a_Scalar, TopRight * a_Scalar, BottomLeft * a_Scalar, BottomRight * a_Scalar };
         }
 
         constexpr CornerRounding operator/( Unit a_Scalar ) const
         {
-            return {
-                TopLeft / a_Scalar,
-                TopRight / a_Scalar,
-                BottomLeft / a_Scalar,
-                BottomRight / a_Scalar
-            };
+            return { TopLeft / a_Scalar, TopRight / a_Scalar, BottomLeft / a_Scalar, BottomRight / a_Scalar };
         }
     };
 
@@ -420,35 +400,9 @@ namespace RatUI
         f32 PercentWidth{ 0.0f };      ///< The percentage of the available width to use when WidthMode is set to Fill.
         f32 PercentHeight{ 0.0f };     ///< The percentage of the available height to use when HeightMode is set to Fill.
 
+        // TODO: Should be flex width and flex height?
         f32 FlexGrow{ 0.0f };          ///< Determines how much of the remaining space the element should occupy relative to its siblings.
         Constraints SizeConstraints{}; ///< The size constraints to consider when laying out the element.
-
-		constexpr LayoutStyle& SetSpacing( Unit a_Spacing ) { Spacing = a_Spacing; return *this; }
-		constexpr LayoutStyle& SetLayoutType( ELayoutType a_LayoutType ) { LayoutType = a_LayoutType; return *this; }
-        constexpr LayoutStyle& SetChildAlign( EAlignment a_ChildAlign ) { ChildAlign = a_ChildAlign; return *this; }
-        constexpr LayoutStyle& SetWrapMode( EWrapMode a_WrapMode ) { WrapMode = a_WrapMode; return *this; }
-        constexpr LayoutStyle& SetVisibility( EVisibility a_Visibility ) { Visibility = a_Visibility; return *this; }
-        constexpr LayoutStyle& SetEnabled( bool a_IsEnabled ) { IsEnabled = a_IsEnabled; return *this; }
-        constexpr LayoutStyle& SetFocusScope( bool a_IsFocusScope ) { IsFocusScope = a_IsFocusScope; return *this; }
-        constexpr LayoutStyle& SetGridColumns( u16 a_GridColumns ) { GridColumns = a_GridColumns; return *this; }
-        constexpr LayoutStyle& SetGridRows( u16 a_GridRows ) { GridRows = a_GridRows; return *this; }
-        constexpr LayoutStyle& SetPadding( Edges a_Padding ) { Padding = a_Padding; return *this; }
-        constexpr LayoutStyle& SetMargin( Edges a_Margin ) { Margin = a_Margin; return *this; }
-        constexpr LayoutStyle& SetAnchor( struct Anchor a_Anchor ) { this->Anchor = a_Anchor; return *this; }
-        constexpr LayoutStyle& SetPositionMode( EPositionMode a_PositionMode ) { PositionMode = a_PositionMode; return *this; }
-        constexpr LayoutStyle& SetSelfAlign( EAlignment a_SelfAlign ) { SelfAlign = a_SelfAlign; return *this; }
-        constexpr LayoutStyle& SetWidthMode( ESizingMode a_WidthMode ) { WidthMode = a_WidthMode; return *this; }
-        constexpr LayoutStyle& SetHeightMode( ESizingMode a_HeightMode ) { HeightMode = a_HeightMode; return *this; }
-        constexpr LayoutStyle& SetFixedWidth( Unit a_FixedWidth ) { FixedWidth = a_FixedWidth; return *this; }
-        constexpr LayoutStyle& SetFixedHeight( Unit a_FixedHeight ) { FixedHeight = a_FixedHeight; return *this; }
-        constexpr LayoutStyle& SetPercentWidth( f32 a_PercentWidth ) { PercentWidth = a_PercentWidth; return *this; }
-        constexpr LayoutStyle& SetPercentHeight( f32 a_PercentHeight ) { PercentHeight = a_PercentHeight; return *this; }
-        constexpr LayoutStyle& SetFlexGrow( f32 a_FlexGrow ) { FlexGrow = a_FlexGrow; return *this; }
-        constexpr LayoutStyle& SetSizeConstraints( Constraints a_SizeConstraints ) { SizeConstraints = a_SizeConstraints; return *this; }
-
-		constexpr LayoutStyle& WithFixedWidth( Unit a_FixedWidth ) { return SetWidthMode( ESizingMode::Fixed ).SetFixedWidth( a_FixedWidth ); }
-		constexpr LayoutStyle& WithFixedHeight( Unit a_FixedHeight ) { return SetHeightMode( ESizingMode::Fixed ).SetFixedHeight( a_FixedHeight ); }
-		constexpr LayoutStyle& WithFixedSize( Unit a_FixedWidth, Unit a_FixedHeight ) { return WithFixedWidth( a_FixedWidth ).WithFixedHeight( a_FixedHeight ); }
     };
 
     /**
@@ -479,11 +433,40 @@ namespace RatUI
      */
     struct LayoutNode
     {
-        LayoutStyle Style{};   ///< The layout style properties that define how this widget should be sized and positioned.
-        LayoutResult Layout{}; ///< The cached layout result for this widget computed during the layout process.
-        u32 NumChildren{ 0 };
-
+		LayoutStyle Style{};         ///< @warning Any changes to this struct should be followed by a call to MarkDirty() to ensure the layout is recalculated. Or use the factory-style setters below which automatically mark the node as dirty.
+        LayoutResult Layout{};       ///< The cached layout result for this widget computed during the layout process.
         Unique<class IWidget> Widget;
+
+        /** @brief Factory-style setter methods for layout properties - automatically marks the node as dirty when a property is changed. */
+
+        LayoutNode& Spacing( Unit a_Spacing )              { Style.Spacing = a_Spacing; MarkDirty(); return *this; }
+        LayoutNode& LayoutType( ELayoutType a_LayoutType ) { Style.LayoutType = a_LayoutType; MarkDirty(); return *this; }
+        LayoutNode& ChildAlign( EAlignment a_ChildAlign )  { Style.ChildAlign = a_ChildAlign; MarkDirty(); return *this; }
+        LayoutNode& WrapMode( EWrapMode a_WrapMode )       { Style.WrapMode = a_WrapMode; MarkDirty(); return *this; }
+        LayoutNode& Visibility( EVisibility a_Visibility ) { Style.Visibility = a_Visibility; MarkDirty(); return *this; }
+        LayoutNode& Enabled( bool a_IsEnabled )            { Style.IsEnabled = a_IsEnabled; MarkDirty(); return *this; }
+        LayoutNode& FocusScope( bool a_IsFocusScope )      { Style.IsFocusScope = a_IsFocusScope; MarkDirty(); return *this; }
+
+        LayoutNode& GridColumns( u16 a_GridColumns )  { Style.GridColumns = a_GridColumns; MarkDirty(); return *this; }
+        LayoutNode& GridRows( u16 a_GridRows )        { Style.GridRows = a_GridRows; MarkDirty(); return *this; }
+        LayoutNode& Padding( Edges a_Padding )        { Style.Padding = a_Padding; MarkDirty(); return *this; }
+        LayoutNode& Margin( Edges a_Margin )          { Style.Margin = a_Margin; MarkDirty(); return *this; }
+        LayoutNode& Anchor( struct Anchor a_Anchor )  { Style.Anchor = a_Anchor; MarkDirty(); return *this; }
+
+        LayoutNode& PositionMode( EPositionMode a_PositionMode ) { Style.PositionMode = a_PositionMode; MarkDirty(); return *this; }
+        LayoutNode& SelfAlign( EAlignment a_SelfAlign )          { Style.SelfAlign = a_SelfAlign; MarkDirty(); return *this; }
+        LayoutNode& WidthMode( ESizingMode a_WidthMode )         { Style.WidthMode = a_WidthMode; MarkDirty(); return *this; }
+        LayoutNode& HeightMode( ESizingMode a_HeightMode )       { Style.HeightMode = a_HeightMode; MarkDirty(); return *this; }
+
+        LayoutNode& FixedWidth( Unit a_FixedWidth )      { Style.WidthMode = ESizingMode::Fixed; Style.FixedWidth = a_FixedWidth; MarkDirty(); return *this; }
+        LayoutNode& FixedHeight( Unit a_FixedHeight )    { Style.HeightMode = ESizingMode::Fixed; Style.FixedHeight = a_FixedHeight; MarkDirty(); return *this; }
+        LayoutNode& PercentWidth( f32 a_PercentWidth )   { Style.WidthMode = ESizingMode::Percent; Style.PercentWidth = a_PercentWidth; MarkDirty(); return *this; }
+        LayoutNode& PercentHeight( f32 a_PercentHeight ) { Style.HeightMode = ESizingMode::Percent; Style.PercentHeight = a_PercentHeight; MarkDirty(); return *this; }
+		LayoutNode& FlexWidth()                          { Style.WidthMode = ESizingMode::Flex; MarkDirty(); return *this; }
+        LayoutNode& FlexHeight()                         { Style.HeightMode = ESizingMode::Flex; MarkDirty(); return *this; }
+        LayoutNode& FlexGrow( f32 a_FlexGrow )           { Style.FlexGrow = a_FlexGrow; MarkDirty(); return *this; }
+
+        LayoutNode& SizeConstraints( Constraints a_SizeConstraints ) { Style.SizeConstraints = a_SizeConstraints; MarkDirty(); return *this; }
 
         /** @brief Hierachy access */
 
@@ -494,42 +477,16 @@ namespace RatUI
         LayoutNode* NextSibling() const { return m_NextSibling; }
 
         /** @brief Marks this node as dirty, indicating that its layout needs to be recalculated. Also marks all ancestor nodes as having a dirty descendant. */
-        void MarkDirty()
-        {
-            if ( !Layout.IsDirty )
-            {
-                Layout.IsDirty = true;
-                if ( m_Parent ) m_Parent->MarkDescendantDirty();
-            }
-        }
+        void MarkDirty();
 
         /** @brief Marks this node and all its descendants as dirty, indicating that their layout needs to be recalculated. */
-        void MarkDescendantDirty()
-        {
-            if ( Layout.IsDescendantDirty ) return; // Already marked as having a dirty descendant, so we can stop here.
-
-            Layout.IsDescendantDirty = true;
-
-            LayoutNode* parent = m_Parent;
-            LayoutNode* current = this;
-
-            while ( parent )
-            {
-                if ( !parent->Layout.IsDescendantDirty )
-                {
-                    parent->Layout.IsDescendantDirty = true;
-                    current = parent;
-                    parent = parent->m_Parent;
-                }
-                else
-                {
-                    break; // Ancestors are already marked as having a dirty descendant, so we can stop here.
-                }
-            }
-        }
+        void MarkDescendantDirty();
 
         /** @brief Detaches this node from its parent, updating the linked list pointers of siblings and parent accordingly. */
         void DetachFromParent();
+
+        /** @brief Returns the number of child nodes this node has. */
+        u32 ChildCount() const { return m_ChildCount; }
 
         /** @brief Attaches the given child node to the end of this node's children. */
         void PushBackChild( LayoutNode& a_Child );
@@ -559,11 +516,6 @@ namespace RatUI
         template<std::invocable<LayoutNode&> Func>
         void ForEachChild( Func&& a_Func );
 
-        /**
-         * @brief Applies the given function to each child widget of this widget (const version).
-         * @tparam Func The type of the function to apply to each child widget. It must be invocable with a const LayoutNode reference.
-         * @param a_Func A callable that takes a const LayoutNode reference. It will be invoked for each child widget of this widget.
-         */
         template<std::invocable<const LayoutNode&> Func>
         void ForEachChild( Func&& a_Func ) const;
 
@@ -575,12 +527,16 @@ namespace RatUI
         template<std::invocable<LayoutNode&> Func>
         void ForEachDescendant( Func&& a_Func );
 
-    private:
+        template<std::invocable<const LayoutNode&> Func>
+        void ForEachDescendant( Func&& a_Func ) const;
+
+    protected:
         LayoutNode* m_Parent{ nullptr };
         LayoutNode* m_FirstChild{ nullptr };
         LayoutNode* m_LastChild{ nullptr };
         LayoutNode* m_PrevSibling{ nullptr };
         LayoutNode* m_NextSibling{ nullptr };
+        u32         m_ChildCount{ 0 };
     };
 
     // === Inline Implementations ===
@@ -607,6 +563,16 @@ namespace RatUI
             std::forward<Func>(a_Func)( child );
             child.ForEachDescendant( std::forward<Func>( a_Func ) );
         });
+    }
+
+    template<std::invocable<const LayoutNode&> Func>
+    void LayoutNode::ForEachDescendant( Func&& a_Func ) const
+    {
+        ForEachChild( [&]( const LayoutNode& child )
+        {
+            std::forward<Func>( a_Func )( child );
+            child.ForEachDescendant( std::forward<Func>( a_Func ) );
+        } );
     }
 
 } // namespace RatUI

@@ -2,6 +2,39 @@
 
 namespace RatUI
 {
+    void LayoutNode::MarkDirty()
+    {
+        if ( !Layout.IsDirty )
+        {
+            Layout.IsDirty = true;
+            if ( m_Parent ) m_Parent->MarkDescendantDirty();
+        }
+    }
+    
+    void LayoutNode::MarkDescendantDirty()
+    {
+        if ( Layout.IsDescendantDirty ) return; // Already marked as having a dirty descendant, so we can stop here.
+
+        Layout.IsDescendantDirty = true;
+
+        LayoutNode* parent = m_Parent;
+        LayoutNode* current = this;
+
+        while ( parent )
+        {
+            if ( !parent->Layout.IsDescendantDirty )
+            {
+                parent->Layout.IsDescendantDirty = true;
+                current = parent;
+                parent = parent->m_Parent;
+            }
+            else
+            {
+                break; // Ancestors are already marked as having a dirty descendant, so we can stop here.
+            }
+        }
+    }
+
     void LayoutNode::DetachFromParent()
     {
         if ( !m_Parent )
@@ -17,7 +50,7 @@ namespace RatUI
         else
             m_Parent->m_LastChild = m_PrevSibling;
 
-        m_Parent->NumChildren--;
+        m_Parent->m_ChildCount--;
         m_Parent = nullptr;
         m_PrevSibling = nullptr;
         m_NextSibling = nullptr;
@@ -42,7 +75,7 @@ namespace RatUI
         }
 
         m_LastChild = &a_Child;
-        ++NumChildren;
+        ++m_ChildCount;
     }
 
     void LayoutNode::PushFrontChild( LayoutNode& a_Child )
@@ -64,7 +97,7 @@ namespace RatUI
         }
 
         m_FirstChild = &a_Child;
-        ++NumChildren;
+        ++m_ChildCount;
     }
 
     void LayoutNode::InsertChildAfter( LayoutNode& a_Child, LayoutNode& a_Sibling )
@@ -87,7 +120,7 @@ namespace RatUI
             m_LastChild = &a_Child;
 
         a_Sibling.m_NextSibling = &a_Child;
-        ++NumChildren;
+        ++m_ChildCount;
     }
 
     void LayoutNode::InsertChildBefore( LayoutNode& a_Child, LayoutNode& a_Sibling )
@@ -110,7 +143,7 @@ namespace RatUI
             m_FirstChild = &a_Child;
 
         a_Sibling.m_PrevSibling = &a_Child;
-        ++NumChildren;
+        ++m_ChildCount;
     }
 
 } // namespace RatUI
