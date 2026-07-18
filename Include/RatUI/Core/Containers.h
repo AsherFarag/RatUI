@@ -11,6 +11,317 @@
 #include <iterator>
 #include <utility>
 
+namespace RatUI
+{
+    namespace Detail
+    {
+        /** 
+         * @brief A fallback type for containers that do not have the expected member types.
+         * @example std::unordered_map does not have reverse iterators, so this fallback type provides a default implementation for such cases.
+         */
+        struct EmptyContainerFallback
+        {
+            using value_type              = void;
+            using size_type               = void;
+            using iterator                = void;
+            using const_iterator          = void;
+            using reverse_iterator        = void;
+            using const_reverse_iterator  = void;
+        };
+
+    #define RATUI_DETECT_MEMBER_TYPE( _Name, _Member )                                                      \
+        template<typename T>                                                                                \
+        concept Has##_Name = requires { typename T::_Member; };                                             \
+        template<typename T>                                                                                \
+        using _Name##Or_t = typename std::conditional_t<Has##_Name<T>, T, EmptyContainerFallback>::_Member;
+
+        RATUI_DETECT_MEMBER_TYPE( ValueType,  value_type )
+        RATUI_DETECT_MEMBER_TYPE( SizeType,   size_type )
+        RATUI_DETECT_MEMBER_TYPE( Iter,       iterator )
+        RATUI_DETECT_MEMBER_TYPE( ConstIter,  const_iterator )
+        RATUI_DETECT_MEMBER_TYPE( RIter,      reverse_iterator )
+        RATUI_DETECT_MEMBER_TYPE( ConstRIter, const_reverse_iterator )
+
+    #undef RATUI_DETECT_MEMBER_TYPE
+
+    } // namespace Detail
+
+    /**
+     * @brief Helper struct to extract member types from standard containers.
+     * This struct provides type aliases for common member types found in standard containers.
+     * This encompasses all common functionality of standard containers, including size, iteration, and element access.
+     */
+    template<typename _Container>
+    struct StdContainerTraits
+    {
+        using Type        = _Container;
+        using ValueType   = Detail::ValueTypeOr_t<Type>;
+        using SizeType    = Detail::SizeTypeOr_t<Type>;
+        using Iter        = Detail::IterOr_t<Type>;
+        using ConstIter   = Detail::ConstIterOr_t<Type>;
+        using RIter       = Detail::RIterOr_t<Type>;
+        using ConstRIter  = Detail::ConstRIterOr_t<Type>;
+
+        // --- Size ---
+
+        static constexpr SizeType Size( const Type& a_Container ) 
+            requires requires { { a_Container.size() } -> std::convertible_to<SizeType>; }
+        {
+            return a_Container.size();
+        }
+
+        static constexpr SizeType SizeBytes( const Type& a_Container ) 
+            requires requires { { a_Container.size_bytes() } -> std::convertible_to<SizeType>; }
+        {
+            return a_Container.size_bytes();
+        }
+
+        static constexpr SizeType Capacity( const Type& a_Container ) 
+            requires requires { { a_Container.capacity() } -> std::convertible_to<SizeType>; }
+        {
+            return a_Container.capacity();
+        }
+
+        static constexpr bool Empty( const Type& a_Container ) 
+            requires requires { { a_Container.empty() } -> std::convertible_to<bool>; }
+        {
+            return a_Container.empty();
+        }
+
+        // --- Value access ---
+
+        static constexpr ValueType& RawAt( Type& a_Container, SizeType a_Index )
+            requires requires { { a_Container[a_Index] } -> std::convertible_to<ValueType&>; }
+        {
+            return a_Container[a_Index];
+        }
+
+        static constexpr const ValueType& RawAt( const Type& a_Container, SizeType a_Index )
+            requires requires { { a_Container[a_Index] } -> std::convertible_to<const ValueType&>; }
+        {
+            return a_Container[a_Index];
+        }
+
+        static constexpr ValueType& Front( Type& a_Container )
+            requires requires { { a_Container.front() } -> std::convertible_to<ValueType&>; }
+        {
+            return a_Container.front();
+        }
+
+        static constexpr const ValueType& Front( const Type& a_Container )
+            requires requires { { a_Container.front() } -> std::convertible_to<const ValueType&>; }
+        {
+            return a_Container.front();
+        }
+
+        static constexpr ValueType& Back( Type& a_Container )
+            requires requires { { a_Container.back() } -> std::convertible_to<ValueType&>; }
+        {
+            return a_Container.back();
+        }
+
+        static constexpr const ValueType& Back( const Type& a_Container )
+            requires requires { { a_Container.back() } -> std::convertible_to<const ValueType&>; }
+        {
+            return a_Container.back();
+        }
+
+        static constexpr ValueType* Data( Type& a_Container )
+            requires requires { { a_Container.data() } -> std::convertible_to<ValueType*>; }
+        {
+            return a_Container.data();
+        }
+
+        static constexpr const ValueType* Data( const Type& a_Container )
+            requires requires { { a_Container.data() } -> std::convertible_to<const ValueType*>; }
+        {
+            return a_Container.data();
+        }
+
+        // --- Iterators ---
+
+        static constexpr Iter Begin( Type& a_Container ) 
+            requires requires { { a_Container.begin() } -> std::convertible_to<Iter>; }
+        {
+            return a_Container.begin();
+        }
+
+        static constexpr ConstIter Begin( const Type& a_Container ) 
+            requires requires { { a_Container.begin() } -> std::convertible_to<ConstIter>; }
+        {
+            return a_Container.begin();
+        }
+
+        static constexpr Iter End( Type& a_Container ) 
+            requires requires { { a_Container.end() } -> std::convertible_to<Iter>; }
+        {
+            return a_Container.end();
+        }
+
+        static constexpr ConstIter End( const Type& a_Container ) 
+            requires requires { { a_Container.end() } -> std::convertible_to<ConstIter>; }
+        {
+            return a_Container.end();
+        }
+
+        static constexpr RIter RBegin( Type& a_Container ) 
+            requires requires { { a_Container.rbegin() } -> std::convertible_to<RIter>; }
+        {
+            return a_Container.rbegin();
+        }
+
+        static constexpr ConstRIter RBegin( const Type& a_Container ) 
+            requires requires { { a_Container.rbegin() } -> std::convertible_to<ConstRIter>; }
+        {
+            return a_Container.rbegin();
+        }
+
+        static constexpr RIter REnd( Type& a_Container ) 
+            requires requires { { a_Container.rend() } -> std::convertible_to<RIter>; }
+        {
+            return a_Container.rend();
+        }
+
+        static constexpr ConstRIter REnd( const Type& a_Container ) 
+            requires requires { { a_Container.rend() } -> std::convertible_to<ConstRIter>; }
+        {
+            return a_Container.rend();
+        }
+
+        // --- Key/Index access ---
+        // Generic over both sequence containers (SizeType index) and associative
+        // containers (KeyType key), since both are ultimately just "whatever
+        // operator[]/.at() accepts" on the underlying std container.
+
+        template<typename K>
+        static constexpr decltype(auto) At( Type& a_Container, const K& a_Key )
+            requires requires { a_Container.at( a_Key ); }
+        {
+            return a_Container.at( a_Key );
+        }
+
+        template<typename K>
+        static constexpr decltype(auto) At( const Type& a_Container, const K& a_Key )
+            requires requires { a_Container.at( a_Key ); }
+        {
+            return a_Container.at( a_Key );
+        }
+
+        template<typename K>
+        static constexpr decltype(auto) RawAt( Type& a_Container, const K& a_Key )
+            requires requires { a_Container[a_Key]; }
+        {
+            return a_Container[a_Key];
+        }
+
+        // --- Modification ---
+
+        static constexpr void PushBack( Type& a_Container, const ValueType& a_Element )
+            requires requires { a_Container.push_back( a_Element ); }
+        {
+            a_Container.push_back( a_Element );
+        }
+
+        static constexpr void PushBack( Type& a_Container, ValueType&& a_Element )
+            requires requires { a_Container.push_back( std::move( a_Element ) ); }
+        {
+            a_Container.push_back( std::move( a_Element ) );
+        }
+
+        template<typename... Args>
+        static constexpr decltype(auto) Emplace( Type& a_Container, Args&&... a_Args )
+            requires requires { a_Container.emplace( std::forward<Args>( a_Args )... ); }
+        {
+            return a_Container.emplace( std::forward<Args>( a_Args )... );
+        }
+
+        template<typename... Args>
+        static constexpr decltype(auto) EmplaceBack( Type& a_Container, Args&&... a_Args )
+            requires requires { a_Container.emplace_back( std::forward<Args>( a_Args )... ); }
+        {
+            return a_Container.emplace_back( std::forward<Args>( a_Args )... );
+        }
+
+        template<typename... Args>
+        static constexpr decltype(auto) TryEmplace( Type& a_Container, Args&&... a_Args )
+            requires requires { a_Container.try_emplace( std::forward<Args>( a_Args )... ); }
+        {
+            return a_Container.try_emplace( std::forward<Args>( a_Args )... );
+        }
+
+        template<typename... Args>
+        static constexpr decltype(auto) Insert( Type& a_Container, Args&&... a_Args )
+            requires requires { a_Container.insert( std::forward<Args>( a_Args )... ); }
+        {
+            return a_Container.insert( std::forward<Args>( a_Args )... );
+        }
+
+        template<typename... Args>
+        static constexpr decltype(auto) Erase( Type& a_Container, Args&&... a_Args )
+            requires requires { a_Container.erase( std::forward<Args>( a_Args )... ); }
+        {
+            return a_Container.erase( std::forward<Args>( a_Args )... );
+        }
+
+        static constexpr void PopBack( Type& a_Container )
+            requires requires { a_Container.pop_back(); }
+        {
+            a_Container.pop_back();
+        }
+
+        static constexpr void Clear( Type& a_Container )
+            requires requires { a_Container.clear(); }
+        {
+            a_Container.clear();
+        }
+
+        static constexpr void Reserve( Type& a_Container, SizeType a_Count )
+            requires requires { a_Container.reserve( a_Count ); }
+        {
+            a_Container.reserve( a_Count );
+        }
+
+        static constexpr void Resize( Type& a_Container, SizeType a_Count )
+            requires requires { a_Container.resize( a_Count ); }
+        {
+            a_Container.resize( a_Count );
+        }
+
+        // --- Lookup ---
+
+        template<typename... Args>
+        static constexpr decltype(auto) Find( Type& a_Container, Args&&... a_Args )
+            requires requires { a_Container.find( std::forward<Args>( a_Args )... ); }
+        {
+            return a_Container.find( std::forward<Args>( a_Args )... );
+        }
+
+        template<typename... Args>
+        static constexpr decltype(auto) Find( const Type& a_Container, Args&&... a_Args )
+            requires requires { a_Container.find( std::forward<Args>( a_Args )... ); }
+        {
+            return a_Container.find( std::forward<Args>( a_Args )... );
+        }
+
+        template<typename K>
+        static constexpr bool Contains( const Type& a_Container, const K& a_Key )
+            requires requires { { a_Container.contains( a_Key ) } -> std::convertible_to<bool>; }
+        {
+            return a_Container.contains( a_Key );
+        }
+
+        template<typename K>
+        static constexpr bool Contains( const Type& a_Container, const K& a_Key )
+            requires ( !requires { a_Container.contains( a_Key ); } &&
+                       requires { { a_Container.find( a_Key ) } -> std::convertible_to<ConstIter>; } )
+        {
+            return a_Container.find( a_Key ) != a_Container.end();
+        }
+    };
+
+
+} // namespace RatUI
+
 #if defined(__has_include)
     #if __has_include("RatUIContainerImpl.h")
         #include "RatUIContainerImpl.h"
@@ -29,84 +340,12 @@ namespace RatUI
     using SpanImpl = std::span<T>;
 
     template<typename _ElementType>
-    struct CoreTraits<SpanImpl<_ElementType>>
+    struct CoreTraits<SpanImpl<_ElementType>> : StdContainerTraits<SpanImpl<_ElementType>>
     {
         using Type        = SpanImpl<_ElementType>;
-        using ElementType = typename Type::element_type;
-        using SizeType    = typename Type::size_type;
-        using Iter        = typename Type::iterator;
-        using RIter       = typename Type::reverse_iterator;
-    
-        static constexpr SizeType DynamicExtent = std::dynamic_extent;
+        using ElementType = typename StdContainerTraits<Type>::ValueType;
 
-        // Capacity
-
-        static constexpr SizeType Size(const Type& a_Container)
-        {
-            return a_Container.size();
-        }
-
-		static constexpr SizeType SizeBytes( const Type& a_Container )
-		{
-			return a_Container.size_bytes();
-		}
-
-        static constexpr bool Empty(const Type& a_Container)
-        {
-            return a_Container.empty();
-        }
-
-        // Element access
-
-        static constexpr ElementType& RawAt(Type& a_Container, SizeType a_Index)
-        {
-            return a_Container[a_Index];
-        }
-
-        static constexpr const ElementType& RawAt(const Type& a_Container, SizeType a_Index)
-        {
-            return a_Container[a_Index];
-        }
-
-        static constexpr ElementType& Front(Type& a_Container)
-        {
-            return a_Container.front();
-        }
-
-        static constexpr const ElementType& Front(const Type& a_Container)
-        {
-            return a_Container.front();
-        }
-
-        static constexpr ElementType& Back(Type& a_Container)
-        {
-            return a_Container.back();
-        }
-
-        static constexpr const ElementType& Back(const Type& a_Container)
-        {
-            return a_Container.back();
-        }
-
-        static constexpr ElementType* Data(Type& a_Container)
-        {
-            return a_Container.data();
-        }
-
-        static constexpr const ElementType* Data(const Type& a_Container)
-        {
-            return a_Container.data();
-        }
-
-        // Iterators
-
-        static constexpr Iter Begin(Type& a_Container) { return a_Container.begin(); }
-        static constexpr Iter End(Type& a_Container) { return a_Container.end(); }
-
-        // Reverse Iterators
-
-        static constexpr RIter RBegin(Type& a_Container) { return a_Container.rbegin(); }
-        static constexpr RIter REnd(Type& a_Container) { return a_Container.rend(); }
+        static constexpr typename StdContainerTraits<Type>::SizeType DynamicExtent = std::dynamic_extent;
     };
 } // namespace RatUI
 
@@ -122,160 +361,10 @@ namespace RatUI
     using ArrayImpl = std::vector<T>;
 
     template<typename _ElementType>
-    struct CoreTraits<ArrayImpl<_ElementType>>
+    struct CoreTraits<ArrayImpl<_ElementType>> : StdContainerTraits<ArrayImpl<_ElementType>>
     {
         using Type        = ArrayImpl<_ElementType>;
-        using ElementType = typename Type::value_type;
-        using SizeType    = typename Type::size_type;
-        using Iter        = typename Type::iterator;
-        using ConstIter   = typename Type::const_iterator;
-        using RIter       = typename Type::reverse_iterator;
-        using ConstRIter  = typename Type::const_reverse_iterator;
-    
-        // Capacity
-    
-        static constexpr SizeType Size(const Type& a_Container)
-        {
-            return a_Container.size();
-        }
-
-        static constexpr SizeType Capacity(const Type& a_Container)
-        {
-            return a_Container.capacity();
-        }
-    
-        static constexpr bool Empty(const Type& a_Container)
-        {
-            return a_Container.empty();
-        }
-    
-        static constexpr void Reserve(Type& a_Container, SizeType a_Count)
-        {
-            a_Container.reserve(a_Count);
-        }
-    
-        static constexpr void Resize(Type& a_Container, SizeType a_Count)
-        {
-            a_Container.resize(a_Count);
-        }
-    
-        static constexpr void Clear(Type& a_Container)
-        {
-            a_Container.clear();
-        }
-    
-        // Element access
-    
-        static constexpr ElementType& RawAt(Type& a_Container, SizeType a_Index)
-        {
-            return a_Container[a_Index];
-        }
-    
-        static constexpr const ElementType& RawAt(const Type& a_Container, SizeType a_Index) 
-        {
-            return a_Container[a_Index];
-        }
-
-        static constexpr ElementType& At(Type& a_Container, SizeType a_Index)
-        {
-            return a_Container.at(a_Index);
-        }
-
-        static constexpr const ElementType& At(const Type& a_Container, SizeType a_Index)
-        {
-            return a_Container.at(a_Index);
-        }
-    
-        static constexpr ElementType& Front(Type& a_Container)
-        {
-            return a_Container.front();
-        }
-    
-        static constexpr const ElementType& Front(const Type& a_Container)
-        {
-            return a_Container.front();
-        }
-    
-        static constexpr ElementType& Back(Type& a_Container)
-        {
-            return a_Container.back();
-        }
-    
-        static constexpr const ElementType& Back(const Type& a_Container)
-        {
-            return a_Container.back();
-        }
-    
-        static constexpr ElementType* Data(Type& a_Container)
-        {
-            return a_Container.data();
-        }
-    
-        static constexpr const ElementType* Data(const Type& a_Container)
-        {
-            return a_Container.data();
-        }
-    
-        // Iterators
-    
-        static constexpr Iter Begin(Type& a_Container) { return a_Container.begin(); }
-        static constexpr ConstIter Begin(const Type& a_Container) { return a_Container.begin(); }
-    
-        static constexpr Iter End(Type& a_Container) { return a_Container.end(); }
-        static constexpr ConstIter End(const Type& a_Container) { return a_Container.end(); }
-    
-        // Reverse Iterators
-    
-        static constexpr RIter RBegin(Type& a_Container) { return a_Container.rbegin(); }
-        static constexpr ConstRIter RBegin(const Type& a_Container) { return a_Container.rbegin(); }
-    
-        static constexpr RIter REnd(Type& a_Container) { return a_Container.rend(); }
-        static constexpr ConstRIter REnd(const Type& a_Container) { return a_Container.rend(); }
-    
-        // Modification
-    
-        static constexpr void PushBack(Type& a_Container, const ElementType& a_Element)
-        {
-            a_Container.push_back(a_Element);
-        }
-    
-        static constexpr void PushBack(Type& a_Container, ElementType&& a_Element)
-        {
-            a_Container.push_back(std::move(a_Element));
-        }
-    
-        template<typename... Args>
-        static constexpr ElementType& EmplaceBack(Type& a_Container, Args&&... a_Args)
-        {
-            return a_Container.emplace_back(std::forward<Args>(a_Args)...);
-        }
-    
-        static constexpr void PopBack(Type& a_Container)
-        {
-            a_Container.pop_back();
-        }
-    
-        template<typename U>
-        static constexpr Iter Insert( Type& a_Container, ConstIter a_Pos, U&& a_Element )
-        {
-            return a_Container.insert( a_Pos, std::forward<U>( a_Element ) );
-        }
-
-        static constexpr Iter Insert( Type& a_Container, ConstIter a_Pos, size_t a_Count, const ElementType& a_Element )
-        {
-            return a_Container.insert( a_Pos, a_Count, a_Element );
-        }
-
-        template<typename InputIt>
-        static constexpr Iter Insert( Type& a_Container, ConstIter a_Pos, InputIt a_First, InputIt a_Last )
-        {
-            return a_Container.insert( a_Pos, a_First, a_Last );
-        }
-    
-        static constexpr Iter Erase(Type& a_Container, ConstIter a_Pos)
-        {
-            return a_Container.erase(a_Pos);
-        }
+        using ElementType = typename StdContainerTraits<Type>::ValueType;
     };
 }
 
@@ -290,97 +379,81 @@ namespace RatUI
     using FixedArrayImpl = std::array<T, N>;
 
     template<typename _ElementType, size_t N>
-    struct CoreTraits<FixedArrayImpl<_ElementType, N>>
+    struct CoreTraits<FixedArrayImpl<_ElementType, N>> : StdContainerTraits<FixedArrayImpl<_ElementType, N>>
     {
         using Type        = FixedArrayImpl<_ElementType, N>;
-        using ElementType = typename Type::value_type;
-        using SizeType    = typename Type::size_type;
-        using Iter        = typename Type::iterator;
-        using ConstIter   = typename Type::const_iterator;
-        using RIter       = typename Type::reverse_iterator;
-        using ConstRIter  = typename Type::const_reverse_iterator;
+        using ElementType = typename StdContainerTraits<Type>::ValueType;
 
-        static constexpr SizeType FixedSize = N;
-
-        // Capacity
-        
-        static constexpr SizeType Size(const Type& a_Container)
-        {
-            return a_Container.size();
-        }
-
-        static constexpr bool Empty(const Type& a_Container)
-        {
-            return a_Container.empty();
-        }
-
-        // Element access
-
-        static constexpr ElementType& RawAt(Type& a_Container, SizeType a_Index)
-        {
-            return a_Container[a_Index];
-        }
-
-        static constexpr const ElementType& RawAt(const Type& a_Container, SizeType a_Index)
-        {
-            return a_Container[a_Index];
-        }
-
-        static constexpr ElementType& At(Type& a_Container, SizeType a_Index)
-        {
-            return a_Container.at(a_Index);
-        }
-
-        static constexpr const ElementType& At(const Type& a_Container, SizeType a_Index)
-        {
-            return a_Container.at(a_Index);
-        }
-
-        static constexpr ElementType& Front(Type& a_Container)
-        {
-            return a_Container.front();
-        }
-
-        static constexpr const ElementType& Front(const Type& a_Container)
-        {
-            return a_Container.front();
-        }
-
-        static constexpr ElementType& Back(Type& a_Container)
-        {
-            return a_Container.back();
-        }
-
-        static constexpr const ElementType& Back(const Type& a_Container)
-        {
-            return a_Container.back();
-        }
-
-        static constexpr ElementType* Data(Type& a_Container)
-        {
-            return a_Container.data();
-        }
-
-        static constexpr const ElementType* Data(const Type& a_Container)
-        {
-            return a_Container.data();
-        }
-
-        // Iterators
-        static constexpr Iter      Begin(Type& a_Container) { return a_Container.begin(); }
-        static constexpr ConstIter Begin(const Type& a_Container) { return a_Container.begin(); }
-        static constexpr Iter      End(Type& a_Container) { return a_Container.end(); }
-        static constexpr ConstIter End(const Type& a_Container) { return a_Container.end(); }
-
-        // Reverse Iterators
-        static constexpr RIter      RBegin(Type& a_Container) { return a_Container.rbegin(); }
-        static constexpr ConstRIter RBegin(const Type& a_Container) { return a_Container.rbegin(); }
-        static constexpr RIter      REnd(Type& a_Container) { return a_Container.rend(); }
-        static constexpr ConstRIter REnd(const Type& a_Container) { return a_Container.rend(); }
+        static constexpr typename StdContainerTraits<Type>::SizeType FixedSize = N;
     };
 }
 
 #endif // Default to std::array if no custom fixed array implementation is provided.
+
+
+#ifndef RATUI_OVERRIDE_HASHMAP_IMPL
+#include <unordered_map>
+
+namespace RatUI
+{
+    template<typename Key, typename Value,
+        typename Hash = std::hash<Key>,
+        typename KeyEqual = std::equal_to<Key>>
+    using HashMapImpl = std::unordered_map<Key, Value, Hash, KeyEqual>;
+
+    template<typename Key, typename Value, typename Hash, typename KeyEqual>
+    struct CoreTraits<HashMapImpl<Key, Value, Hash, KeyEqual>> : StdContainerTraits<HashMapImpl<Key, Value, Hash, KeyEqual>>
+    {
+        using Type       = HashMapImpl<Key, Value, Hash, KeyEqual>;
+        using KeyType    = typename Type::key_type;
+        using MappedType = typename Type::mapped_type;
+    };
+}
+
+#endif // Default to std::unordered_map if no custom hashmap implementation is provided.
+
+#ifndef RATUI_OVERRIDE_STRING_IMPL
+#include <string>
+
+namespace RatUI
+{
+    using StringImpl = std::string;
+
+    template<>
+    struct CoreTraits<StringImpl> : StdContainerTraits<StringImpl>
+    {
+        using Type        = StringImpl;
+        using CharType    = typename Type::value_type;
+        using CharTraits  = typename Type::traits_type;
+        using ElementType = CharType;
+
+        static constexpr const CharType* CStr( const Type& a_String )
+        {
+            return a_String.c_str();
+        }
+    };
+}
+
+#endif // Default to std::string if no custom string implementation is provided.
+
+#ifndef RATUI_STRING_VIEW_IMPL
+#include <string_view>
+
+namespace RatUI
+{
+    using StringViewImpl = std::string_view;
+
+    template<>
+    struct CoreTraits<StringViewImpl> : StdContainerTraits<StringViewImpl>
+    {
+        using Type        = StringViewImpl;
+        using CharType    = typename Type::value_type;
+        using CharTraits  = typename Type::traits_type;
+        using ElementType = CharType;
+    };
+}
+
+#endif // Default to std::string_view if no custom string view implementation is provided.
 
 #ifndef RATUI_OVERRIDE_VARIANT_IMPL
 #include <variant>
@@ -398,7 +471,7 @@ namespace RatUI
         using SizeType = size_t;
         
         template<SizeType I>
-		using ElementType = std::variant_alternative_t<I, Type>;
+		using TypeAt = std::variant_alternative_t<I, Type>;
 
         static constexpr SizeType Index(const Type& a_Variant)
         {
@@ -414,7 +487,7 @@ namespace RatUI
         template<SizeType I>
         static constexpr bool Holds(const Type& a_Variant)
         {
-			return std::holds_alternative<ElementType<I>>( a_Variant );
+			return std::holds_alternative<TypeAt<I>>( a_Variant );
         }
 
         template<typename T>
@@ -479,216 +552,6 @@ namespace RatUI
 }
 
 #endif // Default to std::optional if no custom optional implementation is provided.
-
-#ifndef RATUI_OVERRIDE_HASHMAP_IMPL
-#include <unordered_map>
-
-namespace RatUI
-{
-    template<typename Key, typename Value,
-        typename Hash = std::hash<Key>,
-        typename KeyEqual = std::equal_to<Key>>
-    using HashMapImpl = std::unordered_map<Key, Value, Hash, KeyEqual>;
-
-    template<typename Key, typename Value, typename Hash, typename KeyEqual>
-    struct CoreTraits<HashMapImpl<Key, Value, Hash, KeyEqual>>
-    {
-        using Type        = HashMapImpl<Key, Value, Hash, KeyEqual>;
-        using KeyType     = typename Type::key_type;
-        using MappedType  = typename Type::mapped_type;
-        using ValueType   = typename Type::value_type;
-        using SizeType    = typename Type::size_type;
-        using Iter        = typename Type::iterator;
-        using ConstIter   = typename Type::const_iterator;
-    
-        // === Iteration ===
-    
-        static constexpr Iter Begin(Type& a_Container) { return a_Container.begin(); }
-        static constexpr ConstIter Begin(const Type& a_Container) { return a_Container.begin(); }
-    
-        static constexpr Iter End(Type& a_Container) { return a_Container.end(); }
-        static constexpr ConstIter End(const Type& a_Container) { return a_Container.end(); }
-    
-        // === Capacity ===
-    
-        static constexpr SizeType Size(const Type& a_Container)
-        {
-            return a_Container.size();
-        }
-    
-        static constexpr bool Empty(const Type& a_Container)
-        {
-            return a_Container.empty();
-        }
-    
-        static constexpr void Reserve(Type& a_Container, SizeType a_Capacity)
-        {
-            a_Container.reserve(a_Capacity);
-        }
-    
-        // === Modifiers ===
-    
-        template<typename... Args>
-        static constexpr decltype(auto) Emplace(Type& a_Container, Args&&... a_Args)
-        {
-            return a_Container.emplace(std::forward<Args>(a_Args)...);
-        }
-    
-        template<typename... Args>
-        static constexpr decltype(auto) TryEmplace(Type& a_Container, Args&&... a_Args)
-        {
-            return a_Container.try_emplace(std::forward<Args>(a_Args)...);
-        }
-    
-        template<typename... Args>
-        static constexpr decltype(auto) Insert(Type& a_Container, Args&&... a_Args)
-        {
-            return a_Container.insert(std::forward<Args>(a_Args)...);
-        }
-    
-        template<typename... Args>
-        static constexpr decltype(auto) Erase(Type& a_Container, Args&&... a_Args)
-        {
-            return a_Container.erase(std::forward<Args>(a_Args)...);
-        }
-    
-        static constexpr void Clear(Type& a_Container)
-        {
-            a_Container.clear();
-        }
-    
-        // === Lookup ===
-    
-        static constexpr Iter Find(Type& a_Container, const KeyType& a_Key)
-        {
-            return a_Container.find(a_Key);
-        }
-    
-        static constexpr ConstIter Find(const Type& a_Container, const KeyType& a_Key)
-        {
-            return a_Container.find(a_Key);
-        }
-    
-        static constexpr bool Contains(const Type& a_Container, const KeyType& a_Key)
-        {
-            return a_Container.find(a_Key) != a_Container.end();
-        }
-    
-        // === Element Access (Key-based) ===
-    
-        static constexpr decltype(auto) At(Type& a_Container, const KeyType& a_Key)
-        {
-            return a_Container.at(a_Key);
-        }
-    
-        static constexpr decltype(auto) At(const Type& a_Container, const KeyType& a_Key)
-        {
-            return a_Container.at(a_Key);
-        }
-        static constexpr decltype(auto) RawAt(Type& a_Container, const KeyType& a_Key)
-        {
-            return a_Container[a_Key];
-        }
-    };
-}
-
-#endif // Default to std::unordered_map if no custom hashmap implementation is provided.
-
-#ifndef RATUI_OVERRIDE_STRING_IMPL
-#include <string>
-
-namespace RatUI
-{
-    using StringImpl = std::string;
-
-    template<>
-    struct CoreTraits<StringImpl>
-    {
-        using Type        = StringImpl;
-        using CharType    = typename Type::value_type;
-        using CharTraits  = typename Type::traits_type;
-        using ElementType = CharType;
-        using SizeType    = typename Type::size_type;
-        using Iter        = typename Type::iterator;
-        using ConstIter   = typename Type::const_iterator;
-        using RIter       = typename Type::reverse_iterator;
-        using ConstRIter  = typename Type::const_reverse_iterator;
- 
-        static SizeType           Size(const Type& a_String) { return a_String.size(); }
-        static bool               Empty(const Type& a_String) { return a_String.empty(); }
-        static const CharType*    CStr(const Type& a_String) { return a_String.c_str(); }
-        static void               Clear(Type& a_String) { a_String.clear(); }
-        static void               Reserve(Type& a_String, SizeType a_Count) { a_String.reserve(a_Count); }
-        static void               Resize(Type& a_String, SizeType a_Count) { a_String.resize(a_Count); }
-        static CharType&          Front(Type& a_String) { return a_String.front(); }
-        static const CharType&    Front(const Type& a_String) { return a_String.front(); }
-        static CharType&          Back(Type& a_String) { return a_String.back(); }
-        static const CharType&    Back(const Type& a_String) { return a_String.back(); }
-        static CharType&          RawAt(Type& a_String, SizeType a_Index) { return a_String[a_Index]; }
-        static const CharType&    RawAt(const Type& a_String, SizeType a_Index) { return a_String[a_Index]; }
-        static CharType&          At(Type& a_String, SizeType a_Index) { return a_String.at(a_Index); }
-        static const CharType&    At(const Type& a_String, SizeType a_Index) { return a_String.at(a_Index); }
-        static CharType*          Data(Type& a_String) { return a_String.data(); }
-        static const CharType*    Data(const Type& a_String) { return a_String.data(); }
-        static void               PushBack(Type& a_String, const CharType& a_Char) { a_String.push_back(a_Char); }
-        static void               PushBack(Type& a_String, CharType&& a_Char) { a_String.push_back(std::move(a_Char)); }
-        static void               PushBack(Type& a_String, const Type& a_Other) { a_String.append(a_Other); }
-        static void               PushBack(Type& a_String, Type&& a_Other) { a_String.append(std::move(a_Other)); }
-        static void               PopBack(Type& a_String) { a_String.pop_back(); }
-
-        // - Iterators
-
-        static Iter       Begin(Type& a_String) { return a_String.begin(); }
-        static ConstIter  Begin(const Type& a_String) { return a_String.begin(); }
-        static Iter       End(Type& a_String) { return a_String.end(); }
-        static ConstIter  End(const Type& a_String) { return a_String.end(); }
-        static RIter      RBegin(Type& a_String) { return a_String.rbegin(); }
-        static ConstRIter RBegin(const Type& a_String) { return a_String.rbegin(); }
-        static RIter      REnd(Type& a_String) { return a_String.rend(); }
-        static ConstRIter REnd(const Type& a_String) { return a_String.rend(); }
-    };
-}
-
-#endif // Default to std::string if no custom string implementation is provided.
-
-#ifndef RATUI_STRING_VIEW_IMPL
-#include <string_view>
-
-namespace RatUI
-{
-    using StringViewImpl = std::string_view;
-
-    template<>
-    struct CoreTraits<StringViewImpl>
-    {
-        using Type        = StringViewImpl;
-        using CharType    = typename Type::value_type;
-        using CharTraits  = typename Type::traits_type;
-        using ElementType = CharType;
-        using SizeType    = typename Type::size_type;
-        using Iter        = typename Type::iterator;
-        using ConstIter   = typename Type::const_iterator;
-        using RIter       = typename Type::reverse_iterator;
-        using ConstRIter  = typename Type::const_reverse_iterator;
-
-        static SizeType           Size(const Type& a_StringView) { return a_StringView.size(); }
-        static bool               Empty(const Type& a_StringView) { return a_StringView.empty(); }
-        static const CharType&    Front(const Type& a_StringView) { return a_StringView.front(); }
-        static const CharType&    Back(const Type& a_StringView) { return a_StringView.back(); }
-        static const CharType&    RawAt(const Type& a_StringView, SizeType a_Index) { return a_StringView[a_Index]; }
-        static const CharType&    At(const Type& a_StringView, SizeType a_Index) { return a_StringView.at(a_Index); }
-        static const CharType*    Data(const Type& a_StringView) { return a_StringView.data(); }
-
-        // - Iterators
-
-        static ConstIter          Begin(const Type& a_StringView) { return a_StringView.begin(); }
-        static ConstIter          End(const Type& a_StringView) { return a_StringView.end(); }
-        static ConstRIter         RBegin(const Type& a_StringView) { return a_StringView.rbegin(); }
-        static ConstRIter         REnd(const Type& a_StringView) { return a_StringView.rend(); }
-    };
-}
-
-#endif // Default to std::string_view if no custom string view implementation is provided.
 
 namespace RatUI
 {
