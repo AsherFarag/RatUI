@@ -114,7 +114,7 @@ TEST_CASE( "CreateWidget attaches child to parent layout node", "[scene]" )
 
     REQUIRE( rootNode->FirstChild() == childNode );
     REQUIRE( childNode->Parent()    == rootNode );
-    REQUIRE( rootNode->NumChildren == 1 );
+    REQUIRE( rootNode->ChildCount() == 1 );
 }
 
 TEST_CASE( "CreateWidget calls OnConstruct on each created widget", "[scene]" )
