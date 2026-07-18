@@ -13,14 +13,14 @@ using namespace RatUI;
 // PushBackChild
 // =============================================================================
 
-TEST_CASE( "PushBackChild sets parent pointer and NumChildren", "[layoutnode][hierarchy]" )
+TEST_CASE( "PushBackChild sets parent pointer and ChildCount()", "[layoutnode][hierarchy]" )
 {
     LayoutNode parent{};
     LayoutNode child{};
 
     parent.PushBackChild( child );
 
-    REQUIRE( parent.NumChildren == 1 );
+    REQUIRE( parent.ChildCount() == 1 );
     REQUIRE( parent.FirstChild()  == &child );
     REQUIRE( parent.LastChild()   == &child );
     REQUIRE( child.Parent()       == &parent );
@@ -37,7 +37,7 @@ TEST_CASE( "PushBackChild with two children maintains correct sibling links", "[
     parent.PushBackChild( first );
     parent.PushBackChild( second );
 
-    REQUIRE( parent.NumChildren    == 2 );
+    REQUIRE( parent.ChildCount()    == 2 );
     REQUIRE( parent.FirstChild()     == &first );
     REQUIRE( parent.LastChild()      == &second );
     REQUIRE( first.NextSibling()     == &second );
@@ -55,7 +55,7 @@ TEST_CASE( "PushBackChild with three children preserves order", "[layoutnode][hi
     parent.PushBackChild( b );
     parent.PushBackChild( c );
 
-    REQUIRE( parent.NumChildren == 3 );
+    REQUIRE( parent.ChildCount() == 3 );
     REQUIRE( parent.FirstChild()  == &a );
     REQUIRE( parent.LastChild()   == &c );
     REQUIRE( a.NextSibling()      == &b );
@@ -71,11 +71,11 @@ TEST_CASE( "PushBackChild detaches child from previous parent", "[layoutnode][hi
     LayoutNode child{};
 
     parent1.PushBackChild( child );
-    REQUIRE( parent1.NumChildren == 1 );
+    REQUIRE( parent1.ChildCount() == 1 );
 
     parent2.PushBackChild( child );
-    REQUIRE( parent1.NumChildren == 0 );
-    REQUIRE( parent2.NumChildren == 1 );
+    REQUIRE( parent1.ChildCount() == 0 );
+    REQUIRE( parent2.ChildCount() == 1 );
     REQUIRE( child.Parent()        == &parent2 );
     REQUIRE( parent1.FirstChild()  == nullptr );
     REQUIRE( parent1.LastChild()   == nullptr );
@@ -85,14 +85,14 @@ TEST_CASE( "PushBackChild detaches child from previous parent", "[layoutnode][hi
 // PushFrontChild
 // =============================================================================
 
-TEST_CASE( "PushFrontChild sets parent pointer and NumChildren", "[layoutnode][hierarchy]" )
+TEST_CASE( "PushFrontChild sets parent pointer and ChildCount()", "[layoutnode][hierarchy]" )
 {
     LayoutNode parent{};
     LayoutNode child{};
 
     parent.PushFrontChild( child );
 
-    REQUIRE( parent.NumChildren == 1 );
+    REQUIRE( parent.ChildCount() == 1 );
     REQUIRE( parent.FirstChild()  == &child );
     REQUIRE( parent.LastChild()   == &child );
     REQUIRE( child.Parent()       == &parent );
@@ -107,7 +107,7 @@ TEST_CASE( "PushFrontChild with two children puts second child at front", "[layo
     parent.PushFrontChild( first );
     parent.PushFrontChild( second );
 
-    REQUIRE( parent.NumChildren  == 2 );
+    REQUIRE( parent.ChildCount()  == 2 );
     REQUIRE( parent.FirstChild()   == &second );
     REQUIRE( parent.LastChild()    == &first );
     REQUIRE( second.NextSibling()  == &first );
@@ -144,7 +144,7 @@ TEST_CASE( "DetachFromParent on only child clears parent FirstChild and LastChil
     parent.PushBackChild( child );
     child.DetachFromParent();
 
-    REQUIRE( parent.NumChildren == 0 );
+    REQUIRE( parent.ChildCount() == 0 );
     REQUIRE( parent.FirstChild()  == nullptr );
     REQUIRE( parent.LastChild()   == nullptr );
     REQUIRE( child.Parent()       == nullptr );
@@ -162,7 +162,7 @@ TEST_CASE( "DetachFromParent on first child re-links remaining children", "[layo
 
     a.DetachFromParent();
 
-    REQUIRE( parent.NumChildren == 2 );
+    REQUIRE( parent.ChildCount() == 2 );
     REQUIRE( parent.FirstChild()  == &b );
     REQUIRE( b.PrevSibling()      == nullptr );
     REQUIRE( b.NextSibling()      == &c );
@@ -179,7 +179,7 @@ TEST_CASE( "DetachFromParent on middle child re-links siblings", "[layoutnode][h
 
     b.DetachFromParent();
 
-    REQUIRE( parent.NumChildren == 2 );
+    REQUIRE( parent.ChildCount() == 2 );
     REQUIRE( a.NextSibling()      == &c );
     REQUIRE( c.PrevSibling()      == &a );
     REQUIRE( parent.FirstChild()  == &a );
@@ -195,7 +195,7 @@ TEST_CASE( "DetachFromParent on last child re-links remaining children", "[layou
 
     b.DetachFromParent();
 
-    REQUIRE( parent.NumChildren == 1 );
+    REQUIRE( parent.ChildCount() == 1 );
     REQUIRE( parent.LastChild()   == &a );
     REQUIRE( a.NextSibling()      == nullptr );
 }
@@ -220,7 +220,7 @@ TEST_CASE( "InsertChildAfter places new child immediately after the given siblin
     parent.PushBackChild( c );
     parent.InsertChildAfter( b, a ); // a → b → c
 
-    REQUIRE( parent.NumChildren == 3 );
+    REQUIRE( parent.ChildCount() == 3 );
     REQUIRE( parent.FirstChild()  == &a );
     REQUIRE( parent.LastChild()   == &c );
     REQUIRE( a.NextSibling()      == &b );
@@ -237,7 +237,7 @@ TEST_CASE( "InsertChildAfter at the last position updates LastChild", "[layoutno
     parent.PushBackChild( a );
     parent.InsertChildAfter( b, a ); // a → b
 
-    REQUIRE( parent.NumChildren == 2 );
+    REQUIRE( parent.ChildCount() == 2 );
     REQUIRE( parent.LastChild()   == &b );
     REQUIRE( a.NextSibling()      == &b );
     REQUIRE( b.PrevSibling()      == &a );
@@ -257,7 +257,7 @@ TEST_CASE( "InsertChildBefore places new child immediately before the given sibl
     parent.PushBackChild( c );
     parent.InsertChildBefore( b, c ); // a → b → c
 
-    REQUIRE( parent.NumChildren == 3 );
+    REQUIRE( parent.ChildCount() == 3 );
     REQUIRE( parent.FirstChild()  == &a );
     REQUIRE( parent.LastChild()   == &c );
     REQUIRE( a.NextSibling()      == &b );
@@ -274,7 +274,7 @@ TEST_CASE( "InsertChildBefore at the first position updates FirstChild", "[layou
     parent.PushBackChild( b );
     parent.InsertChildBefore( a, b ); // a → b
 
-    REQUIRE( parent.NumChildren == 2 );
+    REQUIRE( parent.ChildCount() == 2 );
     REQUIRE( parent.FirstChild()  == &a );
     REQUIRE( a.PrevSibling()      == nullptr );
     REQUIRE( a.NextSibling()      == &b );
