@@ -362,7 +362,13 @@ namespace RatUI
         TryFlatten();
     }
 
-    void DrawBatcher::EmitText( const ShapedText& a_Text, const TextRenderStyle& a_Style, Rect<Pixel> a_LayoutRect, GlyphAtlas& a_Atlas, f32 a_DpiScale )
+    void DrawBatcher::EmitText( 
+        const ShapedText& a_Text, 
+        const TextRenderStyle& a_Style, 
+        Rect<Pixel> a_LayoutRect, 
+        GlyphAtlas& a_Atlas, 
+        f32 a_DpiScale, 
+        u32 a_MaxGlyphs )
     {
         if ( Empty( a_Text.Glyphs ) || Empty( a_Text.Lines ) )
             return;
@@ -439,7 +445,8 @@ namespace RatUI
         }
     
         Pixel penY = baselineY;
-    
+        u32 numGlyphs = 0;
+
         for ( u32 lineIdx = 0; lineIdx < a_Text.LineCount(); ++lineIdx )
         {
             const ShapedLine& line = a_Text.Lines[lineIdx];
@@ -463,6 +470,11 @@ namespace RatUI
     
             for ( u32 g = line.Start; g < line.End; ++g )
             {
+                // Even if a glyph is skipped due to missing metrics, we still count it towards the total glyph limit.
+                // By doing this, we ensure that the glyph limit is respected even if some glyphs cannot be rendered.
+                if ( numGlyphs++ >= a_MaxGlyphs )
+                    break; // Stop processing glyphs if we've reached the maximum glyph limit
+
                 const ShapedGlyph& sg = a_Text.Glyphs[g];
     
                 Optional<GlyphMetrics> gr = a_Atlas.GetOrRasterizeGlyph( a_Text.Font, sg.GlyphIndex );
@@ -506,6 +518,9 @@ namespace RatUI
                 penX += ToPixel( sg.XAdvance, fontSize, a_DpiScale );
                 vertexBase += 4;
             }
+
+            if ( numGlyphs >= a_MaxGlyphs )
+                break; // Stop processing lines if we've reached the maximum glyph limit
     
             penY += ToPixel( a_Text.LineHeight, a_DpiScale );
         }

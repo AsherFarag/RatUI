@@ -111,6 +111,18 @@ public:
             .WidthMode( ESizingMode::Flex )
             .HeightMode( ESizingMode::Content );
 
+        m_DynamicVisibleGlyphsText = m_Scene.CreateWidget<TextWidget>(
+            previewCard->GetLayoutID(),
+            MakeText( "My game dialogue uses visible glyphs system. "
+                      "This only affects the rendering of the text, not the layout or shaped text data. "
+                      "This is useful when you have text that is being revealed over time, such as in a dialogue system, and you want to show only the visible glyphs without affecting the layout of the text. "
+            ),
+            MakeTextLayout( 16_u, ETextOverflow::Clip, TextWrap::WrapWord() ) );
+		m_DynamicVisibleGlyphsText->Theme = m_ActiveTheme;
+        m_DynamicVisibleGlyphsText->GetLayout()
+            .FixedWidth( 280_u )
+            .FlexHeight();
+
         // Add TextWidget with vertical overflow to demonstrate text overflow handling in the active theme.
         // This will intentionally overflow to show the fade effect.
         {
@@ -173,6 +185,11 @@ public:
 
 	void Render( DrawList& a_DrawList, f32 a_DeltaSeconds ) override
     {
+        static f32 timeAccumulator = 0.f;
+		timeAccumulator += a_DeltaSeconds;
+
+		m_DynamicVisibleGlyphsText->VisibleGlyphs = 500 * ( std::fmodf( timeAccumulator, 10.f ) / 10.f );
+
         m_Scene.Render( a_DrawList, a_DeltaSeconds );
     }
 
@@ -183,7 +200,8 @@ private:
     size          m_ActiveThemeIndex{ 0 };
 
     std::array<String, 4> m_ThemeNames{ "Dark", "Light", "Neon", "Minecraft" };
-    TextWidget* m_StatusText{ nullptr }; ///< Cached pointer — valid for the lifetime of the scene.
+    TextWidget* m_StatusText{ nullptr };
+	TextWidget* m_DynamicVisibleGlyphsText{ nullptr };
 
     TextLayoutStyle MakeTextLayout( Unit a_Size, ETextOverflow a_Overflow, TextWrap a_Wrap = TextWrap::NoWrap() ) const
     {

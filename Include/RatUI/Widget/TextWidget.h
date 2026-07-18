@@ -16,6 +16,7 @@ namespace RatUI
         // --------------------------------------------------------------------
 
         TextRenderStyle RenderStyle{};
+        u32 VisibleGlyphs = Limits<u32>::max(); ///< Maximum number of glyphs to draw.
 
         TextWidget( Text a_Text = {}, const TextLayoutStyle& a_Style = {} )
             : m_Text       ( std::move( a_Text ) )
@@ -176,13 +177,13 @@ namespace RatUI
                 case ETextOverflow::Fade:
                 {
                     //a_Event.DrawList.PushClipRect( textRect );
-                    a_Event.Drawer.AddText( *m_ShapedText, effectiveStyle, textRect );
+                    a_Event.Drawer.AddText( *m_ShapedText, effectiveStyle, textRect, VisibleGlyphs );
                     //a_Event.DrawList.PopClipRect();
                     break;
                 }
                 default:
                 {
-                    a_Event.Drawer.AddText( *m_ShapedText, effectiveStyle, textRect );
+                    a_Event.Drawer.AddText( *m_ShapedText, effectiveStyle, textRect, VisibleGlyphs );
                     break;
                 }
             }

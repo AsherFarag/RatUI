@@ -166,7 +166,8 @@ namespace RatUI
             const TextRenderStyle& a_Style,
             Rect<Pixel>            a_LayoutRect,
             GlyphAtlas&            a_Atlas,
-            f32                    a_DpiScale );
+            f32                    a_DpiScale,
+            u32                    a_MaxGlyphs = Limits<u32>::max() );
 
     protected:
         Array<byte>      m_Vertices;

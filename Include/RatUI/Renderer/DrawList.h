@@ -166,8 +166,17 @@ namespace RatUI
 		 * @brief Adds shaped text to the draw list with the specified style.
 		 * The text will be transformed and clipped according to the current transform and clip stacks. 
          * The font size in the ShapedText is in units, but will be scaled to pixels based on the atlas configuration and current DPI scale.
+         * @param a_Shaped The shaped text to render, which contains the sequence of glyphs and layout information.
+         * @param a_Style The rendering style for the text, including fill color, outline, shadow, etc.
+         * @param a_Rect The layout rectangle in which to render the text. The text will be clipped to this rectangle.
+         * @param a_MaxGlyphs The maximum number of glyphs to render. Useful for effects in games where you want to reveal text gradually. Default is unlimited.
+         * @return A reference to the DrawList, allowing for method chaining.
          */
-        DrawList& AddText( const ShapedText& a_Shaped, const TextRenderStyle& a_Style, Rect<Unit> a_Rect )
+        DrawList& AddText( 
+            const ShapedText& a_Shaped, 
+            const TextRenderStyle& a_Style, 
+            Rect<Unit> a_Rect, 
+            u32 a_MaxGlyphs = Limits<u32>::max() )
 		{
 			const f32   baseSize   = m_Atlas.GetConfig().BaseSize.ToFloat();
             const Pixel fontSizePx = ToPixel( a_Shaped.FontSize, m_DPIScale );
@@ -175,7 +184,7 @@ namespace RatUI
 
 			DrawBatcher& batcher = GetCurrentBatcher();
             batcher.EnsureMSDFTextBatch( GetPixelClipRect(), GetPixelTransform(), MSDFTextDrawData::From( m_Atlas.GetTexture(), a_Style, msdfScale));
-			batcher.EmitText( a_Shaped, a_Style, ToPixelRect( a_Rect ), m_Atlas, m_DPIScale );
+			batcher.EmitText( a_Shaped, a_Style, ToPixelRect( a_Rect ), m_Atlas, m_DPIScale, a_MaxGlyphs );
             return *this;
         }
 
