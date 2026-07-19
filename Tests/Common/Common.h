@@ -6,18 +6,10 @@
  */
 
 #include <RatUI/RatUI.h>
+#include <RatUI/Backends/Null.h>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 #include <format>
-
-namespace RatUI
-{
-    // This is a stub implementation of GetRendererFromTexture for testing purposes.
-    RATUI_NODISCARD inline IRenderer* GetRendererFromTexture( const TextureHandle& )
-    {
-		return nullptr;
-    }
-}
 
 // Approximate float comparison tolerance used throughout the test suite.
 inline constexpr float k_FloatEpsilon = 1e-5f;
