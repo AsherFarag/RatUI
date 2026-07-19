@@ -427,8 +427,12 @@ namespace RatUI::OpenGL
     {
         if ( IsValidTexture( a_Texture ) )
         {
-            const Texture* tex = static_cast<const Texture*>( a_Texture.get() );
+            Texture* tex = static_cast<Texture*>( a_Texture.get() );
             glDeleteTextures( 1, &tex->ID );
+
+            // Invalidate the texture
+            tex->ID = 0;
+            tex->Renderer = nullptr;
         }
     }
 
