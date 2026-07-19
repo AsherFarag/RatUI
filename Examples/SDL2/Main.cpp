@@ -244,16 +244,16 @@ TextureHandle LoadTexture( const char* a_FilePath, TextureSampler a_Sampler )
     if ( !data )
     {
         std::cerr << "Failed to load texture: " << a_FilePath << "\n";
-        return TextureHandle::Null();
+        return {};
     }
 
 
     TextureHandle handle = g_Renderer->CreateTexture( 
-        { 
-            .Size = { (u32)width, (u32)height },
-            .Format = ETextureFormat::RGBA8,
-            .Sampler = a_Sampler 
-        }, data );
+    { 
+        .Size = { (u32)width, (u32)height },
+        .Format = ETextureFormat::RGBA8,
+        .Sampler = a_Sampler 
+    }, data );
 
     stbi_image_free( data );
     return handle;

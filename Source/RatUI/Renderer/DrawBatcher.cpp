@@ -246,11 +246,17 @@ namespace RatUI
         // TODO: Need cleaner and safer api here
 		const TextureHandle& texture = std::get<SDFDrawData>( Back( m_Batches ).Data ).Texture;
 
-        Optional<TextureInfo> texInfo = texture.QueryInfo();
+		IRenderer* renderer = GetRendererFromTexture( texture );
+        if ( !renderer )
+        {
+			RATUI_USER_ASSERT( false, "Failed to get renderer from texture for nine-slice rect" );
+			return;
+        }
 
+		Optional<TextureInfo> texInfo = GetRendererFromTexture( texture )->QueryTextureInfo( texture );
         if ( !texInfo )
         {
-			RATUI_ASSERT( false, "Failed to query texture info for nine-slice rect" );
+            RATUI_USER_ASSERT( false, "Failed to query texture info for nine-slice rect" );
             return;
         }
 

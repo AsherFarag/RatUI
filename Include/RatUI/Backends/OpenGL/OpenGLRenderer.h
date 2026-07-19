@@ -3,37 +3,32 @@
 #include "../../Renderer/Shaders/GLSL.h"
 #include "../FreeType/FontCache.h"
 
-/**
- * @file OpenGLRenderer.h
- * @brief OpenGL renderer backend with MSDF text support.
- *
- * **Usage**
- * 1. Create an OpenGLRenderer after an OpenGL context is current.
- * 2. Call Execute( batcher ) each frame.
- *
- * **GL loader**
- * Include your preferred OpenGL loader header *before* this file, e.g.
- *   @code
- *   #include <glad/glad.h>
- *   #include <RatUI/Backends/OpenGL/OpenGLRenderer.h>
- *   @endcode
- * Alternatively define RATUI_OPENGL_INCLUDE to your loader path and the
- * renderer will include it automatically:
- *   @code
- *   #define RATUI_OPENGL_INCLUDE <glad/glad.h>
- *   @endcode
- *
- * **Coordinate system**
- * Clip-space transform is injected via the u_PVM uniform (ortho 2-D,
- * top-left origin, Y-down).  Call SetViewport() when the window is resized.
- */
-
 #ifdef RATUI_OPENGL_INCLUDE
 #   include RATUI_OPENGL_INCLUDE
 #endif
 
 namespace RatUI::OpenGL
 {
+	class OpenGLRenderer;
+
+    /**
+     * @brief Internal OpenGL texture resource managed by the OpenGLRenderer.
+     * TextureHandle is a shared pointer to this struct, which allows the renderer to manage the lifetime of the OpenGL texture resource.
+     */
+    struct Texture
+    {
+		OpenGLRenderer* Renderer{ nullptr };
+		GLuint ID{ 0 };
+    };
+
+    /**
+     * @brief Create a TextureHandle from an OpenGL texture ID, which will be managed by the given OpenGLRenderer.
+     */
+	RATUI_NODISCARD TextureHandle MakeTextureHandle( OpenGLRenderer& a_Renderer, GLuint a_GLTextureID )
+    {
+		return MakeShared<Texture>( &a_Renderer, a_GLTextureID );
+    }
+
     /**
      * @brief OpenGL 3.3 renderer for RatUI.
      *
@@ -70,10 +65,10 @@ namespace RatUI::OpenGL
         void SetViewport( int a_Width, int a_Height );
         void Execute( const DrawBatcher& a_Batcher ) override;
         TextureHandle CreateTexture( TextureInfo a_Info, const void* a_Data ) override;
-        bool UpdateTexture( TextureID a_Texture, u32 a_MipLevel, Rectu a_Region, const void* a_Data, size a_DataSizeBytes ) override;
-        void DestroyTexture( TextureID a_Texture ) override;
-        bool IsValidTexture( TextureID a_Texture ) const override;
-		Optional<TextureInfo> QueryTextureInfo( TextureID a_Texture ) const override;
+        bool UpdateTexture( const TextureHandle& a_Texture, u32 a_MipLevel, Rectu a_Region, const void* a_Data, size a_DataSizeBytes ) override;
+        void DestroyTexture( const TextureHandle& a_Texture ) override;
+        bool IsValidTexture( const TextureHandle& a_Texture ) const override;
+		Optional<TextureInfo> QueryTextureInfo( const TextureHandle& a_Texture ) const override;
 
     private:
 
@@ -124,6 +119,19 @@ namespace RatUI::OpenGL
 
         TextureHandle m_WhitePixelTexture; // TODO: Expose a default white texture for users to avoid creating their own
     };
+
+} // namespace RatUI::OpenGL
+
+namespace RatUI
+{
+    RATUI_NODISCARD IRenderer* GetRendererFromTexture( const TextureHandle& a_Texture )
+    {
+		return a_Texture ? static_cast<OpenGL::Texture*>( a_Texture.get() )->Renderer : nullptr;
+    }
+}
+
+namespace RatUI::OpenGL
+{
 
     // =====================================================================
     // Implementation
@@ -375,15 +383,12 @@ namespace RatUI::OpenGL
 
         glBindTexture( GL_TEXTURE_2D, 0 );
 
-        TextureID id;
-        id.ID = static_cast<uptr>( texID );
-
-        return TextureHandle(  MakeShared<Texture>( *this, id ) );
+		return MakeTextureHandle( *this, texID );
     }
 
-    bool OpenGLRenderer::UpdateTexture( TextureID a_Texture, u32 /*a_MipLevel*/, Rectu a_Region, const void* a_Data, size a_DataSizeBytes )
+    bool OpenGLRenderer::UpdateTexture( const TextureHandle& a_Texture, u32 /*a_MipLevel*/, Rectu a_Region, const void* a_Data, size a_DataSizeBytes )
     {
-        if ( a_Texture == TextureID::Null() || !a_Data )
+        if ( !a_Texture || !a_Data )
             return false;
 
         const u32 w = a_Region.Size[0];
@@ -398,7 +403,8 @@ namespace RatUI::OpenGL
         else if ( a_DataSizeBytes == pixelCount * 4u )
             fmt = GL_RGBA;
 
-        glBindTexture( GL_TEXTURE_2D, static_cast<GLuint>( a_Texture.ID ) );
+		const Texture* tex = static_cast<const Texture*>( a_Texture.get() );
+        glBindTexture( GL_TEXTURE_2D, static_cast<GLuint>( tex->ID ) );
         glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
         glTexSubImage2D( GL_TEXTURE_2D, 0,
                          static_cast<GLint>( a_Region.Origin[0] ),
@@ -411,26 +417,27 @@ namespace RatUI::OpenGL
         return true;
     }
 
-    void OpenGLRenderer::DestroyTexture( TextureID a_Texture )
+    void OpenGLRenderer::DestroyTexture( const TextureHandle& a_Texture )
     {
         if ( IsValidTexture( a_Texture ) )
         {
-            GLuint texID = static_cast<GLuint>( a_Texture.ID );
-            glDeleteTextures( 1, &texID );
+            const Texture* tex = static_cast<const Texture*>( a_Texture.get() );
+            glDeleteTextures( 1, &tex->ID );
         }
     }
 
-    bool OpenGLRenderer::IsValidTexture( TextureID a_Texture ) const
+    bool OpenGLRenderer::IsValidTexture( const TextureHandle& a_Texture ) const
     {
-        return a_Texture.ID != 0;
+		return a_Texture && static_cast<const Texture*>( a_Texture.get() )->Renderer == this;
     }
 
-    Optional<TextureInfo> OpenGLRenderer::QueryTextureInfo( TextureID a_Texture ) const
+    Optional<TextureInfo> OpenGLRenderer::QueryTextureInfo( const TextureHandle& a_Texture ) const
     {
         if ( !IsValidTexture( a_Texture ) )
             return NullOpt;
 
-        glBindTexture( GL_TEXTURE_2D, static_cast<GLuint>( a_Texture.ID ) );
+        const Texture* tex = static_cast<const Texture*>( a_Texture.get() );
+        glBindTexture( GL_TEXTURE_2D, static_cast<GLuint>( tex->ID ) );
 
         TextureInfo info{};
 
@@ -495,19 +502,19 @@ namespace RatUI::OpenGL
     {
         glActiveTexture( GL_TEXTURE0 );
 
-        if ( TextureID texID = a_Data.Texture.GetID(); IsValidTexture( texID ) )
+        if ( IsValidTexture( a_Data.Texture ) )
         {
-            glBindTexture( GL_TEXTURE_2D, static_cast<GLuint>( texID.ID ) );
+            glBindTexture( GL_TEXTURE_2D, static_cast<const Texture*>( a_Data.Texture.get() )->ID );
         }
         else
         {
-            if ( m_WhitePixelTexture.GetID() == TextureID::Null() )
+            if ( !m_WhitePixelTexture )
             {
                 const u8 whitePixel[4] = { 255, 255, 255, 255 };
                 m_WhitePixelTexture = CreateTexture( { .Size = { 1, 1 }, .Format = ETextureFormat::RGBA8 }, whitePixel );
             }
 
-            glBindTexture( GL_TEXTURE_2D, static_cast<GLuint>( m_WhitePixelTexture.GetID().ID ) );
+			glBindTexture( GL_TEXTURE_2D, static_cast<const Texture*>( m_WhitePixelTexture.get() )->ID );
         }
 
         glBindVertexArray( m_SDFVAO );
@@ -528,10 +535,10 @@ namespace RatUI::OpenGL
 
     void OpenGLRenderer::DispatchBatch( const MSDFTextDrawData& a_Data, u32 a_VertexByteOffset, const f32 a_PVM[16] )
     {
-        if ( TextureID texID = a_Data.FontAtlas.GetID(); IsValidTexture( texID ) )
+        if ( IsValidTexture( a_Data.FontAtlas ) )
         {
             glActiveTexture( GL_TEXTURE0 );
-            glBindTexture( GL_TEXTURE_2D, static_cast<GLuint>( texID.ID ) );
+			glBindTexture( GL_TEXTURE_2D, static_cast<const Texture*>( a_Data.FontAtlas.get() )->ID );
         }
 
         glBindVertexArray( m_TextVAO );
