@@ -253,7 +253,7 @@ namespace RatUI
 			return;
         }
 
-		Optional<TextureInfo> texInfo = GetRendererFromTexture( texture )->QueryTextureInfo( texture );
+		Optional<TextureInfo> texInfo = renderer->QueryTextureInfo( texture );
         if ( !texInfo )
         {
             RATUI_USER_ASSERT( false, "Failed to query texture info for nine-slice rect" );
