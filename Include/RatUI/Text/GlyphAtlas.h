@@ -86,7 +86,7 @@ namespace RatUI
             if ( const auto it = Find( m_GlyphMap, key ); it != End( m_GlyphMap ) )
                 return it->second;
 
-            if ( !m_Texture.IsValid() )
+            if ( !m_Texture )
                 return NullOpt; // Can't upload if texture is invalid.
 
             const Color* pixels = nullptr; // In RGBA8 format
@@ -116,7 +116,7 @@ namespace RatUI
             if ( auto region = AllocateRegion( static_cast<u16>( width ), static_cast<u16>( height ) ) )
             {
                 const size dataSizeBytes = static_cast<size>( width ) * height * sizeof( Color );
-                m_Renderer.UpdateTexture( m_Texture.GetID(), 0, region->Cast<u32>(), pixels, dataSizeBytes);
+                m_Renderer.UpdateTexture( m_Texture, 0, region->Cast<u32>(), pixels, dataSizeBytes);
 
                 GlyphMetrics rect { .Bearing   = bearing,
                                     .AtlasRect = *region,
