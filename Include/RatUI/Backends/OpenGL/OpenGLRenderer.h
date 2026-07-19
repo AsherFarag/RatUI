@@ -24,10 +24,10 @@ namespace RatUI::OpenGL
     /**
      * @brief Create a TextureHandle from an OpenGL texture ID, which will be managed by the given OpenGLRenderer.
      */
-	RATUI_NODISCARD TextureHandle MakeTextureHandle( OpenGLRenderer& a_Renderer, GLuint a_GLTextureID )
-    {
-		return MakeShared<Texture>( &a_Renderer, a_GLTextureID );
-    }
+	RATUI_NODISCARD inline TextureHandle MakeTextureHandle( OpenGLRenderer& a_Renderer, GLuint a_GLTextureID )
+	{
+		return MakeShared<Texture>( Texture{ &a_Renderer, a_GLTextureID } );
+	}
 
     /**
      * @brief OpenGL 3.3 renderer for RatUI.
