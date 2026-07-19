@@ -394,7 +394,7 @@ namespace RatUI::OpenGL
 
     bool OpenGLRenderer::UpdateTexture( const TextureHandle& a_Texture, u32 /*a_MipLevel*/, Rectu a_Region, const void* a_Data, size a_DataSizeBytes )
     {
-        if ( !a_Texture || !a_Data )
+        if ( !IsValidTexture( a_Texture ) || !a_Data )
             return false;
 
         const u32 w = a_Region.Size[0];
