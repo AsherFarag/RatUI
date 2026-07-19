@@ -19,6 +19,12 @@ namespace RatUI::OpenGL
     {
 		OpenGLRenderer* Renderer{ nullptr };
 		GLuint ID{ 0 };
+
+		~Texture()
+		{
+			if ( ID != 0 )
+				glDeleteTextures( 1, &ID );
+		}
     };
 
     /**
