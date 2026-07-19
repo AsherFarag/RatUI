@@ -124,9 +124,9 @@ namespace RatUI::OpenGL
 
 namespace RatUI
 {
-    RATUI_NODISCARD IRenderer* GetRendererFromTexture( const TextureHandle& a_Texture )
+    RATUI_NODISCARD inline IRenderer* GetRendererFromTexture( const TextureHandle& a_Texture )
     {
-		return a_Texture ? static_cast<OpenGL::Texture*>( a_Texture.get() )->Renderer : nullptr;
+		return a_Texture ? static_cast<const OpenGL::Texture*>( a_Texture.get() )->Renderer : nullptr;
     }
 }
 
