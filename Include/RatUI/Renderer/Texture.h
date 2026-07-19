@@ -11,14 +11,6 @@ namespace RatUI
     using TextureHandle = Shared<void>;
 
     /**
-     * @brief Retrieves the renderer associated with a given texture handle.
-     * @param a_Texture The texture handle for which to retrieve the renderer.
-     * @return A pointer to the renderer, or nullptr if the texture is invalid.
-	 * @note This function must be implemented by the renderer backend to allow users to query the renderer from a texture handle.
-     */
-    RATUI_NODISCARD extern IRenderer* GetRendererFromTexture( const TextureHandle& a_Texture );
-
-    /**
      * @brief Defines the dimensions of the corners and edges for nine-slice scaling of textures.
      */
     struct NineSlice

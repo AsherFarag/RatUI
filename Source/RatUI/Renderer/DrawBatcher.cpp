@@ -241,29 +241,13 @@ namespace RatUI
         TryFlatten();
     }
 
-    void DrawBatcher::EmitSlicedRect( Rect<Pixel> a_Rect, NineSlice a_Slice, Color a_Tint )
+    void DrawBatcher::EmitSlicedRect( Rect<Pixel> a_Rect, NineSlice a_Slice, Vec2u a_TextureSize, Color a_Tint )
     {
         // TODO: Need cleaner and safer api here
 		const TextureHandle& texture = std::get<SDFDrawData>( Back( m_Batches ).Data ).Texture;
 
-		IRenderer* renderer = GetRendererFromTexture( texture );
-        if ( !renderer )
-        {
-			RATUI_USER_ASSERT( false, "Failed to get renderer from texture for nine-slice rect" );
-			return;
-        }
-
-		Optional<TextureInfo> texInfo = renderer->QueryTextureInfo( texture );
-        if ( !texInfo )
-        {
-            RATUI_USER_ASSERT( false, "Failed to query texture info for nine-slice rect" );
-            return;
-        }
-
-		const Vec2u texSize = texInfo->Size;
-
-        const f32 rcpTexW = 1.f / static_cast<f32>( texSize[0] );
-        const f32 rcpTexH = 1.f / static_cast<f32>( texSize[1] );
+        const f32 rcpTexW = 1.f / static_cast<f32>( a_TextureSize[0] );
+        const f32 rcpTexH = 1.f / static_cast<f32>( a_TextureSize[1] );
 
         const f32 rectW = a_Rect.Size[0].ToFloat();
         const f32 rectH = a_Rect.Size[1].ToFloat();

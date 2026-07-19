@@ -1,14 +1,6 @@
 #pragma once
 #include "../RatUI.h"
 
-namespace RatUI
-{
-    RATUI_NODISCARD inline IRenderer* GetRendererFromTexture( const TextureHandle& )
-    {
-		return nullptr;
-    }
-}
-
 namespace RatUI::Null
 {
     class NullRenderer : public IRenderer

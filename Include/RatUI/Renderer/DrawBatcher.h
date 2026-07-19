@@ -158,7 +158,8 @@ namespace RatUI
                        Vec4<Pixel> a_Rounding = {} );
 
         void EmitSlicedRect( Rect<Pixel> a_Rect, 
-                             NineSlice a_NineSlice, 
+                             NineSlice a_NineSlice,
+                             Vec2u a_TextureSize,
                              Color a_Tint = Colors::White );
 
         void EmitText(

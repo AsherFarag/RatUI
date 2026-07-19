@@ -17,23 +17,31 @@ namespace RatUI::OpenGL
      */
     struct Texture
     {
-		OpenGLRenderer* Renderer{ nullptr };
-		GLuint ID{ 0 };
+        OpenGLRenderer* Renderer{ nullptr };
+        GLuint ID{ 0 };
 
-		~Texture()
-		{
-			if ( ID != 0 )
-				glDeleteTextures( 1, &ID );
-		}
+        Texture( OpenGLRenderer& a_Renderer, GLuint a_GLTextureID )
+            : Renderer( &a_Renderer )
+            , ID( a_GLTextureID )
+        {}
+
+        ~Texture()
+        {
+            if ( ID != 0 )
+                glDeleteTextures( 1, &ID );
+        }
+
+        Texture( const Texture& ) = delete;
+        Texture& operator=( const Texture& ) = delete;
     };
 
     /**
      * @brief Create a TextureHandle from an OpenGL texture ID, which will be managed by the given OpenGLRenderer.
      */
-	RATUI_NODISCARD inline TextureHandle MakeTextureHandle( OpenGLRenderer& a_Renderer, GLuint a_GLTextureID )
-	{
-		return MakeShared<Texture>( Texture{ &a_Renderer, a_GLTextureID } );
-	}
+    RATUI_NODISCARD inline TextureHandle MakeTextureHandle( OpenGLRenderer& a_Renderer, GLuint a_GLTextureID )
+    {
+        return MakeShared<Texture>( a_Renderer, a_GLTextureID );
+    }
 
     /**
      * @brief OpenGL 3.3 renderer for RatUI.
@@ -127,14 +135,6 @@ namespace RatUI::OpenGL
     };
 
 } // namespace RatUI::OpenGL
-
-namespace RatUI
-{
-    RATUI_NODISCARD inline IRenderer* GetRendererFromTexture( const TextureHandle& a_Texture )
-    {
-		return a_Texture ? static_cast<const OpenGL::Texture*>( a_Texture.get() )->Renderer : nullptr;
-    }
-}
 
 namespace RatUI::OpenGL
 {

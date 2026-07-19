@@ -131,10 +131,19 @@ namespace RatUI
 
 		DrawList& AddSlicedRect( Rect<Unit> a_Rect, const SlicedRectStyle& a_Style )
 		{
-			DrawBatcher& batcher = GetCurrentBatcher();
+            // TODO: Dodgy way of getting the renderer for the texture.
+            // There should be a correct way to get the associated renderer for the texture or at least its size.
+            auto texInfo = m_Atlas.GetRenderer().QueryTextureInfo( a_Style.Texture );
+            if ( !texInfo )
+            {
+                return *this;
+            }
+
+            DrawBatcher& batcher = GetCurrentBatcher();
             batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), a_Style.Texture );
             batcher.EmitSlicedRect( ToPixelRect( a_Rect ),
                 a_Style.Slice,
+                texInfo->Size,
                 a_Style.Tint );
 
 			return *this;
