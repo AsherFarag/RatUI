@@ -155,9 +155,9 @@ namespace RatUI
 			Vec2u sliceSize = texInfo->Size;
 			if ( !a_Style.Texture.Region.IsInfinite() )
 			{
-                sliceSize = { 
-                    (u32)a_Style.Texture.Region.Size[0], 
-                    (u32)a_Style.Texture.Region.Size[1] 
+                sliceSize = {
+                    static_cast<u32>( a_Style.Texture.Region.Size[0] ),
+                    static_cast<u32>( a_Style.Texture.Region.Size[1] )
                 };
 			}
 
