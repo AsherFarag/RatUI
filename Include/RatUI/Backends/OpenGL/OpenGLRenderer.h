@@ -512,9 +512,9 @@ namespace RatUI::OpenGL
     {
         glActiveTexture( GL_TEXTURE0 );
 
-        if ( IsValidTexture( a_Data.Texture ) )
+        if ( IsValidTexture( a_Data.Texture.Handle ) )
         {
-            glBindTexture( GL_TEXTURE_2D, static_cast<const Texture*>( a_Data.Texture.get() )->ID );
+            glBindTexture( GL_TEXTURE_2D, static_cast<const Texture*>( a_Data.Texture.Handle.get() )->ID );
         }
         else
         {

@@ -70,4 +70,35 @@ namespace RatUI
 		TextureSampler Sampler; ///< The sampling parameters for the texture, such as filtering mode.
     };
 
+    struct TextureView
+    {
+        TextureHandle Handle;
+        Rect<u16>     Region{ Rect<u16>::Infinite() }; ///< The region of the texture to be used for rendering. Defaults to the entire texture.
+
+        bool operator==( const TextureView& a_Other ) const = default;
+    };
+
+    /**
+     * @brief Helper function to compute the UV coordinates for a given texture region and full texture size.
+     * The UV coordinates are normalized texture coordinates in the range [0, 1], 
+     * where (0, 0) corresponds to the top-left corner of the texture and (1, 1) corresponds to the bottom-right corner.
+     * @param a_Region The pixel region of the texture to be used for rendering, as specified in a TextureView.
+     * @param a_FullTextureSize The size, in pixels, of the full underlying texture that the view references.
+     * @return A Rect<f32> whose Origin/Size describe the UV sub-rect for a_View.Region.
+     */
+    template<typename T>
+    inline Rect<f32> ComputeUVRect( Rect<T> a_Region, Vec2u a_FullTextureSize )
+    {
+        if ( a_Region.IsInfinite() || a_FullTextureSize[0] == 0 || a_FullTextureSize[1] == 0 )
+            return Rect<f32>{ Vec2f{ 0.f, 0.f }, Vec2f{ 1.f, 1.f } };
+
+        const f32 rcpW = 1.f / static_cast<f32>( a_FullTextureSize[0] );
+        const f32 rcpH = 1.f / static_cast<f32>( a_FullTextureSize[1] );
+
+        return Rect<f32>{
+            Vec2f{ static_cast<f32>( a_Region.Origin[0] ) * rcpW, static_cast<f32>( a_Region.Origin[1] ) * rcpH },
+            Vec2f{ static_cast<f32>( a_Region.Size[0] )   * rcpW, static_cast<f32>( a_Region.Size[1] )   * rcpH }
+        };
+    }
+
 } // namespace RatUI

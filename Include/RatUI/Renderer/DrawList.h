@@ -21,22 +21,22 @@ namespace RatUI
             Color          BorderColor{ Colors::Transparent };
             Unit           BorderThickness{ 0_u };
             CornerRounding Rounding{ CornerRounding::None() };
-            TextureHandle  Texture{};
+            TextureView    Texture{};
         };
 
         struct SlicedRectStyle
         {
-            TextureHandle Texture;
-            NineSlice     Slice;
-            Color         Tint{ Colors::White };
+            TextureView Texture;
+            NineSlice   Slice;
+            Color       Tint{ Colors::White };
         };
     
         struct CircleStyle
         {
-            Color         FillColor{ Colors::Transparent };
-            Color         BorderColor{ Colors::Transparent };
-            Unit          BorderThickness{ 0_u };
-            TextureHandle Texture{};
+            Color       FillColor{ Colors::Transparent };
+            Color       BorderColor{ Colors::Transparent };
+            Unit        BorderThickness{ 0_u };
+            TextureView Texture{};
         };
 
 		DrawList( GlyphAtlas& a_Atlas, f32 a_DPIScale = 1.f )
@@ -119,13 +119,23 @@ namespace RatUI
          */
         DrawList& AddRect( Rect<Unit> a_Rect, RectStyle a_Style )
         {
+            // Only need to query the renderer for the full texture size when the view references
+            // a sub-region; a default (infinite) Region always maps to the full [0, 1] UV rect.
+            Rect<f32> uvRect{ Vec2f{ 0.f, 0.f }, Vec2f{ 1.f, 1.f } };
+            if ( a_Style.Texture.Handle && !a_Style.Texture.Region.IsInfinite() )
+            {
+                if ( auto texInfo = m_Atlas.GetRenderer().QueryTextureInfo( a_Style.Texture.Handle ) )
+                    uvRect = ComputeUVRect( a_Style.Texture.Region, texInfo->Size );
+            }
+
             DrawBatcher& batcher = GetCurrentBatcher();
             batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), std::move( a_Style.Texture ) );
             batcher.EmitRect( ToPixelRect( a_Rect ), 
                 a_Style.FillColor, 
                 ToPixel( a_Style.BorderThickness, m_DPIScale ), 
                 a_Style.BorderColor, 
-                ToPixelRounding( a_Style.Rounding ) );
+                ToPixelRounding( a_Style.Rounding ),
+                uvRect );
             return *this;
         }
 
@@ -133,18 +143,30 @@ namespace RatUI
 		{
             // TODO: Dodgy way of getting the renderer for the texture.
             // There should be a correct way to get the associated renderer for the texture or at least its size.
-            auto texInfo = m_Atlas.GetRenderer().QueryTextureInfo( a_Style.Texture );
+            auto texInfo = m_Atlas.GetRenderer().QueryTextureInfo( a_Style.Texture.Handle );
             if ( !texInfo )
             {
                 return *this;
             }
 
+			Vec2u sliceSize = texInfo->Size;
+			if ( !a_Style.Texture.Region.IsInfinite() )
+			{
+                sliceSize = { 
+                    (u32)a_Style.Texture.Region.Size[0], 
+                    (u32)a_Style.Texture.Region.Size[1] 
+                };
+			}
+
+            const Rect<f32> uvRect = ComputeUVRect( a_Style.Texture.Region, texInfo->Size );
+
             DrawBatcher& batcher = GetCurrentBatcher();
             batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), a_Style.Texture );
             batcher.EmitSlicedRect( ToPixelRect( a_Rect ),
                 a_Style.Slice,
-                texInfo->Size,
-                a_Style.Tint );
+				sliceSize,
+                a_Style.Tint,
+                uvRect );
 
 			return *this;
 		}
