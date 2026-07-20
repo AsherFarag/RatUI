@@ -246,6 +246,9 @@ namespace RatUI
 
     void DrawBatcher::EmitSlicedRect( Rect<Pixel> a_Rect, NineSlice a_Slice, Vec2u a_SliceSize, Color a_Tint, Rect<f32> a_UVRect )
     {
+        if ( a_SliceSize[0] == 0 || a_SliceSize[1] == 0 )
+            return; // Avoid division by zero and invalid UV mapping
+
         const f32 rcpTexW = 1.f / static_cast<f32>( a_SliceSize[0] );
         const f32 rcpTexH = 1.f / static_cast<f32>( a_SliceSize[1] );
 
