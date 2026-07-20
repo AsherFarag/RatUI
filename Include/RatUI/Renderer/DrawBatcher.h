@@ -48,7 +48,7 @@ namespace RatUI
      */
     struct SDFDrawData
     {
-        TextureHandle Texture{};
+        TextureView Texture{};
 
         /** 
          * @brief Determines if this SDFDrawData can be flattened with another, 
@@ -148,19 +148,21 @@ namespace RatUI
 		Span<const DrawBatch> GetBatches()  const noexcept { return m_Batches; }
 
         void Clear();
-        DrawBatch& EnsureSDFBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, TextureHandle a_Texture );
+        DrawBatch& EnsureSDFBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, TextureView a_Texture );
         DrawBatch& EnsureMSDFTextBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, const MSDFTextDrawData& a_Data );
 
         void EmitRect( Rect<Pixel> a_Rect,
                        Color a_FillColor,
                        Pixel a_BorderThickness = 0_px,
                        Color a_BorderColor = Colors::Transparent,
-                       Vec4<Pixel> a_Rounding = {} );
+                       Vec4<Pixel> a_Rounding = {},
+                       Rect<f32> a_UVRect = Rect<f32>{ Vec2f{ 0.f, 0.f }, Vec2f{ 1.f, 1.f } } );
 
         void EmitSlicedRect( Rect<Pixel> a_Rect, 
                              NineSlice a_NineSlice,
-                             Vec2u a_TextureSize,
-                             Color a_Tint = Colors::White );
+                             Vec2u a_SliceSize,
+                             Color a_Tint = Colors::White,
+                             Rect<f32> a_UVRect = Rect<f32>{ Vec2f{ 0.f, 0.f }, Vec2f{ 1.f, 1.f } } );
 
         void EmitText(
             const ShapedText&      a_Text,

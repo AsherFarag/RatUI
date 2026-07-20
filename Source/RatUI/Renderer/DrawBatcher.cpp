@@ -126,7 +126,7 @@ namespace RatUI
         ::RatUI::Clear( m_Batches );
     }
 
-    DrawBatch& DrawBatcher::EnsureSDFBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, TextureHandle a_Texture )
+    DrawBatch& DrawBatcher::EnsureSDFBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, TextureView a_Texture )
     {
         return EnsureBatch( a_ClipRect, a_Transform, SDFDrawData{ .Texture = std::move( a_Texture ) } );
     }
@@ -136,8 +136,11 @@ namespace RatUI
         return EnsureBatch( a_ClipRect, a_Transform, a_Data );
     }
 
-    void DrawBatcher::EmitRect( Rect<Pixel> a_Rect, Color a_FillColor, Pixel a_BorderThickness, Color a_BorderColor, Vec4<Pixel> a_Rounding )
+    void DrawBatcher::EmitRect( Rect<Pixel> a_Rect, Color a_FillColor, Pixel a_BorderThickness, Color a_BorderColor, Vec4<Pixel> a_Rounding, Rect<f32> a_UVRect )
     {
+        const auto mapU = [&]( f32 a_U ) { return a_UVRect.Origin[0] + a_U * a_UVRect.Size[0]; };
+        const auto mapV = [&]( f32 a_V ) { return a_UVRect.Origin[1] + a_V * a_UVRect.Size[1]; };
+
         const Pixel w = a_Rect.Size[0];
         const Pixel h = a_Rect.Size[1];
 
@@ -188,7 +191,7 @@ namespace RatUI
         verts[0] = {
             .Position = { cx - outerHalfW, cy - outerHalfH },
             .LocalPos = { -outerHalfW, -outerHalfH },
-            .UV = { 0.f, 0.f },
+            .UV = { mapU( 0.f ), mapV( 0.f ) },
             .FillColor = a_FillColor,
             .BorderColor = a_BorderColor,
             .BorderThickness = border,
@@ -199,7 +202,7 @@ namespace RatUI
         verts[1] = {
             .Position = { cx + outerHalfW, cy - outerHalfH },
             .LocalPos = { outerHalfW, -outerHalfH },
-            .UV = { 1.f, 0.f },
+            .UV = { mapU( 1.f ), mapV( 0.f ) },
             .FillColor = a_FillColor,
             .BorderColor = a_BorderColor,
             .BorderThickness = border,
@@ -210,7 +213,7 @@ namespace RatUI
         verts[2] = {
             .Position = { cx - outerHalfW, cy + outerHalfH },
             .LocalPos = { -outerHalfW, outerHalfH },
-            .UV = { 0.f, 1.f },
+            .UV = { mapU( 0.f ), mapV( 1.f ) },
             .FillColor = a_FillColor,
             .BorderColor = a_BorderColor,
             .BorderThickness = border,
@@ -221,7 +224,7 @@ namespace RatUI
         verts[3] = {
             .Position = { cx + outerHalfW, cy + outerHalfH },
             .LocalPos = { outerHalfW, outerHalfH },
-            .UV = { 1.f, 1.f },
+            .UV = { mapU( 1.f ), mapV( 1.f ) },
             .FillColor = a_FillColor,
             .BorderColor = a_BorderColor,
             .BorderThickness = border,
@@ -241,13 +244,16 @@ namespace RatUI
         TryFlatten();
     }
 
-    void DrawBatcher::EmitSlicedRect( Rect<Pixel> a_Rect, NineSlice a_Slice, Vec2u a_TextureSize, Color a_Tint )
+    void DrawBatcher::EmitSlicedRect( Rect<Pixel> a_Rect, NineSlice a_Slice, Vec2u a_SliceSize, Color a_Tint, Rect<f32> a_UVRect )
     {
-        // TODO: Need cleaner and safer api here
-		const TextureHandle& texture = std::get<SDFDrawData>( Back( m_Batches ).Data ).Texture;
+        if ( a_SliceSize[0] == 0 || a_SliceSize[1] == 0 )
+            return; // Avoid division by zero and invalid UV mapping
 
-        const f32 rcpTexW = 1.f / static_cast<f32>( a_TextureSize[0] );
-        const f32 rcpTexH = 1.f / static_cast<f32>( a_TextureSize[1] );
+        const f32 rcpTexW = 1.f / static_cast<f32>( a_SliceSize[0] );
+        const f32 rcpTexH = 1.f / static_cast<f32>( a_SliceSize[1] );
+
+        const auto mapU = [&]( f32 a_U ) { return a_UVRect.Origin[0] + a_U * a_UVRect.Size[0]; };
+        const auto mapV = [&]( f32 a_V ) { return a_UVRect.Origin[1] + a_V * a_UVRect.Size[1]; };
 
         const f32 rectW = a_Rect.Size[0].ToFloat();
         const f32 rectH = a_Rect.Size[1].ToFloat();
@@ -286,16 +292,17 @@ namespace RatUI
         const f32 y3 = y0 + rectH;
         const f32 y2 = y3 - dstBottom;
 
-        // Source UV split points
-        const f32 u0 = 0.f;
-        const f32 u1 = static_cast<f32>( a_Slice.Left ) * rcpTexW;
-        const f32 u2 = 1.f - static_cast<f32>( a_Slice.Right ) * rcpTexW;
-        const f32 u3 = 1.f;
+        // Source UV split points, in local [0, 1] slice space, then mapped into the
+        // TextureView's UV sub-rect so slices sourced from a texture atlas sample correctly.
+        const f32 u0 = mapU( 0.f );
+        const f32 u1 = mapU( static_cast<f32>( a_Slice.Left ) * rcpTexW );
+        const f32 u2 = mapU( 1.f - static_cast<f32>( a_Slice.Right ) * rcpTexW );
+        const f32 u3 = mapU( 1.f );
 
-        const f32 v0 = 0.f;
-        const f32 v1 = static_cast<f32>( a_Slice.Top ) * rcpTexH;
-        const f32 v2 = 1.f - static_cast<f32>( a_Slice.Bottom ) * rcpTexH;
-        const f32 v3 = 1.f;
+        const f32 v0 = mapV( 0.f );
+        const f32 v1 = mapV( static_cast<f32>( a_Slice.Top ) * rcpTexH );
+        const f32 v2 = mapV( 1.f - static_cast<f32>( a_Slice.Bottom ) * rcpTexH );
+        const f32 v3 = mapV( 1.f );
 
         const auto EmitQuad = [&]( f32 dx0, f32 dy0, f32 dx1, f32 dy1,
                                    f32 su0, f32 sv0, f32 su1, f32 sv1 )
