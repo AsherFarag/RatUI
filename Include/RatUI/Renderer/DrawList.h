@@ -124,8 +124,11 @@ namespace RatUI
             Rect<f32> uvRect{ Vec2f{ 0.f, 0.f }, Vec2f{ 1.f, 1.f } };
             if ( a_Style.Texture.Handle && !a_Style.Texture.Region.IsInfinite() )
             {
-                if ( auto texInfo = m_Atlas.GetRenderer().QueryTextureInfo( a_Style.Texture.Handle ) )
-                    uvRect = ComputeUVRect( a_Style.Texture.Region, texInfo->Size );
+                auto texInfo = m_Atlas.GetRenderer().QueryTextureInfo( a_Style.Texture.Handle );
+                if ( !texInfo )
+                    return *this;
+
+                uvRect = ComputeUVRect( a_Style.Texture.Region, texInfo->Size );
             }
 
             DrawBatcher& batcher = GetCurrentBatcher();
