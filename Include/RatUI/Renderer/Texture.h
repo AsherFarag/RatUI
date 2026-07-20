@@ -84,7 +84,7 @@ namespace RatUI
      * where (0, 0) corresponds to the top-left corner of the texture and (1, 1) corresponds to the bottom-right corner.
      * @param a_Region The pixel region of the texture to be used for rendering, as specified in a TextureView.
      * @param a_FullTextureSize The size, in pixels, of the full underlying texture that the view references.
-     * @return A Rect<f32> whose Origin/Size describe the UV sub-rect for a_View.Region.
+     * @return A Rect<f32> whose Origin/Size describe the UV sub-rect for a_Region.
      */
     template<typename T>
     inline Rect<f32> ComputeUVRect( Rect<T> a_Region, Vec2u a_FullTextureSize )
