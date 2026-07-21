@@ -6,8 +6,6 @@
 #include "../Renderer/DrawList.h"
 #include "WidgetMixins.h"
 
-#include <iostream>
-
 namespace RatUI
 {
     class Scene;
@@ -134,11 +132,11 @@ namespace RatUI
         /** @brief Called when a pointer (e.g., mouse cursor) exits the widget's bounds. */
         virtual Reply OnPointerExit( const PointerEvent& a_Event ) { return Reply::Unhandled(); }
 
-		virtual Reply OnPress( const PressEvent& ) { std::cout << "IWidget::OnPress() called" << std::endl; return Reply::Unhandled(); }
-        virtual Reply OnLongPress( const LongPressEvent& ) { std::cout << "IWidget::OnLongPress() called" << std::endl; return Reply::Unhandled(); }
-        virtual Reply OnDragStart( const DragEvent& ) { std::cout << "IWidget::OnDragStart() called" << std::endl; return Reply::Unhandled(); }
-        virtual Reply OnDragMove( const DragEvent& ) { std::cout << "IWidget::OnDragMove() called" << std::endl; return Reply::Unhandled(); }
-        virtual Reply OnDragEnd( const DragEvent& ) { std::cout << "IWidget::OnDragEnd() called" << std::endl; return Reply::Unhandled(); }
+		virtual Reply OnPress( const PressEvent& ) { return Reply::Unhandled(); }
+        virtual Reply OnLongPress( const LongPressEvent& ) { return Reply::Unhandled(); }
+        virtual Reply OnDragStart( const DragEvent& ) { return Reply::Unhandled(); }
+        virtual Reply OnDragMove( const DragEvent& ) { return Reply::Unhandled(); }
+        virtual Reply OnDragEnd( const DragEvent& ) { return Reply::Unhandled(); }
 
 		// - Focus Events: Only called for widgets that return true from IsFocusable()
 
