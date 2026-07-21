@@ -42,7 +42,11 @@ namespace RatUI
             ArrangeLayoutNode( *rootNode, Rect<Unit>{ Vec2<Unit>( 0_u, 0_u ), a_AvailableSize } );
         }
 
-		//ProcessPointerEvent( Input.LastPointerEvent );
+        // Note: This is hacky but currently it's necessary to do this to avoid invalid input state after a layout change.
+		// For example, if a widget is removed while the pointer is over it, we need to clear the hovered state.
+		// Or if we click and hold a button, move the pointer off it, this re-process helps clear the pressed state.
+		// Otherwise, we would have to wait until the next pointer event to fix the state.
+		ProcessPointerEvent( Input.LastPointerEvent );
     }
 
     void Scene::Tick( f64 a_DeltaSeconds )
