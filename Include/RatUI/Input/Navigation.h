@@ -146,4 +146,70 @@ namespace RatUI
         EBoundaryRule                m_Rule{ EBoundaryRule::Escape };
     };
 
+    /**
+     * @brief Represents a mapping between input buttons and navigation actions for keyboard, gamepad, and other input devices.
+     * This allows for customizable navigation controls in the UI.
+     */
+    struct InputNavMap
+    {
+        HashMap<EButtonID, ENavAction> ButtonMap;
+
+        /**
+         * @brief Maps a specific input button to a navigation action.
+         * @param a_Button The input button to map (e.g., keyboard key, gamepad button).
+         * @param a_Action The navigation action to associate with the button (e.g., MoveLeft, ActivatePressed).
+         */
+        void MapNav( EButtonID a_Button, ENavAction a_Action )
+        {
+            ButtonMap[a_Button] = a_Action;
+        }
+
+        /**
+         * @brief Resolves the navigation action associated with a specific input button.
+         * @param a_Button The input button to resolve (e.g., keyboard key, gamepad button).
+         * @return The navigation action associated with the button, or ENavAction::None if no mapping exists.
+         */
+        RATUI_NODISCARD ENavAction Resolve( EButtonID a_Button ) const
+        {
+            auto it = Find( ButtonMap, a_Button );
+            return it != End( ButtonMap ) ? it->second : ENavAction::None;
+        }
+
+        /**
+         * @brief Binds the default desktop navigation mappings.
+         * @return A reference to this InputNavMap for chaining.
+         */
+        InputNavMap& BindDefaultDesktop()
+        {
+            MapNav( EButtonID::KeyLeft,  ENavAction::MoveLeft );
+            MapNav( EButtonID::KeyRight, ENavAction::MoveRight );
+            MapNav( EButtonID::KeyUp,    ENavAction::MoveUp );
+            MapNav( EButtonID::KeyDown,  ENavAction::MoveDown );
+
+            MapNav( EButtonID::KeyEnter,  ENavAction::ActivatePressed );
+            MapNav( EButtonID::KeySpace,  ENavAction::ActivatePressed );
+            MapNav( EButtonID::KeyEscape, ENavAction::Cancel );
+            // TODO: Handle Tab
+
+            return *this;
+        }
+
+        /**
+         * @brief Binds the default gamepad navigation mappings.
+         * @return A reference to this InputNavMap for chaining.
+         */
+        InputNavMap& BindDefaultGamepad()
+        {
+            MapNav( EButtonID::GamepadLeftStick,  ENavAction::MoveLeft );
+            MapNav( EButtonID::GamepadRightStick, ENavAction::MoveRight );
+            MapNav( EButtonID::GamepadDPadUp,     ENavAction::MoveUp );
+            MapNav( EButtonID::GamepadDPadDown,   ENavAction::MoveDown );
+
+            MapNav( EButtonID::GamepadA, ENavAction::ActivatePressed );
+            MapNav( EButtonID::GamepadB, ENavAction::Cancel );
+
+            return *this;
+        }
+    };
+
 } // namespace RatUI

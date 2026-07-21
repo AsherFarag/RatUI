@@ -3,6 +3,8 @@
 
 namespace RatUI
 {
+    using PointerID = u32;
+
     /** 
      * @brief Bitflag enum representing different input devices. Used in input events to indicate the source of the input.
      */ 
@@ -28,6 +30,16 @@ namespace RatUI
         Touch,
         Pen
     };
+
+    enum class EModifier : u8
+    {
+        None  = 0,
+        Shift = 1 << 0,
+        Ctrl  = 1 << 1,
+        Alt   = 1 << 2,
+        Super = 1 << 3, ///< Windows / Command key
+    };
+    RATUI_ENUM_ENABLE_BITMASK_OPERATORS( EModifier, u8 )
 
     /**
      * @brief Enum representing various input buttons and controls across different device types.
@@ -158,6 +170,28 @@ namespace RatUI
         XRMenu,
     };
 
+    inline constexpr bool IsPointerButton( EButtonID a_Button )
+    {
+        return a_Button >= EButtonID::Mouse0 && a_Button <= EButtonID::Mouse7;
+    }
+
+    /** @brief Maps a raw button to the modifier it represents, or EModifier::None if it isn't one. */
+    inline constexpr EModifier ModifierFor( EButtonID a_Button )
+    {
+        switch ( a_Button )
+        {
+            case EButtonID::KeyLeftShift:
+            case EButtonID::KeyRightShift: return EModifier::Shift;
+            case EButtonID::KeyLeftCtrl:
+            case EButtonID::KeyRightCtrl:  return EModifier::Ctrl;
+            case EButtonID::KeyLeftAlt:
+            case EButtonID::KeyRightAlt:   return EModifier::Alt;
+            case EButtonID::KeyLeftSuper:
+            case EButtonID::KeyRightSuper: return EModifier::Super;
+            default:                       return EModifier::None;
+        }
+    }
+
 	inline constexpr bool IsAlpha( EButtonID a_Button )
 	{
 		return a_Button >= EButtonID::KeyA && a_Button <= EButtonID::KeyZ;
@@ -234,15 +268,17 @@ namespace RatUI
     }
 
     /**
-     * @brief Pointer input event, which can come from a mouse, touch, or pen device. Contains position, movement delta, and device-specific data.
+     * @brief Pointer input event, which can come from a mouse, touch, or pen device. 
+     * Contains position, movement delta, and device-specific data.
      */
     struct PointerEvent
     {
         Vec2<Unit>   Position{ 0_u, 0_u };
         Vec2<Unit>   Delta{ 0_u, 0_u };
         EPointerType Type{ EPointerType::Unknown };
+        EModifier    Modifiers{ EModifier::None };
 
-        u32        PointerID{ 0 };          ///< TouchID or PenID or 0 for mouse
+        PointerID  ID{ 0 };                 ///< TouchID or PenID or 0 for mouse
         Vec2<Unit> ScrollDelta{ 0_u, 0_u }; ///< Mouse
         f32        Pressure{ 0.f };         ///< Touch/pen pressure (0.0 to 1.0)
 		Degrees    TiltX{ 0.f };            ///< Pen tilt X in degrees
@@ -254,14 +290,20 @@ namespace RatUI
     };
 
     /**
-     * @brief Button input event, which can represent keyboard keys, mouse buttons, gamepad buttons, or other digital inputs. Contains the button ID and its state (pressed, released, held).
+     * @brief Button input event, which can represent keyboard keys,
+     * mouse buttons, gamepad buttons, or other digital inputs. 
+     * Contains the button ID and its state (pressed, released, held).
      */
     struct ButtonEvent
     {
         EButtonID Button{ EButtonID::Unknown };
+        EModifier Modifiers{ EModifier::None };
         bool Pressed{ false };   ///< True on the frame the button was pressed.
         bool Released{ false };  ///< True on the frame the button was released.
         bool Held{ false };      ///< True every frame the button is held down (including the pressed and released frames).
+
+        Optional<PointerID> PointerID{};
+        Optional<Vec2<Unit>> PointerPosition;
     };
 
     // TODO: Clean this up
@@ -269,9 +311,7 @@ namespace RatUI
     {
         //codepoint Character{}; ///< The Unicode code point of the character that was input.
         EButtonID Button{ EButtonID::Unknown };
-        bool Shift{ false };
-        bool Ctrl{ false };
-        bool Alt{ false };
+        EModifier Modifiers{ EModifier::None };
     };
 
     /**

@@ -249,11 +249,11 @@ namespace RatUI
                     return TextEditOutcome::Cancel();
 
                 case EButtonID::KeyUp:
-                    a_Model.MoveUp( a_Event.Shift );
+					a_Model.MoveUp( HasFlag( a_Event.Modifiers, EModifier::Shift ) );
                     return TextEditOutcome::Handle();
 
                 case EButtonID::KeyDown:
-                    a_Model.MoveDown( a_Event.Shift );
+					a_Model.MoveDown( HasFlag( a_Event.Modifiers, EModifier::Shift ) );
                     return TextEditOutcome::Handle();
 
                 default:

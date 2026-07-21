@@ -215,7 +215,8 @@ private:
                         .Button = static_cast<EButtonID>( SDL_BUTTON( sdlEvent.button.button ) ),
                         .Pressed = sdlEvent.type == SDL_MOUSEBUTTONDOWN,
                         .Released = sdlEvent.type == SDL_MOUSEBUTTONUP,
-                        .Held = false // Held state can be tracked separately if needed
+                        .Held = false, // Held state can be tracked separately if needed
+						.PointerPosition = Vec2<Unit>{ Unit{ (f32)sdlEvent.button.x }, Unit{ (f32)sdlEvent.button.y } }
                     }
                 };
             }

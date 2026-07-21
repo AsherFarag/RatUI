@@ -336,24 +336,27 @@ namespace RatUI
 
     TextEditOutcome ITextEditPolicy::HandleKey( TextEditModel& a_Model, const TextInputEvent& a_Event )
     {
+		const bool isCtrl = HasFlag( a_Event.Modifiers, EModifier::Ctrl );
+		const bool isShift = HasFlag( a_Event.Modifiers, EModifier::Shift );
+
         switch ( a_Event.Button )
         {
             case EButtonID::KeyLeft:
-                if ( a_Event.Ctrl ) a_Model.MoveWordLeft( a_Event.Shift );
-                else                a_Model.MoveLeft( a_Event.Shift );
+                if ( isCtrl ) a_Model.MoveWordLeft( isShift );
+                else          a_Model.MoveLeft( isShift );
                 return TextEditOutcome::Handle();
 
             case EButtonID::KeyRight:
-                if ( a_Event.Ctrl ) a_Model.MoveWordRight( a_Event.Shift );
-                else                a_Model.MoveRight( a_Event.Shift );
+                if ( isCtrl ) a_Model.MoveWordRight( isShift );
+                else          a_Model.MoveRight( isShift );
                 return TextEditOutcome::Handle();
 
             case EButtonID::KeyHome:
-                a_Model.MoveHome( a_Event.Shift );
+                a_Model.MoveHome( isShift );
                 return TextEditOutcome::Handle();
 
             case EButtonID::KeyEnd:
-                a_Model.MoveEnd( a_Event.Shift );
+                a_Model.MoveEnd( isShift );
                 return TextEditOutcome::Handle();
 
             case EButtonID::KeyBackspace:
@@ -363,7 +366,7 @@ namespace RatUI
                 return TextEditOutcome::Change( a_Model.Delete() );
 
             case EButtonID::KeyA:
-                if ( a_Event.Ctrl )
+                if ( isCtrl )
                 {
                     a_Model.SelectAll();
                     return TextEditOutcome::Handle();
@@ -371,19 +374,16 @@ namespace RatUI
                 return TextEditOutcome::Unhandle();
 
             case EButtonID::KeyZ:
-                if ( a_Event.Ctrl )
+                if ( isCtrl )
                 {
-                    return a_Event.Shift ? TextEditOutcome::Change( a_Model.Redo() )
-                                          : TextEditOutcome::Change( a_Model.Undo() );
+                    return isShift ? TextEditOutcome::Change( a_Model.Redo() )
+                                   : TextEditOutcome::Change( a_Model.Undo() );
                 }
                 return TextEditOutcome::Unhandle();
 
             case EButtonID::KeyY:
-                if ( a_Event.Ctrl )
-                {
-                    return TextEditOutcome::Change( a_Model.Redo() );
-                }
-                return TextEditOutcome::Unhandle();
+                if ( isCtrl ) return TextEditOutcome::Change( a_Model.Redo() );
+                else          return TextEditOutcome::Unhandle();
 
             default:
                 return TextEditOutcome::Unhandle();

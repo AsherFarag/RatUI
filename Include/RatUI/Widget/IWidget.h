@@ -6,9 +6,48 @@
 #include "../Renderer/DrawList.h"
 #include "WidgetMixins.h"
 
+#include <iostream>
+
 namespace RatUI
 {
     class Scene;
+
+    /**
+	 * @brief Represents a drag gesture event, containing information about the origin, current position, delta movement, and any modifier keys pressed.
+	 * Like when a user clicks and holds the mouse button, then moves the mouse while holding the button down.
+	 * Or when a user touches the screen and moves their finger while maintaining contact.
+     */
+    struct DragEvent
+    {
+        Vec2<Unit> Origin{};
+        Vec2<Unit> Current{};
+        Vec2<Unit> Delta{};       ///< Since last DragMove, not since Origin
+        EModifier  Modifiers{};
+    };
+
+    /**
+     * @brief Represents a press gesture event, containing information about the position, press count, and any modifier keys pressed.
+	 * Represents either a mouse click or a finger tap on a touch screen.
+     */
+    struct PressEvent
+    {
+        Vec2<Unit> Position{};
+        u32        PressCount{ 1 };
+        EModifier  Modifiers{};
+
+        RATUI_NODISCARD constexpr bool IsDoublePress() const { return PressCount == 2; }
+        RATUI_NODISCARD constexpr bool IsTriplePress() const { return PressCount == 3; }
+    };
+
+    /**
+     * @brief Represents a long press gesture event, containing information about the position and any modifier keys pressed.
+	 * Triggered when a user presses and holds the mouse button or touches the screen for a specified duration.
+     */
+    struct LongPressEvent
+    {
+        Vec2<Unit> Position{};
+        EModifier  Modifiers{};
+    };
 
     /**
      * @brief The base class for all UI elements.
@@ -94,6 +133,12 @@ namespace RatUI
 
         /** @brief Called when a pointer (e.g., mouse cursor) exits the widget's bounds. */
         virtual Reply OnPointerExit( const PointerEvent& a_Event ) { return Reply::Unhandled(); }
+
+		virtual Reply OnPress( const PressEvent& ) { std::cout << "IWidget::OnPress() called" << std::endl; return Reply::Unhandled(); }
+        virtual Reply OnLongPress( const LongPressEvent& ) { std::cout << "IWidget::OnLongPress() called" << std::endl; return Reply::Unhandled(); }
+        virtual Reply OnDragStart( const DragEvent& ) { std::cout << "IWidget::OnDragStart() called" << std::endl; return Reply::Unhandled(); }
+        virtual Reply OnDragMove( const DragEvent& ) { std::cout << "IWidget::OnDragMove() called" << std::endl; return Reply::Unhandled(); }
+        virtual Reply OnDragEnd( const DragEvent& ) { std::cout << "IWidget::OnDragEnd() called" << std::endl; return Reply::Unhandled(); }
 
 		// - Focus Events: Only called for widgets that return true from IsFocusable()
 
