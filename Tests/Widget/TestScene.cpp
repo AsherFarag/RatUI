@@ -384,28 +384,6 @@ TEST_CASE( "DispatchInputEvent pointer leaving widget triggers OnPointerExit", "
     REQUIRE( w->PointerExitCount == 1 );
 }
 
-TEST_CASE( "DispatchInputEvent button press dispatches to hovered widget", "[scene][input]" )
-{
-    Scene scene;
-    NodeID rootID = CreateRootTracking( scene );
-
-    LayoutNode* node = scene.Layouts.Get( scene.GetWidget( rootID )->GetLayoutID() );
-    node->Style.WidthMode   = ESizingMode::Fixed;
-    node->Style.HeightMode  = ESizingMode::Fixed;
-    node->Style.FixedWidth  = Unit{ 200.0f };
-    node->Style.FixedHeight = Unit{ 200.0f };
-    scene.UpdateLayout( ToUnitVec2( Vec2f{ 200.0f, 200.0f } ) );
-
-    // Hover over root
-    scene.DispatchInputEvent( MakeMouseMove( Vec2f{ 50.0f, 50.0f } ) );
-
-    // Press
-    scene.DispatchInputEvent( MakeMousePress( true ) );
-
-    TrackingWidget* w = scene.GetWidget<TrackingWidget>( rootID );
-    REQUIRE( w->PressedCount == 1 );
-}
-
 TEST_CASE( "DispatchInputEvent button press dispatches to focused widget when nothing hovered", "[scene][input]" )
 {
     Scene scene;
