@@ -47,6 +47,11 @@ namespace RatUI
         EModifier  Modifiers{};
     };
 
+    struct NavEvent
+    {
+		ENavAction Action{ ENavAction::None };
+    };
+
     /**
      * @brief The base class for all UI elements.
      * Widgets are responsible for rendering themselves and handling input events. 
@@ -121,21 +126,32 @@ namespace RatUI
         // - Pointer Events: Only called for widgets that return true from IsInteractable()
 
         /** @brief Called when a pointer (e.g., mouse cursor) enters the widget's bounds. */
-        virtual Reply OnPointerEnter( const PointerEvent& a_Event ) { return Reply::Unhandled(); }
+        virtual Reply OnPointerEnter( const PointerEvent& ) { return Reply::Unhandled(); }
 
         /** @brief Called each frame while a pointer is inside (or captured by) this widget. */
-        virtual Reply OnPointerMove( const PointerEvent& a_Event ) { return Reply::Unhandled(); }
+        virtual Reply OnPointerMove( const PointerEvent& ) { return Reply::Unhandled(); }
 
         /** @brief Called when the pointer scrolls over this widget. */
-        virtual Reply OnPointerScroll( const PointerEvent& a_Event ) { return Reply::Unhandled(); }
+        virtual Reply OnPointerScroll( const PointerEvent& ) { return Reply::Unhandled(); }
 
         /** @brief Called when a pointer (e.g., mouse cursor) exits the widget's bounds. */
-        virtual Reply OnPointerExit( const PointerEvent& a_Event ) { return Reply::Unhandled(); }
+        virtual Reply OnPointerExit( const PointerEvent& ) { return Reply::Unhandled(); }
 
+		// - Gesture Events: Only called for widgets that return true from IsInteractable()
+
+		/** @brief Called when a pointer (e.g., mouse button or touch) is pressed down and released within the widget's bounds. */
 		virtual Reply OnPress( const PressEvent& ) { return Reply::Unhandled(); }
+
+		/** @brief Called when a pointer (e.g., mouse button or touch) is pressed and held within the widget's bounds for a certain duration. */
         virtual Reply OnLongPress( const LongPressEvent& ) { return Reply::Unhandled(); }
+
+		/** @brief Called when a pointer (e.g., mouse button or touch) is pressed and moved within the widget's bounds. */
         virtual Reply OnDragStart( const DragEvent& ) { return Reply::Unhandled(); }
+
+		/** @brief Called when a pointer (e.g., mouse button or touch) is moved while the widget is being dragged. */
         virtual Reply OnDragMove( const DragEvent& ) { return Reply::Unhandled(); }
+
+		/** @brief Called when a pointer (e.g., mouse button or touch) is released after a drag operation. */
         virtual Reply OnDragEnd( const DragEvent& ) { return Reply::Unhandled(); }
 
 		// - Focus Events: Only called for widgets that return true from IsFocusable()
@@ -146,7 +162,7 @@ namespace RatUI
         /** @brief Called when this widget loses focus for input. */
         virtual void OnFocusLost( const FocusEvent& a_Event ) {}
 
-        // - Button Events:
+		// - Button Events: Only called for widgets that return true from IsFocusable() and are currently focused
 
         /** @brief Called when an input button is pressed while this widget is focused. */
         virtual Reply OnButtonPressed( const ButtonEvent& a_Event ) { return Reply::Unhandled(); }
@@ -159,8 +175,7 @@ namespace RatUI
 		// - Navigation: Only called for widgets that return true from IsNavigationBoundary()
 
 		/** @brief */
-        // TODO: Should I make a_Action a struct with more info and for api stability?
-		virtual NavReply OnNavigationBoundary( ENavAction a_Action ) { return NavReply::Escape(); }
+		virtual NavReply OnNavigationBoundary( const NavEvent& a_Event ) { return NavReply::Escape(); }
 
     protected:
         /** @brief Called when the widget should render itself. */

@@ -443,7 +443,7 @@ namespace RatUI
         while ( node )
         {
             if ( node->Widget && node->Widget->IsNavigationBoundary() )
-                return node->Widget->OnNavigationBoundary( a_Action );
+                return node->Widget->OnNavigationBoundary( NavEvent{ .Action = a_Action } );
 
             node = node->Parent();
         }
