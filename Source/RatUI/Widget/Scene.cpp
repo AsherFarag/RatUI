@@ -358,11 +358,13 @@ namespace RatUI
 
         if ( a_Event.PointerPosition && IsPointerButton( a_Event.Button ) )
         {
+            const NodeID capturedBefore = Input.CapturedWidget;
+
             UpdateGestureState( a_Event );
 
-            // Pointer buttons target whatever's captured/hit, not keyboard focus
-            targetWidget = Input.CapturedWidget != c_InvalidNodeID
-                ? Input.CapturedWidget
+            // Pointer buttons should dispatch to the captured widget (if any) so release stays with the press target.
+            targetWidget = capturedBefore != c_InvalidNodeID
+                ? capturedBefore
                 : HitTest( RootWidget, *a_Event.PointerPosition );
         }
 
