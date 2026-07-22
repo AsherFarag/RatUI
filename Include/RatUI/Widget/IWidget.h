@@ -162,8 +162,7 @@ namespace RatUI
         /** @brief Called when this widget loses focus for input. */
         virtual void OnFocusLost( const FocusEvent& a_Event ) {}
 
-		// - Button Events: Only called for widgets that return true from IsFocusable() and are currently focused
-
+		// - Button Events: For pointer buttons, dispatched to the captured widget (if any) or the hit-tested widget; for non-pointer buttons, dispatched to the focused widget.
         /** @brief Called when an input button is pressed while this widget is focused. */
         virtual Reply OnButtonPressed( const ButtonEvent& a_Event ) { return Reply::Unhandled(); }
 
