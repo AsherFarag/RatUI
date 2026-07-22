@@ -212,9 +212,9 @@ namespace RatUI
         if ( !node )
             return c_InvalidNodeID;
 
-        if ( !Visibility::IsHitTestable( node->Layout.Visibility ) )
+        if ( !Visibility::IsHitTestable( node->Layout.Visibility ) &&
+             !Visibility::AreChildrenHitTestable( node->Layout.Visibility ) )
             return c_InvalidNodeID;
-
         if ( !node->Layout.FinalRect.Contains( a_LogicalPos ) )
             return c_InvalidNodeID;
 
