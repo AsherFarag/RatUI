@@ -43,17 +43,6 @@ namespace RatUI
 
     } // namespace
 
-    bool Scene::DispatchInputEvent( const InputEvent& a_Event )
-    {
-        if ( Holds<PointerEvent>( a_Event.Payload ) )
-            return ProcessPointerEvent( Get<PointerEvent>( a_Event.Payload ) );
-
-        if ( Holds<ButtonEvent>( a_Event.Payload ) )
-            return ProcessButtonEvent( Get<ButtonEvent>( a_Event.Payload ) );
-
-        return false;
-    }
-
     void Scene::UpdateLayout( Vec2<Unit> a_AvailableSize )
     {
         CleanupDestroyedWidgets();
@@ -76,7 +65,9 @@ namespace RatUI
             const Vec2<Unit> innerSize( node.Layout.FinalRect.Size[0] - node.Style.Padding.Horizontal(),
                                         node.Layout.FinalRect.Size[1] - node.Style.Padding.Vertical() );
             node.ForEachChild( [&]( LayoutNode& child )
-                               { anyChanged |= Self( Self, child, innerSize ); } );
+            {
+                anyChanged |= Self( Self, child, innerSize );
+            } );
 
             return anyChanged;
         };
@@ -92,7 +83,38 @@ namespace RatUI
             ArrangeLayoutNode( *rootNode, Rect<Unit>{ Vec2<Unit>( 0_u, 0_u ), a_AvailableSize } );
         }
 
-        ProcessPointerEvent( m_LastPointerEvent );
+        // Note: This is hacky but currently it's necessary to do this to avoid invalid input state after a layout change.
+		// For example, if a widget is removed while the pointer is over it, we need to clear the hovered state.
+		// Or if we click and hold a button, move the pointer off it, this re-process helps clear the pressed state.
+		// Otherwise, we would have to wait until the next pointer event to fix the state.
+        if ( Input.LastPointerEvent.Type != EPointerType::Unknown )
+            ProcessPointerEvent( Input.LastPointerEvent );
+    }
+
+    void Scene::Tick( f64 a_DeltaSeconds )
+    {
+        m_ClockSeconds += a_DeltaSeconds;
+
+        const f64 now = m_ClockSeconds;
+        const GestureConfig& cfg = Input.Config;
+
+        // Long-press detection: scan pointers currently down, not dragging, not already fired.
+        for ( auto& [pointerID, gesture] : Input.PointerStates )
+        {
+            if ( !gesture.IsDown || gesture.IsDragging || gesture.LongPressFired )
+                continue;
+
+            if ( now - gesture.LastDownTime < cfg.LongPressSeconds )
+                continue;
+
+            gesture.LongPressFired = true;
+
+            if ( IWidget* widget = GetWidget( gesture.PressedWidget ) )
+            {
+                LongPressEvent evt{ .Position = gesture.DownPosition, .Modifiers = Input.ModifierState };
+                ApplyReply( widget->OnLongPress( evt ) );
+            }
+        }
     }
 
     void Scene::Render( DrawList& a_DrawList, f32 a_DeltaSeconds )
@@ -101,49 +123,392 @@ namespace RatUI
 
         if ( LayoutNode* rootNode = Layouts.Get( RootWidget ) )
             if ( rootNode->Widget )
-				rootNode->Widget->Paint( PaintEvent{ a_DrawList, a_DeltaSeconds } );
+                rootNode->Widget->Paint( PaintEvent{ a_DrawList, a_DeltaSeconds } );
     }
 
-    void Scene::SetFocus( NodeID a_NodeID )
+    // ========================================================================
+    // Widget Lookup
+    // ========================================================================
+
+    IWidget* Scene::GetWidget( NodeID a_ID )
     {
-        FocusEvent focusEvent; // TODO: Populate this with useful information?
+        LayoutNode* node = Layouts.Get( a_ID );
+        return ( node && node->Widget ) ? node->Widget.get() : nullptr;
+    }
 
-        // Callers should not need to check IsFocusable() before calling SetFocus().
-        if ( LayoutNode* targetNode = Layouts.Get( a_NodeID ) )
+    const IWidget* Scene::GetWidget( NodeID a_ID ) const
+    {
+        const LayoutNode* node = Layouts.Get( a_ID );
+        return ( node && node->Widget ) ? node->Widget.get() : nullptr;
+    }
+
+    // ========================================================================
+    // Reply Application
+    // ========================================================================
+
+    void Scene::ApplyReply( const Reply& a_Reply )
+    {
+        if ( a_Reply.ShouldCaptureMouse() )
+            Input.CapturedWidget = a_Reply.GetMouseCaptureTarget();
+
+        if ( a_Reply.ShouldReleaseMouse() )
+            Input.CapturedWidget = c_InvalidNodeID;
+
+        if ( a_Reply.ShouldSetFocus() )
+            SetFocus( a_Reply.GetFocusTarget() );
+
+        if ( a_Reply.ShouldClearFocus() )
+            SetFocus( c_InvalidNodeID );
+    }
+
+    // ========================================================================
+    // Focus
+    // ========================================================================
+
+    void Scene::SetFocus( NodeID a_Node )
+    {
+        if ( Input.FocusedWidget == a_Node )
+            return;
+
+        // Reject focusing a non-existent or non-focusable widget; c_InvalidNodeID (clear) is always allowed.
+        if ( a_Node != c_InvalidNodeID )
         {
-            if ( targetNode->Widget && !targetNode->Widget->IsFocusable() )
+            IWidget* target = GetWidget( a_Node );
+            if ( !target || !target->IsFocusable() )
                 return;
         }
 
-        if ( LayoutNode* currentNode = Layouts.Get( m_FocusedWidget ) )
+        if ( IWidget* prev = GetWidget( Input.FocusedWidget ) )
+            prev->OnFocusLost( FocusEvent{} );
+
+        Input.FocusedWidget = a_Node;
+
+        if ( IWidget* next = GetWidget( a_Node ) )
+            next->OnFocusReceived( FocusEvent{} );
+    }
+
+    void Scene::EnsureInitialFocus()
+    {
+        if ( Input.FocusedWidget != c_InvalidNodeID )
+            return;
+
+        LayoutNode* root = Layouts.Get( RootWidget );
+        if ( !root )
+            return;
+
+        Array<const LayoutNode*> candidates;
+        CollectFocusableCandidates( *root, candidates );
+
+        if ( !Empty( candidates ) )
+            SetFocus( candidates[0]->Widget->GetLayoutID() );
+    }
+
+    // ========================================================================
+    // Hit Testing
+    // ========================================================================
+
+    NodeID Scene::HitTest( NodeID a_ID, Vec2<Unit> a_LogicalPos )
+    {
+        LayoutNode* node = Layouts.Get( a_ID );
+        if ( !node )
+            return c_InvalidNodeID;
+
+        if ( !Visibility::IsHitTestable( node->Layout.Visibility ) &&
+             !Visibility::AreChildrenHitTestable( node->Layout.Visibility ) )
+            return c_InvalidNodeID;
+        if ( !node->Layout.FinalRect.Contains( a_LogicalPos ) )
+            return c_InvalidNodeID;
+
+        // Children are checked first, topmost (last-drawn) wins.
+        NodeID childHit = c_InvalidNodeID;
+        node->ForEachChildReverse( [&]( LayoutNode& child )
         {
-            if ( m_FocusedWidget == a_NodeID )
+            if ( childHit != c_InvalidNodeID || !child.Widget )
                 return;
 
-            if ( currentNode->Widget )
-                currentNode->Widget->OnFocusLost( focusEvent );
+            childHit = HitTest( child.Widget->GetLayoutID(), a_LogicalPos );
+        } );
+
+        if ( childHit != c_InvalidNodeID )
+            return childHit;
+
+        if ( node->Widget && node->Widget->IsInteractable() )
+            return a_ID;
+
+        return c_InvalidNodeID;
+    }
+
+    // ========================================================================
+    // Input Dispatch
+    // ========================================================================
+
+    bool Scene::DispatchInputEvent( const InputEvent& a_Event )
+    {
+		if ( Holds<PointerEvent>( a_Event.Payload ) )
+			return ProcessPointerEvent( Get<PointerEvent>( a_Event.Payload ) );
+
+		if ( Holds<ButtonEvent>( a_Event.Payload ) )
+			return ProcessButtonEvent( Get<ButtonEvent>( a_Event.Payload ) );
+
+		return false;
+    }
+
+    bool Scene::ProcessPointerEvent( const PointerEvent& a_Event )
+    {
+        Input.LastPointerEvent = a_Event;
+
+        if ( a_Event.IsMouse() || Math::LengthSq( a_Event.Delta ) > 0_u )
+            Input.InputMode = EInputMode::Pointer;
+
+        const NodeID captured = Input.CapturedWidget;
+        const NodeID target = captured != c_InvalidNodeID ? captured : HitTest( RootWidget, a_Event.Position );
+
+        // --- Hover transitions ---
+        if ( captured == c_InvalidNodeID && target != Input.HoveredWidget )
+        {
+            if ( IWidget* prev = GetWidget( Input.HoveredWidget ) )
+                ApplyReply( prev->OnPointerExit( a_Event ) );
+
+            Input.HoveredWidget = target;
+
+            if ( IWidget* next = GetWidget( target ) )
+                ApplyReply( next->OnPointerEnter( a_Event ) );
         }
 
-        m_FocusedWidget = a_NodeID;
+        bool handled = false;
 
-        if ( LayoutNode* newNode = Layouts.Get( m_FocusedWidget ) )
-            if ( newNode->Widget )
-                newNode->Widget->OnFocusReceived( focusEvent );
+        // --- Drag detection & movement ---
+        PointerGestureState& gesture = Input.PointerStates[a_Event.ID];
+        const GestureConfig& cfg = Input.Config;
+
+        if ( gesture.IsDown && !gesture.IsDragging )
+        {
+            if ( Math::DistanceSq( a_Event.Position, gesture.DownPosition ) > Math::Sq( cfg.DragThreshold ) )
+            {
+                gesture.IsDragging = true;
+
+                if ( IWidget* widget = GetWidget( gesture.PressedWidget ) )
+                {
+                    DragEvent drag{
+                        .Origin = gesture.DownPosition,
+                        .Current = a_Event.Position,
+                        .Delta = a_Event.Position - gesture.DownPosition,  // Initial delta (threshold exceeded)
+                        .Modifiers = a_Event.Modifiers
+                    };
+                    ApplyReply( widget->OnDragStart( drag ) );
+                }
+            }
+        }
+
+        // --- Drag move ---
+        if ( gesture.IsDragging )
+        {
+            if ( IWidget* widget = GetWidget( gesture.PressedWidget ) )
+            {
+                DragEvent drag{
+                    .Origin = gesture.DownPosition,
+                    .Current = a_Event.Position,
+                    .Delta = a_Event.Delta,  // Per-frame delta
+                    .Modifiers = a_Event.Modifiers
+                };
+                ApplyReply( widget->OnDragMove( drag ) );
+            }
+        }
+
+        // --- Raw pointer dispatch (move / scroll) ---
+        if ( IWidget* widget = GetWidget( target ) )
+        {
+            if ( a_Event.ScrollDelta[0] != 0_u || a_Event.ScrollDelta[1] != 0_u )
+                ApplyReply( widget->OnPointerScroll( a_Event ) );
+
+            Reply moveReply = widget->OnPointerMove( a_Event );
+            ApplyReply( moveReply );
+            handled = handled || moveReply.IsHandled();
+        }
+
+        return handled;
+    }
+
+    bool Scene::ProcessButtonEvent( const ButtonEvent& a_Event )
+    {
+        if ( a_Event.Pressed || a_Event.Released )
+            Input.UpdateModifiers( a_Event.Button, a_Event.Pressed );
+
+		// --- Navigation mapping ---
+        const ENavAction navAction = Input.NavMap.Resolve( a_Event.Button );
+        if ( navAction != ENavAction::None )
+        {
+            Input.InputMode = EInputMode::Navigation;
+            EnsureInitialFocus();
+
+            if ( navAction == ENavAction::ActivatePressed || navAction == ENavAction::ActivateReleased )
+            {
+                if ( a_Event.Pressed )  Navigate( ENavAction::ActivatePressed );
+                if ( a_Event.Released ) Navigate( ENavAction::ActivateReleased );
+            }
+            else if ( a_Event.Pressed )
+            {
+                Navigate( navAction );
+            }
+
+            return true; // Nav mappings always consume the button; it doesn't reach the focused widget raw.
+        }
+
+        // --- Gesture from button press/release ---
+        NodeID targetWidget = Input.FocusedWidget;
+
+        if ( a_Event.PointerPosition && IsPointerButton( a_Event.Button ) )
+        {
+            const NodeID capturedBefore = Input.CapturedWidget;
+
+            UpdateGestureState( a_Event );
+
+            // Pointer buttons should dispatch to the captured widget (if any) so release stays with the press target.
+            targetWidget = capturedBefore != c_InvalidNodeID
+                ? capturedBefore
+                : HitTest( RootWidget, *a_Event.PointerPosition );
+        }
+
+		// --- Dispatch to focused widget ---
+        if ( IWidget* focused = GetWidget( targetWidget ) )
+        {
+            Reply reply = Reply::Unhandled();
+            if ( a_Event.Pressed )
+                reply = focused->OnButtonPressed( a_Event );
+			else if ( a_Event.Released )
+				reply = focused->OnButtonReleased( a_Event );
+
+            ApplyReply( reply );
+            return reply.IsHandled();
+        }
+
+        return false;
+    }
+
+    void Scene::UpdateGestureState( const ButtonEvent& a_Event )
+    {
+        if ( !a_Event.Pointer )
+            return;
+
+        PointerGestureState& gesture = Input.PointerStates[*a_Event.Pointer];
+        const GestureConfig& cfg = Input.Config;
+        const f64 now = m_ClockSeconds;
+
+        if ( a_Event.Pressed )
+        {
+            const NodeID target = HitTest( RootWidget, *a_Event.PointerPosition );
+
+            const bool withinWindow = ( now - gesture.LastPressTime ) <= cfg.MultiPressWindowSeconds;
+            const bool withinRange = a_Event.PointerPosition
+                ? Math::DistanceSq( *a_Event.PointerPosition, gesture.DownPosition ) <= Math::Sq( cfg.MultiPressDistance )
+                : false;
+
+            if ( !withinWindow || !withinRange )
+                gesture.PressCount = 0;
+
+            gesture.PressCount += 1;
+            gesture.DownPosition = *a_Event.PointerPosition;
+            gesture.LastDownTime = now;
+            gesture.PressedWidget = target;
+            gesture.IsDragging = false;
+            gesture.LongPressFired = false;
+            gesture.IsDown = true;
+
+            // Capture pointer on press so drag/release stay on this widget
+            if ( IWidget* widget = GetWidget( target ) )
+            {
+                // Widget can override capture in OnButtonPressed, but we default-capture
+                // for interactable widgets to ensure drag/click completion
+                if ( widget->IsInteractable() )
+                    Input.CapturedWidget = target;
+            }
+        }
+        else if ( a_Event.Released && gesture.IsDown )
+        {
+            // --- Drag end ---
+            if ( gesture.IsDragging )
+            {
+                if ( IWidget* widget = GetWidget( gesture.PressedWidget ) )
+                {
+                    DragEvent drag{
+                        .Origin = gesture.DownPosition,
+                        .Current = *a_Event.PointerPosition,
+                        .Delta = *a_Event.PointerPosition - gesture.DownPosition,  // Total delta
+                        .Modifiers = a_Event.Modifiers
+                    };
+                    ApplyReply( widget->OnDragEnd( drag ) );
+                }
+            }
+            // --- Click (single, double, triple, etc.) ---
+            else if ( !gesture.LongPressFired )
+            {
+                if ( IWidget* widget = GetWidget( gesture.PressedWidget ) )
+                {
+                    PressEvent press{
+                        .Position = *a_Event.PointerPosition,
+                        .PressCount = gesture.PressCount,
+                        .Modifiers = a_Event.Modifiers
+                    };
+                    Reply reply = widget->OnPress( press );
+                    ApplyReply( reply );
+
+                    if ( widget->IsFocusable() )
+                        SetFocus( gesture.PressedWidget );
+                }
+            }
+
+            gesture.LastPressTime = now;
+            gesture.IsDown = false;
+            gesture.IsDragging = false;
+
+            // Release capture on button up
+            Input.CapturedWidget = c_InvalidNodeID;
+        }
+    }
+
+    // ========================================================================
+    // Navigation
+    // ========================================================================
+
+    void Scene::PushNavScope( NodeID a_ScopeID )
+    {
+        Input.PushNavScope( a_ScopeID, Input.FocusedWidget );
+    }
+
+    void Scene::PopNavScope()
+    {
+        if ( Optional<NavScope> popped = Input.PopNavScope() )
+        {
+            if ( popped->Restored != c_InvalidNodeID )
+                SetFocus( popped->Restored );
+        }
     }
 
     NavReply Scene::QueryBoundaryReply( ENavAction a_Action, NodeID a_Focused )
     {
-        // Walk up from the focused node asking each navigation boundary widget.
         LayoutNode* node = Layouts.Get( a_Focused );
         while ( node )
         {
             if ( node->Widget && node->Widget->IsNavigationBoundary() )
-                return node->Widget->OnNavigationBoundary( a_Action );
+                return node->Widget->OnNavigationBoundary( NavEvent{ .Action = a_Action } );
 
             node = node->Parent();
         }
-
         return NavReply::Escape();
+    }
+
+    void Scene::CollectFocusableCandidates( LayoutNode& a_Scope, Array<const LayoutNode*>& a_Out )
+    {
+        a_Scope.ForEachChild( [&]( LayoutNode& child )
+        {
+            if ( child.Widget && child.Widget->IsFocusable() )
+                PushBack( a_Out, &child );
+
+            // Don't descend into a nested boundary's subtree -- that's a separate scope,
+            // only entered by explicitly pushing it.
+            if ( !child.Widget || !child.Widget->IsNavigationBoundary() )
+                CollectFocusableCandidates( child, a_Out );
+        } );
     }
 
     void Scene::Navigate( ENavAction a_Action )
@@ -171,14 +536,14 @@ namespace RatUI
 
         if ( a_Action == ENavAction::ActivatePressed || a_Action == ENavAction::ActivateReleased )
         {
-            LayoutNode* focusedNode = Layouts.Get( m_FocusedWidget );
+            LayoutNode* focusedNode = Layouts.Get( Input.FocusedWidget );
             if ( !focusedNode || !focusedNode->Widget )
                 return;
 
             if ( a_Action == ENavAction::ActivatePressed && focusedNode->Style.IsFocusScope )
             {
-                PushNavScope( m_FocusedWidget );
-                FocusFirstIn( m_FocusedWidget );
+                PushNavScope( Input.FocusedWidget );
+                FocusFirstIn( Input.FocusedWidget );
                 return;
             }
 
@@ -198,9 +563,9 @@ namespace RatUI
             return;
         }
 
-        NodeID      scopeID     = GetCurrentNavScope();
-        LayoutNode* scopeNode   = Layouts.Get( scopeID );
-        LayoutNode* focusedNode = Layouts.Get( m_FocusedWidget );
+        NodeID      scopeID = GetCurrentNavScope();
+        LayoutNode* scopeNode = Layouts.Get( scopeID );
+        LayoutNode* focusedNode = Layouts.Get( Input.FocusedWidget );
 
         if ( !scopeNode )
             return;
@@ -216,11 +581,11 @@ namespace RatUI
 
         auto focusableNodes = LayoutChildRange{ scopeNode->FirstChild() }
             | std::views::filter( [&]( LayoutNode* node ) -> bool
-            {
-                if ( !node ) return false;
-                // TODO: Probs dont need LayoutStyle::IsFocusScope anymore
-                return ( node->Widget && node->Widget->IsFocusable() ) || node->Style.IsFocusScope;
-            } );
+        {
+            if ( !node ) return false;
+            // TODO: Probs dont need LayoutStyle::IsFocusScope anymore
+            return ( node->Widget && node->Widget->IsFocusable() ) || node->Style.IsFocusScope;
+        } );
 
         const LayoutNode* nextNode = FindNavigatableNode( a_Action, focusedNode, focusableNodes );
 
@@ -231,7 +596,7 @@ namespace RatUI
         }
 
         // No target found within the current scope - consult boundary policy.
-        const NavReply navReply = QueryBoundaryReply( a_Action, m_FocusedWidget );
+        const NavReply navReply = QueryBoundaryReply( a_Action, Input.FocusedWidget );
 
         switch ( navReply.GetRule() )
         {
@@ -250,7 +615,7 @@ namespace RatUI
 
             case NavReply::EBoundaryRule::Custom:
             {
-                NodeID target = navReply.ResolveCustom( a_Action, m_FocusedWidget );
+                NodeID target = navReply.ResolveCustom( a_Action, Input.FocusedWidget );
                 if ( target != c_InvalidNodeID )
                     SetFocus( target );
                 break;
@@ -258,228 +623,16 @@ namespace RatUI
         }
     }
 
-    void Scene::PushNavScope( NodeID a_ScopeID )
-    {
-        PushBack( m_NavStack, NavScope{
-            .Scope = a_ScopeID,
-            .Restored = m_FocusedWidget,
-        } );
-    }
-
-    void Scene::PopNavScope()
-    {
-        ClearFocus();
-
-        if ( Empty( m_NavStack ) )
-            return;
-
-        NodeID restored = Back( m_NavStack ).Restored;
-        PopBack( m_NavStack );
-
-        if ( restored != c_InvalidNodeID )
-            SetFocus( restored );
-    }
-
-    IWidget* Scene::GetWidget( NodeID a_ID )
-    {
-        LayoutNode* node = Layouts.Get( a_ID );
-        return node ? node->Widget.get() : nullptr;
-    }
-
-    const IWidget* Scene::GetWidget( NodeID a_ID ) const
-    {
-        const LayoutNode* node = Layouts.Get( a_ID );
-        return node ? node->Widget.get() : nullptr;
-    }
+    // ========================================================================
+    // Reset
+    // ========================================================================
 
     void Scene::Reset()
     {
         Layouts.Clear();
-        RootWidget      = c_InvalidNodeID;
-        m_HoveredWidget = c_InvalidNodeID;
-        ClearFocus();
-        Clear( m_NavStack );
-    }
-
-    NodeID Scene::HitTest( NodeID a_ID, Vec2<Unit> a_LogicalPos )
-    {
-        LayoutNode* rootNode = Layouts.Get( a_ID );
-        if ( !rootNode )
-            return c_InvalidNodeID;
-
-        const auto hitTestNode = [&]( auto&& Self, LayoutNode* a_Node ) -> NodeID
-        {
-            if ( !a_Node )
-                return c_InvalidNodeID;
-
-            if ( !a_Node->Layout.FinalRect.Contains( a_LogicalPos ) )
-                return c_InvalidNodeID;
-
-            NodeID result = c_InvalidNodeID;
-
-            if ( Visibility::AreChildrenHitTestable( a_Node->Layout.Visibility ) )
-            {
-                a_Node->ForEachChild( [&]( LayoutNode& child )
-                {
-                    NodeID childHit = Self( Self, &child );
-                    if ( childHit != c_InvalidNodeID )
-                        result = childHit;
-                });
-
-                if ( result != c_InvalidNodeID )
-                    return result;
-            }
-
-            // Only return this node as a hit target if:
-            // it is both visibility-hit-testable 
-            // AND the widget explicitly opts in via IsInteractable().
-            // Non-interactive widgets (Panel, decorative containers, etc) fall
-            // through so their interactable ancestor can receive the event instead.
-            if ( a_Node->Widget && Visibility::IsHitTestable( a_Node->Layout.Visibility ) )
-            {
-                if ( a_Node->Widget->IsInteractable() )
-                    return a_Node->Widget->GetLayoutID();
-            }
-
-            return c_InvalidNodeID;
-        };
-
-        return hitTestNode( hitTestNode, rootNode );
-    }
-
-    void Scene::ApplyReply( const Reply& a_Reply )
-    {
-        if ( a_Reply.ShouldCaptureMouse() )
-            CapturePointer( a_Reply.GetMouseCaptureTarget() );
-
-        if ( a_Reply.ShouldReleaseMouse() )
-            ReleasePointerCapture();
-
-        if ( a_Reply.ShouldSetFocus() )
-            SetFocus( a_Reply.GetFocusTarget() );
-        else if ( a_Reply.ShouldClearFocus() )
-            ClearFocus();
-    }
-
-    bool Scene::ProcessPointerEvent( const PointerEvent& a_Event )
-    {
-        if ( !a_Event.IsMouse() )
-            return false;
-
-        m_LastPointerEvent = a_Event;
-
-        // --- Scroll ---
-        if ( a_Event.ScrollDelta[0] != 0_u || a_Event.ScrollDelta[1] != 0_u )
-        {
-            NodeID scrollTarget = m_CapturedWidget != c_InvalidNodeID
-                ? m_CapturedWidget
-                : HitTest( RootWidget, a_Event.Position );
-
-            if ( IWidget* w = GetWidget( scrollTarget ) )
-            {
-                Reply reply = w->OnPointerScroll( a_Event );
-                ApplyReply( reply );
-            }
-
-            return false;
-        }
-
-        // --- Move (captured widget takes priority) ---
-        if ( m_CapturedWidget != c_InvalidNodeID )
-        {
-            if ( IWidget* w = GetWidget( m_CapturedWidget ) )
-            {
-                Reply reply = w->OnPointerMove( a_Event );
-                ApplyReply( reply );
-            }
-            return false;
-        }
-
-        // --- Hover tracking ---
-        NodeID hovered = HitTest( RootWidget, a_Event.Position );
-
-        if ( hovered != m_HoveredWidget )
-        {
-            if ( IWidget* prevHovered = GetWidget( m_HoveredWidget ) )
-            {
-                Reply reply = prevHovered->OnPointerExit( a_Event );
-                ApplyReply( reply );
-            }
-
-            m_HoveredWidget = hovered;
-
-            if ( IWidget* newHovered = GetWidget( m_HoveredWidget ) )
-            {
-                Reply reply = newHovered->OnPointerEnter( a_Event );
-                ApplyReply( reply );
-            }
-        }
-        else if ( hovered != c_InvalidNodeID )
-        {
-            if ( IWidget* w = GetWidget( hovered ) )
-            {
-                Reply reply = w->OnPointerMove( a_Event );
-                ApplyReply( reply );
-            }
-        }
-
-        return false;
-    }
-
-    bool Scene::ProcessButtonEvent( const ButtonEvent& a_Event )
-    {
-        // Captured widget gets all button events first during an active drag/press.
-        if ( m_CapturedWidget != c_InvalidNodeID )
-        {
-            if ( IWidget* w = GetWidget( m_CapturedWidget ) )
-            {
-                Reply reply = a_Event.Pressed
-                    ? w->OnButtonPressed( a_Event )
-                    : w->OnButtonReleased( a_Event );
-
-                ApplyReply( reply );
-
-                // Release capture on mouse button up regardless of whether the
-                // widget handled it - a capture shouldn't outlive its button press.
-                if ( a_Event.Released )
-                    ReleasePointerCapture();
-
-                if ( reply.IsHandled() )
-                    return true;
-            }
-        }
-
-        // Hovered widget gets mouse button events.
-        if ( IWidget* hovered = GetWidget( m_HoveredWidget ) )
-        {
-            Reply reply = a_Event.Pressed
-                ? hovered->OnButtonPressed( a_Event )
-                : hovered->OnButtonReleased( a_Event );
-
-            ApplyReply( reply );
-
-            if ( reply.IsHandled() )
-                return true;
-        }
-
-        // Focused widget gets keyboard/gamepad events that the hovered widget
-        // didn't consume. Skip if hovered == focused to avoid double-dispatch.
-        if ( m_FocusedWidget != m_HoveredWidget )
-        {
-            if ( IWidget* focused = GetWidget( m_FocusedWidget ) )
-            {
-                Reply reply = a_Event.Pressed
-                    ? focused->OnButtonPressed( a_Event )
-                    : focused->OnButtonReleased( a_Event );
-
-                ApplyReply( reply );
-
-                if ( reply.IsHandled() )
-                    return true;
-            }
-        }
-
-        return false;
+        RootWidget = c_InvalidNodeID;
+        Input.Reset();
+        Clear( m_ToDestroy );
     }
 
 } // namespace RatUI

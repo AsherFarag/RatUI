@@ -173,6 +173,35 @@ private:
 
     void ProcessEvents()
     {
+        const auto toMouseButton = +[](Uint8 a_SDLButton) -> EButtonID
+        {
+            switch (a_SDLButton)
+            {
+                case SDL_BUTTON_LEFT:   return EButtonID::MouseLeft;
+                case SDL_BUTTON_RIGHT:  return EButtonID::MouseRight;
+                case SDL_BUTTON_MIDDLE: return EButtonID::MouseMiddle;
+                case SDL_BUTTON_X1:     return EButtonID::Mouse3;
+                case SDL_BUTTON_X2:     return EButtonID::Mouse4;
+                default:                return EButtonID::Unknown;
+            }
+        };
+
+        const auto ToModifiers = +[](SDL_Keymod a_Mods) -> EModifier
+        {
+            EModifier result = EModifier::None;
+        
+            if (a_Mods & KMOD_LSHIFT) result |= EModifier::LShift;
+            if (a_Mods & KMOD_RSHIFT) result |= EModifier::RShift;
+            if (a_Mods & KMOD_LCTRL)  result |= EModifier::LCtrl;
+            if (a_Mods & KMOD_RCTRL)  result |= EModifier::RCtrl;
+            if (a_Mods & KMOD_LALT)   result |= EModifier::LAlt;
+            if (a_Mods & KMOD_RALT)   result |= EModifier::RAlt;
+            if (a_Mods & KMOD_LGUI)   result |= EModifier::LSuper;
+            if (a_Mods & KMOD_RGUI)   result |= EModifier::RSuper;
+        
+            return result;
+        };
+
 		// TODO: Convert from Pixel space to Unit space for input events, and handle DPI scaling if needed.
 
         SDL_Event sdlEvent;
@@ -201,6 +230,7 @@ private:
                     .Device = EDeviceID::Keyboard,
                     .Payload = ButtonEvent{
 						.Button = SDLKeyboardToRatUIButtonID( sdlEvent.key.keysym.sym ),
+                        .Modifiers = ToModifiers(SDL_GetModState()),
                         .Pressed = sdlEvent.type == SDL_KEYDOWN,
                         .Released = sdlEvent.type == SDL_KEYUP,
                         .Held = false // Held state can be tracked separately if needed
@@ -212,10 +242,13 @@ private:
                 inputEvent = InputEvent{
                     .Device = EDeviceID::Mouse,
                     .Payload = ButtonEvent{
-                        .Button = static_cast<EButtonID>( SDL_BUTTON( sdlEvent.button.button ) ),
+                        .Button = toMouseButton( sdlEvent.button.button ),
+                        .Modifiers = ToModifiers(SDL_GetModState()),
                         .Pressed = sdlEvent.type == SDL_MOUSEBUTTONDOWN,
                         .Released = sdlEvent.type == SDL_MOUSEBUTTONUP,
-                        .Held = false // Held state can be tracked separately if needed
+                        .Held = false, // Held state can be tracked separately if needed
+						.Pointer = PointerID{ 0 }, // Assuming single mouse pointer with ID 0
+						.PointerPosition = Vec2<Unit>{ Unit{ (f32)sdlEvent.button.x }, Unit{ (f32)sdlEvent.button.y } }
                     }
                 };
             }
@@ -225,6 +258,7 @@ private:
                     .Device = EDeviceID::Mouse,
                     .Payload = PointerEvent{
                         .Type = EPointerType::Mouse,
+                        .Modifiers = ToModifiers( SDL_GetModState() ),
                         .ScrollDelta = Vec2<Unit>{ Unit{ (f32)sdlEvent.wheel.x }, Unit{ (f32)sdlEvent.wheel.y } }
                     }
                 };
@@ -236,7 +270,8 @@ private:
                     .Payload      = PointerEvent{
                         .Position = Vec2<Unit>{ Unit{ (f32)sdlEvent.motion.x }, Unit{ (f32)sdlEvent.motion.y } },
                         .Delta    = Vec2<Unit>{ Unit{ (f32)sdlEvent.motion.xrel }, Unit{ (f32)sdlEvent.motion.yrel } },
-                        .Type     = EPointerType::Mouse
+                        .Type     = EPointerType::Mouse,
+                        .Modifiers = ToModifiers(SDL_GetModState()),
                     }
                 };
             }

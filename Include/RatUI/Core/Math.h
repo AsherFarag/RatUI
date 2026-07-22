@@ -349,6 +349,18 @@ namespace RatUI
             return std::sqrt( LengthSq( a_Vec ) );
 		}
 
+		template<typename Scalar, auto Dim>
+		constexpr Scalar DistanceSq( const Vec<Scalar, Dim>& a_Left, const Vec<Scalar, Dim>& a_Right )
+		{
+			return LengthSq( a_Left - a_Right );
+		}
+
+		template<typename Scalar, auto Dim>
+		constexpr Scalar Distance( const Vec<Scalar, Dim>& a_Left, const Vec<Scalar, Dim>& a_Right )
+		{
+			return std::sqrt( DistanceSq( a_Left, a_Right ) );
+		}
+
 	} // namespace Math
 
     namespace Colors

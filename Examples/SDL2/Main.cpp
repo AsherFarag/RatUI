@@ -187,6 +187,7 @@ protected:
 		windowSize[1] /= m_UIScale;
 
         m_Scene->GetScene().UpdateLayout( windowSize );
+		m_Scene->GetScene().Tick( m_DeltaSeconds );
     }
 
     void OnRender( IRenderer& a_Renderer ) override

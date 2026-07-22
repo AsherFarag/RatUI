@@ -519,6 +519,12 @@ namespace RatUI
         template<std::invocable<const LayoutNode&> Func>
         void ForEachChild( Func&& a_Func ) const;
 
+        template<std::invocable<LayoutNode&> Func>
+        void ForEachChildReverse( Func&& a_Func );
+
+        template<std::invocable<const LayoutNode&> Func>
+        void ForEachChildReverse( Func&& a_Func ) const;
+
         /**
          * @brief Applies the given function to this widget and all of its descendant widgets in a depth-first manner.
          * @tparam Func The type of the function to apply to each descendant widget. It must be invocable with a LayoutNode reference.
@@ -552,6 +558,20 @@ namespace RatUI
     void LayoutNode::ForEachChild( Func&& a_Func ) const
     {
         for ( const LayoutNode* child = m_FirstChild; child != nullptr; child = child->m_NextSibling )
+            std::forward<Func>(a_Func)(*child);
+    }
+
+    template<std::invocable<LayoutNode&> Func>
+    void LayoutNode::ForEachChildReverse( Func&& a_Func )
+    {
+        for ( LayoutNode* child = m_LastChild; child != nullptr; child = child->m_PrevSibling )
+            std::forward<Func>(a_Func)(*child);
+    }
+
+    template<std::invocable<const LayoutNode&> Func>
+    void LayoutNode::ForEachChildReverse( Func&& a_Func ) const
+    {
+        for ( const LayoutNode* child = m_LastChild; child != nullptr; child = child->m_PrevSibling )
             std::forward<Func>(a_Func)(*child);
     }
 
