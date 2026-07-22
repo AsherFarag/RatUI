@@ -31,13 +31,27 @@ namespace RatUI
         Pen
     };
 
+    /**
+     * @brief Keyboard modifiers (Shift, Ctrl, Alt, Super) represented as bitflags. 
+     * Used in input events to indicate which modifier keys are currently pressed.
+     */
     enum class EModifier : u8
     {
         None  = 0,
-        Shift = 1 << 0,
-        Ctrl  = 1 << 1,
-        Alt   = 1 << 2,
-        Super = 1 << 3, ///< Windows / Command key
+
+        LShift = 1 << 0,
+        RShift = 1 << 1,
+        LCtrl  = 1 << 2,
+        RCtrl  = 1 << 3,
+        LAlt   = 1 << 4,
+        RAlt   = 1 << 5,
+        LSuper = 1 << 6,
+        RSuper = 1 << 7,
+
+        Shift = LShift | RShift,
+        Ctrl  = LCtrl  | RCtrl,
+        Alt   = LAlt   | RAlt,
+        Super = LSuper | RSuper, ///< Windows / Command(Apple) key
     };
     RATUI_ENUM_ENABLE_BITMASK_OPERATORS( EModifier, u8 )
 
@@ -380,19 +394,20 @@ namespace RatUI
 
         /** @brief Get the widget that is currently capturing mouse events. */
         constexpr NodeID GetMouseCaptureTarget() const { return m_MouseCapture; }
+        
         /** @brief Get the widget that currently has keyboard focus. */
         constexpr NodeID GetFocusTarget()        const { return m_FocusWidget; }
 
     private:
         constexpr explicit Reply( bool a_Handled ) : m_Handled( a_Handled ) {}
 
-        NodeID m_MouseCapture     { c_InvalidNodeID };
-        NodeID m_FocusWidget      { c_InvalidNodeID };
-        bool     m_Handled        : 1 { false };
-        bool     m_RequestCapture : 1 { false };
-        bool     m_ReleaseMouse   : 1 { false };
-        bool     m_ClearFocus     : 1 { false };
-        bool     m_PreventDefault : 1 { false };
+        NodeID m_MouseCapture       { c_InvalidNodeID };
+        NodeID m_FocusWidget        { c_InvalidNodeID };
+        bool   m_Handled        : 1 { false };
+        bool   m_RequestCapture : 1 { false };
+        bool   m_ReleaseMouse   : 1 { false };
+        bool   m_ClearFocus     : 1 { false };
+        bool   m_PreventDefault : 1 { false };
     };
 
 } // namespace RatUI

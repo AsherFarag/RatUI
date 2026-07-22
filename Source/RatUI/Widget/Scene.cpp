@@ -87,7 +87,8 @@ namespace RatUI
 		// For example, if a widget is removed while the pointer is over it, we need to clear the hovered state.
 		// Or if we click and hold a button, move the pointer off it, this re-process helps clear the pressed state.
 		// Otherwise, we would have to wait until the next pointer event to fix the state.
-		ProcessPointerEvent( Input.LastPointerEvent );
+        if ( Input.LastPointerEvent.Type != EPointerType::Unknown )
+            ProcessPointerEvent( Input.LastPointerEvent );
     }
 
     void Scene::Tick( f64 a_DeltaSeconds )
@@ -631,7 +632,7 @@ namespace RatUI
         Layouts.Clear();
         RootWidget = c_InvalidNodeID;
         Input.Reset();
-        Clear( m_ToDestory );
+        Clear( m_ToDestroy );
     }
 
 } // namespace RatUI

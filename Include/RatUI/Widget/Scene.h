@@ -109,7 +109,7 @@ namespace RatUI
         WidgetType* CreateRootWidget( Args&&... a_Args );
 
         /** @brief Destroys the widget with the specified ID, including its children. */
-        bool DestroyWidget( NodeID a_WidgetID ) { PushBack( m_ToDestory, a_WidgetID ); return true; }
+        bool DestroyWidget( NodeID a_WidgetID ) { PushBack( m_ToDestroy, a_WidgetID ); return true; }
 
         RATUI_NODISCARD IWidget* GetWidget( NodeID a_ID );
 
@@ -133,7 +133,7 @@ namespace RatUI
     protected:
         // --- Internal State ---
 
-        Array<NodeID> m_ToDestory;
+        Array<NodeID> m_ToDestroy;
 		f64           m_ClockSeconds{ 0.0 };
 
         // --- Internal Methods ---
@@ -149,7 +149,7 @@ namespace RatUI
         /** @brief Recursively collects focusable widgets within a_Scope's subtree, not descending into nested navigation boundaries. */
         void CollectFocusableCandidates( LayoutNode& a_Scope, Array<const LayoutNode*>& a_Out );
 
-        void DestoyWidgetImmediately( NodeID a_NodeID )
+        void DestroyWidgetImmediately( NodeID a_NodeID )
         {
             LayoutNode* node = Layouts.Get( a_NodeID );
             if (!node) return;
@@ -158,7 +158,7 @@ namespace RatUI
 
             node->ForEachChild( [&]( LayoutNode& child ) {
                 if (child.Widget)
-                    DestoyWidgetImmediately( child.Widget->GetLayoutID() );
+                    DestroyWidgetImmediately( child.Widget->GetLayoutID() );
             } );
 
             if (node->Widget)
@@ -169,12 +169,12 @@ namespace RatUI
 
         void CleanupDestroyedWidgets()
         {
-            for (NodeID nodeID : m_ToDestory)
+            for (NodeID nodeID : m_ToDestroy)
             {
-                DestoyWidgetImmediately( nodeID );
+                DestroyWidgetImmediately( nodeID );
             }
 
-            Clear( m_ToDestory );
+            Clear( m_ToDestroy );
         }
     };
 
