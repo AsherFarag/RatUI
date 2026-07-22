@@ -302,7 +302,7 @@ namespace RatUI
         bool Released{ false };  ///< True on the frame the button was released.
         bool Held{ false };      ///< True every frame the button is held down (including the pressed and released frames).
 
-        Optional<PointerID> PointerID{};
+        Optional<PointerID>  Pointer{};
         Optional<Vec2<Unit>> PointerPosition;
     };
 

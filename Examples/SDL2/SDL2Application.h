@@ -216,6 +216,7 @@ private:
                         .Pressed = sdlEvent.type == SDL_MOUSEBUTTONDOWN,
                         .Released = sdlEvent.type == SDL_MOUSEBUTTONUP,
                         .Held = false, // Held state can be tracked separately if needed
+						.Pointer = PointerID{ 0 }, // Assuming single mouse pointer with ID 0
 						.PointerPosition = Vec2<Unit>{ Unit{ (f32)sdlEvent.button.x }, Unit{ (f32)sdlEvent.button.y } }
                     }
                 };

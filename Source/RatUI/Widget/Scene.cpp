@@ -343,7 +343,10 @@ namespace RatUI
 
     void Scene::UpdateGestureState( const ButtonEvent& a_Event )
     {
-        PointerGestureState& gesture = Input.PointerStates[a_Event.PointerID.value_or( 0 )];
+        if ( !a_Event.Pointer )
+            return;
+
+        PointerGestureState& gesture = Input.PointerStates[*a_Event.Pointer];
         const GestureConfig& cfg = Input.Config;
         const f64 now = m_ClockSeconds;
 
