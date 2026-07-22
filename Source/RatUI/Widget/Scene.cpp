@@ -2,6 +2,47 @@
 
 namespace RatUI
 {
+    // TODO: Make this a reusable utility?
+    namespace 
+    {
+        struct LayoutChildIterator
+        {
+            using iterator_concept = std::forward_iterator_tag;
+            using iterator_category = std::forward_iterator_tag;
+            using value_type = LayoutNode*;
+            using difference_type = std::ptrdiff_t;
+
+            LayoutNode* Current{ nullptr };
+
+            value_type operator*() const { return Current; }
+
+            LayoutChildIterator& operator++()
+            {
+                Current = Current ? Current->NextSibling() : nullptr;
+                return *this;
+            }
+
+            LayoutChildIterator operator++( int )
+            {
+                LayoutChildIterator copy = *this;
+                ++( *this );
+                return copy;
+            }
+
+            bool operator==( std::default_sentinel_t ) const { return Current == nullptr; }
+        };
+
+        struct LayoutChildRange : std::ranges::view_interface<LayoutChildRange>
+        {
+            LayoutNode* First{ nullptr };
+
+            LayoutChildRange( LayoutNode* a_First ) : First( a_First ) {}
+            LayoutChildIterator begin() const { return LayoutChildIterator{ First }; }
+            std::default_sentinel_t end() const { return {}; }
+        };
+
+    } // namespace
+
     void Scene::UpdateLayout( Vec2<Unit> a_AvailableSize )
     {
         CleanupDestroyedWidgets();
@@ -469,85 +510,113 @@ namespace RatUI
 
     void Scene::Navigate( ENavAction a_Action )
     {
-        Input.InputMode = EInputMode::Navigation;
+        const auto FocusFirstIn = [&]( NodeID a_ScopeID )
+        {
+            LayoutNode* scopeNode = Layouts.Get( a_ScopeID );
+            if ( !scopeNode ) return;
+
+            for ( LayoutNode* child = scopeNode->FirstChild(); child; child = child->NextSibling() )
+            {
+                if ( child->Widget && child->Widget->IsFocusable() )
+                {
+                    SetFocus( child->Widget->GetLayoutID() );
+                    return;
+                }
+            }
+        };
+
+        if ( a_Action == ENavAction::Cancel )
+        {
+            PopNavScope();
+            return;
+        }
 
         if ( a_Action == ENavAction::ActivatePressed || a_Action == ENavAction::ActivateReleased )
         {
-            IWidget* focused = GetWidget( Input.FocusedWidget );
-            if ( !focused )
+            LayoutNode* focusedNode = Layouts.Get( Input.FocusedWidget );
+            if ( !focusedNode || !focusedNode->Widget )
                 return;
 
-            ButtonEvent synthetic{};
-            synthetic.Pressed   = a_Action == ENavAction::ActivatePressed;
-            synthetic.Released  = a_Action == ENavAction::ActivateReleased;
-            synthetic.Modifiers = Input.ModifierState;
+            if ( a_Action == ENavAction::ActivatePressed && focusedNode->Style.IsFocusScope )
+            {
+                PushNavScope( Input.FocusedWidget );
+                FocusFirstIn( Input.FocusedWidget );
+                return;
+            }
 
-            Reply reply = synthetic.Pressed ? focused->OnButtonPressed( synthetic )
-                                             : focused->OnButtonReleased( synthetic );
+            const ButtonEvent ev{
+                .Button = EButtonID::KeyEnter,
+                .Pressed = ( a_Action == ENavAction::ActivatePressed ),
+                .Released = ( a_Action == ENavAction::ActivateReleased ),
+                .Held = ( a_Action == ENavAction::ActivatePressed ),
+            };
+
+            // TODO: Shouldnt be making fake events like this, should add something like IWidget::OnPressed/OnHovered etc??
+            Reply reply = a_Action == ENavAction::ActivatePressed
+                ? focusedNode->Widget->OnButtonPressed( ev )
+                : focusedNode->Widget->OnButtonReleased( ev );
+
             ApplyReply( reply );
             return;
         }
 
-        if ( a_Action == ENavAction::Cancel )
+        NodeID      scopeID = GetCurrentNavScope();
+        LayoutNode* scopeNode = Layouts.Get( scopeID );
+        LayoutNode* focusedNode = Layouts.Get( Input.FocusedWidget );
+
+        if ( !scopeNode )
+            return;
+
+        if ( !focusedNode )
         {
-            NavReply boundary = QueryBoundaryReply( a_Action, Input.FocusedWidget );
-
-            if ( boundary.GetRule() == NavReply::EBoundaryRule::Explicit )
-            {
-                SetFocus( boundary.GetExplicitTarget() );
-                return;
-            }
-
-            if ( Input.HasNavScopes() )
-                PopNavScope();
-
+            FocusFirstIn( scopeID );
             return;
         }
 
-        NavReply boundary = QueryBoundaryReply( a_Action, Input.FocusedWidget );
+        // TODO: If I move navigation from LayoutNodes to Widgets, I should remove this.
+        // TODO: Though I do like not having explicit widget types for containers like VBox/HBox/Grid etc and still keep nav for them.
 
-        switch ( boundary.GetRule() )
+        auto focusableNodes = LayoutChildRange{ scopeNode->FirstChild() }
+            | std::views::filter( [&]( LayoutNode* node ) -> bool
         {
+            if ( !node ) return false;
+            // TODO: Probs dont need LayoutStyle::IsFocusScope anymore
+            return ( node->Widget && node->Widget->IsFocusable() ) || node->Style.IsFocusScope;
+        } );
+
+        const LayoutNode* nextNode = FindNavigatableNode( a_Action, focusedNode, focusableNodes );
+
+        if ( nextNode )
+        {
+            SetFocus( nextNode->Widget->GetLayoutID() );
+            return;
+        }
+
+        // No target found within the current scope - consult boundary policy.
+        const NavReply navReply = QueryBoundaryReply( a_Action, Input.FocusedWidget );
+
+        switch ( navReply.GetRule() )
+        {
+            case NavReply::EBoundaryRule::Escape:
+                PopNavScope();
+                break;
+
+            case NavReply::EBoundaryRule::Stop:
+                // Wrap: focus the first/last focusable child depending on direction.
+                FocusFirstIn( scopeID );
+                break;
+
             case NavReply::EBoundaryRule::Explicit:
-                SetFocus( boundary.GetExplicitTarget() );
-                return;
+                SetFocus( navReply.GetExplicitTarget() );
+                break;
 
             case NavReply::EBoundaryRule::Custom:
             {
-                NodeID target = boundary.ResolveCustom( a_Action, Input.FocusedWidget );
+                NodeID target = navReply.ResolveCustom( a_Action, Input.FocusedWidget );
                 if ( target != c_InvalidNodeID )
                     SetFocus( target );
-                return;
+                break;
             }
-
-            default:
-                break; // Escape / Stop fall through to spatial search below.
-        }
-
-        const NodeID scopeID = GetCurrentNavScope();
-        LayoutNode* start = Layouts.Get( Input.FocusedWidget );
-        LayoutNode* scope = Layouts.Get( scopeID );
-
-        if ( !start || !scope )
-            return;
-
-        Array<const LayoutNode*> candidates;
-        CollectFocusableCandidates( *scope, candidates );
-
-        if ( const LayoutNode* best = FindNavigatableNode( a_Action, start, candidates ) )
-        {
-            SetFocus( best->Widget->GetLayoutID() );
-            return;
-        }
-
-        if ( boundary.GetRule() == NavReply::EBoundaryRule::Stop )
-            return; // Trapped; no candidate found. (Wrap-around is a future extension, not implemented here.)
-
-        // Escape and nothing found locally: pop up a scope and retry there.
-        if ( Input.HasNavScopes() )
-        {
-            PopNavScope();
-            Navigate( a_Action );
         }
     }
 
