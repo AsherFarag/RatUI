@@ -42,10 +42,11 @@ namespace RatUI
         Scene( Scene&& ) = default;
         Scene& operator=( Scene&& ) = default;
 
-        LayoutNodePool Layouts{};     ///< Pool of layout nodes representing the hierarchical structure and layout information of widgets in the scene.
-        NodeID         RootWidget{};  ///< The NodeID of the root widget in the scene, which serves as the entry point for layout and rendering.
-        ITextMetrics*  TextMetrics{}; ///< Pointer to a text metrics provider used for measuring text during layout, set by the user.
-        InputState     Input{};       ///< The current input state. Prefer Scene's methods (SetFocus, Navigate, etc.) over mutating this directly.
+        LayoutNodePool Layouts{};      ///< Pool of layout nodes representing the hierarchical structure and layout information of widgets in the scene.
+        NodeID         RootWidget{};   ///< The NodeID of the root widget in the scene, which serves as the entry point for layout and rendering.
+        ITextMetrics*  TextMetrics{};  ///< Pointer to a text metrics provider used for measuring text during layout, set by the user.
+        InputState     Input{};        ///< The current input state. Prefer Scene's methods (SetFocus, Navigate, etc.) over mutating this directly.
+        ThemeHandle    DefaultTheme{}; ///< Widgets (with ThemeMixin) will be set automatically to this theme before OnConstruct() is called, if they don't have a theme set already.
 
         // - Scene Management
 
@@ -204,6 +205,12 @@ namespace RatUI
         {
             if ( LayoutNode* parentNode = Layouts.Get( a_ParentID ) )
                 parentNode->PushBackChild( *node );
+        }
+
+        if constexpr ( IWidget::HasMixin<ThemeMixin> )
+        {
+            if ( !node->Widget->Theme )
+                node->Widget->Theme = DefaultTheme;
         }
 
         // Call construct after fully initialized and linked into hierarchy, in case widget logic depends on that
