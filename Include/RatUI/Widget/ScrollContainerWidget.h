@@ -112,7 +112,14 @@ namespace RatUI
                     a_Event.Drawer.PushTransform( translation );
                 }
 
-                PaintChildren( a_Event );
+                if ( LayoutNode* contentNode = scene.GetLayoutNode( m_ContentNodeID ) )
+                {
+                    contentNode->ForEachChild( [&]( LayoutNode& child )
+                    {
+                        if ( child.Widget )
+                            child.Widget->Paint( a_Event );
+                    } );
+                }
 
                 if ( hasTranslation )
                     a_Event.Drawer.PopTransform();
@@ -208,8 +215,8 @@ namespace RatUI
         /**
          * @brief Creates both scrollbar widgets and inserts them at the correct positions.
          *
-         * V-scrollbar: appended to the content row  � Fixed width, Flex height.
-         * H-scrollbar: appended to the root node    � Flex width, Fixed height.
+         * V-scrollbar: appended to the content row
+         * H-scrollbar: appended to the root node  
          */
         void EnsureScrollbars()
         {

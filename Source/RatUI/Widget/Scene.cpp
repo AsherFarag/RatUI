@@ -223,16 +223,17 @@ namespace RatUI
         NodeID childHit = c_InvalidNodeID;
         node->ForEachChildReverse( [&]( LayoutNode& child )
         {
-            if ( childHit != c_InvalidNodeID || !child.Widget )
+            if ( childHit != c_InvalidNodeID )
                 return;
 
-            childHit = HitTest( child.Widget->GetLayoutID(), a_LogicalPos );
+            childHit = HitTest( child.ID, a_LogicalPos );
         } );
 
         if ( childHit != c_InvalidNodeID )
             return childHit;
 
-        if ( node->Widget && node->Widget->IsInteractable() )
+        if ( Visibility::IsHitTestable( node->Layout.Visibility ) &&
+             node->Widget && node->Widget->IsInteractable() )
             return a_ID;
 
         return c_InvalidNodeID;
