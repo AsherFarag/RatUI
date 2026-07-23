@@ -11,7 +11,7 @@ namespace RatUI
      * @tparam T The type of item to store. Must be default-constructible.
      * @tparam ItemsPerBucket The number of items to store in each bucket.
      */
-    template<typename T, u32 ItemsPerBucket = 256>
+    template<typename T, u32 ItemsPerBucket = 512>
     class Pool
     {
     public:

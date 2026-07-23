@@ -47,7 +47,7 @@ namespace RatUI
     {
         CleanupDestroyedWidgets();
 
-        LayoutNode* rootNode = Layouts.Get( RootWidget );
+        LayoutNode* rootNode = m_Layouts.Get( RootWidget );
         if ( !rootNode )
             return;
 
@@ -121,7 +121,7 @@ namespace RatUI
     {
         CleanupDestroyedWidgets();
 
-        if ( LayoutNode* rootNode = Layouts.Get( RootWidget ) )
+        if ( LayoutNode* rootNode = m_Layouts.Get( RootWidget ) )
             if ( rootNode->Widget )
                 rootNode->Widget->Paint( PaintEvent{ a_DrawList, a_DeltaSeconds } );
     }
@@ -132,13 +132,13 @@ namespace RatUI
 
     IWidget* Scene::GetWidget( NodeID a_ID )
     {
-        LayoutNode* node = Layouts.Get( a_ID );
+        LayoutNode* node = m_Layouts.Get( a_ID );
         return ( node && node->Widget ) ? node->Widget.get() : nullptr;
     }
 
     const IWidget* Scene::GetWidget( NodeID a_ID ) const
     {
-        const LayoutNode* node = Layouts.Get( a_ID );
+        const LayoutNode* node = m_Layouts.Get( a_ID );
         return ( node && node->Widget ) ? node->Widget.get() : nullptr;
     }
 
@@ -192,7 +192,7 @@ namespace RatUI
         if ( Input.FocusedWidget != c_InvalidNodeID )
             return;
 
-        LayoutNode* root = Layouts.Get( RootWidget );
+        LayoutNode* root = m_Layouts.Get( RootWidget );
         if ( !root )
             return;
 
@@ -209,7 +209,7 @@ namespace RatUI
 
     NodeID Scene::HitTest( NodeID a_ID, Vec2<Unit> a_LogicalPos )
     {
-        LayoutNode* node = Layouts.Get( a_ID );
+        LayoutNode* node = m_Layouts.Get( a_ID );
         if ( !node )
             return c_InvalidNodeID;
 
@@ -486,7 +486,7 @@ namespace RatUI
 
     NavReply Scene::QueryBoundaryReply( ENavAction a_Action, NodeID a_Focused )
     {
-        LayoutNode* node = Layouts.Get( a_Focused );
+        LayoutNode* node = m_Layouts.Get( a_Focused );
         while ( node )
         {
             if ( node->Widget && node->Widget->IsNavigationBoundary() )
@@ -515,7 +515,7 @@ namespace RatUI
     {
         const auto FocusFirstIn = [&]( NodeID a_ScopeID )
         {
-            LayoutNode* scopeNode = Layouts.Get( a_ScopeID );
+            LayoutNode* scopeNode = m_Layouts.Get( a_ScopeID );
             if ( !scopeNode ) return;
 
             for ( LayoutNode* child = scopeNode->FirstChild(); child; child = child->NextSibling() )
@@ -536,7 +536,7 @@ namespace RatUI
 
         if ( a_Action == ENavAction::ActivatePressed || a_Action == ENavAction::ActivateReleased )
         {
-            LayoutNode* focusedNode = Layouts.Get( Input.FocusedWidget );
+            LayoutNode* focusedNode = m_Layouts.Get( Input.FocusedWidget );
             if ( !focusedNode || !focusedNode->Widget )
                 return;
 
@@ -564,8 +564,8 @@ namespace RatUI
         }
 
         NodeID      scopeID = GetCurrentNavScope();
-        LayoutNode* scopeNode = Layouts.Get( scopeID );
-        LayoutNode* focusedNode = Layouts.Get( Input.FocusedWidget );
+        LayoutNode* scopeNode = m_Layouts.Get( scopeID );
+        LayoutNode* focusedNode = m_Layouts.Get( Input.FocusedWidget );
 
         if ( !scopeNode )
             return;
@@ -629,10 +629,28 @@ namespace RatUI
 
     void Scene::Reset()
     {
-        Layouts.Clear();
+        m_Layouts.Clear();
         RootWidget = c_InvalidNodeID;
         Input.Reset();
         Clear( m_ToDestroy );
+    }
+
+    LayoutNode& Scene::CreateLayoutNode( LayoutStyle a_Style, NodeID a_ParentID )
+    {
+        NodeID nodeID = m_Layouts.Allocate();
+        LayoutNode* node = m_Layouts.Get( nodeID );
+        RATUI_ASSERT( node, "Failed to allocate layout node." );
+        
+        node->ID = nodeID;
+        node->Style = a_Style;
+
+        if ( a_ParentID != c_InvalidNodeID )
+        {
+            if ( LayoutNode* parentNode = m_Layouts.Get( a_ParentID ) )
+                parentNode->PushBackChild( *node );
+        }
+
+        return *node;
     }
 
 } // namespace RatUI

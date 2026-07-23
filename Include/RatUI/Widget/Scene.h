@@ -42,7 +42,6 @@ namespace RatUI
         Scene( Scene&& ) = default;
         Scene& operator=( Scene&& ) = default;
 
-        LayoutNodePool Layouts{};      ///< Pool of layout nodes representing the hierarchical structure and layout information of widgets in the scene.
         NodeID         RootWidget{};   ///< The NodeID of the root widget in the scene, which serves as the entry point for layout and rendering.
         ITextMetrics*  TextMetrics{};  ///< Pointer to a text metrics provider used for measuring text during layout, set by the user.
         InputState     Input{};        ///< The current input state. Prefer Scene's methods (SetFocus, Navigate, etc.) over mutating this directly.
@@ -72,7 +71,7 @@ namespace RatUI
         // - Focus Management
 
         /** @brief Returns the NodeID of the currently focused widget, or c_InvalidNodeID if no widget is focused. */
-        NodeID GetFocusedNode() const { return Input.FocusedWidget; }
+        RATUI_NODISCARD NodeID GetFocusedNode() const { return Input.FocusedWidget; }
 
         /** @brief Sets the focus to the specified widget, if it is focusable. Fires OnFocusLost/OnFocusReceived. */
         void SetFocus( NodeID a_Node );
@@ -84,10 +83,10 @@ namespace RatUI
 
         void ReleasePointerCapture() { Input.CapturedWidget = c_InvalidNodeID; }
 
-        NodeID GetCapturedWidget() const { return Input.CapturedWidget; }
+        RATUI_NODISCARD NodeID GetCapturedWidget() const { return Input.CapturedWidget; }
 
         /** @brief Whether input is currently pointer-driven or navigation-driven; useful for widgets deciding whether to show a focus ring. */
-        EInputMode GetInputMode() const { return Input.InputMode; }
+        RATUI_NODISCARD EInputMode GetInputMode() const { return Input.InputMode; }
 
         // - Navigation
 
@@ -96,12 +95,17 @@ namespace RatUI
         /** @brief Pushes a navigation scope, remembering the currently focused widget so it can be restored on pop. */
         void PushNavScope( NodeID a_ScopeID );
         void PopNavScope();
-        NodeID GetCurrentNavScope() const { return Input.GetCurrentNavScope( RootWidget ); }
+        RATUI_NODISCARD NodeID GetCurrentNavScope() const { return Input.GetCurrentNavScope( RootWidget ); }
 
         /** @brief If no widget is currently focused, focuses the first focusable widget in the scene. Called automatically the first time navigation input arrives. */
         void EnsureInitialFocus();
 
         // - Widget Management
+
+        LayoutNode& CreateLayoutNode( LayoutStyle a_Style = {}, NodeID a_ParentID = c_InvalidNodeID );
+
+        RATUI_NODISCARD       LayoutNode* GetLayoutNode( NodeID a_ID )       { return m_Layouts.Get( a_ID ); }
+        RATUI_NODISCARD const LayoutNode* GetLayoutNode( NodeID a_ID ) const { return m_Layouts.Get( a_ID ); }
 
         template<std::derived_from<IWidget> WidgetType, typename... Args>
         WidgetType* CreateWidget( NodeID a_ParentID, Args&&... a_Args );
@@ -134,8 +138,9 @@ namespace RatUI
     protected:
         // --- Internal State ---
 
-        Array<NodeID> m_ToDestroy;
-		f64           m_ClockSeconds{ 0.0 };
+        LayoutNodePool m_Layouts{};      ///< Pool of layout nodes representing the hierarchical structure and layout information of widgets in the scene.
+        Array<NodeID>  m_ToDestroy;
+		f64            m_ClockSeconds{ 0.0 };
 
         // --- Internal Methods ---
 
@@ -150,29 +155,25 @@ namespace RatUI
         /** @brief Recursively collects focusable widgets within a_Scope's subtree, not descending into nested navigation boundaries. */
         void CollectFocusableCandidates( LayoutNode& a_Scope, Array<const LayoutNode*>& a_Out );
 
-        void DestroyWidgetImmediately( NodeID a_NodeID )
+        void DestroyWidgetImmediately( LayoutNode& a_Node )
         {
-            LayoutNode* node = Layouts.Get( a_NodeID );
-            if (!node) return;
-
-            node->DetachFromParent();
-
-            node->ForEachChild( [&]( LayoutNode& child ) {
-                if (child.Widget)
-                    DestroyWidgetImmediately( child.Widget->GetLayoutID() );
+            a_Node.DetachFromParent();
+            a_Node.ForEachChild( [&]( LayoutNode& child ) {
+                DestroyWidgetImmediately( child );
             } );
 
-            if (node->Widget)
-                node->Widget->OnDestroy();
+            if (a_Node.Widget)
+                a_Node.Widget->OnDestroy();
 
-            Layouts.Deallocate( a_NodeID );
+            m_Layouts.Deallocate( a_Node.ID );
         }
 
         void CleanupDestroyedWidgets()
         {
             for (NodeID nodeID : m_ToDestroy)
             {
-                DestroyWidgetImmediately( nodeID );
+                if (LayoutNode* node = m_Layouts.Get(nodeID))
+                    DestroyWidgetImmediately( *node );
             }
 
             Clear( m_ToDestroy );
@@ -193,28 +194,21 @@ namespace RatUI
     WidgetType* Scene::CreateWidget( NodeID a_ParentID, Args&&... a_Args )
     {
         // Allocate layout node and widget
-        NodeID nodeID    = Layouts.Allocate();
-        LayoutNode* node = Layouts.Get( nodeID );
-        node->Widget     = MakeUnique<WidgetType>( std::forward<Args>( a_Args )... );
+        LayoutNode& node = CreateLayoutNode( {}, a_ParentID );
+        node.Widget     = MakeUnique<WidgetType>( std::forward<Args>( a_Args )... );
 
         // Wire up back-references for the widget
-        node->Widget->m_Scene    = this;
-        node->Widget->m_LayoutID = nodeID;
-
-        if ( a_ParentID != c_InvalidNodeID )
-        {
-            if ( LayoutNode* parentNode = Layouts.Get( a_ParentID ) )
-                parentNode->PushBackChild( *node );
-        }
+        node.Widget->m_Scene    = this;
+        node.Widget->m_LayoutID = node.ID;
 
         if constexpr ( IWidget::HasMixin<ThemeMixin> )
         {
-            if ( !node->Widget->Theme )
-                node->Widget->Theme = DefaultTheme;
+            if ( !node.Widget->Theme )
+                node.Widget->Theme = DefaultTheme;
         }
 
         // Call construct after fully initialized and linked into hierarchy, in case widget logic depends on that
-        WidgetType& widget = static_cast<WidgetType&>( *node->Widget );
+        WidgetType& widget = static_cast<WidgetType&>( *node.Widget );
         widget.OnConstruct();
 
         return &widget;
@@ -223,7 +217,7 @@ namespace RatUI
     template<std::invocable<IWidget&> Func>
     void Scene::ForEachChildWidget( NodeID a_NodeID, Func&& a_Func )
     {
-        LayoutNode* node = Layouts.Get( a_NodeID );
+        LayoutNode* node = m_Layouts.Get( a_NodeID );
         if ( !node ) return;
 
         node->ForEachChild( [&]( LayoutNode& childNode )
@@ -235,7 +229,7 @@ namespace RatUI
     template<std::invocable<const IWidget&> Func>
     void Scene::ForEachChildWidget( NodeID a_NodeID, Func&& a_Func ) const
     {
-        const LayoutNode* node = Layouts.Get( a_NodeID );
+        const LayoutNode* node = m_Layouts.Get( a_NodeID );
         if ( !node ) return;
 
         node->ForEachChild( [&]( const LayoutNode& childNode )

@@ -39,7 +39,7 @@ private:
 
     LayoutNode* Node( WidgetID id )
     {
-        return m_Scene.Layouts.Get( m_Scene.GetWidget( id )->GetLayoutID() );
+        return m_Scene.m_Layouts.Get( m_Scene.GetWidget( id )->GetLayoutID() );
     }
 
     // -------------------------------------------------------------------------
@@ -748,7 +748,7 @@ public:
         // Oscillate animated container width: 80 px -> 500 px
         if ( IWidget* w = m_Scene.GetWidget( m_AnimContainer ) )
         {
-            if ( LayoutNode* n = m_Scene.Layouts.Get( w->GetLayoutID() ) )
+            if ( LayoutNode* n = m_Scene.m_Layouts.Get( w->GetLayoutID() ) )
             {
                 const f32 t = ( std::sin( m_Time * 0.6f ) + 1.f ) * 0.5f;
                 n->Style.PercentWidth = Math::Lerp( 0.1f, 1.f, t );

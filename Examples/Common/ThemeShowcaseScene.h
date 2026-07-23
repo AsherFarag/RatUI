@@ -2,6 +2,7 @@
 #include "IDemoScene.h"
 #include <RatUI/Widget/SliderWidget.h>
 #include <RatUI/Widget/InputTextWidget.h>
+#include <RatUI/Widget/ScrollContainerWidget.h>
 #include <RatUI/Widget/WidgetBuilder.h>
 #include <array>
 #include <cmath>

@@ -161,9 +161,7 @@ namespace RatUI
             if ( !m_IsDragging )
                 return Reply::Unhandled();
 
-            const LayoutNode* node = GetScene().Layouts.Get( GetLayoutID() );
-            if ( node )
-                UpdateFromPointer( node->Layout.FinalRect, a_Event.Position );
+            UpdateFromPointer( GetLayout().Layout.FinalRect, a_Event.Position );
 
             return Reply::Unhandled();
         }

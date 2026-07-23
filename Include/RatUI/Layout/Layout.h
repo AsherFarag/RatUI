@@ -433,6 +433,7 @@ namespace RatUI
      */
     struct LayoutNode
     {
+        NodeID ID{};                 ///< The pool ID of this node, this is set automatically by the scene.
 		LayoutStyle Style{};         ///< @warning Any changes to this struct should be followed by a call to MarkDirty() to ensure the layout is recalculated. Or use the factory-style setters below which automatically mark the node as dirty.
         LayoutResult Layout{};       ///< The cached layout result for this widget computed during the layout process.
         Unique<class IWidget> Widget;
