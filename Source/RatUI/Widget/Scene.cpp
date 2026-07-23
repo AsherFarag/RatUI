@@ -216,24 +216,27 @@ namespace RatUI
         if ( !Visibility::IsHitTestable( node->Layout.Visibility ) &&
              !Visibility::AreChildrenHitTestable( node->Layout.Visibility ) )
             return c_InvalidNodeID;
+
         if ( !node->Layout.FinalRect.Contains( a_LogicalPos ) )
             return c_InvalidNodeID;
 
-        // Children are checked first, topmost (last-drawn) wins.
+        // Children may be visually offset from their FinalRect translate 
+        // the test position into their local space before recursing.
+        const Vec2<Unit> childPos = a_LogicalPos + node->ChildHitTestOffset;
+
         NodeID childHit = c_InvalidNodeID;
         node->ForEachChildReverse( [&]( LayoutNode& child )
         {
             if ( childHit != c_InvalidNodeID )
-                return;
+                return; // TODO: Need a way to break out of ForEachChildReverse early, or use a different iteration method.
 
-            childHit = HitTest( child.ID, a_LogicalPos );
+            childHit = HitTest( child.ID, childPos );
         } );
 
         if ( childHit != c_InvalidNodeID )
             return childHit;
 
-        if ( Visibility::IsHitTestable( node->Layout.Visibility ) &&
-             node->Widget && node->Widget->IsInteractable() )
+        if ( node->Widget && node->Widget->IsInteractable() )
             return a_ID;
 
         return c_InvalidNodeID;

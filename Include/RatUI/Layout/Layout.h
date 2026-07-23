@@ -433,10 +433,18 @@ namespace RatUI
      */
     struct LayoutNode
     {
-        NodeID ID{};                 ///< The pool ID of this node, this is set automatically by the scene.
-		LayoutStyle Style{};         ///< @warning Any changes to this struct should be followed by a call to MarkDirty() to ensure the layout is recalculated. Or use the factory-style setters below which automatically mark the node as dirty.
-        LayoutResult Layout{};       ///< The cached layout result for this widget computed during the layout process.
+        NodeID ID{};                               ///< The pool ID of this node, this is set automatically by the scene.
+		LayoutStyle Style{};                       ///< @warning Any changes to this struct should be followed by a call to MarkDirty() to ensure the layout is recalculated. 
+                                                   ///< Or use the factory-style setters below which automatically mark the node as dirty.
+        LayoutResult Layout{};                     ///< The cached layout result for this widget computed during the layout process.
         Unique<class IWidget> Widget;
+
+        // TODO: Im not a big fan of this, but it's the only solution I can think of for now. 
+        // The problem is that some widgets (like ScrollContainer) have children that are 
+        // visually offset from their layout rect (e.g. scrolled content). 
+        // If we don't account for this, the hit test will fail for those children. 
+        // So we need to apply the ChildHitTestOffset to the logical position before recursing into children.
+        Vec2<Unit> ChildHitTestOffset{ 0_u, 0_u }; ///< The offset to apply to child hit-testing, allowing for custom hit-test regions that differ from the layout bounds.
 
         /** @brief Factory-style setter methods for layout properties - automatically marks the node as dirty when a property is changed. */
 

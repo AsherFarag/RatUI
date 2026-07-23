@@ -148,6 +148,10 @@ namespace RatUI
         void SetScrollOffset( Vec2<Unit> a_Offset )
         {
             m_ScrollOffset = a_Offset;
+
+            if ( LayoutNode* contentNode = GetContentNode() )
+                contentNode->ChildHitTestOffset = m_ScrollOffset;
+
             if ( OnScroll ) OnScroll( *this, m_ScrollOffset );
         }
 
@@ -284,7 +288,7 @@ namespace RatUI
         void UpdateScrollMetrics()
         {
             Scene& scene = GetScene();
-            const LayoutNode* contentNode = GetContentNode();
+            LayoutNode* contentNode = GetContentNode();
             if ( !contentNode )
                 return;
 
@@ -321,7 +325,8 @@ namespace RatUI
 
             const f32 clampedX = std::clamp( m_ScrollOffset[0].ToFloat(), 0.f, maxX );
             const f32 clampedY = std::clamp( m_ScrollOffset[1].ToFloat(), 0.f, maxY );
-            m_ScrollOffset = { Unit( clampedX ), Unit( clampedY ) };
+            m_ScrollOffset     = { Unit( clampedX ), Unit( clampedY ) };
+            contentNode->ChildHitTestOffset = m_ScrollOffset;
 
             if ( SliderWidget* hScroll = scene.GetWidget<SliderWidget>( m_HScrollbarID ) )
             {
