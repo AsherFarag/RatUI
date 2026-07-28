@@ -170,4 +170,68 @@ namespace RatUI
         #endif
     >;
 
+    template<class ThisType>
+    struct ThemeArg
+    {
+        ThemeHandle Theme;
+
+        ThisType& WithTheme( ThemeHandle a_Theme )
+        {
+            Theme = a_Theme;
+            return static_cast<ThisType&>( *this );
+        }
+
+        template<class WidgetType>
+        void ApplyTo( WidgetType& a_Widget ) &&
+        {
+            if constexpr ( a_Widget.HasMixin<ThemeMixin> )
+            {
+				if ( Theme )
+                    a_Widget.Theme = std::move( Theme );
+            }
+        }
+    };
+
+    template<class ThisType>
+    struct DebugNameArg
+    {
+        String Name;
+
+        ThisType& WithDebugName( StringView a_Name )
+        {
+            #if RATUI_DEBUG
+                Name = String{ a_Name };
+            #endif
+
+            return static_cast<ThisType&>( *this );
+        }
+
+        template<class WidgetType>
+        void ApplyTo( WidgetType& a_Widget ) &&
+        {
+            if constexpr ( a_Widget.HasMixin<DebugMixin> )
+            {
+				if ( !Empty( Name ) )
+                    a_Widget.DebugName = std::move( Name );
+            }
+        }
+    };
+
+    template<template<class> class... Mixins>
+    struct BaseWidgetArgs : Mixins<BaseWidgetArgs<Mixins...>>...
+    {
+        template<class WidgetType>
+        void ApplyTo( WidgetType& widget )&&
+        {
+            using ThisType = BaseWidgetArgs<Mixins...>;
+
+            (
+                std::move( static_cast<Mixins<ThisType>&>( *this ) ).ApplyTo( widget ),
+                ...
+            );
+        }
+    };
+
+    using WidgetArgs = BaseWidgetArgs<ThemeArg, DebugNameArg>;
+
 } // namespace RatUI

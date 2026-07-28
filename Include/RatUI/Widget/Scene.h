@@ -108,7 +108,7 @@ namespace RatUI
         RATUI_NODISCARD const LayoutNode* GetLayoutNode( NodeID a_ID ) const { return m_Layouts.Get( a_ID ); }
 
         template<std::derived_from<IWidget> WidgetType, typename... Args>
-        WidgetType* CreateWidget( NodeID a_ParentID, Args&&... a_Args );
+        WidgetType* CreateWidget( NodeID a_ParentID, WidgetArgs a_WidgetArgs = {}, Args&&... a_Args );
 
         template<std::derived_from<IWidget> WidgetType, typename... Args>
         WidgetType* CreateRootWidget( Args&&... a_Args );
@@ -185,13 +185,13 @@ namespace RatUI
     template<std::derived_from<IWidget> WidgetType, typename... Args>
     WidgetType* Scene::CreateRootWidget( Args&&... a_Args )
     {
-        WidgetType* widget = CreateWidget<WidgetType>( c_InvalidNodeID, std::forward<Args>( a_Args )... );
+        WidgetType* widget = CreateWidget<WidgetType>( c_InvalidNodeID, WidgetArgs{}, std::forward<Args>( a_Args )... );
         RootWidget = widget->GetLayoutID();
         return widget;
     }
 
     template<std::derived_from<IWidget> WidgetType, typename... Args>
-    WidgetType* Scene::CreateWidget( NodeID a_ParentID, Args&&... a_Args )
+    WidgetType* Scene::CreateWidget( NodeID a_ParentID, WidgetArgs a_WidgetArgs, Args&&... a_Args )
     {
         // Allocate layout node and widget
         LayoutNode& node = CreateLayoutNode( {}, a_ParentID );
@@ -201,6 +201,12 @@ namespace RatUI
         node.Widget->m_Scene    = this;
         node.Widget->m_LayoutID = node.ID;
 
+        WidgetType& widget = static_cast<WidgetType&>( *node.Widget );
+
+        // Apply widget arguments
+        std::move( a_WidgetArgs ).ApplyTo( widget );
+
+		// Apply default theme if the widget has a ThemeMixin and no theme was provided
         if constexpr ( IWidget::HasMixin<ThemeMixin> )
         {
             if ( !node.Widget->Theme )
@@ -208,7 +214,6 @@ namespace RatUI
         }
 
         // Call construct after fully initialized and linked into hierarchy, in case widget logic depends on that
-        WidgetType& widget = static_cast<WidgetType&>( *node.Widget );
         widget.OnConstruct();
 
         return &widget;
