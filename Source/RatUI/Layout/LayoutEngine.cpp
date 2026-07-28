@@ -1,14 +1,15 @@
 #include <RatUI/Layout/LayoutEngine.h>
+#include <RatUI/Widget/IWidget.h>
 
 namespace RatUI
 {
 namespace
 {
-        struct GridDimensions
-        {
-            u32 Columns;
-            u32 Rows;
-        };
+    struct GridDimensions
+    {
+        u32 Columns;
+        u32 Rows;
+    };
 
     /**
      * @brief Resolves the final arranged size of a child on both axes,
@@ -90,6 +91,15 @@ namespace
 
     Vec2<Unit> MeasureLayoutNode( LayoutNode& a_Node, Vec2<Unit> a_AvailableSize )
     {
+        if ( !a_Node.Layout.IsDirty && 
+             !a_Node.Layout.IsDescendantDirty && 
+             a_Node.Layout.LastAvailableSize == a_AvailableSize )
+        {
+            return a_Node.Layout.DesiredSize; // Unchanged, skip entirely
+        }
+
+        a_Node.Layout.LastAvailableSize = a_AvailableSize;
+
         ResolveNodeVisibility( a_Node );
 
         if ( !Visibility::AffectsLayout( a_Node.Layout.Visibility ) )
@@ -101,62 +111,38 @@ namespace
         const LayoutStyle& s = a_Node.Style;
         Vec2<Unit> desired{ 0_u, 0_u };
 
-        switch ( s.WidthMode )
-        {
-            case ESizingMode::Fixed:   desired[0] = s.FixedWidth; break;
-            case ESizingMode::Percent: desired[0] = s.PercentWidth * a_AvailableSize[0]; break;
-            case ESizingMode::Flex:
-            case ESizingMode::Content: desired[0] = a_Node.Layout.IntrinsicSize[0]; break;
-        }
+             if ( s.WidthMode == ESizingMode::Fixed )   desired[0] = s.FixedWidth;
+        else if ( s.WidthMode == ESizingMode::Percent ) desired[0] = s.PercentWidth * a_AvailableSize[0];
 
-        switch ( s.HeightMode )
-        {
-            case ESizingMode::Fixed:   desired[1] = s.FixedHeight; break;
-            case ESizingMode::Percent: desired[1] = s.PercentHeight * a_AvailableSize[1]; break;
-            case ESizingMode::Flex:
-            case ESizingMode::Content: desired[1] = a_Node.Layout.IntrinsicSize[1]; break;
-        }
+             if ( s.HeightMode == ESizingMode::Fixed )   desired[1] = s.FixedHeight;
+        else if ( s.HeightMode == ESizingMode::Percent ) desired[1] = s.PercentHeight * a_AvailableSize[1];
+
+        const Vec2<Unit> childAvailSize{
+            ( s.WidthMode == ESizingMode::Fixed || s.WidthMode == ESizingMode::Percent )
+                ? std::max( 0_u, desired[0] - s.Padding.Horizontal() )
+                : std::max( 0_u, a_AvailableSize[0] - s.Padding.Horizontal() ),
+            ( s.HeightMode == ESizingMode::Fixed || s.HeightMode == ESizingMode::Percent )
+                ? std::max( 0_u, desired[1] - s.Padding.Vertical() )
+                : std::max( 0_u, a_AvailableSize[1] - s.Padding.Vertical() )
+        };
+
+        Vec2<Unit> intrinsicSize{ 0_u, 0_u };
+        if ( a_Node.Widget )
+            intrinsicSize = a_Node.Widget->OnMeasureContent( a_Node, childAvailSize );
+
+        if ( s.WidthMode == ESizingMode::Flex  || s.WidthMode == ESizingMode::Content )  desired[0] = intrinsicSize[0];
+        if ( s.HeightMode == ESizingMode::Flex || s.HeightMode == ESizingMode::Content ) desired[1] = intrinsicSize[1];
 
         {
             const Vec2<Unit> padding = s.Padding.Total();
-
-            // Children get the inner available size - either derived from a
-            // known fixed/percent dimension or from the available size passed in.
-            Vec2<Unit> childAvailSize;
-            childAvailSize[0] = ( s.WidthMode  == ESizingMode::Fixed || s.WidthMode  == ESizingMode::Percent )
-                ? std::max( 0_u, desired[0] - s.Padding.Horizontal() )
-                : std::max( 0_u, a_AvailableSize[0] - s.Padding.Horizontal() );
-            childAvailSize[1] = ( s.HeightMode == ESizingMode::Fixed || s.HeightMode == ESizingMode::Percent )
-                ? std::max( 0_u, desired[1] - s.Padding.Vertical() )
-                : std::max( 0_u, a_AvailableSize[1] - s.Padding.Vertical() );
-
-            Vec2<Unit>   contentSize         = a_Node.Layout.IntrinsicSize;
-            u32          numFlow             = 0;
+            Vec2<Unit> contentSize = intrinsicSize;
+            u32        numFlow = 0;
 
             // TODO: Replace with an arena allocator
-            Array<Vec2<Unit>> gridChildSizes = {}; // Only populated for Grid layouts
+            Array<Vec2<Unit>> gridChildSizes = {};
 
-            a_Node.ForEachChild( [&]( LayoutNode& child )
+            const auto AccumulateChild = [&]( const LayoutNode& child )
             {
-                ResolveNodeVisibility( child );
-
-                if ( !Visibility::AffectsLayout( child.Layout.Visibility ) )
-                    return;
-
-                if ( child.Style.PositionMode == EPositionMode::Anchored )
-                {
-                    // Anchored children are measured but don't contribute to
-                    // the parent's content size.
-                    MeasureLayoutNode( child, a_AvailableSize );
-                    return;
-                }
-
-                numFlow++;
-
-                MeasureLayoutNode( child, childAvailSize );
-
-                // Percent children don't contribute to the parent's intrinsic
-                // size - they depend on it, not the other way around.
                 const Vec2<Unit> childDesired{
                     child.Style.WidthMode  == ESizingMode::Percent ? 0_u : child.Layout.DesiredSize[0] + child.Style.Margin.Horizontal(),
                     child.Style.HeightMode == ESizingMode::Percent ? 0_u : child.Layout.DesiredSize[1] + child.Style.Margin.Vertical()
@@ -183,7 +169,107 @@ namespace
                         EmplaceBack( gridChildSizes, childDesired );
                         break;
                 }
-            });
+            };
+
+            if ( s.LayoutType == ELayoutType::Horizontal || s.LayoutType == ELayoutType::Vertical )
+            {
+                const bool isHz = s.LayoutType == ELayoutType::Horizontal;
+
+                // Pass 1: 
+                // Measure non-flex-main children at the full available size, and
+                // accumulate totals for flex-main children, mirrors ArrangeLinear's first
+                // pass, so flex-main children are measured against their true share of
+                // space rather than the container's full inner size.
+                Unit totalFixed = 0_u;
+                Unit flexMarginSpace = 0_u;
+                f32  totalGrow = 0.f;
+
+                // TODO: Replace with an arena allocator
+                Array<LayoutNode*> flexMainChildren;
+
+                a_Node.ForEachChild( [&]( LayoutNode& child )
+                {
+                    ResolveNodeVisibility( child );
+                    if ( !Visibility::AffectsLayout( child.Layout.Visibility ) ) return;
+
+                    if ( child.Style.PositionMode == EPositionMode::Anchored )
+                    {
+                        MeasureLayoutNode( child, a_AvailableSize );
+                        return;
+                    }
+
+                    numFlow++;
+
+                    const bool isFlexMain    = isHz ? ( child.Style.WidthMode == ESizingMode::Flex ) : ( child.Style.HeightMode == ESizingMode::Flex );
+                    const bool isPercentMain = isHz ? ( child.Style.WidthMode == ESizingMode::Percent ) : ( child.Style.HeightMode == ESizingMode::Percent );
+                    const Unit marginMain    = isHz ? child.Style.Margin.Horizontal() : child.Style.Margin.Vertical();
+
+                    if ( isFlexMain )
+                    {
+                        PushBack( flexMainChildren, &child );
+                        if ( !isPercentMain ) 
+                            flexMarginSpace += marginMain;
+
+                        totalGrow += child.Style.FlexGrow > 0.f ? child.Style.FlexGrow : 1.f;
+                        return; // measured in pass 2, once its share of space is known
+                    }
+
+                    MeasureLayoutNode( child, childAvailSize );
+
+                    if ( !isPercentMain )
+                        totalFixed += ( isHz ? child.Layout.DesiredSize[0] : child.Layout.DesiredSize[1] ) + marginMain;
+
+                    AccumulateChild( child );
+                } );
+
+                const Unit availableMain = ( isHz ? childAvailSize[0] : childAvailSize[1] )
+                    - s.Spacing * static_cast<f32>( numFlow > 0 ? numFlow - 1 : 0 );
+                const Unit leftover = std::max( 0_u, availableMain - totalFixed - flexMarginSpace );
+
+                // Pass 2: 
+                // Measure flex-main children with their true distributed share.
+                for ( LayoutNode* childPtr : flexMainChildren )
+                {
+                    LayoutNode& child = *childPtr;
+
+                    const f32          growWeight = child.Style.FlexGrow > 0.f ? child.Style.FlexGrow : 1.f;
+                    const Unit         share = totalGrow > 0.f ? leftover * ( growWeight / totalGrow ) : 0_u;
+                    const Constraints& c = child.Style.SizeConstraints;
+
+                    Vec2<Unit> flexAvail = childAvailSize;
+                    if ( isHz ) flexAvail[0] = std::clamp( share, c.MinSize[0], c.MaxSize[0] );
+                    else        flexAvail[1] = std::clamp( share, c.MinSize[1], c.MaxSize[1] );
+
+                    MeasureLayoutNode( child, flexAvail );
+                    AccumulateChild( child );
+                }
+
+				// Cache the totals for ArrangeLinear to use.
+                a_Node.Layout.CachedLinear = { 
+                    .TotalFixed = totalFixed, 
+                    .FlexMarginSpace = flexMarginSpace, 
+                    .TotalGrow = totalGrow, 
+                    .NumFlow = numFlow 
+                };
+            }
+            else // Overlay, Grid - no main-axis space-sharing between siblings
+            {
+                a_Node.ForEachChild( [&]( LayoutNode& child )
+                {
+                    ResolveNodeVisibility( child );
+                    if ( !Visibility::AffectsLayout( child.Layout.Visibility ) ) return;
+
+                    if ( child.Style.PositionMode == EPositionMode::Anchored )
+                    {
+                        MeasureLayoutNode( child, a_AvailableSize );
+                        return;
+                    }
+
+                    numFlow++;
+                    MeasureLayoutNode( child, childAvailSize );
+                    AccumulateChild( child );
+                } );
+            }
 
             // Remove the trailing spacing that was added after the last child.
             if ( numFlow > 0 )
@@ -238,6 +324,9 @@ namespace
         desired[1] = std::clamp( desired[1], s.SizeConstraints.MinSize[1], s.SizeConstraints.MaxSize[1] );
 
         a_Node.Layout.DesiredSize = desired;
+        a_Node.Layout.IsDirty = false;
+        a_Node.Layout.IsDescendantDirty = false;
+
         return desired;
     }
 
@@ -299,7 +388,7 @@ namespace
     // Arrange
     // =========================================================================
 
-    static void ArrangeAnchored( LayoutNode& a_Node, Rect<Unit> a_Container )
+    static bool ArrangeAnchored( LayoutNode& a_Node, Rect<Unit> a_Container )
     {
         const Anchor&    anchor   = a_Node.Style.Anchor;
         const Vec2<Unit> parentSz = a_Container.Size;
@@ -314,7 +403,7 @@ namespace
         {
             origin[0]  = a_Container.Origin[0] + ( parentSz[0] * anchor.Min[0] ) + anchor.Offset[0];
             Unit right = a_Container.Origin[0] + ( parentSz[0] * anchor.Max[0] ) - anchor.Offset[0];
-            size[0] = std::max( 0_u, right - origin[0] );
+            size[0]    = std::max( 0_u, right - origin[0] );
         }
         else
         {
@@ -326,7 +415,7 @@ namespace
         {
             origin[1]    = a_Container.Origin[1] + ( parentSz[1] * anchor.Min[1] ) + anchor.Offset[1];
             Unit bottom  = a_Container.Origin[1] + ( parentSz[1] * anchor.Max[1] ) - anchor.Offset[1];
-            size[1] = std::max( 0_u, bottom - origin[1] );
+            size[1]      = std::max( 0_u, bottom - origin[1] );
         }
         else
         {
@@ -334,11 +423,12 @@ namespace
             origin[1] = anchorY - ( size[1] * anchor.Pivot[1] ) + anchor.Offset[1];
         }
 
-        ArrangeLayoutNode( a_Node, Rect<Unit>{ origin, size } );
+        return ArrangeLayoutNode( a_Node, Rect<Unit>{ origin, size } );
     }
 
-    static void ArrangeOverlay( LayoutNode& a_Node, Rect<Unit> a_Inner )
+    static bool ArrangeOverlay( LayoutNode& a_Node, Rect<Unit> a_Inner )
     {
+        bool reflowed = false;
         a_Node.ForEachChild( [&]( LayoutNode& child )
         {
             ResolveNodeVisibility( child );
@@ -348,7 +438,7 @@ namespace
 
             if ( child.Style.PositionMode == EPositionMode::Anchored )
             {
-                ArrangeAnchored( child, a_Inner );
+                reflowed |= ArrangeAnchored( child, a_Inner );
                 return;
             }
 
@@ -365,62 +455,33 @@ namespace
             };
 
             Rect<Unit> childRect = AlignRect( childSize, marginInnerRect, ResolveAlign( child, a_Node ) );
-            ArrangeLayoutNode( child, childRect );
+            reflowed |= ArrangeLayoutNode( child, childRect );
         });
+		return reflowed;
     }
 
-    static void ArrangeLinear( LayoutNode& a_Node, Rect<Unit> a_Inner )
+    static bool ArrangeLinear( LayoutNode& a_Node, Rect<Unit> a_Inner )
     {
-        const LayoutStyle& s    = a_Node.Style;
-        const bool         isHz = s.LayoutType == ELayoutType::Horizontal;
-
-        // ---- First pass: accumulate fixed sizes and flex weights ----
-
-        Unit totalFixed     = 0_u;
-        Unit flexMarginSpace = 0_u;
-        f32  totalGrow      = 0.f;
-        u32  numFlow        = 0;
-
-        a_Node.ForEachChild( [&]( const LayoutNode& child )
-        {
-            const EVisibility childVis = Visibility::Apply( a_Node.Layout.Visibility, child.Style.Visibility );
-
-            if ( child.Style.PositionMode == EPositionMode::Anchored ) return;
-            if ( !Visibility::AffectsLayout( childVis ) ) return;
-
-            const bool isFlexMain    = ( isHz && child.Style.WidthMode  == ESizingMode::Flex )
-                                    || ( !isHz && child.Style.HeightMode == ESizingMode::Flex );
-            const bool isPercentMain = ( isHz && child.Style.WidthMode  == ESizingMode::Percent )
-                                    || ( !isHz && child.Style.HeightMode == ESizingMode::Percent );
-
-            const Unit marginMain = isHz ? child.Style.Margin.Horizontal() : child.Style.Margin.Vertical();
-
-            if ( !isFlexMain && !isPercentMain )
-                totalFixed += ( isHz ? child.Layout.DesiredSize[0] : child.Layout.DesiredSize[1] ) + marginMain;
-
-            if ( isFlexMain && !isPercentMain )
-                flexMarginSpace += marginMain;
-
-            totalGrow += child.Style.FlexGrow > 0.f ? child.Style.FlexGrow : ( isFlexMain ? 1.f : 0.f );
-
-            ++numFlow;
-        });
+        const LayoutStyle&     s    = a_Node.Style;
+        const bool             isHz = s.LayoutType == ELayoutType::Horizontal;
+		const LinearAggregate& cached = a_Node.Layout.CachedLinear;
 
         const Unit available = ( isHz ? a_Inner.Size[0] : a_Inner.Size[1] )
-            - s.Spacing * static_cast<f32>( numFlow > 0 ? numFlow - 1 : 0 );
+            - s.Spacing * static_cast<f32>( cached.NumFlow > 0 ? cached.NumFlow - 1 : 0 );
 
-        const Unit leftover = std::max( 0_u, available - totalFixed - flexMarginSpace );
+        const Unit leftover = std::max( 0_u, available - cached.TotalFixed - cached.FlexMarginSpace );
         Unit cursor = isHz ? a_Inner.Origin[0] : a_Inner.Origin[1];
 
         // ---- Second pass: place each child ----
 
+        bool reflowed = false;
         a_Node.ForEachChild( [&]( LayoutNode& child )
         {
             ResolveNodeVisibility( child );
 
             if ( child.Style.PositionMode == EPositionMode::Anchored )
             {
-                ArrangeAnchored( child, a_Inner );
+                reflowed |= ArrangeAnchored( child, a_Inner );
                 return;
             }
 
@@ -434,10 +495,10 @@ namespace
 
             f32 growWeight = child.Style.FlexGrow > 0.f ? child.Style.FlexGrow : ( isFlexMain ? 1.f : 0.f );
 
-            if ( growWeight > 0.f && totalGrow > 0.f )
+            if ( growWeight > 0.f && cached.TotalGrow > 0.f )
             {
                 const Constraints& c    = child.Style.SizeConstraints;
-                const Unit         share = leftover * ( growWeight / totalGrow );
+                const Unit         share = leftover * ( growWeight / cached.TotalGrow );
 
                 if ( isHz )
                     childSize[0] = std::clamp( isFlexMain ? share : childSize[0] + share, c.MinSize[0], c.MaxSize[0] );
@@ -476,11 +537,12 @@ namespace
 
             cursor += advance + s.Spacing;
 
-            ArrangeLayoutNode( child, childRect );
+            reflowed |= ArrangeLayoutNode( child, childRect );
         });
+		return reflowed;
     }
 
-    static void ArrangeGrid( LayoutNode& a_Node, Rect<Unit> a_Inner )
+    static bool ArrangeGrid( LayoutNode& a_Node, Rect<Unit> a_Inner )
     {
         const LayoutStyle& s = a_Node.Style;
 
@@ -489,13 +551,14 @@ namespace
         // TODO: Replace with an arena allocator
         Array<LayoutNode*> flowChildren;
 
+		bool reflowed = false;
         a_Node.ForEachChild( [&]( LayoutNode& child )
         {
             ResolveNodeVisibility( child );
 
             if ( child.Style.PositionMode == EPositionMode::Anchored )
             {
-                ArrangeAnchored( child, a_Inner );
+                reflowed |= ArrangeAnchored( child, a_Inner );
                 return;
             }
 
@@ -506,7 +569,7 @@ namespace
         });
 
         if ( Empty( flowChildren ) )
-            return;
+            return reflowed;
 
         const GridDimensions dims = ResolveGridDimensions( s, static_cast<u32>( Size( flowChildren ) ) );
 
@@ -594,38 +657,62 @@ namespace
             childRect.Size[0]    = std::max( 0_u, childRect.Size[0] );
             childRect.Size[1]    = std::max( 0_u, childRect.Size[1] );
 
-            ArrangeLayoutNode( child, childRect );
+            reflowed |= ArrangeLayoutNode( child, childRect );
         }
+
+		return reflowed;
     }
 
 } // namespace
 
-    void ArrangeLayoutNode( LayoutNode& a_Node, Rect<Unit> a_AllocatedRect )
+    bool ArrangeLayoutNode( LayoutNode& a_Node, Rect<Unit> a_AllocatedRect )
     {
         ResolveNodeVisibility( a_Node );
-
         a_Node.Layout.FinalRect = a_AllocatedRect;
-
-        if ( !a_Node.FirstChild() )
-            return;
-
-        const Rect<Unit> inner = a_Node.Style.Padding.Apply( a_AllocatedRect );
-
-        switch ( a_Node.Style.LayoutType )
+    
+        bool reflowed = false;
+    
+        if ( a_Node.Widget && a_Node.Widget->HasWidthDependentContent() )
         {
-            case ELayoutType::Horizontal:
-            case ELayoutType::Vertical:
-                ArrangeLinear( a_Node, inner );
-                break;
-
-            case ELayoutType::Overlay:
-                ArrangeOverlay( a_Node, inner );
-                break;
-
-            case ELayoutType::Grid:
-                ArrangeGrid( a_Node, inner );
-                break;
+            const LayoutStyle& s = a_Node.Style;
+            const Vec2<Unit>   contentSize = s.Padding.Apply( a_AllocatedRect ).Size;
+            const Vec2<Unit>   newIntrinsic = a_Node.Widget->OnMeasureContent( a_Node, contentSize );
+    
+            if ( s.HeightMode == ESizingMode::Content || s.HeightMode == ESizingMode::Flex )
+            {
+                const Unit newHeight = std::clamp( newIntrinsic[1] + s.Padding.Vertical(),
+                                                    s.SizeConstraints.MinSize[1], s.SizeConstraints.MaxSize[1] );
+    
+                if ( !IsApproxEqual( newHeight.ToFloat(), a_Node.Layout.DesiredSize[1].ToFloat() ) )
+                {
+                    a_Node.Layout.DesiredSize[1] = newHeight;
+                    reflowed = true;
+                }
+            }
         }
+    
+        if ( a_Node.FirstChild() )
+        {
+            const Rect<Unit> inner = a_Node.Style.Padding.Apply( a_AllocatedRect );
+    
+            switch ( a_Node.Style.LayoutType )
+            {
+                case ELayoutType::Horizontal:
+                case ELayoutType::Vertical:
+                    reflowed |= ArrangeLinear( a_Node, inner );
+                    break;
+    
+                case ELayoutType::Overlay:
+                    reflowed |= ArrangeOverlay( a_Node, inner );
+                    break;
+    
+                case ELayoutType::Grid:
+                    reflowed |= ArrangeGrid( a_Node, inner );
+                    break;
+            }
+        }
+    
+        return reflowed;
     }
 
 } // namespace RatUI

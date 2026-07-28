@@ -51,36 +51,13 @@ namespace RatUI
         if ( !rootNode )
             return;
 
-        const auto SyncSubtree = [&]( auto& Self, LayoutNode& node, Vec2<Unit> parentSize ) -> bool
-        {
-            bool anyChanged = false;
-
-            if ( node.Widget )
-            {
-                const Vec2<Unit> oldIntrinsics = node.Layout.IntrinsicSize;
-                node.Widget->OnSyncLayout( node, parentSize );
-                anyChanged |= ( node.Layout.IntrinsicSize != oldIntrinsics );
-            }
-
-            const Vec2<Unit> innerSize( node.Layout.FinalRect.Size[0] - node.Style.Padding.Horizontal(),
-                                        node.Layout.FinalRect.Size[1] - node.Style.Padding.Vertical() );
-            node.ForEachChild( [&]( LayoutNode& child )
-            {
-                anyChanged |= Self( Self, child, innerSize );
-            } );
-
-            return anyChanged;
-        };
-
-        SyncSubtree( SyncSubtree, *rootNode, a_AvailableSize );
         MeasureLayoutNode( *rootNode, a_AvailableSize );
-        ArrangeLayoutNode( *rootNode, Rect<Unit>{ Vec2<Unit>( 0_u, 0_u ), a_AvailableSize } );
+        const bool needsSecondPass = ArrangeLayoutNode( *rootNode, Rect{ Vec2<Unit>{ 0_u, 0_u }, a_AvailableSize } );
 
-        if ( const bool needsSecondPass = SyncSubtree( SyncSubtree, *rootNode, a_AvailableSize ) )
+        if ( needsSecondPass )
         {
-            (void)needsSecondPass;
             MeasureLayoutNode( *rootNode, a_AvailableSize );
-            ArrangeLayoutNode( *rootNode, Rect<Unit>{ Vec2<Unit>( 0_u, 0_u ), a_AvailableSize } );
+            ArrangeLayoutNode( *rootNode, Rect{ Vec2<Unit>{ 0_u, 0_u }, a_AvailableSize } );
         }
 
         // Note: This is hacky but currently it's necessary to do this to avoid invalid input state after a layout change.

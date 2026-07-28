@@ -405,6 +405,14 @@ namespace RatUI
         Constraints SizeConstraints{}; ///< The size constraints to consider when laying out the element.
     };
 
+	struct LinearAggregate
+    {
+        Unit TotalFixed{ 0_u };
+        Unit FlexMarginSpace{ 0_u };
+        f32  TotalGrow{ 0.f };
+        u32  NumFlow{ 0 };
+    };
+
     /**
      * @brief Represents the output of the layout process for a UI element, including its final position and size, desired size, and visibility state.
      * Calculated and cached during the Measure and Arrange steps of the layout process.
@@ -413,10 +421,9 @@ namespace RatUI
     {
         Rect<Unit> FinalRect{};          ///< The final position and size of the element after layout, in absolute coordinates. Filled by the Arrange step.
         Vec2<Unit> DesiredSize{};        ///< The desired size of the element based on its content and constraints. Filled by the Measure step.
+		Vec2<Unit> LastAvailableSize{};  ///< The last available size passed to the Measure step. Used to determine if a re-measure is necessary.
 
-		// TODO: This works as a hot fix for text support but it doesnt work with text wrapping etc.
-        // Figure out a clean solution without coupling the layout engine to the widgets.
-		Vec2<Unit> IntrinsicSize{};      ///< The natural content size set by the user before layout. (e.g., the size of an image or text block).
+		LinearAggregate CachedLinear{};  ///< Cached aggregate values for linear layouts, used to optimize layout calculations.
 
         EVisibility Visibility{ EVisibility::Visible };       ///< The visibility state of the element, which can affect both rendering and layout.
         bool        IsDirty{ true };            ///< Whether the layout needs to be recalculated. Set to true when properties affecting layout are changed.

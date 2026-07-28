@@ -93,10 +93,13 @@ namespace RatUI
         virtual void OnConstruct() {}
 
         /** @brief Called immediately before the widget is destroyed and disassociated from its layout node. */
-        virtual void OnDestroy() {} ///< Called immediately before the widget is destroyed and disassociated from its layout node.
+        virtual void OnDestroy() {}
 
-        /** @brief Called during the layout process, allowing the widget to update its layout properties or perform calculations based on its children. */
-        virtual void OnSyncLayout( LayoutNode& a_Node, Vec2<Unit> a_AvailableSize ) {}
+        /** */
+        virtual Vec2<Unit> OnMeasureContent( const LayoutNode& a_Node, Vec2<Unit> a_AvailableSize ) { return Vec2<Unit>{ 0_u, 0_u }; }
+
+        /** */
+        virtual bool HasWidthDependentContent() const { return false; }
 
         void Paint( const PaintEvent& a_Event )
         {

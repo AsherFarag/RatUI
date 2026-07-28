@@ -53,104 +53,41 @@ namespace RatUI
         // IWidget overrides
         // --------------------------------------------------------------------
 
-        void OnSyncLayout( LayoutNode& a_Node, Vec2<Unit> a_AvailableSize ) override
+        Vec2<Unit> OnMeasureContent( const LayoutNode& a_Node, Vec2<Unit> a_AvailableSize ) override
         {
             HandleThemeUpdate();
 
             ITextMetrics* metrics = GetScene().TextMetrics;
-            a_Node.Layout.IntrinsicSize = { 0_u, 0_u };
+            if ( !metrics ) return { 0_u, 0_u };
 
-            if ( !metrics )
-                return;
-
-            // ---- Resolve phase ----
-            // ResolveText() is cheap and called every frame. The returned Version lets
-            // us detect localisation/binding changes without storing a full string copy.
             const Optional<ResolvedText> resolved = ResolveText( m_Text );
-            if ( !resolved || resolved->Data.empty() )
-                return;
+            if ( !resolved || resolved->Data.empty() ) return { 0_u, 0_u };
 
-            // If the resolved string changed (new version or first resolve), the
-            // prepared and shaped caches are both stale.
             if ( !m_ResolvedText || resolved->Version != m_ResolvedText->Version )
             {
                 m_ResolvedText = resolved;
                 InvalidatePrepared();
             }
 
-            // ---- Prepare phase ----
-            // Re-run when text content or any layout style property changes.
-            if ( !m_PreparedText )
+            if ( !m_PreparedText || m_LayoutStyle != m_LastLayoutStyle )
             {
                 m_PreparedText = metrics->Prepare( m_ResolvedText->Data, m_LayoutStyle );
-                if ( !m_PreparedText )
-                {
-                    // Keep trying next frame.
-                    return;
-                }
-                m_LastLayoutStyle = m_LayoutStyle; // snapshot for future change detection
-                InvalidateShaped();
-            }
-            else if ( m_LayoutStyle != m_LastLayoutStyle )
-            {
-                // Layout style changed since last prepare - full redo.
-                m_PreparedText = metrics->Prepare( m_ResolvedText->Data, m_LayoutStyle );
-                if ( !m_PreparedText )
-                    return;
+                if ( !m_PreparedText ) return { 0_u, 0_u };
                 m_LastLayoutStyle = m_LayoutStyle;
                 InvalidateShaped();
             }
 
-            // ---- Determine shaping width ----
-            Unit maxWidth = 0_u;
-
-            if ( a_Node.Style.WidthMode == ESizingMode::Fixed )
-            {
-                maxWidth = a_Node.Style.FixedWidth;
-            }
-            else if ( a_Node.Style.WidthMode == ESizingMode::Percent &&
-                      a_Node.Layout.FinalRect.Size[0] > 0_u )
-            {
-                maxWidth = a_Node.Layout.FinalRect.Size[0] - a_Node.Style.Padding.Horizontal();
-            }
-            else if ( a_Node.Style.WidthMode == ESizingMode::Flex )
-            {
-                // Two-pass approach:
-                //   Pass 1: FinalRect is zero - shape at available width as a best-effort
-                //           measure.  The resulting intrinsic size triggers a second layout
-                //           pass in Scene::UpdateLayout.
-                //   Pass 2: FinalRect is populated from the first arrange - shape at the
-                //           real allocated width.
-                if ( a_Node.Layout.FinalRect.Size[0] > 0_u )
-                    maxWidth = a_Node.Layout.FinalRect.Size[0] - a_Node.Style.Padding.Horizontal();
-                else
-                    maxWidth = std::max( 0_u, a_AvailableSize[0] - a_Node.Style.Padding.Horizontal() );
-            }
-            else
-            {
-                // Content-sized or fallback
-                maxWidth = std::max( 0_u, a_AvailableSize[0] - a_Node.Style.Padding.Horizontal() );
-            }
-
-            maxWidth = std::max( maxWidth, 0_u );
-
-            // ---- Shape phase ----
-            // Re-shape if the width changed or if shaped cache is invalid.
-            // Use approximate equality to avoid needless reshaping from floating-point drift.
-            const bool widthChanged = !IsApproxEqual( maxWidth.ToFloat(), m_ShapedWidth.ToFloat() );
-
+            const bool widthChanged = !IsApproxEqual( a_AvailableSize[0].ToFloat(), m_ShapedWidth.ToFloat() );
             if ( !m_ShapedText || widthChanged )
             {
-                m_ShapedText  = metrics->Shape( *m_PreparedText, m_LayoutStyle,
-                                                { maxWidth, Limits<Unit>::max() } );
-                m_ShapedWidth = maxWidth;
+                m_ShapedText = metrics->Shape( *m_PreparedText, m_LayoutStyle, { a_AvailableSize[0], Limits<Unit>::max() } );
+                m_ShapedWidth = a_AvailableSize[0];
             }
 
-            if ( !m_ShapedText )
-                return;
-
-            a_Node.Layout.IntrinsicSize = { m_ShapedText->MaxWidth, m_ShapedText->TotalHeight };
+            return m_ShapedText ? Vec2<Unit>{ m_ShapedText->MaxWidth, m_ShapedText->TotalHeight } : Vec2<Unit>{ 0_u, 0_u };
         }
+
+        bool HasWidthDependentContent() const override { return true; }
 
         void OnPaint( const PaintEvent& a_Event ) override
         {
@@ -194,17 +131,17 @@ namespace RatUI
         {
             if constexpr ( HasMixin<ThemeMixin> )
             {
-                if ( Theme.Update() )
-                {
-                    RenderStyle = Theme.GetTextStyle( ThemeKey::TextStyle::Default, RenderStyle );
+                if ( !Theme.Update() )
+                    return;
 
-                    if ( const FontHandle* font = Theme.TryGetFont( ThemeKey::Font::Default ) )
+                RenderStyle = Theme.GetTextStyle( ThemeKey::TextStyle::Default, RenderStyle );
+
+                if ( const FontHandle* font = Theme.TryGetFont( ThemeKey::Font::Default ) )
+                {
+                    if ( m_LayoutStyle.Font != *font )
                     {
-                        if ( m_LayoutStyle.Font != *font )
-                        {
-                            m_LayoutStyle.Font = *font;
-                            InvalidatePrepared();
-                        }
+                        m_LayoutStyle.Font = *font;
+                        InvalidatePrepared();
                     }
                 }
             }

@@ -204,6 +204,7 @@ protected:
         m_DrawList->SetDPIScale( dpiscale * m_UIScale );
 
         m_DrawList->Clear();
+        m_DrawList->SetDebugEnabled( true );
 		m_Scene->Render( *m_DrawList, m_DeltaSeconds );
 		m_DrawList->Flush( a_Renderer );
     }
