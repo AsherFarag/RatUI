@@ -39,12 +39,18 @@ inline RatUI::Rectf ToFloatRect( const RatUI::Rect<RatUI::Unit>& a_Value )
 
 inline RatUI::Vec2f MeasureLayoutNode( RatUI::LayoutNode& a_Node, RatUI::Vec2f a_AvailableSize )
 {
-    return ToFloatVec2( RatUI::MeasureLayoutNode( a_Node, ToUnitVec2( a_AvailableSize ) ) );
+    alignas(16) thread_local RatUI::u8 buffer[ 1024 * 1024 ]; // 1 MB stack buffer for temporary allocations during layout.
+    BumpAllocator allocator{ buffer, sizeof( buffer ) };
+    LayoutContext context{ allocator };
+    return ToFloatVec2( RatUI::MeasureLayoutNode( a_Node, ToUnitVec2( a_AvailableSize ), context ) );
 }
 
 inline void ArrangeLayoutNode( RatUI::LayoutNode& a_Node, RatUI::Rectf a_AllocatedRect )
 {
-    RatUI::ArrangeLayoutNode( a_Node, ToUnitRect( a_AllocatedRect ) );
+    alignas(16) thread_local RatUI::u8 buffer[ 1024 * 1024 ]; // 1 MB stack buffer for temporary allocations during layout.
+    BumpAllocator allocator{ buffer, sizeof( buffer ) };
+    LayoutContext context{ allocator };
+    RatUI::ArrangeLayoutNode( a_Node, ToUnitRect( a_AllocatedRect ), context );
 }
 
 inline RatUI::Rectf AlignRect( RatUI::Vec2f a_ContentSize, RatUI::Rectf a_Container, RatUI::EAlign a_Align )
