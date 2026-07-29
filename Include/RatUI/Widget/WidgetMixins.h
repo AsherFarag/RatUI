@@ -135,25 +135,60 @@ namespace RatUI
     {
         String DebugName; ///< An optional name for the widget that can be displayed in debug mode to help identify it.
 
+		void PrePaint( const PaintEvent& a_Event, LayoutNode& a_Node )
+		{
+			if ( !a_Event.Drawer.IsDebugEnabled() )
+				return;
+
+			a_Event.Drawer.AddRect( a_Node.Layout.FinalRect,
+			{
+				.FillColor = FromColorF32( 1.0f, 0.0f, 0.0f, 0.25f )
+			} );
+		}
+
         void PostPaint( const PaintEvent& a_Event, LayoutNode& a_Node )
         {
             if ( !a_Event.Drawer.IsDebugEnabled() )
                 return;
 
-			constexpr Color c_BoundsColor = Colors::Red;
+			constexpr Color c_FlowBoundsColor = Colors::Red;
+			constexpr Color c_AnchorBoundsColor = Colors::Blue;
+			constexpr Color c_CenterColor = Colors::Green;
 
-            // Draw bounds
-            a_Event.Drawer.AddRect( a_Node.Layout.FinalRect,
+
+            if ( a_Node.Style.PositionMode == EPositioning::Anchored )
             {
-                .BorderColor = c_BoundsColor,
-                .BorderThickness = 1_u
-            } );
+                // Draw bounds
+                a_Event.Drawer.AddRect( a_Node.Layout.FinalRect,
+                {
+					.BorderColor = Colors::Orange,
+                    .BorderThickness = 1_u
+                } );
+
+				// Draw pivot point
+				Vec2<Unit> pivotPoint = a_Node.Layout.FinalRect.TopLeft();
+				pivotPoint[0] += a_Node.Layout.FinalRect.Width() * a_Node.Style.PositionAnchor.Pivot[0];
+				pivotPoint[1] += a_Node.Layout.FinalRect.Height() * a_Node.Style.PositionAnchor.Pivot[1];
+                a_Event.Drawer.AddCircle( pivotPoint, 4_u,
+                {
+					.FillColor = Colors::Orange
+                } );
+            }
+            else
+            {
+                // Draw bounds
+                a_Event.Drawer.AddRect( a_Node.Layout.FinalRect,
+                {
+                    .BorderColor = Colors::Red,
+                    .BorderThickness = 1_u
+                } );
+            }
 
             // Draw center point
-			a_Event.Drawer.AddCircle( a_Node.Layout.FinalRect.Center(), 4_u,
-			{
-				.FillColor = c_BoundsColor
-			} );
+            a_Event.Drawer.AddCircle( a_Node.Layout.FinalRect.Center(), 4_u,
+            {
+                .FillColor = c_CenterColor
+            } );
         }
     };
 

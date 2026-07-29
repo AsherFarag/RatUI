@@ -18,11 +18,11 @@ namespace RatUI::Themes
                 { ThemeKey::Color::SliderTrackFill, Colors::AccentBlue }
             } );
 
-            theme->SetRoundings( {
-                { ThemeKey::Rounding::Panel, CornerRounding::Uniform( 8_u ) },
-                { ThemeKey::Rounding::Button, CornerRounding::Uniform( 6_u ) },
-                { ThemeKey::Rounding::SliderTrack, CornerRounding::Uniform( 2_u ) },
-                { ThemeKey::Rounding::SliderThumb, CornerRounding::Uniform( 4_u ) }
+            theme->SetRadii( {
+                { ThemeKey::Radii::Panel, CornerRadius::All( 8_u ) },
+                { ThemeKey::Radii::Button, CornerRadius::All( 6_u ) },
+                { ThemeKey::Radii::SliderTrack, CornerRadius::All( 2_u ) },
+                { ThemeKey::Radii::SliderThumb, CornerRadius::All( 4_u ) }
             } );
 
             theme->SetMetrics( {

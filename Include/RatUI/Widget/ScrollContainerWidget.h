@@ -79,8 +79,8 @@ namespace RatUI
             {
                 GetLayout()
                     .LayoutType( ELayoutType::Vertical )
-                    .WidthMode( ESizingMode::Flex )
-                    .HeightMode( ESizingMode::Flex );
+                    .WidthMode( ESizing::Flex )
+                    .HeightMode( ESizing::Flex );
             }
 
             EnsureContentRow();
@@ -204,15 +204,15 @@ namespace RatUI
             m_ContentRowID = rowNode.ID;
             rowNode
                 .LayoutType( ELayoutType::Horizontal )
-                .WidthMode( ESizingMode::Flex )
-                .HeightMode( ESizingMode::Flex );   
+                .WidthMode( ESizing::Flex )
+                .HeightMode( ESizing::Flex );   
 
             // --- Content node (user children go here) ---
             LayoutNode& contentNode = scene.CreateLayoutNode( {}, rowNode.ID );
             m_ContentNodeID = contentNode.ID;
             contentNode
-                .WidthMode( ESizingMode::Flex )
-                .HeightMode( ESizingMode::Flex )
+                .WidthMode( ESizing::Flex )
+                .HeightMode( ESizing::Flex )
                 .LayoutType( ELayoutType::Vertical );
         }
 
@@ -228,7 +228,7 @@ namespace RatUI
             LayoutNode& selfNode = GetLayout();
             LayoutNode& rowNode = *scene.GetLayoutNode( m_ContentRowID );
 
-            const auto setUpScrollbarStyle = [&]( SliderWidget& a_Slider, EOrientation a_Orientation )
+            const auto setUpScrollbarStyle = [&]( SliderWidget& a_Slider, EOrient a_Orientation )
             {
 				a_Slider.Orientation = a_Orientation;
                 a_Slider.Min = 0.f;
@@ -240,7 +240,7 @@ namespace RatUI
 
 				// Subscribe to value changes to update scroll offset and invoke OnScroll callback
 
-				if ( a_Orientation == EOrientation::Vertical )
+				if ( a_Orientation == EOrient::Vertical )
 				{
 					a_Slider.Value.Subscribe( [this]( const f32& a_Value )
 					{
@@ -266,9 +266,9 @@ namespace RatUI
 
                 vNode
                     .FixedWidth( c_ScrollbarSize )
-                    .HeightMode( ESizingMode::Flex );
+                    .HeightMode( ESizing::Flex );
 
-				setUpScrollbarStyle( *vScroll, EOrientation::Vertical );
+				setUpScrollbarStyle( *vScroll, EOrient::Vertical );
             }
 
             // --- Horizontal scrollbar ---
@@ -278,10 +278,10 @@ namespace RatUI
                 LayoutNode& hNode     = hScroll->GetLayout();
 
                 hNode
-                    .WidthMode( ESizingMode::Flex )
+                    .WidthMode( ESizing::Flex )
                     .FixedHeight( c_ScrollbarSize );
 
-				setUpScrollbarStyle( *hScroll, EOrientation::Horizontal );
+				setUpScrollbarStyle( *hScroll, EOrient::Horizontal );
             }
         }
 

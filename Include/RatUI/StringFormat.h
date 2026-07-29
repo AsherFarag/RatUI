@@ -29,7 +29,7 @@ struct std::formatter<RatUI::Vec<T, Dim>>
 // === Layout.h ===
 
 template<>
-struct std::formatter<RatUI::EAlignment>
+struct std::formatter<RatUI::EAlign>
 {
     constexpr auto parse(std::format_parse_context& ctx)
     {
@@ -37,10 +37,10 @@ struct std::formatter<RatUI::EAlignment>
     }
 
     template<typename FormatContext>
-    auto format(RatUI::EAlignment value, FormatContext& ctx) const
+    auto format(RatUI::EAlign value, FormatContext& ctx) const
     {
         using namespace RatUI;
-        using enum EAlignment;
+        using enum EAlign;
     
         auto out = ctx.out();
     
@@ -56,7 +56,7 @@ struct std::formatter<RatUI::EAlignment>
             case BottomLeft:            return std::format_to(out, "BottomLeft");
             case BottomCenter:          return std::format_to(out, "BottomCenter");
             case BottomRight:           return std::format_to(out, "BottomRight");
-            case static_cast<EAlignment>(0): return std::format_to(out, "None");
+            case static_cast<EAlign>(0): return std::format_to(out, "None");
             default:                         break;
         }
     
@@ -133,7 +133,7 @@ struct std::formatter<RatUI::Constraints>
     template<typename FormatContext>
     auto format(const RatUI::Constraints& value, FormatContext& ctx) const
     {
-        return std::format_to(ctx.out(), "Constraints(Min: {}, Max: {})", value.MinSize, value.MaxSize);
+        return std::format_to(ctx.out(), "Constraints(Min: {}, Max: {})", value.Min, value.Max);
     }
 };
 

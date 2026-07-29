@@ -20,8 +20,8 @@ namespace
         const LayoutStyle& s = a_Child.Style;
         Vec2<Unit> size = a_Child.Layout.DesiredSize;
         
-        if ( s.WidthMode  == ESizingMode::Percent ) size[0] = s.PercentWidth  * a_InnerSize[0];
-        if ( s.HeightMode == ESizingMode::Percent ) size[1] = s.PercentHeight * a_InnerSize[1];
+        if ( s.WidthMode  == ESizing::Percent ) size[0] = s.PercentWidth  * a_InnerSize[0];
+        if ( s.HeightMode == ESizing::Percent ) size[1] = s.PercentHeight * a_InnerSize[1];
 
         return size;
     }
@@ -114,17 +114,17 @@ namespace
         // If it is sized to content, measure the content size of the node's widget (if any) and use that as the desired size.
         // For example, if the widget is a text label, the content size would be the size of the text. 
 
-             if ( s.WidthMode == ESizingMode::Fixed )    desired[0] = s.FixedWidth;
-        else if ( s.WidthMode == ESizingMode::Percent )  desired[0] = s.PercentWidth * a_AvailableSize[0];
+             if ( s.WidthMode == ESizing::Fixed )    desired[0] = s.FixedWidth;
+        else if ( s.WidthMode == ESizing::Percent )  desired[0] = s.PercentWidth * a_AvailableSize[0];
 
-             if ( s.HeightMode == ESizingMode::Fixed )   desired[1] = s.FixedHeight;
-        else if ( s.HeightMode == ESizingMode::Percent ) desired[1] = s.PercentHeight * a_AvailableSize[1];
+             if ( s.HeightMode == ESizing::Fixed )   desired[1] = s.FixedHeight;
+        else if ( s.HeightMode == ESizing::Percent ) desired[1] = s.PercentHeight * a_AvailableSize[1];
 
         const Vec2<Unit> childAvailSize{
-            ( s.WidthMode == ESizingMode::Fixed || s.WidthMode == ESizingMode::Percent )
+            ( s.WidthMode == ESizing::Fixed || s.WidthMode == ESizing::Percent )
                 ? std::max( 0_u, desired[0] - s.Padding.Horizontal() )
                 : std::max( 0_u, a_AvailableSize[0] - s.Padding.Horizontal() ),
-            ( s.HeightMode == ESizingMode::Fixed || s.HeightMode == ESizingMode::Percent )
+            ( s.HeightMode == ESizing::Fixed || s.HeightMode == ESizing::Percent )
                 ? std::max( 0_u, desired[1] - s.Padding.Vertical() )
                 : std::max( 0_u, a_AvailableSize[1] - s.Padding.Vertical() )
         };
@@ -133,8 +133,8 @@ namespace
         if ( a_Node.Widget )
 			contentSize = a_Node.Widget->OnMeasureContent( a_Node, childAvailSize, a_Ctx );
 
-        if ( s.WidthMode == ESizingMode::Flex  || s.WidthMode == ESizingMode::Content )  desired[0] = contentSize[0];
-        if ( s.HeightMode == ESizingMode::Flex || s.HeightMode == ESizingMode::Content ) desired[1] = contentSize[1];
+        if ( s.WidthMode == ESizing::Flex  || s.WidthMode == ESizing::Content )  desired[0] = contentSize[0];
+        if ( s.HeightMode == ESizing::Flex || s.HeightMode == ESizing::Content ) desired[1] = contentSize[1];
 
         // - Step 2:
         // Resolve the desired size of the node's children, based on the layout type and available size.
@@ -145,8 +145,8 @@ namespace
         const auto computeChildDesired = +[]( const LayoutNode& child ) -> Vec2<Unit>
         {
             return Vec2<Unit>{
-                child.Style.WidthMode  == ESizingMode::Percent ? 0_u : child.Layout.DesiredSize[0] + child.Style.Margin.Horizontal(),
-                child.Style.HeightMode == ESizingMode::Percent ? 0_u : child.Layout.DesiredSize[1] + child.Style.Margin.Vertical()
+                child.Style.WidthMode  == ESizing::Percent ? 0_u : child.Layout.DesiredSize[0] + child.Style.Margin.Horizontal(),
+                child.Style.HeightMode == ESizing::Percent ? 0_u : child.Layout.DesiredSize[1] + child.Style.Margin.Vertical()
             };
         };
 
@@ -193,7 +193,7 @@ namespace
                 ResolveNodeVisibility( child );
                 if ( !Visibility::AffectsLayout( child.Layout.Visibility ) ) return;
 
-                if ( child.Style.PositionMode == EPositionMode::Anchored )
+                if ( child.Style.PositionMode == EPositioning::Anchored )
                 {
                     MeasureLayoutNode( child, a_AvailableSize, a_Ctx );
                     return;
@@ -201,8 +201,8 @@ namespace
 
                 numFlow++;
 
-                const bool isFlexMain    = isHz ? ( child.Style.WidthMode == ESizingMode::Flex ) : ( child.Style.HeightMode == ESizingMode::Flex );
-                const bool isPercentMain = isHz ? ( child.Style.WidthMode == ESizingMode::Percent ) : ( child.Style.HeightMode == ESizingMode::Percent );
+                const bool isFlexMain    = isHz ? ( child.Style.WidthMode == ESizing::Flex ) : ( child.Style.HeightMode == ESizing::Flex );
+                const bool isPercentMain = isHz ? ( child.Style.WidthMode == ESizing::Percent ) : ( child.Style.HeightMode == ESizing::Percent );
                 const Unit marginMain    = isHz ? child.Style.Margin.Horizontal() : child.Style.Margin.Vertical();
 
                 if ( isFlexMain )
@@ -238,8 +238,8 @@ namespace
                 const Constraints& c = child.Style.SizeConstraints;
 
                 Vec2<Unit> flexAvail = childAvailSize;
-                if ( isHz ) flexAvail[0] = std::clamp( share, c.MinSize[0], c.MaxSize[0] );
-                else        flexAvail[1] = std::clamp( share, c.MinSize[1], c.MaxSize[1] );
+                if ( isHz ) flexAvail[0] = std::clamp( share, c.Min[0], c.Max[0] );
+                else        flexAvail[1] = std::clamp( share, c.Min[1], c.Max[1] );
 
                 MeasureLayoutNode( child, flexAvail, a_Ctx );
                 accumulateChild( child );
@@ -292,7 +292,7 @@ namespace
                     return;
                 }
 
-                if ( child.Style.PositionMode == EPositionMode::Anchored )
+                if ( child.Style.PositionMode == EPositioning::Anchored )
                 {
                     MeasureLayoutNode( child, a_AvailableSize, a_Ctx );
                     return;
@@ -349,14 +349,14 @@ namespace
 
         contentSize = contentSize + padding;
 
-        if ( s.WidthMode  == ESizingMode::Content ) desired[0] = contentSize[0];
-        if ( s.HeightMode == ESizingMode::Content ) desired[1] = contentSize[1];
+        if ( s.WidthMode  == ESizing::Content ) desired[0] = contentSize[0];
+        if ( s.HeightMode == ESizing::Content ) desired[1] = contentSize[1];
 
         // - Step 3:
         // Clamp the desired size to the node's size constraints, and store the final desired size in the layout node.
 
-        desired[0] = std::clamp( desired[0], s.SizeConstraints.MinSize[0], s.SizeConstraints.MaxSize[0] );
-        desired[1] = std::clamp( desired[1], s.SizeConstraints.MinSize[1], s.SizeConstraints.MaxSize[1] );
+        desired[0] = std::clamp( desired[0], s.SizeConstraints.Min[0], s.SizeConstraints.Max[0] );
+        desired[1] = std::clamp( desired[1], s.SizeConstraints.Min[1], s.SizeConstraints.Max[1] );
 
         a_Node.Layout.DesiredSize = desired;
         a_Node.Layout.LastAvailableSize = a_AvailableSize;
@@ -376,36 +376,36 @@ namespace
 namespace
 {
 
-    static EAlignment ResolveAlign( const LayoutNode& a_Child, const LayoutNode& a_Parent )
+    static EAlign ResolveAlign( const LayoutNode& a_Child, const LayoutNode& a_Parent )
     {
-        return a_Child.Style.SelfAlign != EAlignment::Inherit
+        return a_Child.Style.SelfAlign != EAlign::Inherit
             ? a_Child.Style.SelfAlign
             : a_Parent.Style.ChildAlign;
     }
 
-    static Rect<Unit> AlignRect( Vec2<Unit> a_ContentSize, Rect<Unit> a_Container, EAlignment a_Align )
+    static Rect<Unit> AlignRect( Vec2<Unit> a_ContentSize, Rect<Unit> a_Container, EAlign a_Align )
     {
         Vec2<Unit> offset{ 0_u, 0_u };
 
-             if ( HasFlag( a_Align, EAlignment::HCenter ) ) offset[0] = ( a_Container.Size[0] - a_ContentSize[0] ) / 2.f;
-        else if ( HasFlag( a_Align, EAlignment::Right   ) ) offset[0] =   a_Container.Size[0] - a_ContentSize[0];
+             if ( HasFlag( a_Align, EAlign::HCenter ) ) offset[0] = ( a_Container.Size[0] - a_ContentSize[0] ) / 2.f;
+        else if ( HasFlag( a_Align, EAlign::Right   ) ) offset[0] =   a_Container.Size[0] - a_ContentSize[0];
 
-             if ( HasFlag( a_Align, EAlignment::VCenter ) ) offset[1] = ( a_Container.Size[1] - a_ContentSize[1] ) / 2.f;
-        else if ( HasFlag( a_Align, EAlignment::Bottom  ) ) offset[1] =   a_Container.Size[1] - a_ContentSize[1];
+             if ( HasFlag( a_Align, EAlign::VCenter ) ) offset[1] = ( a_Container.Size[1] - a_ContentSize[1] ) / 2.f;
+        else if ( HasFlag( a_Align, EAlign::Bottom  ) ) offset[1] =   a_Container.Size[1] - a_ContentSize[1];
 
         return { .Origin = a_Container.Origin + offset, .Size = a_ContentSize };
     }
 
     static Unit AlignCrossAxis( Unit a_ChildSize, Unit a_ParentPos, Unit a_ParentSize,
-                                EAlignment a_Align, bool a_IsMainAxisHorizontal )
+                                EAlign a_Align, bool a_IsMainAxisHorizontal )
     {
         const bool center = a_IsMainAxisHorizontal
-            ? HasFlag( a_Align, EAlignment::VCenter )
-            : HasFlag( a_Align, EAlignment::HCenter );
+            ? HasFlag( a_Align, EAlign::VCenter )
+            : HasFlag( a_Align, EAlign::HCenter );
 
         const bool end = a_IsMainAxisHorizontal
-            ? HasFlag( a_Align, EAlignment::Bottom )
-            : HasFlag( a_Align, EAlignment::Right  );
+            ? HasFlag( a_Align, EAlign::Bottom )
+            : HasFlag( a_Align, EAlign::Right  );
 
         if ( center ) return a_ParentPos + ( a_ParentSize - a_ChildSize ) * 0.5f;
         if ( end    ) return a_ParentPos +   a_ParentSize - a_ChildSize;
@@ -418,7 +418,7 @@ namespace
 
     static bool ArrangeAnchored( LayoutNode& a_Node, Rect<Unit> a_Container, LayoutContext& a_Ctx )
     {
-        const Anchor&    anchor   = a_Node.Style.Anchor;
+        const Anchor&    anchor   = a_Node.Style.PositionAnchor;
         const Vec2<Unit> parentSz = a_Container.Size;
 
         const bool stretchX = anchor.Min[0] != anchor.Max[0];
@@ -464,7 +464,7 @@ namespace
             if ( !Visibility::AffectsLayout( child.Layout.Visibility ) )
                 return;
 
-            if ( child.Style.PositionMode == EPositionMode::Anchored )
+            if ( child.Style.PositionMode == EPositioning::Anchored )
             {
                 reflowed |= ArrangeAnchored( child, a_Inner, a_Ctx );
                 return;
@@ -472,12 +472,12 @@ namespace
 
             Vec2<Unit> childSize = ResolveChildArrangeSize( child, a_Inner.Size );
 
-            if (child.Style.WidthMode == ESizingMode::Flex) childSize[0] = std::max( 0_u, a_Inner.Size[0] - child.Style.Margin.Horizontal() );
-            if (child.Style.HeightMode == ESizingMode::Flex) childSize[1] = std::max( 0_u, a_Inner.Size[1] - child.Style.Margin.Vertical() );
+            if (child.Style.WidthMode == ESizing::Flex) childSize[0] = std::max( 0_u, a_Inner.Size[0] - child.Style.Margin.Horizontal() );
+            if (child.Style.HeightMode == ESizing::Flex) childSize[1] = std::max( 0_u, a_Inner.Size[1] - child.Style.Margin.Vertical() );
 
             // Align within the margin-inset container space
             const Rect<Unit> marginInnerRect{
-                .Origin = { a_Inner.Origin[0] + child.Style.Margin.Left, a_Inner.Origin[1] + child.Style.Margin.Top },
+                .Origin = { a_Inner.Origin[0] + child.Style.Margin.L, a_Inner.Origin[1] + child.Style.Margin.T },
                 .Size   = { std::max( 0_u, a_Inner.Size[0] - child.Style.Margin.Horizontal() ),
                             std::max( 0_u, a_Inner.Size[1] - child.Style.Margin.Vertical() ) }
             };
@@ -507,7 +507,7 @@ namespace
         {
             ResolveNodeVisibility( child );
 
-            if ( child.Style.PositionMode == EPositionMode::Anchored )
+            if ( child.Style.PositionMode == EPositioning::Anchored )
             {
                 reflowed |= ArrangeAnchored( child, a_Inner, a_Ctx );
                 return;
@@ -518,8 +518,8 @@ namespace
 
             Vec2<Unit> childSize = ResolveChildArrangeSize( child, a_Inner.Size );
 
-            const bool isFlexMain = ( isHz  && child.Style.WidthMode  == ESizingMode::Flex )
-                                 || ( !isHz && child.Style.HeightMode  == ESizingMode::Flex );
+            const bool isFlexMain = ( isHz  && child.Style.WidthMode  == ESizing::Flex )
+                                 || ( !isHz && child.Style.HeightMode  == ESizing::Flex );
 
             f32 growWeight = child.Style.FlexGrow > 0.f ? child.Style.FlexGrow : ( isFlexMain ? 1.f : 0.f );
 
@@ -529,17 +529,17 @@ namespace
                 const Unit         share = leftover * ( growWeight / cached.TotalGrow );
 
                 if ( isHz )
-                    childSize[0] = std::clamp( isFlexMain ? share : childSize[0] + share, c.MinSize[0], c.MaxSize[0] );
+                    childSize[0] = std::clamp( isFlexMain ? share : childSize[0] + share, c.Min[0], c.Max[0] );
                 else
-                    childSize[1] = std::clamp( isFlexMain ? share : childSize[1] + share, c.MinSize[1], c.MaxSize[1] );
+                    childSize[1] = std::clamp( isFlexMain ? share : childSize[1] + share, c.Min[1], c.Max[1] );
             }
 
-            const EAlignment align = ResolveAlign( child, a_Node );
+            const EAlign align = ResolveAlign( child, a_Node );
 
             // Cross-axis flex/stretch fills the full cross-axis extent.
-            if (isHz && (HasFlag( align, EAlignment::VStretch ) || child.Style.HeightMode == ESizingMode::Flex))
+            if (isHz && (HasFlag( align, EAlign::VStretch ) || child.Style.HeightMode == ESizing::Flex))
                 childSize[1] = std::max( 0_u, a_Inner.Size[1] - child.Style.Margin.Vertical() );
-            if (!isHz && (HasFlag( align, EAlignment::HStretch ) || child.Style.WidthMode == ESizingMode::Flex))
+            if (!isHz && (HasFlag( align, EAlign::HStretch ) || child.Style.WidthMode == ESizing::Flex))
                 childSize[0] = std::max( 0_u, a_Inner.Size[0] - child.Style.Margin.Horizontal() );
 
             Rect<Unit> childRect;
@@ -586,7 +586,7 @@ namespace
         {
             ResolveNodeVisibility( child );
 
-            if ( child.Style.PositionMode == EPositionMode::Anchored )
+            if ( child.Style.PositionMode == EPositioning::Anchored )
             {
                 reflowed |= ArrangeAnchored( child, a_Inner, a_Ctx );
                 return;
@@ -650,19 +650,20 @@ namespace
 
         // ---- Build cumulative origin arrays ----
 
-        // TODO: Replace with an arena allocator
-        Array<Unit> colOrigins( dims.Columns, a_Inner.Origin[0] );
-        Array<Unit> rowOrigins( dims.Rows,    a_Inner.Origin[1] );
+        ScopedMark originsMark( alloc );
+        Span colOrigins = alloc.Allocate<Unit>( dims.Columns );
+        Span rowOrigins = alloc.Allocate<Unit>( dims.Rows );
+        colOrigins[0]   = a_Inner.Origin[0];
+        rowOrigins[0]   = a_Inner.Origin[1];
 
-        for ( u32 c = 1; c < dims.Columns; ++c )
-            colOrigins[c] = colOrigins[c - 1] + colWidths[c - 1]  + s.Spacing;
-
-        for ( u32 r = 1; r < dims.Rows; ++r )
+        for ( u32 c = 1; c < dims.Columns; ++c ) 
+            colOrigins[c] = colOrigins[c - 1] + colWidths[c - 1] + s.Spacing;
+        for ( u32 r = 1; r < dims.Rows; ++r ) 
             rowOrigins[r] = rowOrigins[r - 1] + rowHeights[r - 1] + s.Spacing;
 
         // ---- Arrange each child within its cell ----
 
-        for ( u32 i = 0; i < Size( flowChildren ); ++i )
+		for ( u32 i = 0; i < flowCount; ++i )
         {
             LayoutNode& child = *flowChildren[i];
             const u32 row = i / dims.Columns;
@@ -676,17 +677,14 @@ namespace
                 .Size   = { colWidths[col],  rowHeights[row] }
             };
 
-            Vec2<Unit>       childSize = childSizes[i];
-            const EAlignment align     = ResolveAlign( child, a_Node );
+            Vec2<Unit>   childSize = childSizes[i];
+            const EAlign align     = ResolveAlign( child, a_Node );
 
-            if ( HasFlag( align, EAlignment::HStretch ) || child.Style.WidthMode  == ESizingMode::Flex ) childSize[0] = cellRect.Size[0];
-            if ( HasFlag( align, EAlignment::VStretch ) || child.Style.HeightMode == ESizingMode::Flex ) childSize[1] = cellRect.Size[1];
+            if ( HasFlag( align, EAlign::HStretch ) || child.Style.WidthMode  == ESizing::Flex ) childSize[0] = cellRect.Size[0];
+            if ( HasFlag( align, EAlign::VStretch ) || child.Style.HeightMode == ESizing::Flex ) childSize[1] = cellRect.Size[1];
 
             Rect<Unit> childRect = AlignRect( childSize, cellRect, align );
-            childRect.Origin[0] += child.Style.Margin.Left;
-            childRect.Origin[1] += child.Style.Margin.Top;
-            childRect.Size[0]   -= child.Style.Margin.Horizontal();
-            childRect.Size[1]   -= child.Style.Margin.Vertical();
+			childRect            = child.Style.Margin.Apply( childRect );
             childRect.Size[0]    = std::max( 0_u, childRect.Size[0] );
             childRect.Size[1]    = std::max( 0_u, childRect.Size[1] );
 
@@ -711,10 +709,10 @@ namespace
             const Vec2<Unit>   contentSize = s.Padding.Apply( a_AllocatedRect ).Size;
             const Vec2<Unit>   newIntrinsic = a_Node.Widget->OnMeasureContent( a_Node, contentSize, a_Ctx );
     
-            if ( s.HeightMode == ESizingMode::Content || s.HeightMode == ESizingMode::Flex )
+            if ( s.HeightMode == ESizing::Content || s.HeightMode == ESizing::Flex )
             {
                 const Unit newHeight = std::clamp( newIntrinsic[1] + s.Padding.Vertical(),
-                                                    s.SizeConstraints.MinSize[1], s.SizeConstraints.MaxSize[1] );
+                                                   s.SizeConstraints.Min[1], s.SizeConstraints.Max[1] );
     
                 if ( !IsApproxEqual( newHeight.ToFloat(), a_Node.Layout.DesiredSize[1].ToFloat() ) )
                 {

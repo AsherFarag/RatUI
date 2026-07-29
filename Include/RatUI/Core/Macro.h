@@ -8,7 +8,6 @@
     }
 
 #define RATUI_ENUM_ENABLE_BITMASK_OPERATORS( EnumName, UnderlyingType ) \
-    enum class EnumName : UnderlyingType; \
     inline constexpr EnumName operator|( EnumName a, EnumName b ) \
     { \
         return static_cast<EnumName>( static_cast<UnderlyingType>( a ) | static_cast<UnderlyingType>( b ) ); \

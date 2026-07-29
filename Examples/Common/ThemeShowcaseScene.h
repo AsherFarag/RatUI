@@ -21,27 +21,27 @@ public:
         root->Theme = m_ActiveTheme;
         root->GetLayout()
             .LayoutType( ELayoutType::Vertical )
-            .WidthMode( ESizingMode::Flex )
-            .HeightMode( ESizingMode::Flex )
-            .Padding( Edges::Uniform( 16_u ) )
+            .WidthMode( ESizing::Flex )
+            .HeightMode( ESizing::Flex )
+            .Padding( Edges::All( 16_u ) )
             .Spacing( 12_u )
             .FocusScope( true );
 
         TextWidget* title = m_Scene.CreateWidget<TextWidget>( root->GetLayoutID(), MakeText( "Theme Showcase" ), MakeTextLayout( 30_u, ETextOverflow::Clip ) );
         title->Theme = m_ActiveTheme;
-        title->GetLayout().HeightMode( ESizingMode::Content );
+        title->GetLayout().HeightMode( ESizing::Content );
 
         m_StatusText = m_Scene.CreateWidget<TextWidget>( root->GetLayoutID(), MakeText( "" ), MakeTextLayout( 16_u, ETextOverflow::Clip ) );
         m_StatusText->Theme = m_ActiveTheme;
-        m_StatusText->GetLayout().HeightMode( ESizingMode::Content );
+        m_StatusText->GetLayout().HeightMode( ESizing::Content );
 
         PanelWidget* themeButtonRow = m_Scene.CreateWidget<PanelWidget>( root->GetLayoutID() );
 		themeButtonRow->Theme = m_ActiveTheme;
         themeButtonRow->GetLayout()
             .LayoutType( ELayoutType::Horizontal )
-            .WidthMode( ESizingMode::Flex )
+            .WidthMode( ESizing::Flex )
             .FixedHeight( 54_u )
-            .Padding( Edges::Uniform( 8_u ) )
+            .Padding( Edges::All( 8_u ) )
             .Spacing( 8_u )
             .FocusScope( true );
 
@@ -54,9 +54,9 @@ public:
         contentRow->Theme = m_ActiveTheme;
         contentRow->GetLayout()
             .LayoutType( ELayoutType::Horizontal )
-            .WidthMode( ESizingMode::Flex )
-            .HeightMode( ESizingMode::Flex )
-            .Padding( Edges::Uniform( 12_u ) )
+            .WidthMode( ESizing::Flex )
+            .HeightMode( ESizing::Flex )
+            .Padding( Edges::All( 12_u ) )
             .Spacing( 12_u )
             .FocusScope( true );
 
@@ -64,9 +64,9 @@ public:
         controlsPanel->Theme = m_ActiveTheme;
         controlsPanel->GetLayout()
             .LayoutType( ELayoutType::Vertical )
-            .WidthMode( ESizingMode::Flex )
-            .HeightMode( ESizingMode::Flex )
-            .Padding( Edges::Uniform( 12_u ) )
+            .WidthMode( ESizing::Flex )
+            .HeightMode( ESizing::Flex )
+            .Padding( Edges::All( 12_u ) )
             .Spacing( 10_u )
             .FlexGrow( 1.f )
             .FocusScope( true );
@@ -75,16 +75,16 @@ public:
         previewPanel->Theme = m_ActiveTheme;
         previewPanel->GetLayout()
             .LayoutType( ELayoutType::Vertical )
-            .WidthMode( ESizingMode::Flex )
-            .HeightMode( ESizingMode::Flex )
-            .Padding( Edges::Uniform( 12_u ) )
+            .WidthMode( ESizing::Flex )
+            .HeightMode( ESizing::Flex )
+            .Padding( Edges::All( 12_u ) )
             .Spacing( 10_u )
             .FlexGrow( 1.f )
             .FocusScope( true );
 
         TextWidget* controlsTitle = m_Scene.CreateWidget<TextWidget>( controlsPanel->GetLayoutID(), MakeText( "Controls" ), MakeTextLayout( 20_u, ETextOverflow::Clip ) );
         controlsTitle->Theme = m_ActiveTheme;
-        controlsTitle->GetLayout().HeightMode( ESizingMode::Content );
+        controlsTitle->GetLayout().HeightMode( ESizing::Content );
 
         CreateSliderCard( controlsPanel, "Master Volume",    0.65f, false );
         CreateSliderCard( controlsPanel, "Accent Strength",  0.30f, false );
@@ -96,10 +96,10 @@ public:
 			buttonGrid->Theme = m_ActiveTheme;
 			buttonGrid->GetLayout()
 				.LayoutType( ELayoutType::Grid )
-				.WidthMode( ESizingMode::Content )
-				.HeightMode( ESizingMode::Content )
+				.WidthMode( ESizing::Content )
+				.HeightMode( ESizing::Content )
 				.SizeConstraints( Constraints{}.AtLeast( { 600_u, 75_u } ) )
-				.Padding( Edges::Uniform( 8_u ) )
+				.Padding( Edges::All( 8_u ) )
 				.Spacing( 8_u )
 				.GridColumns( 2 )
 				.GridRows( 2 );
@@ -112,15 +112,15 @@ public:
 
         TextWidget* previewTitle = m_Scene.CreateWidget<TextWidget>( previewPanel->GetLayoutID(), MakeText( "Preview" ), MakeTextLayout( 20_u, ETextOverflow::Clip ) );
         previewTitle->Theme = m_ActiveTheme;
-        previewTitle->GetLayout().HeightMode( ESizingMode::Content );
+        previewTitle->GetLayout().HeightMode( ESizing::Content );
 
         PanelWidget* previewCard = m_Scene.CreateWidget<PanelWidget>( previewPanel->GetLayoutID() );
         previewCard->Theme = m_ActiveTheme;
         previewCard->GetLayout()
             .LayoutType( ELayoutType::Vertical )
-            .WidthMode( ESizingMode::Flex )
-            .HeightMode( ESizingMode::Flex )
-            .Padding( Edges::Uniform( 10_u ) )
+            .WidthMode( ESizing::Flex )
+            .HeightMode( ESizing::Flex )
+            .Padding( Edges::All( 10_u ) )
             .Spacing( 8_u );
 
         TextWidget* previewText = m_Scene.CreateWidget<TextWidget>(
@@ -129,8 +129,8 @@ public:
             MakeTextLayout( 16_u, ETextOverflow::Fade, TextWrap::WrapWord() ) );
         previewText->Theme = m_ActiveTheme;
         previewText->GetLayout()
-            .WidthMode( ESizingMode::Flex )
-            .HeightMode( ESizingMode::Content );
+            .WidthMode( ESizing::Flex )
+            .HeightMode( ESizing::Content );
 
         m_DynamicVisibleGlyphsText = m_Scene.CreateWidget<TextWidget>(
             previewCard->GetLayoutID(),
@@ -153,9 +153,9 @@ public:
                 MakeTextLayout( 16_u, ETextOverflow::Fade, TextWrap::WrapWord() ) );
             overflowText->Theme = m_ActiveTheme;
             overflowText->GetLayout()
-                .WidthMode( ESizingMode::Fixed )
+                .WidthMode( ESizing::Fixed )
                 .FixedWidth( 100_u )
-                .HeightMode( ESizingMode::Fixed )
+                .HeightMode( ESizing::Fixed )
                 .FixedHeight( 100_u );
         }
 
@@ -167,11 +167,11 @@ public:
             } );
         actionButton->Theme = m_ActiveTheme;
         actionButton->GetLayout()
-            .WidthMode( ESizingMode::Fixed )
+            .WidthMode( ESizing::Fixed )
             .FixedWidth( 280_u )
-            .HeightMode( ESizingMode::Fixed )
+            .HeightMode( ESizing::Fixed )
             .FixedHeight( 40_u )
-            .ChildAlign( EAlignment::Center );
+            .ChildAlign( EAlign::Center );
 
         TextWidget* actionButtonText = m_Scene.CreateWidget<TextWidget>( actionButton->GetLayoutID(), MakeText( "Preview Button" ), MakeTextLayout( 16_u, ETextOverflow::Clip ) );
         actionButtonText->Theme = m_ActiveTheme;
@@ -273,11 +273,11 @@ private:
             { ThemeKey::Color::SliderThumbHover,    Colors::LightCyan                       },
             { ThemeKey::Color::SliderThumbPressed,  Colors::AccentRose                      }
         } );
-        m_Themes[2]->SetRoundings( {
-            { ThemeKey::Rounding::Panel,        CornerRounding::Uniform( 12_u ) },
-            { ThemeKey::Rounding::Button,       CornerRounding::Uniform( 10_u ) },
-            { ThemeKey::Rounding::SliderTrack,  CornerRounding::Uniform(  5_u ) },
-            { ThemeKey::Rounding::SliderThumb,  CornerRounding::Uniform(  8_u ) }
+        m_Themes[2]->SetRadii( {
+            { ThemeKey::Radii::Panel,        CornerRadius::All( 12_u ) },
+            { ThemeKey::Radii::Button,       CornerRadius::All( 10_u ) },
+            { ThemeKey::Radii::SliderTrack,  CornerRadius::All(  5_u ) },
+            { ThemeKey::Radii::SliderThumb,  CornerRadius::All(  8_u ) }
         } );
         m_Themes[2]->SetBrushes( {
             { ThemeKey::Brush::PanelNormal,   SolidBrush{ FromColorF32( 0.07f, 0.03f, 0.10f ) } },
@@ -296,8 +296,8 @@ private:
         // Minecraft
         m_Themes[3] = MakeShared<Theme>( *m_Themes[0] );
         m_Themes[3]->SetFont( ThemeKey::Font::Default, FontHandle{ 2 } );
-        for ( const auto& [key, value] : m_Themes[3]->GetRoundings() )
-            m_Themes[3]->SetRounding( key, CornerRounding::None() ); // Override all roundings to sharp corners.
+        for ( const auto& [key, value] : m_Themes[3]->GetRadii() )
+            m_Themes[3]->SetRadius( key, CornerRadius::None() ); // Override all roundings to sharp corners.
 
         m_Themes[3]->SetColors( {
             { ThemeKey::Color::SliderTrackFill,    FromColorF32( 0.1f, 0.5f, 0.1f ) },
@@ -328,9 +328,9 @@ private:
         builder
             .WithTheme( m_ActiveTheme )
 			.WithLayout( LayoutStyle{
-                .ChildAlign = EAlignment::Center,
-                .WidthMode  = ESizingMode::Fixed,
-                .HeightMode = ESizingMode::Flex, 
+                .ChildAlign = EAlign::Center,
+                .WidthMode  = ESizing::Fixed,
+                .HeightMode = ESizing::Flex, 
                 .FixedWidth = 130_u }
 		    ).AddChild<TextWidget>( 
                 [this, a_Label]( Builder<TextWidget>& b )
@@ -347,25 +347,25 @@ private:
         card->Theme = m_ActiveTheme;
         card->GetLayout()
             .LayoutType( ELayoutType::Vertical )
-            .WidthMode( ESizingMode::Flex )
+            .WidthMode( ESizing::Flex )
             .FixedHeight( a_Vertical ? 180_u : 86_u )
-            .Padding( Edges::Uniform( 8_u ) )
+            .Padding( Edges::All( 8_u ) )
             .Spacing( 6_u );
 
         TextWidget* valueText = m_Scene.CreateWidget<TextWidget>( card->GetLayoutID(), MakeText( "" ), MakeTextLayout( 14_u, ETextOverflow::Clip ) );
         valueText->Theme = m_ActiveTheme;
-        valueText->GetLayout().HeightMode(ESizingMode::Content);
+        valueText->GetLayout().HeightMode(ESizing::Content);
 
         SliderWidget* sliderWidget = m_Scene.CreateWidget<SliderWidget>( card->GetLayoutID(), 0.f, 1.f, a_Value );
         sliderWidget->Theme = m_ActiveTheme;
 		LayoutNode& sliderNode = sliderWidget->GetLayout();
         sliderNode
-            .WidthMode( ESizingMode::Flex )
+            .WidthMode( ESizing::Flex )
             .FixedHeight( a_Vertical ? 120_u : 28_u );
 
         if ( a_Vertical )
         {
-            sliderWidget->Orientation = EOrientation::Vertical;
+            sliderWidget->Orientation = EOrient::Vertical;
             sliderNode.FixedWidth( 36_u );
         }
 

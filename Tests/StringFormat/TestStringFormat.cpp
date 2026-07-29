@@ -34,7 +34,7 @@ TEST_CASE( "Vec2f zero formats correctly", "[format][vec]" )
 }
 
 // =============================================================================
-// EAlignment formatter
+// EAlign formatter
 // =============================================================================
 
 TEST_CASE( "Ement formats preset TopLeft", "[format][alignment]" )
@@ -67,7 +67,7 @@ TEST_CASE( "Ement formats all nine presets correctly", "[format][alignment]" )
 
 TEST_CASE( "Ement zero value formats as None", "[format][alignment]" )
 {
-    REQUIRE( std::format( "{}", static_cast<EAlignment>( 0 ) ) == "None" );
+    REQUIRE( std::format( "{}", static_cast<EAlign>( 0 ) ) == "None" );
 }
 
 TEST_CASE( "Ement formats individual flag Left", "[format][alignment]" )
@@ -81,10 +81,10 @@ TEST_CASE( "Ement formats individual flag Top", "[format][alignment]" )
 }
 
 // =============================================================================
-// ELayoutType formatter
+// ELayout formatter
 // =============================================================================
 
-TEST_CASE( "ELayoutType formats all values", "[format][direction]" )
+TEST_CASE( "ELayout formats all values", "[format][direction]" )
 {
     REQUIRE( std::format( "{}", ELayoutType::Horizontal ) == "Horizontal" );
     REQUIRE( std::format( "{}", ELayoutType::Vertical   ) == "Vertical"   );

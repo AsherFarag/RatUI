@@ -16,7 +16,7 @@ namespace RatUI
         // Render properties
         // --------------------------------------------------------------------
 
-        EOrientation Orientation   { EOrientation::Horizontal };
+        EOrient Orientation   { EOrient::Horizontal };
         bool ShowTrackFill         { true };  ///< Whether to render the filled portion of the track.
         bool ScaleThumbOnTrackAxis { false }; ///< When enabled, thumb size is scaled along the scrolling axis by ThumbScale.
         f32  ThumbScale            { 1.f };   ///< [0,1] size ratio of the thumb along the scrolling axis when ScaleThumbOnTrackAxis is enabled.
@@ -26,14 +26,14 @@ namespace RatUI
         Unit  TrackThickness         { 4_u };                 ///< Thickness of the track along the scrolling axis.
         Color TrackColor             { Colors::Surface700 };  ///< Color of the track.
         Color TrackFillColor         { Colors::Transparent }; ///< Color of the filled portion of the track (Useful for progress bars).
-        CornerRounding TrackRounding { CornerRounding::Uniform( 0_u ) }; ///< Corner rounding of the track.
+        CornerRadius TrackRadius     { CornerRadius::All( 0_u ) }; ///< Corner rounding of the track.
 
         // --- Thumb properties ---
 
         Color ThumbColorNormal       { Colors::Surface500 };  ///< Color of the thumb.
         Color ThumbColorHover        { Colors::Surface600 };  ///< Color of the thumb when hovered.
         Color ThumbColorPressed      { Colors::Surface700 };  ///< Color of the thumb when pressed.
-        CornerRounding ThumbRounding { CornerRounding::Uniform( 0_u ) }; ///< Corner rounding of the thumb.
+        CornerRadius ThumbRadius     { CornerRadius::All( 0_u ) }; ///< Corner rounding of the thumb.
 
         // --------------------------------------------------------------------
         // Behaviour properties
@@ -92,12 +92,12 @@ namespace RatUI
                     TrackThickness = Theme.GetMetric( ThemeKey::Metric::SliderTrackThickness, TrackThickness );
                     TrackColor = Theme.GetColor( ThemeKey::Color::SliderTrack, TrackColor );
                     TrackFillColor = Theme.GetColor( ThemeKey::Color::SliderTrackFill, TrackFillColor );
-                    TrackRounding = Theme.GetRounding( ThemeKey::Rounding::SliderTrack, TrackRounding );
+                    TrackRadius = Theme.GetRadius( ThemeKey::Radii::SliderTrack, TrackRadius );
 
                     ThumbColorNormal = Theme.GetColor( ThemeKey::Color::SliderThumb, ThumbColorNormal );
                     ThumbColorHover = Theme.GetColor( ThemeKey::Color::SliderThumbHover, ThumbColorHover );
                     ThumbColorPressed = Theme.GetColor( ThemeKey::Color::SliderThumbPressed, ThumbColorPressed );
-                    ThumbRounding = Theme.GetRounding( ThemeKey::Rounding::SliderThumb, ThumbRounding );
+                    ThumbRadius = Theme.GetRadius( ThemeKey::Radii::SliderThumb, ThumbRadius );
                 }
             }
 
@@ -168,7 +168,7 @@ namespace RatUI
 
         Reply OnPointerScroll( const PointerEvent& a_Event ) override
         {
-            const bool isHz = ( Orientation == EOrientation::Horizontal );
+            const bool isHz = ( Orientation == EOrient::Horizontal );
             const f32  delta = isHz
                 ? a_Event.ScrollDelta[0].ToFloat()
 				: a_Event.ScrollDelta[1].ToFloat() * -1.f; // Invert vertical scroll to match typical scrollbar behaviour.
@@ -190,7 +190,7 @@ namespace RatUI
         Rect<Unit> GetTrackRect( Rect<Unit> a_Rect ) const
         {
 			const Unit trackThickness = Theme.GetMetric( ThemeKey::Metric::SliderTrackThickness, 4_u );
-            if ( Orientation == EOrientation::Horizontal )
+            if ( Orientation == EOrient::Horizontal )
             {
                 const Unit cy = a_Rect.Origin[1] + a_Rect.Size[1] * 0.5f;
                 return {
@@ -216,7 +216,7 @@ namespace RatUI
 
             Vec2<Unit> centre;
 
-            if ( Orientation == EOrientation::Horizontal )
+            if ( Orientation == EOrient::Horizontal )
             {
                 // Reserve half-thumb width at each end so thumb never clips.
                 const Unit travel = a_Rect.Width() - thumbSize[0];
@@ -248,7 +248,7 @@ namespace RatUI
             a_DrawList.AddRect( track,
             {
                 .FillColor = TrackColor,
-                .Rounding  = TrackRounding
+                .Radius    = TrackRadius
             } );
 
             if ( !ShowTrackFill )
@@ -259,7 +259,7 @@ namespace RatUI
             if ( t > 0.f )
             {
                 Rect<Unit> filled = track;
-                if ( Orientation == EOrientation::Horizontal )
+                if ( Orientation == EOrient::Horizontal )
                     filled.Size[0] = track.Size[0] * t;
                 else
                     filled.Size[1] = track.Size[1] * t;
@@ -267,7 +267,7 @@ namespace RatUI
                 a_DrawList.AddRect( filled,
                 {
                     .FillColor = TrackFillColor,
-                    .Rounding  = TrackRounding
+                    .Radius    = TrackRadius
                 } );
             }
         }
@@ -285,7 +285,7 @@ namespace RatUI
                 .FillColor       = fill,
                 .BorderColor     = m_IsDragging ? Colors::AccentBlue : Colors::Transparent,
                 .BorderThickness = m_IsDragging ? 2_u : 0_u,
-                .Rounding        = ThumbRounding
+                .Radius          = ThumbRadius
             } );
         }
 
@@ -303,7 +303,7 @@ namespace RatUI
 
             const Vec2<Unit> thumbSize = GetEffectiveThumbSize( a_Rect );
 
-            if ( Orientation == EOrientation::Horizontal )
+            if ( Orientation == EOrient::Horizontal )
             {
                 const Unit travel = a_Rect.Width() - thumbSize[0];
                 if ( travel <= 0_u ) return;
@@ -330,7 +330,7 @@ namespace RatUI
                 return thumbSize;
 
             const f32 clampedScale = std::clamp( ThumbScale, 0.f, 1.f );
-            if ( Orientation == EOrientation::Horizontal )
+            if ( Orientation == EOrient::Horizontal )
             {
                 const Unit scaledSize = Unit( a_Rect.Width().ToFloat() * clampedScale );
                 thumbSize[0] = std::max( Theme.GetMetric( ThemeKey::Metric::SliderMinThumbSize, 8_u ), std::min( a_Rect.Width(), scaledSize ) );

@@ -20,7 +20,7 @@ namespace RatUI
             Color          FillColor{ Colors::Transparent };
             Color          BorderColor{ Colors::Transparent };
             Unit           BorderThickness{ 0_u };
-            CornerRounding Rounding{ CornerRounding::None() };
+            CornerRadius   Radius{ CornerRadius::None() };
             TextureView    Texture{};
         };
 
@@ -137,7 +137,7 @@ namespace RatUI
                 a_Style.FillColor, 
                 ToPixel( a_Style.BorderThickness, m_DPIScale ), 
                 a_Style.BorderColor, 
-                ToPixelRounding( a_Style.Rounding ),
+                ToPixelRadius( a_Style.Radius ),
                 uvRect );
             return *this;
         }
@@ -191,7 +191,7 @@ namespace RatUI
                 .FillColor = a_Style.FillColor,
                 .BorderColor = a_Style.BorderColor,
                 .BorderThickness = a_Style.BorderThickness,
-                .Rounding = CornerRounding::Uniform( a_Radius ),
+                .Radius = CornerRadius::All( a_Radius ),
                 .Texture = std::move( a_Style.Texture )
             } );
         }
@@ -311,13 +311,13 @@ namespace RatUI
             };
         }
 
-        Vec4<Pixel> ToPixelRounding( const CornerRounding& a_Rounding ) const
+        Vec4<Pixel> ToPixelRadius( const CornerRadius& a_Radius ) const
         {
             return Vec4<Pixel>{
-                ToPixel( a_Rounding.TopLeft, m_DPIScale ),
-                ToPixel( a_Rounding.TopRight, m_DPIScale ),
-                ToPixel( a_Rounding.BottomLeft, m_DPIScale ),
-                ToPixel( a_Rounding.BottomRight, m_DPIScale )
+                ToPixel( a_Radius.TL, m_DPIScale ),
+                ToPixel( a_Radius.TR, m_DPIScale ),
+                ToPixel( a_Radius.BL, m_DPIScale ),
+                ToPixel( a_Radius.BR, m_DPIScale )
             };
         }
 

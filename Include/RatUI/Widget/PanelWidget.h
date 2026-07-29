@@ -20,7 +20,7 @@ namespace RatUI
         Brush FillBrush{ SolidBrush{ Colors::Surface700 } }; ///< The brush used to fill the panel's background
         Color BorderColor{ Colors::Transparent };            ///< The color of the panel's border
         Unit  BorderThickness{ 0_u };                        ///< The thickness of the panel's border
-        CornerRounding Rounding{ CornerRounding::None() };   ///< The corner rounding
+        CornerRadius Radius{ CornerRadius::None() };         ///< The corner rounding
 
         // --------------------------------------------------------------------
         // IWidget Overrides
@@ -43,7 +43,7 @@ namespace RatUI
                     FillBrush = Theme.GetBrush( ThemeKey::Brush::PanelNormal, FillBrush );
                     BorderColor = Theme.GetColor( ThemeKey::Color::PanelBorder, BorderColor );
                     BorderThickness = Theme.GetMetric( ThemeKey::Metric::PanelBorderThickness, BorderThickness );
-                    Rounding = Theme.GetRounding( ThemeKey::Rounding::Panel, Rounding );
+                    Radius = Theme.GetRadius( ThemeKey::Radii::Panel, Radius );
                 }
             }
 
@@ -55,7 +55,7 @@ namespace RatUI
                     .FillColor = solid.Fill,
                     .BorderColor = BorderColor,
                     .BorderThickness = BorderThickness,
-                    .Rounding = Rounding
+                    .Radius = Radius
                 } );
             }
             else if ( std::holds_alternative<TextureBrush>( FillBrush ) )
@@ -66,7 +66,7 @@ namespace RatUI
                     .FillColor = texture.Tint,
                     .BorderColor = BorderColor,
                     .BorderThickness = BorderThickness,
-                    .Rounding = Rounding,
+                    .Radius = Radius,
                     .Texture = texture.Texture
                 } );
             }
@@ -88,7 +88,7 @@ namespace RatUI
 					.FillColor = Colors::Transparent,
 					.BorderColor = BorderColor,
 					.BorderThickness = BorderThickness,
-                    .Rounding = Rounding
+                    .Radius = Radius
                 } );
             }
 

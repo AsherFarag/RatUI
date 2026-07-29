@@ -25,13 +25,13 @@ namespace RatUI
     }
 
     RATUI_NODISCARD constexpr inline 
-    CornerRounding Lerp(const CornerRounding& a_A, const CornerRounding& a_B, f32 a_Time)
+    CornerRadius Lerp(const CornerRadius& a_A, const CornerRadius& a_B, f32 a_Time)
     {
         return {
-            Lerp(a_A.TopLeft,     a_B.TopLeft,     a_Time),
-            Lerp(a_A.TopRight,    a_B.TopRight,    a_Time),
-            Lerp(a_A.BottomLeft,  a_B.BottomLeft,  a_Time),
-            Lerp(a_A.BottomRight, a_B.BottomRight, a_Time),
+            Lerp(a_A.TL,     a_B.TL,     a_Time),
+            Lerp(a_A.TR,    a_B.TR,    a_Time),
+            Lerp(a_A.BL,  a_B.BL,  a_Time),
+            Lerp(a_A.BR, a_B.BR, a_Time),
         };
     }
 

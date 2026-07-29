@@ -1,18 +1,13 @@
 #pragma once
-
-/** 
- * @file Layout.h
- * @brief This file contains layout-related type definitions and utilities for RatUI.
- * The layout engine uses a two-pass approach where the first pass calculates the desired size of each element based on its content and constraints,
- * and the second pass determines the final position and size of each element based on the available space and alignment settings.
- */
-
 #include "../Core.h"
 #include <concepts>
 
 namespace RatUI
 {
-    enum class EOrientation : u8
+    /**
+	 * @brief Orientation of a thing, either horizontal or vertical.
+     */
+    enum class EOrient : u8
     {
         Horizontal,
         Vertical
@@ -22,7 +17,7 @@ namespace RatUI
      * @brief Alignment flags for positioning UI elements within their parent containers. 
      * These can be combined to specify both horizontal and vertical alignment.
      */
-    enum EAlignment : u8
+    enum class EAlign : u8
     {
         Inherit = 0, ///< Inherit alignment from parent container. Only applicable when PositionMode is Flow.
 
@@ -56,11 +51,12 @@ namespace RatUI
         VStretch    = Top  | Bottom,
         StretchFill = HStretch | VStretch, 
     };
+    RATUI_ENUM_ENABLE_BITMASK_OPERATORS( EAlign, u8 )
 
     /** 
      * @brief Positioning modes define how a UI element is positioned relative to its parent container. 
      */
-    enum class EPositionMode : u8
+    enum class EPositioning : u8
     {
         Flow,     ///< Participates in parent's stack/flex layout.
         Anchored, ///< Positioned based on its Anchor relative to the parent.
@@ -69,7 +65,7 @@ namespace RatUI
     /** 
      * @brief Sizing modes define how the size of a UI element is determined during layout. 
      */
-    enum class ESizingMode : u8
+    enum class ESizing : u8
     {
         Content, ///< Size is determined by the content of the element.
         Fixed,   ///< Size is fixed to the specified dimensions.
@@ -80,10 +76,10 @@ namespace RatUI
     /**
      * @brief Wrap modes define how child elements are arranged when they exceed the available space in a container.
 	 * @note Wrapping behavior is only applicable to certain layout types (e.g., Horizontal and Vertical) and is ignored for others (e.g., Overlay).
-	 * ELayoutType::Horizontal with EWrapMode::Wrap will wrap child elements to the next line when they exceed the container's width,
-     * while ELayoutType::Vertical with EWrapMode::Wrap will wrap child elements to the next column when they exceed the container's height.
+	 * ELayout::Horizontal with EWrap::Wrap will wrap child elements to the next line when they exceed the container's width,
+     * while ELayout::Vertical with EWrap::Wrap will wrap child elements to the next column when they exceed the container's height.
      */
-    enum class EWrapMode : u8
+    enum class EWrap : u8
     {
         NoWrap, ///< Child elements are laid out in a single line and may overflow the container if they exceed its size.
         Wrap    ///< Child elements wrap to the next line when they exceed the container's size, similar to text wrapping.
@@ -112,25 +108,26 @@ namespace RatUI
         Vec2f      Pivot{ 0.0f, 0.0f };  ///< The pivot point for rotation and scaling, relative to the element's size. (Values are normalized 0.0 to 1.0)
         Vec2<Unit> Offset{ 0_u, 0_u };   ///< The offset from the anchored position, allowing for fine-tuning of the element's position. (Values are in pixels)
 
-        static constexpr Anchor TopLeft()      { return { { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f } }; }
-        static constexpr Anchor TopCenter()    { return { { 0.5f, 0.0f }, { 0.5f, 0.0f }, { 0.5f, 0.0f } }; }
-        static constexpr Anchor TopRight()     { return { { 1.0f, 0.0f }, { 1.0f, 0.0f }, { 1.0f, 0.0f } }; }
-        static constexpr Anchor CenterLeft()   { return { { 0.0f, 0.5f }, { 0.0f, 0.5f }, { 0.0f, 0.5f } }; }
-        static constexpr Anchor Center()       { return { { 0.5f, 0.5f }, { 0.5f, 0.5f }, { 0.5f, 0.5f } }; }
-        static constexpr Anchor CenterRight()  { return { { 1.0f, 0.5f }, { 1.0f, 0.5f }, { 1.0f, 0.5f } }; }
-        static constexpr Anchor BottomLeft()   { return { { 0.0f, 1.0f }, { 0.0f, 1.0f }, { 0.0f, 1.0f } }; }
-        static constexpr Anchor BottomCenter() { return { { 0.5f, 1.0f }, { 0.5f, 1.0f }, { 0.5f, 1.0f } }; }
-        static constexpr Anchor BottomRight()  { return { { 1.0f, 1.0f }, { 1.0f, 1.0f }, { 1.0f, 1.0f } }; }
+        RATUI_NODISCARD static constexpr Anchor TopLeft()      { return { { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f } }; }
+        RATUI_NODISCARD static constexpr Anchor TopCenter()    { return { { 0.5f, 0.0f }, { 0.5f, 0.0f }, { 0.5f, 0.0f } }; }
+        RATUI_NODISCARD static constexpr Anchor TopRight()     { return { { 1.0f, 0.0f }, { 1.0f, 0.0f }, { 1.0f, 0.0f } }; }
+        RATUI_NODISCARD static constexpr Anchor CenterLeft()   { return { { 0.0f, 0.5f }, { 0.0f, 0.5f }, { 0.0f, 0.5f } }; }
+        RATUI_NODISCARD static constexpr Anchor Center()       { return { { 0.5f, 0.5f }, { 0.5f, 0.5f }, { 0.5f, 0.5f } }; }
+        RATUI_NODISCARD static constexpr Anchor CenterRight()  { return { { 1.0f, 0.5f }, { 1.0f, 0.5f }, { 1.0f, 0.5f } }; }
+        RATUI_NODISCARD static constexpr Anchor BottomLeft()   { return { { 0.0f, 1.0f }, { 0.0f, 1.0f }, { 0.0f, 1.0f } }; }
+        RATUI_NODISCARD static constexpr Anchor BottomCenter() { return { { 0.5f, 1.0f }, { 0.5f, 1.0f }, { 0.5f, 1.0f } }; }
+        RATUI_NODISCARD static constexpr Anchor BottomRight()  { return { { 1.0f, 1.0f }, { 1.0f, 1.0f }, { 1.0f, 1.0f } }; }
 
-        static constexpr Anchor StretchAll()   { return { { 0.0f, 0.0f }, { 1.0f, 1.0f }, { 0.5f, 0.5f } }; }
-        static constexpr Anchor StretchTop()   { return { { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 0.5f, 0.0f } }; }
-        static constexpr Anchor StretchBottom(){ return { { 0.0f, 1.0f }, { 1.0f, 1.0f }, { 0.5f, 1.0f } }; }
-        static constexpr Anchor StretchLeft()  { return { { 0.0f, 0.0f }, { 0.0f, 1.0f }, { 0.0f, 0.5f } }; }
-        static constexpr Anchor StretchRight() { return { { 1.0f, 0.0f }, { 1.0f, 1.0f }, { 1.0f, 0.5f } }; }
+        RATUI_NODISCARD static constexpr Anchor StretchAll()   { return { { 0.0f, 0.0f }, { 1.0f, 1.0f }, { 0.5f, 0.5f } }; }
+        RATUI_NODISCARD static constexpr Anchor StretchTop()   { return { { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 0.5f, 0.0f } }; }
+        RATUI_NODISCARD static constexpr Anchor StretchBottom(){ return { { 0.0f, 1.0f }, { 1.0f, 1.0f }, { 0.5f, 1.0f } }; }
+        RATUI_NODISCARD static constexpr Anchor StretchLeft()  { return { { 0.0f, 0.0f }, { 0.0f, 1.0f }, { 0.0f, 0.5f } }; }
+        RATUI_NODISCARD static constexpr Anchor StretchRight() { return { { 1.0f, 0.0f }, { 1.0f, 1.0f }, { 1.0f, 0.5f } }; }
     };
 
     /**
-	 * @brief Represents the visibility state of a UI element, defining how it is rendered, whether it participates in layout calculations, and whether it can be hit-tested for interactions.
+	 * @brief Represents the visibility state of a UI element, defining how it is rendered, 
+     * whether it participates in layout calculations, and whether it can be hit-tested for interactions.
      */
 	enum class EVisibility : u8
     {
@@ -138,7 +135,8 @@ namespace RatUI
         Render          = 1 << 0, ///< The element is rendered and visible.
         Layout          = 1 << 1, ///< The element participates in layout calculations and occupies space.
         SelfHitTest     = 1 << 2, ///< The element can be hit-tested (e.g., for mouse interactions) based on its own geometry.
-        ChildrenHitTest = 1 << 3, ///< The element's children can be hit-tested, even if the element itself is not (e.g., for invisible containers that still allow interaction with their children).
+        ChildrenHitTest = 1 << 3, ///< The element's children can be hit-tested, even if the element itself is not
+                                  ///< (e.g., for invisible containers that still allow interaction with their children).
 
         /** @brief Visible and hit-testable. Participates in layout and rendering. */
         Visible = Render | Layout | SelfHitTest | ChildrenHitTest,
@@ -161,28 +159,30 @@ namespace RatUI
      */
     namespace Visibility         
     {
+        RATUI_ENUM_ENABLE_BITMASK_OPERATORS( EVisibility, u8 );
+
         /** @brief Returns true if the element should be considered in layout calculations (i.e., it is not Collapsed). */
         inline constexpr bool AffectsLayout( EVisibility a_Visibility )
         {
-            return ( (u8)a_Visibility & (u8)EVisibility::Layout ) != (u8)EVisibility::None;
+            return ( a_Visibility & EVisibility::Layout ) != EVisibility::None;
         }
 
         /** @brief Returns true if the element should be rendered (i.e., it is Visible). */
-        constexpr bool IsRendered(EVisibility a_Visibility)
+        constexpr bool IsRendered( EVisibility a_Visibility )
         {
-            return ( (u8)a_Visibility & (u8)EVisibility::Render ) != (u8)EVisibility::None;
+            return ( a_Visibility & EVisibility::Render ) != EVisibility::None;
         }
 
         /** @brief Returns true if the element should be hit-testable (i.e., it is Visible). */
         constexpr bool IsHitTestable(EVisibility a_Visibility)
         {
-            return ( (u8)a_Visibility & (u8)EVisibility::SelfHitTest ) != (u8)EVisibility::None;
+            return ( a_Visibility & EVisibility::SelfHitTest ) != EVisibility::None;
         }
 
         /** @brief Returns true if the element's children should be hit-testable, even if the element itself is not. */
         constexpr bool AreChildrenHitTestable(EVisibility a_Visibility)
         {
-            return ( (u8)a_Visibility & (u8)EVisibility::ChildrenHitTest ) != (u8)EVisibility::None;
+            return ( a_Visibility & EVisibility::ChildrenHitTest ) != EVisibility::None;
         }
 
         /**
@@ -191,38 +191,24 @@ namespace RatUI
          * @param a_Child The visibility of the child element.
          * @return The effective visibility of the child element after applying the parent's visibility rules.
          */
-        static constexpr EVisibility Apply( EVisibility a_Parent, EVisibility a_Child )
+        RATUI_NODISCARD static constexpr EVisibility Apply( EVisibility a_Parent, EVisibility a_Child )
         {
-            // If parent is fully collapsed, everything below is collapsed.
-            if ( !AffectsLayout( a_Parent ) &&
-                 !IsRendered( a_Parent ) &&
-                 !IsHitTestable( a_Parent ) &&
-                 !AreChildrenHitTestable( a_Parent ) )
+            // Layout: If both parent and child have Layout, then child has Layout. Otherwise, child does not have Layout.
+            // Render: If both parent and child have Render, then child has Render. Otherwise, child does not have Render.
+            // SelfHitTest: If parent has ChildrenHitTest, then child can have SelfHitTest. Otherwise, child cannot have SelfHitTest.
+            // ChildrenHitTest: If parent has ChildrenHitTest, then child can have ChildrenHitTest. Otherwise, child cannot have ChildrenHitTest.
+
+            EVisibility result =
+                (a_Parent & a_Child) &
+                (EVisibility::Render | EVisibility::Layout);
+        
+            if ((a_Parent & EVisibility::ChildrenHitTest) != EVisibility::None)
             {
-                return EVisibility::Collapsed;
+                result |= a_Child &
+                    (EVisibility::SelfHitTest | EVisibility::ChildrenHitTest);
             }
-
-            u8 result = (u8)EVisibility::None;
-
-            // Layout propagation
-            if ( AffectsLayout( a_Parent ) && AffectsLayout( a_Child ) )
-                result |= (u8)EVisibility::Layout;
-
-            // Render propagation
-            if ( IsRendered( a_Parent ) && IsRendered( a_Child ) )
-                result |= (u8)EVisibility::Render;
-
-            // Self hit-test:
-            // Parent must allow children hit-test AND child must allow self hit-test
-            if ( AreChildrenHitTestable( a_Parent ) && IsHitTestable( a_Child ) )
-                result |= (u8)EVisibility::SelfHitTest;
-
-            // Children hit-test:
-            // Parent must allow children hit-test AND child must allow children hit-test
-            if ( AreChildrenHitTestable( a_Parent ) && AreChildrenHitTestable( a_Child ) )
-                result |= (u8)EVisibility::ChildrenHitTest;
-
-            return static_cast<EVisibility>( result );
+        
+            return result;
         }
     }
 
@@ -232,53 +218,37 @@ namespace RatUI
      */
     struct Edges
     {
-        Unit Top;
-        Unit Right;
-        Unit Bottom;
-        Unit Left;
+        Unit T{}, R{}, B{}, L{};
 
         /** @brief Calculates the total horizontal inset. */
-        constexpr Unit Horizontal() const { return Left + Right; }
+        RATUI_NODISCARD constexpr Unit Horizontal() const { return L + R; }
 
         /** @brief Calculates the total vertical inset. */
-        constexpr Unit Vertical() const { return Top + Bottom; }
+        RATUI_NODISCARD constexpr Unit Vertical() const { return T + B; }
 
         /** @brief Calculates the total inset as a vector. */
-        constexpr Vec2<Unit> Total() const { return { Horizontal(), Vertical() }; }
+        RATUI_NODISCARD constexpr Vec2<Unit> Total() const { return { Horizontal(), Vertical() }; }
 
         /** @brief Applies the edge insets to a given rectangle, returning a new rectangle that is reduced by the specified insets. */
-        constexpr Rect<Unit> Apply( const Rect<Unit>& a_Rect ) const
+        RATUI_NODISCARD constexpr Rect<Unit> Apply( const Rect<Unit>& a_Rect ) const
         {
-			return Rect<Unit>::FromMinMax( a_Rect.Min() + Vec2<Unit>{ Left, Top },
-                                           a_Rect.Max() - Vec2<Unit>{ Right, Bottom } );
+			return Rect<Unit>::FromMinMax( a_Rect.Min() + Vec2<Unit>{ L, T },
+                                           a_Rect.Max() - Vec2<Unit>{ R, B } );
         }
 
         /** @brief Initializes all edges to the same value. */
-		static constexpr Edges Uniform( Unit a_Value ) { return { a_Value, a_Value, a_Value, a_Value }; }
+		RATUI_NODISCARD static constexpr Edges All( Unit a_Value ) { return { a_Value, a_Value, a_Value, a_Value }; }
 
         /** @brief Initializes horizontal and vertical edges separately. */
-		static constexpr Edges Symmetric( Unit a_Horizontal, Unit a_Vertical ) { return { a_Vertical, a_Horizontal, a_Vertical, a_Horizontal }; }
+		RATUI_NODISCARD static constexpr Edges Axis( Unit a_Horizontal, Unit a_Vertical ) { return { a_Vertical, a_Horizontal, a_Vertical, a_Horizontal }; }
 
-        /** @brief Initializes each edge individually. */
-		static constexpr Edges Asymmetric( Unit a_Top, Unit a_Right, Unit a_Bottom, Unit a_Left ) { return { a_Top, a_Right, a_Bottom, a_Left }; }
+		RATUI_NODISCARD constexpr Edges operator+( const Edges& a_Other ) const { return { .T = T + a_Other.T, .R = R + a_Other.R, .B = B + a_Other.B, .L = L + a_Other.L }; }
+		RATUI_NODISCARD constexpr Edges operator-( const Edges& a_Other ) const { return { .T = T - a_Other.T, .R = R - a_Other.R, .B = B - a_Other.B, .L = L - a_Other.L }; }
 
-        /** @brief Combines two Edges by adding their respective values together. */
-        constexpr Edges operator+( const Edges& a_Other ) const
-        {
-            return { Top + a_Other.Top, Right + a_Other.Right, Bottom + a_Other.Bottom, Left + a_Other.Left };
-		}
-
-        /** @brief Scales the edge insets by a scalar value, multiplying each edge by the specified factor. */
-        constexpr Edges operator*( f32 a_Scalar ) const
-        {
-            return { Top * a_Scalar, Right * a_Scalar, Bottom * a_Scalar, Left * a_Scalar };
-		}
-
-        /** @brief Scales the edge insets by a scalar value, dividing each edge by the specified factor. */
-        constexpr Edges operator/( f32 a_Scalar ) const
-        {
-            return { Top / a_Scalar, Right / a_Scalar, Bottom / a_Scalar, Left / a_Scalar };
-        }
+		RATUI_NODISCARD constexpr Edges operator+( Unit a_Value ) const { return { .T = T + a_Value, .R = R + a_Value, .B = B + a_Value, .L = L + a_Value }; }
+		RATUI_NODISCARD constexpr Edges operator-( Unit a_Value ) const { return { .T = T - a_Value, .R = R - a_Value, .B = B - a_Value, .L = L - a_Value }; }
+		RATUI_NODISCARD constexpr Edges operator*( f32 a_Scalar ) const { return { .T = T * a_Scalar, .R = R * a_Scalar, .B = B * a_Scalar, .L = L * a_Scalar }; }
+		RATUI_NODISCARD constexpr Edges operator/( f32 a_Scalar ) const { return { .T = T / a_Scalar, .R = R / a_Scalar, .B = B / a_Scalar, .L = L / a_Scalar }; }
     };
 
     /**
@@ -286,56 +256,63 @@ namespace RatUI
      */
     struct Constraints
     {
-        Vec2<Unit> MinSize{ 0_u, 0_u };
-        Vec2<Unit> MaxSize{ Limits<Unit>::max(), Limits<Unit>::max() };
+        Vec2<Unit> Min{ 0_u, 0_u };
+        Vec2<Unit> Max{ Limits<Unit>::max(), Limits<Unit>::max() };
 
         /** @brief Creates unbounded constraints (i.e., no minimum or maximum size limits). */
-        static constexpr Constraints Unbounded() { return {}; }
+        RATUI_NODISCARD static constexpr Constraints Unbounded() { return {}; }
 
         /** @brief Creates fixed size constraints. */
-        static constexpr Constraints Fixed( Vec2<Unit> a_Size ) { return { a_Size, a_Size }; }
+        RATUI_NODISCARD static constexpr Constraints Fixed( Vec2<Unit> a_Size ) { return { a_Size, a_Size }; }
 
         /** @brief Creates minimum size constraints with no maximum limit. */
-        static constexpr Constraints AtLeast( Vec2<Unit> a_Min ) { return { a_Min, { Limits<Unit>::max(), Limits<Unit>::max() } }; }
+        RATUI_NODISCARD static constexpr Constraints AtLeast( Vec2<Unit> a_Min ) { return { .Min = a_Min, .Max = { Limits<Unit>::max(), Limits<Unit>::max() } }; }
 
         /** @brief Creates maximum size constraints with no minimum limit. */
-        static constexpr Constraints AtMost ( Vec2<Unit> a_Max ) { return { { 0_u, 0_u }, a_Max }; }
+        RATUI_NODISCARD static constexpr Constraints AtMost ( Vec2<Unit> a_Max ) { return { .Min = { 0_u, 0_u }, .Max = a_Max }; }
     };
 
     // TODO: THis shouldnt be in Layout.h but I dont know a better spot yet
     /**
      * @brief Represents the radius of each corner of a rectangle, allowing for asymmetric rounding.
      */
-    struct CornerRounding
+    struct CornerRadius
     {
-        Unit TopLeft{};
-        Unit TopRight{};
-        Unit BottomLeft{};
-        Unit BottomRight{};
+        Unit TL{ 0_u }, TR{ 0_u };
+        Unit BR{ 0_u }, BL{ 0_u };
 
-        static constexpr CornerRounding None() { return {}; }
-		static constexpr CornerRounding Uniform( Unit a_Value ) { return { a_Value, a_Value, a_Value, a_Value }; }
-		static constexpr CornerRounding Symmetric( Unit a_Top, Unit a_Bottom ) { return { a_Top, a_Top, a_Bottom, a_Bottom }; }
-        static constexpr CornerRounding Asymmetric( Unit a_TopLeft, Unit a_TopRight, Unit a_BottomLeft, Unit a_BottomRight ) { return { a_TopLeft, a_TopRight, a_BottomLeft, a_BottomRight }; }
+        RATUI_NODISCARD static constexpr CornerRadius None() { return {}; }
+		RATUI_NODISCARD static constexpr CornerRadius All( Unit a_Value ) { return { .TL = a_Value, .TR = a_Value, .BR = a_Value, .BL = a_Value }; }
+		RATUI_NODISCARD static constexpr CornerRadius Vertical( Unit a_Top, Unit a_Bottom ) { return { .TL = a_Top, .TR = a_Top, .BR = a_Bottom, .BL = a_Bottom }; }
+		RATUI_NODISCARD static constexpr CornerRadius Horizontal( Unit a_Left, Unit a_Right ) { return { .TL = a_Left, .TR = a_Right, .BR = a_Right, .BL = a_Left }; }
 
-        constexpr CornerRounding operator+( Unit a_Amount ) const
+        RATUI_NODISCARD constexpr CornerRadius operator+( Unit a_Amount ) const { return { .TL = TL + a_Amount, .TR = TR + a_Amount, .BR = BR + a_Amount, .BL = BL + a_Amount }; }
+		RATUI_NODISCARD constexpr CornerRadius operator-( Unit a_Amount ) const { return { .TL = TL - a_Amount, .TR = TR - a_Amount, .BR = BR - a_Amount, .BL = BL - a_Amount }; }
+		RATUI_NODISCARD constexpr CornerRadius operator*( f32 a_Scalar )  const { return { .TL = TL * a_Scalar, .TR = TR * a_Scalar, .BR = BR * a_Scalar, .BL = BL * a_Scalar }; }
+		RATUI_NODISCARD constexpr CornerRadius operator/( f32 a_Scalar )  const { return { .TL = TL / a_Scalar, .TR = TR / a_Scalar, .BR = BR / a_Scalar, .BL = BL / a_Scalar }; }
+
+		CornerRadius& operator+=( Unit a_Amount )
+		{
+			TL += a_Amount; TR += a_Amount; BR += a_Amount; BL += a_Amount;
+			return *this;
+		}
+
+		CornerRadius& operator-=( Unit a_Amount )
+		{
+			TL -= a_Amount; TR -= a_Amount; BR -= a_Amount; BL -= a_Amount;
+			return *this;
+		}
+
+        CornerRadius& operator*=( f32 a_Scalar )
         {
-            return { TopLeft + a_Amount, TopRight + a_Amount, BottomLeft + a_Amount, BottomRight + a_Amount };
+			TL *= a_Scalar; TR *= a_Scalar; BR *= a_Scalar; BL *= a_Scalar;
+			return *this;
         }
 
-        constexpr CornerRounding operator-( Unit a_Amount ) const
+        CornerRadius& operator/=( f32 a_Scalar )
         {
-            return { TopLeft - a_Amount, TopRight - a_Amount, BottomLeft - a_Amount, BottomRight - a_Amount };
-        }
-
-        constexpr CornerRounding operator*( Unit a_Scalar ) const
-        {
-            return { TopLeft * a_Scalar, TopRight * a_Scalar, BottomLeft * a_Scalar, BottomRight * a_Scalar };
-        }
-
-        constexpr CornerRounding operator/( Unit a_Scalar ) const
-        {
-            return { TopLeft / a_Scalar, TopRight / a_Scalar, BottomLeft / a_Scalar, BottomRight / a_Scalar };
+            TL /= a_Scalar; TR /= a_Scalar; BR /= a_Scalar; BL /= a_Scalar;
+            return *this;
         }
     };
 
@@ -348,32 +325,32 @@ namespace RatUI
         // - Layout properties
         Unit        Spacing{ 0_u };                     ///< The spacing to apply between child elements in a container.
         ELayoutType LayoutType{ ELayoutType::Overlay }; ///< The layout type to use for arranging child elements (if this element is a container).
-        EAlignment  ChildAlign{ EAlignment::TopLeft };  ///< Default alignment for child elements within this container.
-        EWrapMode   WrapMode{ EWrapMode::NoWrap };      ///< The wrap mode to use when child elements exceed the available space in a container.
+        EAlign      ChildAlign{ EAlign::TopLeft };      ///< Default alignment for child elements within this container.
+        EWrap       WrapMode{ EWrap::NoWrap };          ///< The wrap mode to use when child elements exceed the available space in a container.
 		EVisibility Visibility{ EVisibility::Visible }; ///< The visibility state of the element, which can affect both rendering and layout.
-		bool        IsEnabled{ true };                  ///< Whether the element is enabled for interaction. Disabled elements may be rendered differently and do not receive input events.
 		bool        IsFocusScope{ false };              ///< Whether this element should be considered a focus scope for navigation.
 
         /**
          * @note For grid layouts, at least one of GridColumns or GridRows must be set to a non-zero value. 
          * The layout engine will auto-calculate the other dimension based on the number of children and the specified dimension.
+         * Defaults to 1 row, auto columns.
          */
         u16 GridColumns{ 0 }; ///< For grid layouts, the number of columns to arrange child elements into. 0 will auto-calculate.
         u16 GridRows{ 1 };    ///< For grid layouts, the number of rows to arrange child elements into. 0 will auto-calculate.
 
         // - Positioning properties
-        Edges Padding{};        ///< The padding to apply around the content of the element, in pixels.
-        Edges Margin{};         ///< The margin to apply around the element itself, in pixels.
-        struct Anchor Anchor{}; ///< The anchor points for the element, used when PositionMode is set to Anchored.
-        EPositionMode PositionMode{ EPositionMode::Flow }; ///< The positioning mode for the element, 
-                                                                 ///< determining how it is positioned relative to its parent container.
+        Edges  Padding{};        ///< The padding to apply around the content of the element, in pixels.
+        Edges  Margin{};         ///< The margin to apply around the element itself, in pixels.
+        Anchor PositionAnchor{}; ///< The anchor points for the element, used when PositionMode is set to Anchored.
+        EPositioning PositionMode{ EPositioning::Flow }; ///< The positioning mode for the element, 
+                                                         ///< determining how it is positioned relative to its parent container.
 
         // - Alignment properties
-        EAlignment SelfAlign{ EAlignment::Inherit }; ///< Overrides parent's ChildAlign for this element. Only applicable when PositionMode is Flow.
+        EAlign SelfAlign{ EAlign::Inherit }; ///< Overrides parent's ChildAlign for this element. Only applicable when PositionMode is Flow.
 
         // - Sizing properties
-        ESizingMode WidthMode{ ESizingMode::Content };  ///< The sizing mode for the width of the element.
-        ESizingMode HeightMode{ ESizingMode::Content }; ///< The sizing mode for the height of the element.
+        ESizing WidthMode{ ESizing::Content };  ///< The sizing mode for the width of the element.
+        ESizing HeightMode{ ESizing::Content }; ///< The sizing mode for the height of the element.
         Unit FixedWidth{ 0_u };  ///< The fixed width to use when WidthMode is set to Fixed.
         Unit FixedHeight{ 0_u }; ///< The fixed height to use when HeightMode is set to Fixed.
 
@@ -383,14 +360,19 @@ namespace RatUI
          * @note PercentWidth/PercentHeight are only meaningful when the parent axis is Fixed or Flex.
          * Inside a Content-sized parent, Flex children fall back to Content (zero intrinsic size) and PercentWidth/Height is ignored.
          */
-        f32 PercentWidth{ 0.0f };      ///< The percentage of the available width to use when WidthMode is set to Fill.
-        f32 PercentHeight{ 0.0f };     ///< The percentage of the available height to use when HeightMode is set to Fill.
+        f32 PercentWidth{ 0.0f };  ///< The percentage of the available width to use when WidthMode is set to Percent.
+        f32 PercentHeight{ 0.0f }; ///< The percentage of the available height to use when HeightMode is set to Percent.
 
         // TODO: Should be flex width and flex height?
         f32 FlexGrow{ 0.0f };          ///< Determines how much of the remaining space the element should occupy relative to its siblings.
         Constraints SizeConstraints{}; ///< The size constraints to consider when laying out the element.
     };
 
+    /**
+     * @brief Cached values for linear layouts (ELayoutType::Vertical/Horizontal).
+     * Generated by the Measure step in the layout engine, 
+     * and used during the Arrange step to avoid recalculating them.
+     */
 	struct LinearAggregate
     {
         Unit TotalFixed{ 0_u };
@@ -443,29 +425,28 @@ namespace RatUI
 
         LayoutNode& Spacing( Unit a_Spacing )              { Style.Spacing = a_Spacing; MarkDirty(); return *this; }
         LayoutNode& LayoutType( ELayoutType a_LayoutType ) { Style.LayoutType = a_LayoutType; MarkDirty(); return *this; }
-        LayoutNode& ChildAlign( EAlignment a_ChildAlign )  { Style.ChildAlign = a_ChildAlign; MarkDirty(); return *this; }
-        LayoutNode& WrapMode( EWrapMode a_WrapMode )       { Style.WrapMode = a_WrapMode; MarkDirty(); return *this; }
+        LayoutNode& ChildAlign( EAlign a_ChildAlign )      { Style.ChildAlign = a_ChildAlign; MarkDirty(); return *this; }
+        LayoutNode& WrapMode( EWrap a_WrapMode )           { Style.WrapMode = a_WrapMode; MarkDirty(); return *this; }
         LayoutNode& Visibility( EVisibility a_Visibility ) { Style.Visibility = a_Visibility; MarkDirty(); return *this; }
-        LayoutNode& Enabled( bool a_IsEnabled )            { Style.IsEnabled = a_IsEnabled; MarkDirty(); return *this; }
         LayoutNode& FocusScope( bool a_IsFocusScope )      { Style.IsFocusScope = a_IsFocusScope; MarkDirty(); return *this; }
 
         LayoutNode& GridColumns( u16 a_GridColumns )  { Style.GridColumns = a_GridColumns; MarkDirty(); return *this; }
         LayoutNode& GridRows( u16 a_GridRows )        { Style.GridRows = a_GridRows; MarkDirty(); return *this; }
         LayoutNode& Padding( Edges a_Padding )        { Style.Padding = a_Padding; MarkDirty(); return *this; }
         LayoutNode& Margin( Edges a_Margin )          { Style.Margin = a_Margin; MarkDirty(); return *this; }
-        LayoutNode& Anchor( struct Anchor a_Anchor )  { Style.Anchor = a_Anchor; MarkDirty(); return *this; }
+        LayoutNode& Anchor( struct Anchor a_Anchor )  { Style.PositionAnchor = a_Anchor; MarkDirty(); return *this; }
 
-        LayoutNode& PositionMode( EPositionMode a_PositionMode ) { Style.PositionMode = a_PositionMode; MarkDirty(); return *this; }
-        LayoutNode& SelfAlign( EAlignment a_SelfAlign )          { Style.SelfAlign = a_SelfAlign; MarkDirty(); return *this; }
-        LayoutNode& WidthMode( ESizingMode a_WidthMode )         { Style.WidthMode = a_WidthMode; MarkDirty(); return *this; }
-        LayoutNode& HeightMode( ESizingMode a_HeightMode )       { Style.HeightMode = a_HeightMode; MarkDirty(); return *this; }
+        LayoutNode& PositionMode( EPositioning a_PositionMode ) { Style.PositionMode = a_PositionMode; MarkDirty(); return *this; }
+        LayoutNode& SelfAlign( EAlign a_SelfAlign )             { Style.SelfAlign = a_SelfAlign; MarkDirty(); return *this; }
+        LayoutNode& WidthMode( ESizing a_WidthMode )            { Style.WidthMode = a_WidthMode; MarkDirty(); return *this; }
+        LayoutNode& HeightMode( ESizing a_HeightMode )          { Style.HeightMode = a_HeightMode; MarkDirty(); return *this; }
 
-        LayoutNode& FixedWidth( Unit a_FixedWidth )      { Style.WidthMode = ESizingMode::Fixed; Style.FixedWidth = a_FixedWidth; MarkDirty(); return *this; }
-        LayoutNode& FixedHeight( Unit a_FixedHeight )    { Style.HeightMode = ESizingMode::Fixed; Style.FixedHeight = a_FixedHeight; MarkDirty(); return *this; }
-        LayoutNode& PercentWidth( f32 a_PercentWidth )   { Style.WidthMode = ESizingMode::Percent; Style.PercentWidth = a_PercentWidth; MarkDirty(); return *this; }
-        LayoutNode& PercentHeight( f32 a_PercentHeight ) { Style.HeightMode = ESizingMode::Percent; Style.PercentHeight = a_PercentHeight; MarkDirty(); return *this; }
-		LayoutNode& FlexWidth()                          { Style.WidthMode = ESizingMode::Flex; MarkDirty(); return *this; }
-        LayoutNode& FlexHeight()                         { Style.HeightMode = ESizingMode::Flex; MarkDirty(); return *this; }
+        LayoutNode& FixedWidth( Unit a_FixedWidth )      { Style.WidthMode = ESizing::Fixed; Style.FixedWidth = a_FixedWidth; MarkDirty(); return *this; }
+        LayoutNode& FixedHeight( Unit a_FixedHeight )    { Style.HeightMode = ESizing::Fixed; Style.FixedHeight = a_FixedHeight; MarkDirty(); return *this; }
+        LayoutNode& PercentWidth( f32 a_PercentWidth )   { Style.WidthMode = ESizing::Percent; Style.PercentWidth = a_PercentWidth; MarkDirty(); return *this; }
+        LayoutNode& PercentHeight( f32 a_PercentHeight ) { Style.HeightMode = ESizing::Percent; Style.PercentHeight = a_PercentHeight; MarkDirty(); return *this; }
+		LayoutNode& FlexWidth()                          { Style.WidthMode = ESizing::Flex; MarkDirty(); return *this; }
+        LayoutNode& FlexHeight()                         { Style.HeightMode = ESizing::Flex; MarkDirty(); return *this; }
         LayoutNode& FlexGrow( f32 a_FlexGrow )           { Style.FlexGrow = a_FlexGrow; MarkDirty(); return *this; }
 
         LayoutNode& SizeConstraints( Constraints a_SizeConstraints ) { Style.SizeConstraints = a_SizeConstraints; MarkDirty(); return *this; }
