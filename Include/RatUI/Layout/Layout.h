@@ -253,23 +253,14 @@ namespace RatUI
                                            a_Rect.Max() - Vec2<Unit>{ Right, Bottom } );
         }
 
-		/** @brief Initializes all edges to the same value. */
-		constexpr Edges( Unit a_UniformValue = 0_u ) : Top( a_UniformValue ), Right( a_UniformValue ), Bottom( a_UniformValue ), Left( a_UniformValue ) {}
-
-		/** @brief Initializes horizontal and vertical edges separately. */
-		constexpr Edges( Unit a_Horizontal, Unit a_Vertical ) : Top( a_Vertical ), Right( a_Horizontal ), Bottom( a_Vertical ), Left( a_Horizontal ) {}
-
-		/** @brief Initializes each edge individually. */
-		constexpr Edges( Unit a_Top, Unit a_Right, Unit a_Bottom, Unit a_Left ) : Top( a_Top ), Right( a_Right ), Bottom( a_Bottom ), Left( a_Left ) {}
-
         /** @brief Initializes all edges to the same value. */
-        static constexpr Edges Uniform( Unit a_Value ) { return { a_Value }; }
+		static constexpr Edges Uniform( Unit a_Value ) { return { a_Value, a_Value, a_Value, a_Value }; }
 
         /** @brief Initializes horizontal and vertical edges separately. */
-        static constexpr Edges Symmetric( Unit a_Horizontal, Unit a_Vertical ) { return { a_Horizontal, a_Vertical }; }
+		static constexpr Edges Symmetric( Unit a_Horizontal, Unit a_Vertical ) { return { a_Vertical, a_Horizontal, a_Vertical, a_Horizontal }; }
 
         /** @brief Initializes each edge individually. */
-        static constexpr Edges Asymmetric( Unit a_Top, Unit a_Right, Unit a_Bottom, Unit a_Left ) { return { a_Top, a_Right, a_Bottom, a_Left }; }
+		static constexpr Edges Asymmetric( Unit a_Top, Unit a_Right, Unit a_Bottom, Unit a_Left ) { return { a_Top, a_Right, a_Bottom, a_Left }; }
 
         /** @brief Combines two Edges by adding their respective values together. */
         constexpr Edges operator+( const Edges& a_Other ) const
@@ -322,14 +313,9 @@ namespace RatUI
         Unit BottomLeft{};
         Unit BottomRight{};
 
-        constexpr CornerRounding() = default;
-        constexpr CornerRounding( Unit a_UniformValue ) : TopLeft( a_UniformValue ), TopRight( a_UniformValue ), BottomLeft( a_UniformValue ), BottomRight( a_UniformValue ) {}
-        constexpr CornerRounding( Unit a_Top, Unit a_Bottom ) : TopLeft( a_Top ), TopRight( a_Top ), BottomLeft( a_Bottom ), BottomRight( a_Bottom ) {}
-        constexpr CornerRounding( Unit a_TopLeft, Unit a_TopRight, Unit a_BottomLeft, Unit a_BottomRight ) : TopLeft( a_TopLeft ), TopRight( a_TopRight ), BottomLeft( a_BottomLeft ), BottomRight( a_BottomRight ) {}
-
         static constexpr CornerRounding None() { return {}; }
-        static constexpr CornerRounding Uniform( Unit a_Value ) { return { a_Value }; }
-        static constexpr CornerRounding Symmetric( Unit a_Top, Unit a_Bottom ) { return { a_Top, a_Bottom }; }
+		static constexpr CornerRounding Uniform( Unit a_Value ) { return { a_Value, a_Value, a_Value, a_Value }; }
+		static constexpr CornerRounding Symmetric( Unit a_Top, Unit a_Bottom ) { return { a_Top, a_Top, a_Bottom, a_Bottom }; }
         static constexpr CornerRounding Asymmetric( Unit a_TopLeft, Unit a_TopRight, Unit a_BottomLeft, Unit a_BottomRight ) { return { a_TopLeft, a_TopRight, a_BottomLeft, a_BottomRight }; }
 
         constexpr CornerRounding operator+( Unit a_Amount ) const

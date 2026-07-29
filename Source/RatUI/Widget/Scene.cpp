@@ -51,13 +51,18 @@ namespace RatUI
         if ( !rootNode )
             return;
 
-        MeasureLayoutNode( *rootNode, a_AvailableSize );
-        const bool needsSecondPass = ArrangeLayoutNode( *rootNode, Rect{ Vec2<Unit>{ 0_u, 0_u }, a_AvailableSize } );
+		thread_local alignas(16) u8 scratchBuffer[1024 * 1024]; // TODO: Make this configurable
+		BumpAllocator allocator{ scratchBuffer, sizeof( scratchBuffer ) };
+		LayoutContext layoutCtx{ allocator };
 
+		const Rect<Unit> rootRect{ Vec2<Unit>{ 0_u, 0_u }, a_AvailableSize };
+
+        MeasureLayoutNode( *rootNode, a_AvailableSize, layoutCtx );
+        const bool needsSecondPass = ArrangeLayoutNode( *rootNode, rootRect, layoutCtx );
         if ( needsSecondPass )
         {
-            MeasureLayoutNode( *rootNode, a_AvailableSize );
-            ArrangeLayoutNode( *rootNode, Rect{ Vec2<Unit>{ 0_u, 0_u }, a_AvailableSize } );
+            MeasureLayoutNode( *rootNode, a_AvailableSize, layoutCtx );
+            ArrangeLayoutNode( *rootNode, rootRect, layoutCtx );
         }
 
         // Note: This is hacky but currently it's necessary to do this to avoid invalid input state after a layout change.

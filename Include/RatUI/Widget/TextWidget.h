@@ -53,7 +53,7 @@ namespace RatUI
         // IWidget overrides
         // --------------------------------------------------------------------
 
-        Vec2<Unit> OnMeasureContent( const LayoutNode& a_Node, Vec2<Unit> a_AvailableSize ) override
+        Vec2<Unit> OnMeasureContent( const LayoutNode& a_Node, Vec2<Unit> a_AvailableSize, const LayoutContext& ) override
         {
             HandleThemeUpdate();
 
@@ -72,7 +72,9 @@ namespace RatUI
             if ( !m_PreparedText || m_LayoutStyle != m_LastLayoutStyle )
             {
                 m_PreparedText = metrics->Prepare( m_ResolvedText->Data, m_LayoutStyle );
-                if ( !m_PreparedText ) return { 0_u, 0_u };
+                if ( !m_PreparedText ) 
+                    return { 0_u, 0_u };
+
                 m_LastLayoutStyle = m_LayoutStyle;
                 InvalidateShaped();
             }
@@ -80,11 +82,18 @@ namespace RatUI
             const bool widthChanged = !IsApproxEqual( a_AvailableSize[0].ToFloat(), m_ShapedWidth.ToFloat() );
             if ( !m_ShapedText || widthChanged )
             {
-                m_ShapedText = metrics->Shape( *m_PreparedText, m_LayoutStyle, { a_AvailableSize[0], Limits<Unit>::max() } );
+                m_ShapedText = metrics->Shape( 
+                    *m_PreparedText, 
+                    m_LayoutStyle, 
+                    { a_AvailableSize[0], Limits<Unit>::max() 
+                } );
                 m_ShapedWidth = a_AvailableSize[0];
             }
 
-            return m_ShapedText ? Vec2<Unit>{ m_ShapedText->MaxWidth, m_ShapedText->TotalHeight } : Vec2<Unit>{ 0_u, 0_u };
+            if ( !m_ShapedText )
+                return { 0_u, 0_u };
+
+            return Vec2<Unit>{ m_ShapedText->MaxWidth, m_ShapedText->TotalHeight };
         }
 
         bool HasWidthDependentContent() const override { return true; }
@@ -153,6 +162,7 @@ namespace RatUI
         {
             m_PreparedText = NullOpt;
             InvalidateShaped();
+            GetLayout().MarkDirty(); // Mark dirty to trigger re-measure and re-shape
         }
 
         void InvalidateShaped()

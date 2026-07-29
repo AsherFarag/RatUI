@@ -10,6 +10,8 @@ namespace RatUI
 {
     class Scene;
 
+    struct LayoutContext;
+
     /**
 	 * @brief Represents a drag gesture event, containing information about the origin, current position, delta movement, and any modifier keys pressed.
 	 * Like when a user clicks and holds the mouse button, then moves the mouse while holding the button down.
@@ -96,7 +98,7 @@ namespace RatUI
         virtual void OnDestroy() {}
 
         /** */
-        virtual Vec2<Unit> OnMeasureContent( const LayoutNode& a_Node, Vec2<Unit> a_AvailableSize ) { return Vec2<Unit>{ 0_u, 0_u }; }
+        virtual Vec2<Unit> OnMeasureContent( const LayoutNode& a_Node, Vec2<Unit> a_AvailableSize, const LayoutContext& a_Ctx ) { return Vec2<Unit>{ 0_u, 0_u }; }
 
         /** */
         virtual bool HasWidthDependentContent() const { return false; }

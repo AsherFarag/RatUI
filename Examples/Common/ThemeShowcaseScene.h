@@ -90,6 +90,26 @@ public:
         CreateSliderCard( controlsPanel, "Accent Strength",  0.30f, false );
         CreateSliderCard( controlsPanel, "Vertical Mix",     0.45f, true  );
 
+		// 2x2 Grid of sliders
+        {
+			PanelWidget* buttonGrid = m_Scene.CreateWidget<PanelWidget>( controlsPanel->GetLayoutID() );
+			buttonGrid->Theme = m_ActiveTheme;
+			buttonGrid->GetLayout()
+				.LayoutType( ELayoutType::Grid )
+				.WidthMode( ESizingMode::Content )
+				.HeightMode( ESizingMode::Content )
+				.SizeConstraints( Constraints{}.AtLeast( { 600_u, 75_u } ) )
+				.Padding( Edges::Uniform( 8_u ) )
+				.Spacing( 8_u )
+				.GridColumns( 2 )
+				.GridRows( 2 );
+
+			for ( u32 i = 0; i < 4; ++i )
+			{
+				CreateSliderCard( buttonGrid, std::format( "Slider {}", i + 1 ), 0.5f, false );
+			}
+        }
+
         TextWidget* previewTitle = m_Scene.CreateWidget<TextWidget>( previewPanel->GetLayoutID(), MakeText( "Preview" ), MakeTextLayout( 20_u, ETextOverflow::Clip ) );
         previewTitle->Theme = m_ActiveTheme;
         previewTitle->GetLayout().HeightMode( ESizingMode::Content );
