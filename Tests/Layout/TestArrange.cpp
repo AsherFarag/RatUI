@@ -14,9 +14,13 @@ using namespace RatUI;
 /** Runs MeasureLayoutNode then ArrangeLayoutNode on the root LayoutNode. */
 static void DoLayout( LayoutNode& a_Root, Vec2f a_AvailSize )
 {
+    alignas(16) thread_local RatUI::u8 buffer[ 1024 * 1024 ]; // 1 MB stack buffer for temporary allocations during layout.
+    RatUI::BumpAllocator allocator{ buffer, sizeof( buffer ) };
+    RatUI::LayoutContext context{ allocator };
+
     const Vec2<Unit> availSize = ToUnitVec2( a_AvailSize );
-    MeasureLayoutNode( a_Root, availSize );
-    ArrangeLayoutNode( a_Root, Rect<Unit>{ .Origin = { ToUnit( 0.0f ), ToUnit( 0.0f ) }, .Size = availSize } );
+    MeasureLayoutNode( a_Root, availSize, context );
+    ArrangeLayoutNode( a_Root, Rect<Unit>{ .Origin = { ToUnit( 0.0f ), ToUnit( 0.0f ) }, .Size = availSize }, context );
 }
 
 /** Checks Rectf origin and size. */
@@ -456,7 +460,7 @@ TEST_CASE( "ArrangeLinear Horizontal single-child margin shifts position and shr
     child.Style.HeightMode  = ESizing::Fixed;
     child.Style.FixedWidth  = Unit{ 60.0f };
     child.Style.FixedHeight = Unit{ 40.0f };
-    child.Style.Margin      = Edges::Asymmetric( Unit{ 5.0f }, Unit{ 10.0f }, Unit{ 5.0f }, Unit{ 8.0f } ); // top=5, right=10, bottom=5, left=8
+    child.Style.Margin      = Edges{ .T = 5_u, .R = 10_u, .B = 5_u, .L = 8_u };
 
     parent.PushBackChild( child );
 
@@ -919,7 +923,7 @@ TEST_CASE( "ArrangeLinear Collapsed child is skipped and does not advance cursor
 
     // Measure first so DesiredSizes are set
     MeasureLayoutNode( parent, { 400.0f, 100.0f } );
-    RatUI::ArrangeLayoutNode( parent, ToUnitRect( Rectf{ .Origin = { 0.0f, 0.0f }, .Size = { 400.0f, 100.0f } } ) );
+    ArrangeLayoutNode( parent, Rectf{ .Origin = { 0.0f, 0.0f }, .Size = { 400.0f, 100.0f } } );
 
     // c2 is collapsed, so c3 should start right after c1 (no gap for c2)
     REQUIRE( c1.Layout.FinalRect.Origin[0] .ToFloat() == Catch::Approx( 0.0f  ) );
@@ -947,7 +951,7 @@ TEST_CASE( "ArrangeLinear Hidden child still occupies space in layout", "[arrang
     parent.PushBackChild( c3 );
 
     MeasureLayoutNode( parent, { 400.0f, 100.0f } );
-    RatUI::ArrangeLayoutNode( parent, ToUnitRect( Rectf{ .Origin = { 0.0f, 0.0f }, .Size = { 400.0f, 100.0f } } ) );
+    ArrangeLayoutNode( parent, Rectf{ .Origin = { 0.0f, 0.0f }, .Size = { 400.0f, 100.0f } } );
 
     // c1@0, c2@50, c3@110
     REQUIRE( c1.Layout.FinalRect.Origin[0] .ToFloat() == Catch::Approx( 0.0f   ) );
@@ -1099,7 +1103,7 @@ TEST_CASE( "ArrangeLinear Horizontal margin and spacing interact correctly", "[a
 
     LayoutNode c1{}; c1.Style.WidthMode = ESizing::Fixed; c1.Style.HeightMode = ESizing::Fixed;
     c1.Style.FixedWidth = Unit{ 50.0f }; c1.Style.FixedHeight = Unit{ 30.0f };
-    c1.Style.Margin = Edges::Asymmetric( Unit{ 0.0f }, Unit{ 5.0f }, Unit{ 0.0f }, Unit{ 5.0f } ); // top=0, right=5, bottom=0, left=5
+    c1.Style.Margin = Edges{ .T = 0_u, .R = 5_u, .B = 0_u, .L = 5_u };
 
     LayoutNode c2{}; c2.Style.WidthMode = ESizing::Fixed; c2.Style.HeightMode = ESizing::Fixed;
     c2.Style.FixedWidth = Unit{ 60.0f }; c2.Style.FixedHeight = Unit{ 30.0f };
@@ -1378,7 +1382,7 @@ TEST_CASE( "ArrangeLinear Vertical single-child margin shifts position and shrin
     child.Style.HeightMode  = ESizing::Fixed;
     child.Style.FixedWidth  = Unit{ 80.0f };
     child.Style.FixedHeight = Unit{ 60.0f };
-    child.Style.Margin      = Edges::Asymmetric( Unit{ 8.0f }, Unit{ 0.0f }, Unit{ 12.0f }, Unit{ 0.0f } ); // top=8, bottom=12
+    child.Style.Margin      = Edges{ .T = 8_u, .R = 0_u, .B = 12_u, .L = 0_u };
 
     parent.PushBackChild( child );
 
