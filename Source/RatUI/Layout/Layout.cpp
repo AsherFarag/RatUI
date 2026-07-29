@@ -4,12 +4,9 @@ namespace RatUI
 {
     void LayoutNode::MarkDirty()
     {
-        if ( !Layout.IsDirty )
-        {
-            Layout.IsDirty = true;
-            if ( m_Parent ) 
-                m_Parent->MarkDescendantDirty();
-        }
+        Layout.IsDirty = true;
+        if ( m_Parent ) 
+            m_Parent->MarkDescendantDirty();
     }
     
     void LayoutNode::MarkDescendantDirty()
