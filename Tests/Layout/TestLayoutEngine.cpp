@@ -309,7 +309,7 @@ TEST_CASE( "MeasureLayoutNode Vertical layout adds asymmetric padding around con
     parent.Style.LayoutType = ELayoutType::Vertical;
     parent.Style.WidthMode  = ESizing::Content;
     parent.Style.HeightMode = ESizing::Content;
-    parent.Style.Padding    = Edges::Asymmetric( Unit{ 4.0f }, Unit{ 8.0f }, Unit{ 4.0f }, Unit{ 8.0f } ); // top=4, right=8, bottom=4, left=8
+    parent.Style.Padding    = Edges{ .T = 4_u, .R = 8_u, .B = 4_u, .L = 8_u };
 
     LayoutNode c1{}; c1.Style.WidthMode = ESizing::Fixed; c1.Style.HeightMode = ESizing::Fixed;
     c1.Style.FixedWidth = Unit{ 40.0f }; c1.Style.FixedHeight = Unit{ 20.0f };
