@@ -74,18 +74,6 @@ namespace RatUI
     };
 
     /**
-     * @brief Wrap modes define how child elements are arranged when they exceed the available space in a container.
-	 * @note Wrapping behavior is only applicable to certain layout types (e.g., Horizontal and Vertical) and is ignored for others (e.g., Overlay).
-	 * ELayout::Horizontal with EWrap::Wrap will wrap child elements to the next line when they exceed the container's width,
-     * while ELayout::Vertical with EWrap::Wrap will wrap child elements to the next column when they exceed the container's height.
-     */
-    enum class EWrap : u8
-    {
-        NoWrap, ///< Child elements are laid out in a single line and may overflow the container if they exceed its size.
-        Wrap    ///< Child elements wrap to the next line when they exceed the container's size, similar to text wrapping.
-    };
-
-    /**
      * @brief Defines how child elements are arranged and sized within a container.
      */
     enum class ELayoutType : u8
@@ -326,7 +314,6 @@ namespace RatUI
         Unit        Spacing{ 0_u };                     ///< The spacing to apply between child elements in a container.
         ELayoutType LayoutType{ ELayoutType::Overlay }; ///< The layout type to use for arranging child elements (if this element is a container).
         EAlign      ChildAlign{ EAlign::TopLeft };      ///< Default alignment for child elements within this container.
-        EWrap       WrapMode{ EWrap::NoWrap };          ///< The wrap mode to use when child elements exceed the available space in a container.
 		EVisibility Visibility{ EVisibility::Visible }; ///< The visibility state of the element, which can affect both rendering and layout.
 		bool        IsFocusScope{ false };              ///< Whether this element should be considered a focus scope for navigation.
 
@@ -426,7 +413,6 @@ namespace RatUI
         LayoutNode& Spacing( Unit a_Spacing )              { Style.Spacing = a_Spacing; MarkDirty(); return *this; }
         LayoutNode& LayoutType( ELayoutType a_LayoutType ) { Style.LayoutType = a_LayoutType; MarkDirty(); return *this; }
         LayoutNode& ChildAlign( EAlign a_ChildAlign )      { Style.ChildAlign = a_ChildAlign; MarkDirty(); return *this; }
-        LayoutNode& WrapMode( EWrap a_WrapMode )           { Style.WrapMode = a_WrapMode; MarkDirty(); return *this; }
         LayoutNode& Visibility( EVisibility a_Visibility ) { Style.Visibility = a_Visibility; MarkDirty(); return *this; }
         LayoutNode& FocusScope( bool a_IsFocusScope )      { Style.IsFocusScope = a_IsFocusScope; MarkDirty(); return *this; }
 

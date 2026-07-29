@@ -11,7 +11,7 @@ namespace RatUI
      * @tparam T The type of item to store. Must be default-constructible.
      * @tparam ItemsPerBucket The number of items to store in each bucket.
      */
-    template<typename T, u32 ItemsPerBucket = 512>
+    template<typename T, u32 ItemsPerBucket = 4096>
     class Pool
     {
     public:
@@ -48,7 +48,7 @@ namespace RatUI
          */
         struct Bucket
         {
-            alignas(T) FixedArray<u8, c_ItemsPerBucket * sizeof(T)> RawData{};
+            alignas(T) FixedArray<byte, c_ItemsPerBucket * sizeof(T)> RawData{};
             FixedArray<u8, c_ItemsPerBucket> Versions{};
             std::bitset<   c_ItemsPerBucket> Occupancy{};
 

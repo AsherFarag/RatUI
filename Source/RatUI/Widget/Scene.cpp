@@ -51,7 +51,7 @@ namespace RatUI
         if ( !rootNode )
             return;
 
-        alignas( 16 ) static thread_local u8 scratchBuffer[1024 * 1024]; // TODO: Make this configurable
+        alignas( 16 ) static thread_local byte scratchBuffer[1024 * 1024]; // TODO: Make this configurable
 		BumpAllocator allocator{ scratchBuffer, sizeof( scratchBuffer ) };
 		LayoutContext layoutCtx{ allocator };
 

@@ -13,7 +13,6 @@
 namespace RatUI
 {
     using LayoutNodePool = Pool<LayoutNode>;
-    using WidgetPool = Pool<Unique<IWidget>>;
 
     /**
      * @brief Represents a UI scene containing a hierarchy of widgets and their associated layout nodes.

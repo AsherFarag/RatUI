@@ -5,18 +5,18 @@ namespace RatUI
 {
     struct BumpAllocator
     {
-		u8* Buffer;
-		u32 Capacity;
-        u32 Offset;
+        byte* Buffer;
+		u32   Capacity;
+        u32   Offset;
 
-        explicit BumpAllocator( u8* a_Buffer, u32 a_Capacity )
+        explicit BumpAllocator( byte* a_Buffer, u32 a_Capacity ) noexcept
 			: Buffer( a_Buffer ), Capacity( a_Capacity ), Offset( 0 )
 		{}
 
 		BumpAllocator( const BumpAllocator& ) = delete;
 		BumpAllocator& operator=( const BumpAllocator& ) = delete;
 
-        Span<u8> Allocate( u32 a_Size, u32 a_Alignment = 1 )
+        Span<byte> Allocate( u32 a_Size, u32 a_Alignment = 1 )
         {
 			RATUI_ASSERT( a_Alignment > 0 && ( a_Alignment & ( a_Alignment - 1 ) ) == 0, 
                           "Alignment must be a power of two." );
@@ -26,23 +26,23 @@ namespace RatUI
 
 			u32 alignedOffset = ( Offset + ( a_Alignment - 1 ) ) & ~( a_Alignment - 1 );
 			Offset = alignedOffset + a_Size;
-			return Span<u8>( Buffer + alignedOffset, a_Size );
+			return Span<byte>( Buffer + alignedOffset, a_Size );
         }
 
 		template<typename T> 
             requires ( std::is_trivially_destructible_v<T> )
         Span<T> Allocate( u32 a_Count )
         {
-			Span<u8> mem = Allocate( sizeof( T ) * a_Count, alignof( T ) );
+			Span<byte> mem = Allocate( sizeof( T ) * a_Count, alignof( T ) );
             return Span<T>( reinterpret_cast<T*>( Data( mem ) ), a_Count );
         }
 
-		u32 Mark() const 
+		u32 Mark() const noexcept
         { 
             return Offset;
         }
 
-		void Rollback( u32 a_Mark ) 
+		void Rollback( u32 a_Mark ) noexcept
         { 
 			RATUI_USER_ASSERT( a_Mark <= Offset, 
                                "Rollback mark is out of bounds." );
