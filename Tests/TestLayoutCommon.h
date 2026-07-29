@@ -19,7 +19,7 @@ struct LayoutFixture
 {
     static constexpr u32 c_BufferSize = 64 * 1024;
 
-    std::vector<u8> Buffer;
+    std::vector<byte> Buffer;
     BumpAllocator   Allocator;
     LayoutContext   Ctx;
 
