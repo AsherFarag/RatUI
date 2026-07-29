@@ -577,9 +577,9 @@ namespace
 
         // ---- Collect flow children ----
 
-        ScopedMark flowMark( alloc );
-        Span       flowChildren = alloc.Allocate<LayoutNode*>( a_Node.ChildCount() );
-        u32        flowCount = 0;
+        ScopedMark        flowMark( alloc );
+        Span<LayoutNode*> flowChildren = alloc.Allocate<LayoutNode*>( a_Node.ChildCount() );
+        u32               flowCount = 0;
 
 		bool reflowed = false;
         a_Node.ForEachChild( [&]( LayoutNode& child )
@@ -607,9 +607,9 @@ namespace
 
         // TODO: Replace with an arena allocator
         ScopedMark cellsMark( alloc );
-        Span       childSizes = alloc.Allocate<Vec2<Unit>>( flowCount );
-        Span       colWidths = alloc.Allocate<Unit>( dims.Columns );
-        Span       rowHeights = alloc.Allocate<Unit>( dims.Rows );
+        Span<Vec2<Unit>> childSizes = alloc.Allocate<Vec2<Unit>>( flowCount );
+        Span<Unit>       colWidths  = alloc.Allocate<Unit>( dims.Columns );
+        Span<Unit>       rowHeights = alloc.Allocate<Unit>( dims.Rows );
 		std::fill( Begin( colWidths ), End( colWidths ), 0_u );
         std::fill( Begin( rowHeights ), End( rowHeights ), 0_u );
 
@@ -651,10 +651,10 @@ namespace
         // ---- Build cumulative origin arrays ----
 
         ScopedMark originsMark( alloc );
-        Span colOrigins = alloc.Allocate<Unit>( dims.Columns );
-        Span rowOrigins = alloc.Allocate<Unit>( dims.Rows );
-        colOrigins[0]   = a_Inner.Origin[0];
-        rowOrigins[0]   = a_Inner.Origin[1];
+        Span<Unit> colOrigins = alloc.Allocate<Unit>( dims.Columns );
+        Span<Unit> rowOrigins = alloc.Allocate<Unit>( dims.Rows );
+        colOrigins[0]         = a_Inner.Origin[0];
+        rowOrigins[0]         = a_Inner.Origin[1];
 
         for ( u32 c = 1; c < dims.Columns; ++c ) 
             colOrigins[c] = colOrigins[c - 1] + colWidths[c - 1] + s.Spacing;
