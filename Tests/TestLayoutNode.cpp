@@ -192,7 +192,8 @@ TEST_CASE( "MarkDirty propagates IsDescendantDirty up through every ancestor", "
     mid.PushBackChild( leaf );
     root.Layout.IsDescendantDirty = false;
     mid.Layout.IsDescendantDirty  = false;
-
+    leaf.Layout.IsDescendantDirty = false;
+    
     leaf.MarkDirty();
 
     REQUIRE( leaf.Layout.IsDirty );
