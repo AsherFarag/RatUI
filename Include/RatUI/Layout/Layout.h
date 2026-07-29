@@ -141,14 +141,13 @@ namespace RatUI
         /** @brief Visible and hit-testable, but the element itself is not hit-testable (children can still be hit-tested). */
         SelfHitTestInvisible = Render | Layout | ChildrenHitTest
     };
+    RATUI_ENUM_ENABLE_BITMASK_OPERATORS( EVisibility, u8 );
 
     /**
 	 * @brief Utility functions for working with EVisibility flags.
      */
     namespace Visibility         
     {
-        RATUI_ENUM_ENABLE_BITMASK_OPERATORS( EVisibility, u8 );
-
         /** @brief Returns true if the element should be considered in layout calculations (i.e., it is not Collapsed). */
         inline constexpr bool AffectsLayout( EVisibility a_Visibility )
         {
