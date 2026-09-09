@@ -37,7 +37,7 @@ jobs:
 
       # Step 3: Configure CMake
       - name: Configure CMake
-        run: cmake -B build -DRATUI_BUILD_TESTS=ON
+        run: cmake -B build -DRATUI_BUILD_TESTS=ON -DRATUI_INSTALL=OFF
 
       # Step 4: Build project
       - name: Build project
@@ -45,4 +45,4 @@ jobs:
 
       # Step 5: Run tests
       - name: Run tests
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build -C Release --output-on-failure

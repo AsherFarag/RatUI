@@ -22,6 +22,7 @@ RatUI
  ├───Examples      # Example apps using RatUI
  ├───Include/RatUI # Public API (*Note: This is all you need to use this library)
  ├───Scripts       # Build and utility scripts
+ ├───cmake         # CMake helper modules and the package config template
  └───Tests         # Unit and integration tests
  ```
 
@@ -29,43 +30,111 @@ RatUI
 
 **For examples and tests:**
 - C++20‑compatible compiler (GCC, Clang, MSVC)
-- [CMake](https://cmake.org/) 3.16+
+- [CMake](https://cmake.org/) 3.16+ (3.21+ to use the bundled `CMakePresets.json`)
 
-## Building Tests and Examples from Source
+## Example
 
-1. **Clone the repository:**
+```cpp
+auto renderer = RatUI::OpenGL::OpenGLRenderer{ 1920, 1080 };
 
-   ```bash
-   git clone https://github.com/AsherFarag/RatUI.git
-   cd RatUI
-   ```
+auto fontCache = RatUI::FreeType::FontCache{};
+fontCache->RegisterFontHandle( FontHandle{1}, "Path/To/Font.ttf" );
 
-2. **Configure the project with CMake:**
+auto textMetrics = RatUI::FreeType::TextMetrics{ fontCache };
+auto atlas = RatUI::GlyphAtlas{ renderer, textMetrics };
+auto drawList = RatUI::DrawList{ atlas };
 
-   ```bash
-   cmake -B build -S . \
-     -DRATUI_BUILD_TESTS=ON \
-     -DRATUI_BUILD_EXAMPLES=ON
-   ```
-   Creates the build system inside build/.
-3. **Build the project:**
+auto scene = RatUI::Scene{};
+scene.TextMetrics = textMetrics;
 
-   ```bash
-   cmake --build build
-   ```
-   *Or*, optionally specify the config:
-   ```bash
-   cmake --build build --config Debug
-   ```
+// TODO Finish this example
 
-4. **Run Tests (optional):**
-   ```bash
-   ctest --test-dir build --output-on-failure
-   ```
+```
 
-5. **Run Examples:**
+## Building from Source
 
-   After building, example executables will be located inside the '**build/**' directory.
+Everything is opt-in. A plain configure builds only the header-light core
+library and needs no third party dependencies at all:
+
+```bash
+git clone https://github.com/AsherFarag/RatUI.git
+cd RatUI
+cmake -B build -S .
+cmake --build build
+```
+
+Turn on what you actually need:
+
+```bash
+cmake -B build -S . -DRATUI_BUILD_TESTS=ON -DRATUI_BUILD_EXAMPLES=ON
+cmake --build build --config Debug
+ctest --test-dir build -C Debug --output-on-failure
+```
+
+Or use one of the bundled presets (`lib`, `tests`, `examples`, `dev`, `release`):
+
+```bash
+cmake --preset dev
+cmake --build --preset dev
+ctest --preset dev
+```
+
+### Options
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `RATUI_FETCH_DEPENDENCIES` | `ON` (standalone) | Download and build any dependency `find_package()` cannot locate |
+| `RATUI_BACKEND_FREETYPE` | `OFF` | FreeType text backend (FreeType + HarfBuzz + msdfgen) |
+| `RATUI_BACKEND_OPENGL` | `OFF` | OpenGL renderer backend (GLEW + OpenGL; implies the FreeType backend) |
+| `RATUI_BACKEND_BGFX` | `OFF` | bgfx renderer backend |
+| `RATUI_BUILD_TESTS` | `OFF` | Build the Catch2 test suite |
+| `RATUI_BUILD_EXAMPLES` | `OFF` | Build the SDL2 sandbox (enables the OpenGL backend if no renderer is selected) |
+| `RATUI_ENABLE_ASSERTS` | `ON` | Enable RatUI runtime assertions |
+| `RATUI_INSTALL` | `ON` (standalone) | Generate install/export rules |
+
+Enabling a backend defines a matching macro on the `RatUI` target
+(`RATUI_BACKEND_FREETYPE=1`, `RATUI_BACKEND_OPENGL=1`, `RATUI_BACKEND_BGFX=1`),
+so your code can check which ones are available.
+
+### Dependencies
+
+Every dependency is resolved the same way:
+
+1. Use the target if your project already defines it.
+2. Otherwise `find_package()` it (system, vcpkg, Conan, ...).
+3. Otherwise, if `RATUI_FETCH_DEPENDENCIES=ON`, download and build it.
+4. Otherwise fail with a message explaining what is missing.
+
+The fetched versions are pinned in cache variables (`RATUI_FREETYPE_TAG`,
+`RATUI_HARFBUZZ_TAG`, `RATUI_MSDFGEN_TAG`, `RATUI_SDL2_TAG`, `RATUI_CATCH2_TAG`,
+`RATUI_BGFX_TAG`, `RATUI_GLEW_URL`) and can be overridden on the command line.
+
+> Install rules are skipped automatically when a dependency was fetched, because
+> a fetched dependency cannot be exported. Install the dependencies properly to
+> produce an installable RatUI package.
+
+### Using RatUI in your project
+
+With `FetchContent`:
+
+```cmake
+include(FetchContent)
+FetchContent_Declare(RatUI
+    GIT_REPOSITORY https://github.com/AsherFarag/RatUI.git
+    GIT_TAG        main)
+set(RATUI_BACKEND_OPENGL ON)
+set(RATUI_FETCH_DEPENDENCIES ON)
+FetchContent_MakeAvailable(RatUI)
+
+target_link_libraries(MyApp PRIVATE RatUI::RatUI)
+```
+
+Or against an installed copy:
+
+```cmake
+find_package(RatUI REQUIRED)
+target_link_libraries(MyApp PRIVATE RatUI::RatUI)
+```
 
 # Contributing
 

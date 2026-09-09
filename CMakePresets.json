@@ -1,0 +1,72 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "RATUI_FETCH_DEPENDENCIES": "ON"
+      }
+    },
+    {
+      "name": "lib",
+      "inherits": "base",
+      "displayName": "Library only",
+      "description": "Core RatUI with no backends and no third party dependencies"
+    },
+    {
+      "name": "tests",
+      "inherits": "base",
+      "displayName": "Tests",
+      "description": "Core RatUI plus the Catch2 test suite",
+      "cacheVariables": { "RATUI_BUILD_TESTS": "ON" }
+    },
+    {
+      "name": "examples",
+      "inherits": "base",
+      "displayName": "Examples",
+      "description": "OpenGL + FreeType backends and the SDL2 sandbox",
+      "cacheVariables": { "RATUI_BUILD_EXAMPLES": "ON" }
+    },
+    {
+      "name": "dev",
+      "inherits": "base",
+      "displayName": "Everything",
+      "description": "All backends, tests and examples",
+      "cacheVariables": {
+        "RATUI_BUILD_TESTS": "ON",
+        "RATUI_BUILD_EXAMPLES": "ON",
+        "RATUI_BACKEND_OPENGL": "ON",
+        "RATUI_BACKEND_FREETYPE": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "dev",
+      "displayName": "Everything (Release)",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "lib", "configurePreset": "lib" },
+    { "name": "tests", "configurePreset": "tests" },
+    { "name": "examples", "configurePreset": "examples" },
+    { "name": "dev", "configurePreset": "dev" },
+    { "name": "release", "configurePreset": "release", "configuration": "Release" }
+  ],
+  "testPresets": [
+    {
+      "name": "tests",
+      "configurePreset": "tests",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "output": { "outputOnFailure": true }
+    }
+  ]
+}

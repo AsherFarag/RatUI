@@ -1,0 +1,26 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+set(RatUI_BACKEND_FREETYPE @RATUI_EXPORTED_BACKEND_FREETYPE@)
+set(RatUI_BACKEND_OPENGL   @RATUI_EXPORTED_BACKEND_OPENGL@)
+set(RatUI_BACKEND_BGFX     @RATUI_EXPORTED_BACKEND_BGFX@)
+
+if(RatUI_BACKEND_FREETYPE)
+    find_dependency(Freetype)
+    find_dependency(harfbuzz)
+    find_dependency(msdfgen)
+endif()
+
+if(RatUI_BACKEND_OPENGL)
+    find_dependency(OpenGL)
+    find_dependency(GLEW)
+endif()
+
+if(RatUI_BACKEND_BGFX)
+    find_dependency(bgfx)
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/RatUITargets.cmake")
+
+check_required_components(RatUI)
