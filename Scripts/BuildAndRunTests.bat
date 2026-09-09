@@ -10,7 +10,7 @@ echo.
 
 REM Configure CMake with tests enabled
 echo Configuring CMake...
-cmake -B build -DRATUI_BUILD_TESTS=ON
+cmake -B build -DRATUI_BUILD_TESTS=ON -DRATUI_INSTALL=OFF
 if errorlevel 1 (
     echo CMake configuration failed!
     exit /b 1
@@ -28,7 +28,7 @@ if errorlevel 1 (
 REM Run the tests in temporary directory
 echo.
 echo Running tests...
-ctest --test-dir "%PROJECT_ROOT%\build" --output-on-failure
+ctest --test-dir "%PROJECT_ROOT%\build" -C Debug --output-on-failure
 if errorlevel 1 (
     echo Tests failed!
     cd /d "%PROJECT_ROOT%"

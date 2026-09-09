@@ -104,7 +104,7 @@ namespace RatUI
         Brush PressedBrush{ SolidBrush{ Colors::Surface500 } }; ///< The brush used to fill the button's background when pressed
         Color BorderColor{ Colors::Transparent };               ///< The color of the panel's border
         Unit  BorderThickness{ 0_u };                           ///< The thickness of the panel's border
-        CornerRounding Rounding{ CornerRounding::None() };      ///< The corner rounding
+        CornerRadius Radius{ CornerRadius::None() };            ///< The corner rounding
 
         // --------------------------------------------------------------------
         // IWidget Overrides
@@ -125,7 +125,7 @@ namespace RatUI
                     PressedBrush = Theme.GetBrush( ThemeKey::Brush::ButtonPressed, PressedBrush );
                     BorderColor = Theme.GetColor( ThemeKey::Color::ButtonBorder, BorderColor );
                     BorderThickness = Theme.GetMetric( ThemeKey::Metric::ButtonBorderThickness, BorderThickness );
-                    Rounding = Theme.GetRounding( ThemeKey::Rounding::Button, Rounding );
+                    Radius = Theme.GetRadius( ThemeKey::Radii::Button, Radius );
                 }
             }
 
@@ -140,7 +140,7 @@ namespace RatUI
                     .FillColor = solid.Fill,
                     .BorderColor = BorderColor,
                     .BorderThickness = BorderThickness,
-                    .Rounding = Rounding
+                    .Radius = Radius
                 } );
             }
             else if ( std::holds_alternative<TextureBrush>( fillBrush ) )
@@ -151,7 +151,7 @@ namespace RatUI
                     .FillColor = texture.Tint,
                     .BorderColor = BorderColor,
                     .BorderThickness = BorderThickness,
-                    .Rounding = Rounding,
+                    .Radius = Radius,
                     .Texture = texture.Texture
                 } );
             }
@@ -175,7 +175,7 @@ namespace RatUI
                     .FillColor = Colors::Transparent,
                     .BorderColor = BorderColor,
                     .BorderThickness = BorderThickness,
-                    .Rounding = Rounding
+                    .Radius = Radius
                 } );
             }
 

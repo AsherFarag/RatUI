@@ -72,7 +72,7 @@ namespace RatUI
             AnimationTrack<Degrees>,
             AnimationTrack<Vec2f>,
             AnimationTrack<Color>,
-            AnimationTrack<CornerRounding>,
+            AnimationTrack<CornerRadius>,
             AnimationTrack<RenderTransform>
         >;
 

@@ -3,9 +3,7 @@
  * @brief Tests for RatUI container type aliases and free-function wrappers.
  */
 
-#include "../Common/Common.h"
-
-using namespace RatUI;
+#include "TestCommon.h"
 
 // =============================================================================
 // Array (std::vector by default)

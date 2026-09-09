@@ -2,7 +2,7 @@
 #include "../Core.h"
 #include "../Text/Text.h"
 #include "../Renderer/Brush.h"
-#include "../Layout/Layout.h" // TODO: Remove once CornerRounding is moved to a more appropriate header
+#include "../Layout/Layout.h" // TODO: Remove once CornerRadius is moved to a more appropriate header
 
 namespace RatUI
 {
@@ -12,7 +12,7 @@ namespace RatUI
      */
     #define RATUI_THEME_PROPERTIES(X) \
         X(Color,           Color,     Colors     ) \
-        X(CornerRounding,  Rounding,  Roundings  ) \
+        X(CornerRadius,    Radius,    Radii      ) \
         X(TextRenderStyle, TextStyle, TextStyles ) \
         X(Unit,            Metric,    Metrics    ) \
         X(FontHandle,      Font,      Fonts      ) \
@@ -325,7 +325,7 @@ namespace RatUI
             inline constexpr StringID SliderThumbPressed = "Slider.ThumbPressed"_id;
         }
 
-        namespace Rounding
+        namespace Radii
         {
             inline constexpr StringID FocusOutline = "FocusOutline"_id;
             inline constexpr StringID Button       = "Button"_id;

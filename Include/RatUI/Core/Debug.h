@@ -21,3 +21,19 @@
         #define RATUI_USER_ASSERT( expr, msg )
     #endif
 #endif
+
+namespace RatUI::Detail
+{
+    [[noreturn]] inline void Unreachable()
+    {
+    #if defined(_MSC_VER) && !defined(__clang__)
+            __assume(false);
+    #else
+            __builtin_unreachable();
+    #endif
+    }
+}
+
+#ifndef RATUI_UNREACHABLE
+    #define RATUI_UNREACHABLE( msg ) RatUI::Detail::Unreachable()
+#endif

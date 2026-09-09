@@ -47,40 +47,22 @@ namespace RatUI
     {
         CleanupDestroyedWidgets();
 
-        LayoutNode* rootNode = Layouts.Get( RootWidget );
+        LayoutNode* rootNode = m_Layouts.Get( RootWidget );
         if ( !rootNode )
             return;
 
-        const auto SyncSubtree = [&]( auto& Self, LayoutNode& node, Vec2<Unit> parentSize ) -> bool
+        alignas( 16 ) static thread_local byte scratchBuffer[1024 * 1024]; // TODO: Make this configurable
+		BumpAllocator allocator{ scratchBuffer, sizeof( scratchBuffer ) };
+		LayoutContext layoutCtx{ allocator };
+
+		const Rect<Unit> rootRect{ Vec2<Unit>{ 0_u, 0_u }, a_AvailableSize };
+
+        MeasureLayoutNode( *rootNode, a_AvailableSize, layoutCtx );
+        const bool needsSecondPass = ArrangeLayoutNode( *rootNode, rootRect, layoutCtx );
+        if ( needsSecondPass )
         {
-            bool anyChanged = false;
-
-            if ( node.Widget )
-            {
-                const Vec2<Unit> oldIntrinsics = node.Layout.IntrinsicSize;
-                node.Widget->OnSyncLayout( node, parentSize );
-                anyChanged |= ( node.Layout.IntrinsicSize != oldIntrinsics );
-            }
-
-            const Vec2<Unit> innerSize( node.Layout.FinalRect.Size[0] - node.Style.Padding.Horizontal(),
-                                        node.Layout.FinalRect.Size[1] - node.Style.Padding.Vertical() );
-            node.ForEachChild( [&]( LayoutNode& child )
-            {
-                anyChanged |= Self( Self, child, innerSize );
-            } );
-
-            return anyChanged;
-        };
-
-        SyncSubtree( SyncSubtree, *rootNode, a_AvailableSize );
-        MeasureLayoutNode( *rootNode, a_AvailableSize );
-        ArrangeLayoutNode( *rootNode, Rect<Unit>{ Vec2<Unit>( 0_u, 0_u ), a_AvailableSize } );
-
-        if ( const bool needsSecondPass = SyncSubtree( SyncSubtree, *rootNode, a_AvailableSize ) )
-        {
-            (void)needsSecondPass;
-            MeasureLayoutNode( *rootNode, a_AvailableSize );
-            ArrangeLayoutNode( *rootNode, Rect<Unit>{ Vec2<Unit>( 0_u, 0_u ), a_AvailableSize } );
+            MeasureLayoutNode( *rootNode, a_AvailableSize, layoutCtx );
+            ArrangeLayoutNode( *rootNode, rootRect, layoutCtx );
         }
 
         // Note: This is hacky but currently it's necessary to do this to avoid invalid input state after a layout change.
@@ -121,7 +103,7 @@ namespace RatUI
     {
         CleanupDestroyedWidgets();
 
-        if ( LayoutNode* rootNode = Layouts.Get( RootWidget ) )
+        if ( LayoutNode* rootNode = m_Layouts.Get( RootWidget ) )
             if ( rootNode->Widget )
                 rootNode->Widget->Paint( PaintEvent{ a_DrawList, a_DeltaSeconds } );
     }
@@ -132,13 +114,13 @@ namespace RatUI
 
     IWidget* Scene::GetWidget( NodeID a_ID )
     {
-        LayoutNode* node = Layouts.Get( a_ID );
+        LayoutNode* node = m_Layouts.Get( a_ID );
         return ( node && node->Widget ) ? node->Widget.get() : nullptr;
     }
 
     const IWidget* Scene::GetWidget( NodeID a_ID ) const
     {
-        const LayoutNode* node = Layouts.Get( a_ID );
+        const LayoutNode* node = m_Layouts.Get( a_ID );
         return ( node && node->Widget ) ? node->Widget.get() : nullptr;
     }
 
@@ -192,7 +174,7 @@ namespace RatUI
         if ( Input.FocusedWidget != c_InvalidNodeID )
             return;
 
-        LayoutNode* root = Layouts.Get( RootWidget );
+        LayoutNode* root = m_Layouts.Get( RootWidget );
         if ( !root )
             return;
 
@@ -209,24 +191,28 @@ namespace RatUI
 
     NodeID Scene::HitTest( NodeID a_ID, Vec2<Unit> a_LogicalPos )
     {
-        LayoutNode* node = Layouts.Get( a_ID );
+        LayoutNode* node = m_Layouts.Get( a_ID );
         if ( !node )
             return c_InvalidNodeID;
 
         if ( !Visibility::IsHitTestable( node->Layout.Visibility ) &&
              !Visibility::AreChildrenHitTestable( node->Layout.Visibility ) )
             return c_InvalidNodeID;
+
         if ( !node->Layout.FinalRect.Contains( a_LogicalPos ) )
             return c_InvalidNodeID;
 
-        // Children are checked first, topmost (last-drawn) wins.
+        // Children may be visually offset from their FinalRect translate 
+        // the test position into their local space before recursing.
+        const Vec2<Unit> childPos = a_LogicalPos + node->ChildHitTestOffset;
+
         NodeID childHit = c_InvalidNodeID;
         node->ForEachChildReverse( [&]( LayoutNode& child )
         {
-            if ( childHit != c_InvalidNodeID || !child.Widget )
-                return;
+            if ( childHit != c_InvalidNodeID )
+                return; // TODO: Need a way to break out of ForEachChildReverse early, or use a different iteration method.
 
-            childHit = HitTest( child.Widget->GetLayoutID(), a_LogicalPos );
+            childHit = HitTest( child.ID, childPos );
         } );
 
         if ( childHit != c_InvalidNodeID )
@@ -486,7 +472,7 @@ namespace RatUI
 
     NavReply Scene::QueryBoundaryReply( ENavAction a_Action, NodeID a_Focused )
     {
-        LayoutNode* node = Layouts.Get( a_Focused );
+        LayoutNode* node = m_Layouts.Get( a_Focused );
         while ( node )
         {
             if ( node->Widget && node->Widget->IsNavigationBoundary() )
@@ -515,7 +501,7 @@ namespace RatUI
     {
         const auto FocusFirstIn = [&]( NodeID a_ScopeID )
         {
-            LayoutNode* scopeNode = Layouts.Get( a_ScopeID );
+            LayoutNode* scopeNode = m_Layouts.Get( a_ScopeID );
             if ( !scopeNode ) return;
 
             for ( LayoutNode* child = scopeNode->FirstChild(); child; child = child->NextSibling() )
@@ -536,7 +522,7 @@ namespace RatUI
 
         if ( a_Action == ENavAction::ActivatePressed || a_Action == ENavAction::ActivateReleased )
         {
-            LayoutNode* focusedNode = Layouts.Get( Input.FocusedWidget );
+            LayoutNode* focusedNode = m_Layouts.Get( Input.FocusedWidget );
             if ( !focusedNode || !focusedNode->Widget )
                 return;
 
@@ -564,8 +550,8 @@ namespace RatUI
         }
 
         NodeID      scopeID = GetCurrentNavScope();
-        LayoutNode* scopeNode = Layouts.Get( scopeID );
-        LayoutNode* focusedNode = Layouts.Get( Input.FocusedWidget );
+        LayoutNode* scopeNode = m_Layouts.Get( scopeID );
+        LayoutNode* focusedNode = m_Layouts.Get( Input.FocusedWidget );
 
         if ( !scopeNode )
             return;
@@ -629,10 +615,28 @@ namespace RatUI
 
     void Scene::Reset()
     {
-        Layouts.Clear();
+        m_Layouts.Clear();
         RootWidget = c_InvalidNodeID;
         Input.Reset();
         Clear( m_ToDestroy );
+    }
+
+    LayoutNode& Scene::CreateLayoutNode( LayoutStyle a_Style, NodeID a_ParentID )
+    {
+        NodeID nodeID = m_Layouts.Allocate();
+        LayoutNode* node = m_Layouts.Get( nodeID );
+        RATUI_ASSERT( node, "Failed to allocate layout node." );
+        
+        node->ID = nodeID;
+        node->Style = a_Style;
+
+        if ( a_ParentID != c_InvalidNodeID )
+        {
+            if ( LayoutNode* parentNode = m_Layouts.Get( a_ParentID ) )
+                parentNode->PushBackChild( *node );
+        }
+
+        return *node;
     }
 
 } // namespace RatUI
