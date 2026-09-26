@@ -20,9 +20,7 @@ namespace RatUI::GLSL
         ETextUniform_PVM = 0,
         ETextUniform_Atlas,
         ETextUniform_PxRange,
-        ETextUniform_Scale,
 
-        ETextUniform_FillColor,
         ETextUniform_FillSoftness,
         ETextUniform_FillThreshold,
 
@@ -30,21 +28,14 @@ namespace RatUI::GLSL
         ETextUniform_OutlineWidth,
         ETextUniform_OutlineSoftness,
 
-        ETextUniform_ShadowEnable,
         ETextUniform_ShadowColor,
         ETextUniform_ShadowOffset,
         ETextUniform_ShadowSoftness,
         ETextUniform_ShadowSpread,
 
-        ETextUniform_GlowEnable,
         ETextUniform_GlowColor,
         ETextUniform_GlowSpread,
         ETextUniform_GlowPower,
-
-        ETextUniform_InnerGlowEnable,
-        ETextUniform_InnerGlowColor,
-        ETextUniform_InnerGlowRange,
-        ETextUniform_InnerGlowSoftness,
 
         ETextUniform_UniformCount
     };
@@ -53,26 +44,32 @@ namespace RatUI::GLSL
         "u_PVM",
         "u_Atlas",
         "u_PxRange",
-        "u_Scale",
-        "u_FillColor",
         "u_FillSoftness",
         "u_FillThreshold",
         "u_OutlineColor",
         "u_OutlineWidth",
         "u_OutlineSoftness",
-        "u_ShadowEnable",
         "u_ShadowColor",
         "u_ShadowOffset",
         "u_ShadowSoftness",
         "u_ShadowSpread",
-        "u_GlowEnable",
         "u_GlowColor",
         "u_GlowSpread",
         "u_GlowPower",
-        "u_InnerGlowEnable",
-        "u_InnerGlowColor",
-        "u_InnerGlowRange",
-        "u_InnerGlowSoftness"
+    };
+    static_assert( sizeof( c_TextUniformNames ) / sizeof( c_TextUniformNames[0] ) == ETextUniform_UniformCount );
+
+    enum EBitmapTextUniform
+    {
+        EBitmapTextUniform_PVM = 0,
+        EBitmapTextUniform_Atlas,
+
+        EBitmapTextUniform_UniformCount
+    };
+
+    inline constexpr const char* c_BitmapTextUniformNames[] = {
+        "u_PVM",
+        "u_Atlas",
     };
 
     // -----------------------------------------------------------------
@@ -173,7 +170,7 @@ namespace RatUI::GLSL
         if (v_BorderThickness > 0.0)
         {
             float outerMask = 1.0 - smoothstep(
-                -aa - v_Softness, 
+                -aa - v_Softness,
                  aa + v_Softness,
                  d - v_BorderThickness );
 
@@ -181,16 +178,16 @@ namespace RatUI::GLSL
         }
 
         vec4 tex = texture(u_Texture, v_UV);
-        
+
         // Composite fill "over" border using premultiplied alpha.
         float bAlpha    = borderMask * v_BorderColor.a;
         float fAlpha    = fillMask   * v_FillColor.a;
-        
+
         vec3 fillRGB    = v_FillColor.rgb * tex.rgb; // TEXTURE ONLY AFFECTS FILL
-        
+
         vec3 borderPre  = v_BorderColor.rgb * bAlpha;
         vec3 fillPre    = fillRGB * fAlpha;
-        
+
         float outA   = fAlpha + bAlpha * (1.0 - fAlpha);
         vec3  outRGB = fillPre + borderPre * (1.0 - fAlpha);
 
@@ -199,22 +196,29 @@ namespace RatUI::GLSL
     }
     )";
 
+    /** @brief Shared by both text pipelines. */
     inline constexpr const char* c_TextVertSrc = R"(
     #version 330 core
     layout(location = 0) in vec2  a_Pos;
-    layout(location = 1) in float a_Opacity;
-    layout(location = 2) in vec2  a_UV;
-    
+    layout(location = 1) in vec2  a_UV;
+    layout(location = 2) in vec4  a_Color;
+    layout(location = 3) in float a_Weight;
+    layout(location = 4) in float a_Opacity;
+
     uniform mat4 u_PVM;
-    
+
+    out vec2  v_UV;
+    out vec4  v_Color;
+    out float v_Weight;
     out float v_Opacity;
-    out vec2 v_UV;
-    
+
     void main()
     {
         gl_Position = u_PVM * vec4(a_Pos, 0.0, 1.0);
-        v_Opacity   = a_Opacity;
         v_UV        = a_UV;
+        v_Color     = a_Color;
+        v_Weight    = a_Weight;
+        v_Opacity   = a_Opacity;
     }
     )";
 
@@ -229,18 +233,18 @@ namespace RatUI::GLSL
     inline constexpr const char* c_TextFragSrc = R"(
     #version 330 core
 
-    in vec2 v_UV;
+    in vec2  v_UV;
+    in vec4  v_Color;
+    in float v_Weight;  // SDF threshold offset (faux bold)
     in float v_Opacity;
     out vec4 FragColor;
 
     // - Atlas
-    uniform sampler2D u_Atlas;          // MTSDF atlas (RGBA, linear filtering)
-    uniform float     u_PxRange;        // msdfgen pxrange (e.g. 4.0)
-    uniform float     u_Scale;          // Glyph scale (from batch)
+    uniform sampler2D u_Atlas;
+    uniform float     u_PxRange;        // Distance range in atlas pixels
 
     // - Fill
-    uniform vec4  u_FillColor;    
-    uniform float u_FillSoftness; 
+    uniform float u_FillSoftness;
     uniform float u_FillThreshold;
 
     // - Outline
@@ -250,27 +254,22 @@ namespace RatUI::GLSL
 
     // - Shadow
     uniform vec4  u_ShadowColor;
-    uniform vec2  u_ShadowOffset;  
+    uniform vec2  u_ShadowOffset;
     uniform float u_ShadowSoftness;
-    uniform float u_ShadowSpread;  
+    uniform float u_ShadowSpread;
 
     // - Glow
     uniform vec4  u_GlowColor;
     uniform float u_GlowSpread;
-    uniform float u_GlowPower; 
+    uniform float u_GlowPower;
 
-    // - Inner Glow
-    uniform vec4  u_InnerGlowColor;
-    uniform float u_InnerGlowRange;
-    uniform float u_InnerGlowSoftness;
-
-    float Median(float a_Red, float a_Green, float a_Blue) 
+    float Median(float a_Red, float a_Green, float a_Blue)
     {
         return max(min(a_Red, a_Green), min(max(a_Red, a_Green), a_Blue));
     }
 
     //  Helper: screen-space derivative scale -> converts SDF units to pixels.
-    float ScreenPxRange(vec2 a_UV ) 
+    float ScreenPxRange(vec2 a_UV )
     {
         vec2 unitRange = vec2(u_PxRange) / textureSize(u_Atlas, 0).xy;
         vec2 screenTexSize = vec2(1.0) / fwidth(a_UV);
@@ -291,7 +290,7 @@ namespace RatUI::GLSL
     //  a_Softness is in user-facing pixel units. Adding 0.5 guarantees a minimum
     //  half-pixel AA transition even at softness=0, preventing hard aliasing.
     //  The combined value is then divided by pxRange to convert into SDF units.
-    float SDFAlpha(float a_Dist, float a_Threshold, float a_Softness, float a_PxRange) 
+    float SDFAlpha(float a_Dist, float a_Threshold, float a_Softness, float a_PxRange)
     {
         float sdfSoft = (a_Softness + 0.5) / a_PxRange;
         return smoothstep(a_Threshold - sdfSoft, a_Threshold + sdfSoft, a_Dist);
@@ -301,7 +300,7 @@ namespace RatUI::GLSL
     //  Blur radius is clamped to the SDF gradient band to prevent out-of-tile sampling.
     const int c_ShadowTaps = 5;
 
-    float ShadowAlpha(vec2 a_UV, float a_Threshold, float a_Softness, float a_PxRange) 
+    float ShadowAlpha(vec2 a_UV, float a_Threshold, float a_Softness, float a_PxRange)
     {
         // Precomputed Gaussian weights for 5 taps, normalized so their sum is 1.
         // WARNING: Update these if you change c_ShadowTaps!
@@ -314,7 +313,7 @@ namespace RatUI::GLSL
 
         // Radius in SDF units, clamped so taps stay within the SDF gradient band
         // and cannot wander into neighbouring atlas tiles or empty atlas space.
-        vec2  atlasSize    = vec2(textureSize(u_Atlas, 0)); 
+        vec2  atlasSize    = vec2(textureSize(u_Atlas, 0));
         float blurSDF      = clamp(a_Softness, 0.0, u_PxRange * 0.5);
         float blurRadiusUV = (blurSDF / u_PxRange) / min(atlasSize.x, atlasSize.y);
 
@@ -337,7 +336,7 @@ namespace RatUI::GLSL
     //  2. Outer glow (above shadow but beneath outline and fill, so it can glow both inside and outside the glyph edges)
     //  3. Outline (overrides glow and fill at edges)
     //  4. Fill (overrides glow at edges, but under the outline)
-    void main() 
+    void main()
     {
         float pxRange = ScreenPxRange(v_UV);
         vec4  mtsdf   = texture(u_Atlas, v_UV);
@@ -371,7 +370,7 @@ namespace RatUI::GLSL
                 // Remap dist to [0,1] within the band: 0 at outerEdge, 1 at innerEdge.
                 float bandT     = clamp((tsdf - outerEdge) / bandWidth, 0.0, 1.0);
                 float glowAlpha = pow(bandT, u_GlowPower);
-                
+
                 color = mix(color, u_GlowColor, glowAlpha * u_GlowColor.a);
             }
         }
@@ -386,11 +385,33 @@ namespace RatUI::GLSL
         }
 
         // - 4. Fill
-        float fillAlpha = SDFAlpha(dist, u_FillThreshold, u_FillSoftness, pxRange);
-        color = mix(color, u_FillColor, fillAlpha * u_FillColor.a);
+        float fillAlpha = SDFAlpha(dist, u_FillThreshold - v_Weight, u_FillSoftness, pxRange);
+        color = mix(color, v_Color, fillAlpha * v_Color.a);
 
         color.a *= v_Opacity; // Apply vertex alpha at the end so it affects all layers.
         FragColor = color;
     }
     )";
+    /** @brief Bitmap glyphs (Raster / Pixel). v_Weight = 1 draws an alpha-only silhouette for shadows / outlines. */
+    inline constexpr const char* c_BitmapTextFragSrc = R"(
+    #version 330 core
+
+    in vec2  v_UV;
+    in vec4  v_Color;
+    in float v_Weight;
+    in float v_Opacity;
+    out vec4 FragColor;
+
+    uniform sampler2D u_Atlas;
+
+    void main()
+    {
+        vec4 texel = texture(u_Atlas, v_UV);
+        vec3 rgb   = mix(texel.rgb, vec3(1.0), v_Weight) * v_Color.rgb;
+        float a    = texel.a * v_Color.a * v_Opacity;
+        if (a < 0.002) discard;
+        FragColor = vec4(rgb, a);
+    }
+    )";
+
 } // namespace RatUI::GLSL

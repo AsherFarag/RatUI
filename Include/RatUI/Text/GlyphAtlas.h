@@ -1,213 +1,158 @@
 #pragma once
 #include "../Renderer/IRenderer.h"
-#include "ITextMetrics.h"
+#include "FontLibrary.h"
 
 namespace RatUI
 {
-    // TODO: This should be configurable
-    inline constexpr f64 c_MsdfPxRange = 16.0;
-
-    /**
-     * @brief Metrics describing the position of a rasterized glyph within the atlas texture and how to position it relative to the baseline when rendering.
-     */
-    struct GlyphMetrics
-    {
-        Vec2<FontUnit> Bearing;   ///< Offset from the baseline origin to the top-left of the glyph bitmap (Y-up).
-        Rectu16        AtlasRect; ///< Rectangle within the glyph atlas texture where the glyph's bitmap is stored, in pixel coordinates.
-        FontUnit       XAdvance;  ///< Horizontal advance to the next glyph. TODO: Should we support YAdvance for vertical text layout in the future?
-    };
-
-    /**
-     * @brief Configuration settings for the glyph atlas.
-     */
     struct GlyphAtlasConfig
     {
-        u16      AtlasWidth { 2048 }; ///< The width of the glyph atlas texture in pixels.
-        u16      AtlasHeight{ 2048 }; ///< The height of the glyph atlas texture in pixels.
-        Pixel    BaseSize{ 56_px };   ///< The base font size in pixels at which glyphs are rasterized.
-                                      ///< Higher values => better quality at larger sizes but more texture space used. 
-                                      ///< Lower values => more efficient for small text but missing details at large sizes.
-                                      ///< Ideal range is typically around 48-64.              
+        u16 PageSize       { 1024 }; ///< Width / height of each page texture.
+        u8  MaxPagesPerMode{ 8 };    ///< When full, the least recently used page is recycled.
+        u16 SDFBaseSize    { 56 };   ///< MTSDF glyphs are generated at this pixel size.
+        f32 SDFPixelRange  { 16.f }; ///< MTSDF distance range in pixels at SDFBaseSize.
+    };
+
+    /** @brief Everything that changes a glyph's pixels, so e.g. faux bold never shares the regular glyph's entry. */
+    struct GlyphCacheKey
+    {
+        FontFaceHandle   Face{};
+        GlyphID          Glyph{};
+        EGlyphRenderMode Mode{ EGlyphRenderMode::MTSDF };
+        u16              PixelSize{ 0 };      ///< Raster only, MTSDF / Pixel glyphs are scaled at draw time.
+        bool             SynthBold  { false }; ///< Raster / Pixel only.
+        bool             SynthItalic{ false }; ///< Raster / Pixel only.
+
+        constexpr bool operator==( const GlyphCacheKey& ) const = default;
+
+        static constexpr GlyphCacheKey For( const ResolvedFace& a_Face, GlyphID a_Glyph, EGlyphRenderMode a_Mode, u16 a_PixelSize )
+        {
+            const bool bitmap = a_Mode != EGlyphRenderMode::MTSDF;
+            return GlyphCacheKey{
+                .Face        = a_Face.Face,
+                .Glyph       = a_Glyph,
+                .Mode        = a_Mode,
+                .PixelSize   = a_Mode == EGlyphRenderMode::Raster ? a_PixelSize : u16{ 0 },
+                .SynthBold   = bitmap && a_Face.SynthBold,
+                .SynthItalic = bitmap && a_Face.SynthItalic,
+            };
+        }
+    };
+
+    struct AtlasGlyph
+    {
+        const TextureHandle* Page{ nullptr }; ///< Stable for the lifetime of the atlas.
+        Rectu16              Rect{};          ///< Zero size for blank glyphs.
+        Vec2f                Bearing{};       ///< Pen to top-left, Y-up. MTSDF: em. Raster / Pixel: pixels.
+
+        constexpr bool IsBlank() const { return Rect.Size[0] == 0 || Rect.Size[1] == 0; }
+    };
+
+    /** @brief */
+    class SkylinePacker
+    {
+    public:
+        void Reset( u16 a_Width, u16 a_Height );
+        Optional<Vec2<u16>> Allocate( u16 a_Width, u16 a_Height );
+
+    private:
+        struct Node { i32 X, Y, Width; };
+
+        bool Fits( size a_Index, i32 a_Width, i32 a_Height, i32& o_Y ) const;
+
+        Array<Node> m_Nodes;
+        i32         m_Width{ 0 }, m_Height{ 0 };
     };
 
     /**
-     * @brief
+     * @brief Rasterizes glyphs on demand into texture pages, one pool per render mode (Pixel pages use nearest sampling).
+     * Each page starts with a small white block, used to draw underlines / strikethroughs in the text batch.
      * TODO: Support multithreading
-     * TODO: Currently it can just fill up and fail when full. Should either:
-     * - Add page support (texture array) but this may be slow for rendering.
-     * - Add an ImGui-style system where once its full, it evicts the oldest glyphs and reuses their space. 
-     *   But this is bad if the text sizes dynamically change etc, as there will be constant texture updates.
      */
     class GlyphAtlas
     {
     public:
-        static constexpr StringView c_CommonASCIIGlyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" 
+        static constexpr StringView c_CommonASCIIGlyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                                                           "abcdefghijklmnopqrstuvwxyz"
                                                           "0123456789"
                                                           ".,!?-+/():;%&`\"*#=[]";
 
-        GlyphAtlas( IRenderer& a_Renderer, 
-                    ITextMetrics& a_TextMetrics,
-                    const GlyphAtlasConfig& a_Config = {} )
-            : m_Renderer   ( a_Renderer )
-            , m_TextMetrics( a_TextMetrics )
-            , m_Config     ( a_Config )
-        {
-            m_Texture = m_Renderer.CreateTexture( 
-                {
-					.Size = { m_Config.AtlasWidth, m_Config.AtlasHeight },
-					.Format = ETextureFormat::RGBA8,
-                },
-                nullptr );
-        }
+        static constexpr u16 c_WhiteBlockSize = 8;
+
+        GlyphAtlas( IRenderer& a_Renderer, FontLibrary& a_Fonts, const GlyphAtlasConfig& a_Config = {} );
 
         GlyphAtlas( const GlyphAtlas& ) = delete;
         GlyphAtlas& operator=( const GlyphAtlas& ) = delete;
 
-        /** @brief Returns the GPU texture that holds the rasterized glyph bitmaps. */
-        const TextureHandle& GetTexture() const { return m_Texture; }
-
-        /** @brief Returns a reference to the configuration settings of the glyph atlas. */
         const GlyphAtlasConfig& GetConfig() const { return m_Config; }
-
-        /** @brief Returns a reference to the renderer used by the glyph atlas. */
         IRenderer& GetRenderer() const { return m_Renderer; }
+        FontLibrary& GetFontLibrary() const { return m_Fonts; }
 
-        /** @brief Returns a reference to the text metrics system used by the glyph atlas. */
-        ITextMetrics& GetTextMetrics() const { return m_TextMetrics; }
+        /** @brief Pages used this frame are never recycled. Called by DrawList::Clear(). */
+        void BeginFrame() { ++m_Frame; }
 
-        /**
-         * @brief
-         */
-		Optional<GlyphMetrics> GetOrRasterizeGlyph( FontHandle a_Font, GlyphID a_GlyphIndex )
+        /** @brief Rasterizes and uploads the glyph on first use. NullOpt if it can't be made or no page is free this frame. */
+        Optional<AtlasGlyph> GetOrRasterizeGlyph( const GlyphCacheKey& a_Key );
+
+        /** @brief Solid white texels in a page of @p a_Mode, for decorations. */
+        Optional<AtlasGlyph> GetWhiteBlock( EGlyphRenderMode a_Mode );
+
+        /** @brief */
+        void LoadGlyphs( const ResolvedFace& a_Face, u16 a_PixelSize, StringView a_Text );
+
+        /** @brief Drops every cached glyph, keeping the pages. */
+        void Clear();
+
+        u32 GetPageCount( EGlyphRenderMode a_Mode ) const { return static_cast<u32>( Size( m_Pools[ToUnderlying( a_Mode )] ) ); }
+        u32 GetGlyphCount() const { return static_cast<u32>( Size( m_Glyphs ) ); }
+        u32 GetEvictionCount() const { return m_EvictionCount; }
+
+    private:
+        struct Page
         {
-            const GlyphKey key{ a_Font, a_GlyphIndex };
+            TextureHandle Texture;
+            SkylinePacker Packer;
+            u64           LastUsedFrame{ 0 };
+        };
 
-            if ( const auto it = Find( m_GlyphMap, key ); it != End( m_GlyphMap ) )
-                return it->second;
-
-            if ( !m_Texture )
-                return NullOpt; // Can't upload if texture is invalid.
-
-            const Color* pixels = nullptr; // In RGBA8 format
-            u32            width  = 0, height = 0;
-            Vec2<FontUnit> bearing{};
-            FontUnit       xAdvance{};
-
-            const f32 baseSize = m_Config.BaseSize.ToFloat();
-            if ( !std::isfinite( baseSize ) || baseSize <= 0.f )
-                return NullOpt;
-
-            const u32 baseSizePx = static_cast<u32>( std::max( 1.0f, baseSize ) );
-
-            if ( !m_TextMetrics.RasterizeGlyph( a_Font, a_GlyphIndex, baseSizePx,
-                pixels, width, height, bearing, xAdvance ) )
-                return NullOpt; // Rasterization failed (e.g. missing glyph in font).
-
-            if ( width == 0 || height == 0 )
-            {
-                // Cache invisible glyphs as zero-size rects to avoid repeated rasterization attempts.
-                constexpr GlyphMetrics invisibleRect{};
-                m_GlyphMap[key] = invisibleRect;
-                return invisibleRect;
-            }
-
-            // Upload the glyph bitmap to the atlas texture.
-            if ( auto region = AllocateRegion( static_cast<u16>( width ), static_cast<u16>( height ) ) )
-            {
-                const size dataSizeBytes = static_cast<size>( width ) * height * sizeof( Color );
-                m_Renderer.UpdateTexture( m_Texture, 0, region->Cast<u32>(), pixels, dataSizeBytes);
-
-                GlyphMetrics rect { .Bearing   = bearing,
-                                    .AtlasRect = *region,
-                                    .XAdvance  = xAdvance };
-
-                m_GlyphMap[key] = rect;
-                return rect;
-            }
-            
-            return NullOpt; // Failed to allocate space in the atlas.
-        }
-
-		void LoadGlyphs( FontHandle a_Font, StringView a_Codepoints )
-		{
-            auto prepared = m_TextMetrics.Prepare( a_Codepoints, TextLayoutStyle{ .Font = a_Font } );
-            if ( !prepared )
-                return; // Failed to prepare text (e.g. invalid font).
-
-            auto shaped = m_TextMetrics.Shape( *prepared, TextLayoutStyle{ .Font = a_Font } );
-            if ( !shaped )
-                return; // Failed to shape text.
-
-            for ( const ShapedGlyph& glyph : shaped->Glyphs )
-            {
-                GetOrRasterizeGlyph( a_Font, glyph.GlyphIndex );
-            }
-		}
-
-    protected:
-
-        Optional<Rectu16> AllocateRegion( u16 a_Width, u16 a_Height )
+        struct CachedGlyph
         {
-            if ( m_AtlasFull )
-                return NullOpt; // Fast exit once full - don't re-attempt every frame.
-
-            if ( a_Width > m_Config.AtlasWidth || a_Height > m_Config.AtlasHeight )
-                return NullOpt; // Glyph is too large to fit in the atlas.
-
-            // Check horizontal overflow and move to next row if needed.
-            if ( m_CursorX + a_Width > m_Config.AtlasWidth )
-            {
-                m_CursorX = 0;
-                m_CursorY = m_RowBottom;
-            }
-
-            // Check vertical overflow.
-            if ( m_CursorY + a_Height > m_Config.AtlasHeight )
-            {
-                m_AtlasFull = true;
-                RATUI_ASSERT( false, "GlyphAtlas is full - increase atlas dimensions" );
-                return NullOpt;
-            }
-
-            Rectu16 region{ { m_CursorX, m_CursorY },
-                            { a_Width, a_Height } };
-
-            m_CursorX  += a_Width + 1; // 1 px padding to prevent bleeding
-            m_RowBottom = std::max( m_RowBottom, static_cast<u16>( m_CursorY + a_Height + 1 ) );
-
-            return region;
-        }
-
-    protected:
-        IRenderer&       m_Renderer;
-        ITextMetrics&    m_TextMetrics;
-        TextureHandle    m_Texture;
-        GlyphAtlasConfig m_Config;
-        u16              m_CursorX{ 0 }, m_CursorY{ 0 }, m_RowBottom{ 0 };
-        bool             m_AtlasFull{ false };
-
-        struct GlyphKey
-        {
-            FontHandle Font;
-            GlyphID    GlyphIndex;
-
-            bool operator==( const GlyphKey& a_Other ) const = default;
+            u8      PageIndex{ 0 };
+            Rectu16 Rect{};
+            Vec2f   Bearing{};
         };
 
         struct GlyphKeyHasher
         {
-            std::size_t operator()( const GlyphKey& a_Key ) const
+            size_t operator()( const GlyphCacheKey& a_Key ) const
             {
                 // FNV-1a hash combine
-                std::size_t hash = 2166136261u;
-                hash = ( hash ^ std::hash<FontHandle>{}( a_Key.Font ) ) * 16777619u;
-                hash = ( hash ^ std::hash<GlyphID>{}( a_Key.GlyphIndex ) ) * 16777619u;
-                return hash;
+                u64 hash = 1469598103934665603ull;
+                const auto mix = [&]( u64 a_Value ) { hash = ( hash ^ a_Value ) * 1099511628211ull; };
+                mix( a_Key.Face.ID );
+                mix( ToUnderlying( a_Key.Glyph ) );
+                mix( ( static_cast<u64>( ToUnderlying( a_Key.Mode ) ) << 32 ) | ( static_cast<u64>( a_Key.PixelSize ) << 8 )
+                     | ( a_Key.SynthBold ? 1u : 0u ) | ( a_Key.SynthItalic ? 2u : 0u ) );
+                return static_cast<size_t>( hash );
             }
         };
 
-        HashMap<GlyphKey, GlyphMetrics, GlyphKeyHasher> m_GlyphMap;
+        using PagePool = Array<Unique<Page>>;
+
+        Optional<CachedGlyph> Rasterize( const GlyphCacheKey& a_Key );
+        Optional<Vec2<u16>>   AllocateRegion( EGlyphRenderMode a_Mode, u16 a_Width, u16 a_Height, u8& o_PageIndex );
+        Page*                 CreatePage( EGlyphRenderMode a_Mode );
+        void                  ResetPage( EGlyphRenderMode a_Mode, u8 a_PageIndex );
+        AtlasGlyph            ToAtlasGlyph( EGlyphRenderMode a_Mode, const CachedGlyph& a_Glyph );
+
+        IRenderer&       m_Renderer;
+        FontLibrary&     m_Fonts;
+        GlyphAtlasConfig m_Config;
+        u64              m_Frame{ 1 };
+        u32              m_EvictionCount{ 0 };
+
+        FixedArray<PagePool, static_cast<size>( EGlyphRenderMode::Count )> m_Pools;
+        HashMap<GlyphCacheKey, CachedGlyph, GlyphKeyHasher> m_Glyphs;
+        Array<Color> m_UploadBuffer;
     };
 
 } // namespace RatUI

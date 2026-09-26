@@ -139,61 +139,56 @@ namespace RatUI
         constexpr u8 _NumBits = 2;
     };
 
-    /**
-     * @brief Specifies how whitespace characters are handled during text layout and rendering.
-     */
+    /** @brief How spaces and tabs are handled. */
     namespace EWhitespace
     {
-        constexpr u8 Preserve = 0; ///< Whitespace is preserved as-is. Text will only wrap on line breaks.
-        constexpr u8 Collapse = 1; ///< Sequences of whitespace will collapse into a single whitespace. Text will wrap when necessary.
+        constexpr u8 Preserve = 0; ///< Kept as-is, including indentation.
+        constexpr u8 Collapse = 1; ///< Runs collapse into one space, trimmed at line starts / ends.
 
         constexpr u8 _NumBits = 1;
     };
 
-    /**
-     * @brief Specifies how newline characters are handled during text layout and rendering.
-     */
+    /** @brief How newlines (LF, CR, CRLF, FF, NEL, LS, PS) are handled. */
     namespace ENewline
     {
-        constexpr u8 Preserve = 0; ///< Sequences of newlines will collapse into a single newline. Text will wrap when necessary, and on line breaks.
-        constexpr u8 Collapse = 1; ///< Newlines are treated as whitespace and will collapse into a single whitespace. Text will wrap when necessary.
+        constexpr u8 Preserve = 0; ///< Every newline is a line break.
+        constexpr u8 Collapse = 1; ///< Newlines are treated as spaces.
 
         constexpr u8 _NumBits = 1;
     };
 
-    /**
-     * @brief Defines text wrapping behavior, including line-breaking rules, whitespace handling, and newline handling.
-     */
+    /** @brief Wrapping, whitespace and newline handling. The presets mirror CSS 'white-space'. */
     struct TextWrap
     {
         u8 BreakMode  : EBreakMode::_NumBits  { EBreakMode::Word };
         u8 Whitespace : EWhitespace::_NumBits { EWhitespace::Collapse };
         u8 Newline    : ENewline::_NumBits    { ENewline::Preserve };
 
-        /** @brief Determines if the text should be pre-wrapped - i.e., whether Prepare() should do an initial layout pass treating newlines as hard breaks. */
-        constexpr bool Prewrap() const { return ( BreakMode != EBreakMode::None ) && ( Newline == ENewline::Preserve ); }
+        constexpr bool CollapsesSpaces() const   { return Whitespace == EWhitespace::Collapse; }
+        constexpr bool PreservesNewlines() const { return Newline == ENewline::Preserve; }
+        constexpr bool Wraps() const             { return BreakMode != EBreakMode::None; }
+
+        /** @deprecated Use PreservesNewlines(). */
+        constexpr bool Prewrap() const { return PreservesNewlines(); }
 
         constexpr bool operator==( const TextWrap& ) const = default;
 
-        /** @brief Sequences of whitespace will collapse into a single whitespace. Text will never wrap to the next line. */
-        static constexpr TextWrap NoWrap()   { return { EBreakMode::None, EWhitespace::Collapse, ENewline::Preserve }; }
+        /** @brief One line: all whitespace, newlines included, collapses (CSS nowrap). */
+        static constexpr TextWrap NoWrap()   { return { EBreakMode::None, EWhitespace::Collapse, ENewline::Collapse }; }
 
-        /** @brief Ordinary wrapping at word boundaries. Sequences of whitespace will collapse into a single whitespace. 
-         *  Text will wrap when necessary, and on line breaks. */
+        /** @brief Wraps at words and newlines, spaces collapse (CSS pre-line). */
         static constexpr TextWrap WrapWord() { return { EBreakMode::Word, EWhitespace::Collapse, ENewline::Preserve }; }
 
-        /** @brief Aggressive wrapping at any character boundary. Sequences of whitespace will collapse into a single whitespace. 
-         *  Text will wrap when necessary, and on line breaks. */
+        /** @brief Like WrapWord, but can break anywhere. */
         static constexpr TextWrap WrapChar() { return { EBreakMode::Char, EWhitespace::Collapse, ENewline::Preserve }; }
 
-        /** @brief Sequences of whitespace will be preserved as-is. Text will only wrap on line breaks. */
+        /** @brief Keeps spaces, only breaks at newlines (CSS pre). */
         static constexpr TextWrap Pre()      { return { EBreakMode::None, EWhitespace::Preserve, ENewline::Preserve }; }
 
-        /** @brief Sequences of whitespace will collapse into a single whitespace. Text will only wrap on line breaks. */
+        /** @brief Same as WrapWord (CSS pre-line). */
         static constexpr TextWrap PreLine()  { return { EBreakMode::Word, EWhitespace::Collapse, ENewline::Preserve }; }
 
-        /** @brief Sequences of whitespace will be preserved as-is. Text will wrap at word boundaries, and on line breaks. 
-         *  Newlines will be treated as whitespace and will collapse into a single whitespace. */
+        /** @brief Keeps spaces, wraps at words and newlines (CSS pre-wrap). */
         static constexpr TextWrap PreWrap()  { return { EBreakMode::Word, EWhitespace::Preserve, ENewline::Preserve }; }
 
         /** @brief A default text wrap configuration that provides ordinary wrapping at word boundaries. */
@@ -207,22 +202,34 @@ namespace RatUI
      */
     struct TextLayoutStyle
     {
-        FontHandle     Font              {}; ///< The font to use for rendering the text, specified as a FontHandle. If not set, a default font will be used.
-        Unit           Size        { 16_u }; ///< The size of the font in points, which determines the height of the characters. Default is 16.0f.          
+        FontFamilyHandle Family          {}; ///< Invalid = the FontLibrary's default family.
+        EFontWeight    Weight   { EFontWeight::Regular };
+        EFontStyle     Style    { EFontStyle::Normal };
+        FontSynthesis  Synthesis{};
+        Unit           Size        { 16_u }; ///< EM size. Pixel faces snap to a whole multiple of their native size.
         Unit           LineHeight   { 0_u }; ///< The height of each line of text, including spacing. If set to 0, it will be automatically calculated based on the font size and metrics.
-        Unit           LetterSpacing{ 0_u }; ///< The spacing between characters in the text, specified in points. Default is 0.0f.
-		Unit           WordSpacing  { 0_u }; ///< The spacing between words in the text, specified in points. Default is 0.0f.
-		Unit           LineSpacing  { 0_u }; ///< The additional spacing between lines of text, specified in points. Default is 0.0f.
+        Unit           LetterSpacing{ 0_u }; ///< Added after every character.
+		Unit           WordSpacing  { 0_u }; ///< Added after every space.
+		Unit           LineSpacing  { 0_u }; ///< The additional spacing between lines of text, in layout units.
 		u32            MaxLines       { 0 }; ///< The maximum number of lines to display. If set to 0, there is no limit and all lines will be displayed.
 
         EScript        Script     { EScript::Invalid };
         ETextDirection Direction  { ETextDirection::Auto };
-        TextWrap       Wrap       { TextWrap::Normal() }; 
+        TextWrap       Wrap       { TextWrap::Normal() };
         ETextOverflow  Overflow   { ETextOverflow::Clip };
         ETextTransform Transform  { ETextTransform::None };
 
 		constexpr bool operator==( const TextLayoutStyle& ) const = default;
+
+        constexpr FontQuery GetFontQuery() const { return FontQuery{ Family, Weight, Style, Synthesis }; }
     };
+
+    namespace ETextDecoration
+    {
+        constexpr u8 None          = 0;
+        constexpr u8 Underline     = 1 << 0;
+        constexpr u8 Strikethrough = 1 << 1;
+    }
 
 	/**
 	 * @brief A struct that encapsulates the styling information for rendering of text, such as color and decorations.
@@ -259,8 +266,7 @@ namespace RatUI
 		// - Shadow properties
  
 		Color ShadowColor    { Colors::Black }; ///< RGBA color of the drop shadow. Default is black.
-        Vec2f ShadowOffset   { 4.f, 4.f };      ///< Shadow displacement in atlas pixels (X right, Y down). Converted to UV space
-		                                        ///< automatically. Larger values move the shadow further from the glyph. Default is (4, 4).
+        Vec2f ShadowOffset   { 4.f, 4.f };      ///< Shadow displacement in atlas pixels at GlyphAtlasConfig::SDFBaseSize (X right, Y down). Default is (4, 4).
 		f32   ShadowSoftness { 1.0f };          ///< Blur radius of the shadow edge, in screen pixels. 0 = hard shadow. Default is 1.0.
 		f32   ShadowSpread   { 0.05f };         ///< Dilates the shadow shape before blurring, in SDF units [0, 0.5].
 		                                        ///< Positive values make the shadow larger than the glyph. Default is 0.05.
@@ -270,7 +276,7 @@ namespace RatUI
 		Color GlowColor  { Colors::White }; ///< RGBA color of the outer glow. Default is white.
 		f32   GlowSpread { 1.f };           ///< Width of the glow band in SDF units. The glow extends outward from the outline edge
 		                                    ///< (or fill edge if no outline) by this amount. Clamped internally to the usable SDF
-		                                    ///< range - increase c_MsdfPxRange for wider glows. Default is 1.0.
+		                                    ///< range - increase GlyphAtlasConfig::SDFPixelRange for wider glows. Default is 1.0.
 		f32   GlowPower  { 1.5f };          ///< Falloff exponent for the glow intensity across the band.
 		                                    ///< 1.0 = linear fade from the glyph edge outward.
 		                                    ///< >1.0 = intensity concentrated near the glyph edge, faster falloff.
@@ -280,7 +286,7 @@ namespace RatUI
     };
 
     /**
-	 * @brief Stores measurement results of a block of text created by ITextMetrics.
+	 * @brief Stores measurement results of a block of text created by TextMetrics.
      */
     struct TextMeasurement
     {
@@ -296,7 +302,7 @@ namespace RatUI
     {
         Text,       ///< A word (Latin / script run) or a single CJK codepoint.
         Space,      ///< Collapsible inter-word whitespace.
-        HardBreak,  ///< Explicit newline (only emitted in pre-wrap mode).
+        HardBreak,  ///< Explicit newline (only emitted when newlines are preserved).
     };
 
     /**
@@ -319,6 +325,21 @@ namespace RatUI
         bool         IsCJKChar{ false }; ///< True when this is a single CJK codepoint.
     };
 
+    /** @brief Part of the normalised text with one face and style. */
+    struct TextRun
+    {
+        u32          StartByte{ 0 };
+        u32          EndByte  { 0 };
+        ResolvedFace Face{};
+        Unit         Size{ 16_u };          ///< Effective (pixel-snapped) size.
+        Unit         LetterSpacing{ 0_u };
+        Color        FillColor{ Colors::White };
+        bool         HasFillColor{ false }; ///< Otherwise TextRenderStyle::FillColor is used.
+        u8           Decorations{ ETextDecoration::None };
+
+        constexpr bool operator==( const TextRun& ) const = default;
+    };
+
     /**
      * @brief Result of the prepare phase, used as input to the layout phase.
      * Treat this as an immutable value and only re-run Prepare() when the text content or style changes.
@@ -327,17 +348,30 @@ namespace RatUI
     {
         String             NormalizedText;     ///< Text after whitespace normalisation.
         Array<TextSegment> Segments;           ///< Pre-measured segments in logical order.
+        Array<TextRun>     Runs;               ///< Style / face runs, in logical order.
         Unit               HyphenWidth{ 0_u }; ///< Width of "-" (reserved for soft-hyphen support).
     };
 
-    /**
-     * @brief Represents a single shaped glyph used for rendering text, containing the glyph ID, pixel size, advance, and offset information.
-     */
     struct ShapedGlyph
     {
-        GlyphID   GlyphIndex{};
-        FontUnit  XAdvance  { 0.f }, YAdvance{ 0.f }; ///< The advance of the glyph, to move the pen position after rendering this glyph.
-        FontUnit  XOffset   { 0.f },  YOffset{ 0.f }; ///< The offset of the glyph, relative to the pen position when rendering.
+        GlyphID GlyphIndex{};
+        u32     Cluster { 0 };   ///< Byte offset of the source text.
+        Unit    XAdvance{ 0_u };
+        Unit    XOffset { 0_u };
+        Unit    YOffset { 0_u }; ///< Y-down.
+    };
+
+    /** @brief Glyphs on one line that share a face and style. */
+    struct ShapedRun
+    {
+        u32              GlyphStart{ 0 };
+        u32              GlyphEnd  { 0 };
+        ResolvedFace     Face{};
+        EGlyphRenderMode Mode{ EGlyphRenderMode::MTSDF };
+        Unit             Size{ 16_u };
+        Color            FillColor{ Colors::White };
+        bool             HasFillColor{ false };
+        u8               Decorations{ ETextDecoration::None };
     };
 
     /**
@@ -345,29 +379,27 @@ namespace RatUI
      */
     struct ShapedLine
     {
-        u32  Start { 0 };
-        u32  End   { 0 };
-        Unit Width { 0_u };
+        u32  Start   { 0 };   ///< Glyph range.
+        u32  End     { 0 };
+        u32  RunStart{ 0 };   ///< ShapedRun range.
+        u32  RunEnd  { 0 };
+        Unit Width   { 0_u };
+        Unit Top     { 0_u }; ///< From the top of the text block.
+        Unit Baseline{ 0_u }; ///< From the top of the text block.
+        Unit Height  { 0_u };
     };
 
     /**
-     * @brief Optimised data for rendering lines of text, produced by shaping the prepared text with ITextMetrics::Shape().
+     * @brief Optimised data for rendering lines of text, produced by shaping the prepared text with TextMetrics::Shape().
      */
     struct ShapedText
     {
         Array<ShapedGlyph> Glyphs; ///< The sequence of shaped glyphs that represent the rendered text.
+        Array<ShapedRun>   Runs;
         Array<ShapedLine>  Lines;  ///< Metadata about the lines in the shaped text.
-        FontHandle         Font{}; ///< The font used for shaping the text, which is needed for rendering and glyph atlas lookups.
 
-        Unit FontSize   { 0_u }; ///< The font size used for shaping the text, which is needed for rendering and layout calculations.
-        Unit LineHeight { 0_u };
-        Unit Ascender   { 0_u };
-        Unit Descender  { 0_u };
-
-        Unit MaxWidth          { 0_u }; ///< The maximum line width, used for overflow checks when rendering.
-        Unit TotalHeight       { 0_u }; ///< The total height of the shaped text block, used for vertical alignment and spacing calculations.
-        Unit UnderlinePosition { 0_u }; ///< The vertical position of the underline relative to the baseline, used for rendering underlines.
-        Unit UnderlineThickness{ 0_u }; ///< The thickness of the underline, used for rendering underlines.
+        Unit MaxWidth   { 0_u }; ///< The maximum line width, used for overflow checks when rendering.
+        Unit TotalHeight{ 0_u }; ///< The total height of the shaped text block, used for vertical alignment and spacing calculations.
 
 		/** @brief Returns the number of lines in the shaped text, which can be used for layout and spacing calculations. */
 		u32 LineCount() const { return static_cast<u32>( Size( Lines ) ); }

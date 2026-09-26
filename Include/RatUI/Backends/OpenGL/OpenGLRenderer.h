@@ -1,7 +1,6 @@
 #pragma once
 #include "../../RatUI.h"
 #include "../../Renderer/Shaders/GLSL.h"
-#include "../FreeType/FontCache.h"
 
 #ifdef RATUI_OPENGL_INCLUDE
 #   include RATUI_OPENGL_INCLUDE
@@ -46,9 +45,9 @@ namespace RatUI::OpenGL
     /**
      * @brief OpenGL 3.3 renderer for RatUI.
      *
-     * Maintains two VAOs — one for SDF shapes (SDFVertex), one for MSDF text
-     * (TextVertex) — both sharing a single VBO + IBO that are re-uploaded each
-     * frame via GL_STREAM_DRAW.
+     * Maintains two VAOs — one for SDF shapes (SDFVertex), one for text
+     * (TextVertex, shared by the MTSDF and bitmap text programs) — both sharing
+     * a single VBO + IBO that are re-uploaded each frame via GL_STREAM_DRAW.
      *
      * Because all batches share one contiguous VBO, attrib pointers are
      * re-specified each batch using the batch's VertexByteOffset so the GPU
@@ -57,7 +56,8 @@ namespace RatUI::OpenGL
      *
      * Programs are compiled once on construction:
      *   - SDF program   : SDFVertex layout — rounded rects, circles, borders.
-     *   - MSDF program  : TextVertex layout — MSDF glyph rendering.
+     *   - MSDF program  : TextVertex layout — MTSDF glyph rendering with effects.
+     *   - Bitmap program: TextVertex layout — Raster / Pixel glyphs (texel * colour).
      *
      * The renderer uses a standard 2-D orthographic projection (top-left origin,
      * Y-down).  Call SetViewport() on every framebuffer resize.
@@ -92,6 +92,10 @@ namespace RatUI::OpenGL
 
         void DispatchBatch( const SDFDrawData& a_Data, u32 a_VertexByteOffset, const f32 a_PVM[16] );
         void DispatchBatch( const MSDFTextDrawData& a_Data, u32 a_VertexByteOffset, const f32 a_PVM[16] );
+        void DispatchBatch( const BitmapTextDrawData& a_Data, u32 a_VertexByteOffset, const f32 a_PVM[16] );
+
+        /** @brief Binds the text VAO and points its attributes at the TextVertex data starting at @p a_VertexByteOffset. */
+        void BindTextVertices( u32 a_VertexByteOffset );
 
         // =====================================================================
         // Helpers
@@ -123,9 +127,11 @@ namespace RatUI::OpenGL
         GLuint m_TextVAO   { 0 };
         GLuint m_SDFProgram  { 0 };
         GLuint m_MSDFProgram { 0 };
+        GLuint m_BitmapProgram{ 0 };
 
         GLint m_SDFUniforms [GLSL::ESDFUniform_UniformCount ]{};
         GLint m_TextUniforms[GLSL::ETextUniform_UniformCount]{};
+        GLint m_BitmapUniforms[GLSL::EBitmapTextUniform_UniformCount]{};
 
         Mat3f m_Projection    {};
         i32   m_ViewportWidth { 800 };
@@ -253,10 +259,11 @@ namespace RatUI::OpenGL
     OpenGLRenderer::OpenGLRenderer( int a_ViewportWidth, int a_ViewportHeight )
     {
         static_assert( sizeof( SDFVertex ) == 52, "SDFVertex layout assumption broken" );
-        static_assert( sizeof( TextVertex ) == 20, "TextVertex layout assumption broken" );
+        static_assert( sizeof( TextVertex ) == 28, "TextVertex layout assumption broken" );
 
-        m_SDFProgram = Detail::LinkProgram( GLSL::c_SDFVertSrc, GLSL::c_SDFFragSrc );
-        m_MSDFProgram = Detail::LinkProgram( GLSL::c_TextVertSrc, GLSL::c_TextFragSrc );
+        m_SDFProgram    = Detail::LinkProgram( GLSL::c_SDFVertSrc, GLSL::c_SDFFragSrc );
+        m_MSDFProgram   = Detail::LinkProgram( GLSL::c_TextVertSrc, GLSL::c_TextFragSrc );
+        m_BitmapProgram = Detail::LinkProgram( GLSL::c_TextVertSrc, GLSL::c_BitmapTextFragSrc );
 
         const auto collectUniforms = []( GLuint a_Program, const char* const* a_Names, GLint* a_OutLocs, i32 a_Count )
         {
@@ -266,6 +273,7 @@ namespace RatUI::OpenGL
 
         collectUniforms( m_SDFProgram, GLSL::c_SDFUniformNames, m_SDFUniforms, (i32)GLSL::ESDFUniform_UniformCount );
         collectUniforms( m_MSDFProgram, GLSL::c_TextUniformNames, m_TextUniforms, (i32)GLSL::ETextUniform_UniformCount );
+        collectUniforms( m_BitmapProgram, GLSL::c_BitmapTextUniformNames, m_BitmapUniforms, (i32)GLSL::EBitmapTextUniform_UniformCount );
 
         glGenBuffers( 1, &m_VBO );
         glGenBuffers( 1, &m_IBO );
@@ -282,7 +290,7 @@ namespace RatUI::OpenGL
         glBindVertexArray( m_TextVAO );
         glBindBuffer( GL_ARRAY_BUFFER, m_VBO );
         glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, m_IBO );
-        for ( int i = 0; i < 3; ++i )
+        for ( int i = 0; i < 5; ++i )
             glEnableVertexAttribArray( i );
         glBindVertexArray( 0 );
 
@@ -297,6 +305,7 @@ namespace RatUI::OpenGL
         glDeleteBuffers( 1, &m_IBO );
         glDeleteProgram( m_SDFProgram );
         glDeleteProgram( m_MSDFProgram );
+        glDeleteProgram( m_BitmapProgram );
     }
 
     void OpenGLRenderer::SetViewport( int a_Width, int a_Height )
@@ -543,6 +552,17 @@ namespace RatUI::OpenGL
         glUniformMatrix4fv( m_SDFUniforms[GLSL::ESDFUniform_PVM], 1, GL_FALSE, a_PVM );
     }
 
+    void OpenGLRenderer::BindTextVertices( u32 a_VertexByteOffset )
+    {
+        glBindVertexArray( m_TextVAO );
+        const auto vo = static_cast<uintptr_t>( a_VertexByteOffset );
+        glVertexAttribPointer( 0, 2, GL_FLOAT,         GL_FALSE, sizeof( TextVertex ), (const void*)( vo + 0 ) );  // Position
+        glVertexAttribPointer( 1, 2, GL_FLOAT,         GL_FALSE, sizeof( TextVertex ), (const void*)( vo + 8 ) );  // UV
+        glVertexAttribPointer( 2, 4, GL_UNSIGNED_BYTE, GL_TRUE,  sizeof( TextVertex ), (const void*)( vo + 16 ) ); // Tint
+        glVertexAttribPointer( 3, 1, GL_FLOAT,         GL_FALSE, sizeof( TextVertex ), (const void*)( vo + 20 ) ); // Weight
+        glVertexAttribPointer( 4, 1, GL_FLOAT,         GL_FALSE, sizeof( TextVertex ), (const void*)( vo + 24 ) ); // Opacity
+    }
+
     void OpenGLRenderer::DispatchBatch( const MSDFTextDrawData& a_Data, u32 a_VertexByteOffset, const f32 a_PVM[16] )
     {
         if ( IsValidTexture( a_Data.FontAtlas ) )
@@ -551,19 +571,13 @@ namespace RatUI::OpenGL
 			glBindTexture( GL_TEXTURE_2D, static_cast<const Texture*>( a_Data.FontAtlas.get() )->ID );
         }
 
-        glBindVertexArray( m_TextVAO );
-        const auto vo = static_cast<uintptr_t>( a_VertexByteOffset );
-        glVertexAttribPointer( 0, 2, GL_FLOAT, GL_FALSE, sizeof( TextVertex ), (const void*)( vo + 0 ) );
-        glVertexAttribPointer( 1, 1, GL_FLOAT, GL_FALSE, sizeof( TextVertex ), (const void*)( vo + 8 ) );
-        glVertexAttribPointer( 2, 2, GL_FLOAT, GL_FALSE, sizeof( TextVertex ), (const void*)( vo + 12 ) );
+        BindTextVertices( a_VertexByteOffset );
 
         glUseProgram( m_MSDFProgram );
         glUniformMatrix4fv( m_TextUniforms[GLSL::ETextUniform_PVM], 1, GL_FALSE, a_PVM );
         glUniform1i( m_TextUniforms[GLSL::ETextUniform_Atlas], 0 );
         glUniform1f( m_TextUniforms[GLSL::ETextUniform_PxRange], a_Data.PixelRange );
-        glUniform1f( m_TextUniforms[GLSL::ETextUniform_Scale], a_Data.Scale );
 
-        Detail::UniformColor( m_TextUniforms[GLSL::ETextUniform_FillColor], a_Data.FillColor );
         glUniform1f( m_TextUniforms[GLSL::ETextUniform_FillSoftness], a_Data.FillSoftness );
         glUniform1f( m_TextUniforms[GLSL::ETextUniform_FillThreshold], a_Data.FillThreshold );
 
@@ -607,10 +621,21 @@ namespace RatUI::OpenGL
             glUniform1f( m_TextUniforms[GLSL::ETextUniform_GlowSpread], 0.f );
             glUniform1f( m_TextUniforms[GLSL::ETextUniform_GlowPower], 0.f );
         }
+    }
 
-        Detail::UniformColorZero( m_TextUniforms[GLSL::ETextUniform_InnerGlowColor] );
-        glUniform1f( m_TextUniforms[GLSL::ETextUniform_InnerGlowRange], 0.f );
-        glUniform1f( m_TextUniforms[GLSL::ETextUniform_InnerGlowSoftness], 0.f );
+    void OpenGLRenderer::DispatchBatch( const BitmapTextDrawData& a_Data, u32 a_VertexByteOffset, const f32 a_PVM[16] )
+    {
+        if ( IsValidTexture( a_Data.Page ) )
+        {
+            glActiveTexture( GL_TEXTURE0 );
+            glBindTexture( GL_TEXTURE_2D, static_cast<const Texture*>( a_Data.Page.get() )->ID );
+        }
+
+        BindTextVertices( a_VertexByteOffset );
+
+        glUseProgram( m_BitmapProgram );
+        glUniformMatrix4fv( m_BitmapUniforms[GLSL::EBitmapTextUniform_PVM], 1, GL_FALSE, a_PVM );
+        glUniform1i( m_BitmapUniforms[GLSL::EBitmapTextUniform_Atlas], 0 );
     }
 
     void OpenGLRenderer::SetClipRect( const Optional<Rectu16>& a_ClipRect )

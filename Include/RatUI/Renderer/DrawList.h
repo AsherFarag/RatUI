@@ -196,31 +196,19 @@ namespace RatUI
             } );
         }
 
-        /**
-		 * @brief Adds shaped text to the draw list with the specified style.
-		 * The text will be transformed and clipped according to the current transform and clip stacks. 
-         * The font size in the ShapedText is in units, but will be scaled to pixels based on the atlas configuration and current DPI scale.
-         * @param a_Shaped The shaped text to render, which contains the sequence of glyphs and layout information.
-         * @param a_Style The rendering style for the text, including fill color, outline, shadow, etc.
-         * @param a_Rect The layout rectangle in which to render the text. The text will be clipped to this rectangle.
-         * @param a_MaxGlyphs The maximum number of glyphs to render. Useful for effects in games where you want to reveal text gradually. Default is unlimited.
-         * @return A reference to the DrawList, allowing for method chaining.
-         */
+        /** @brief Adds shaped text. @p a_MaxGlyphs limits how many glyphs are drawn (for typewriter reveals). */
         DrawList& AddText( 
             const ShapedText& a_Shaped, 
             const TextRenderStyle& a_Style, 
             Rect<Unit> a_Rect, 
             u32 a_MaxGlyphs = Limits<u32>::max() )
 		{
-			const f32   baseSize   = m_Atlas.GetConfig().BaseSize.ToFloat();
-            const Pixel fontSizePx = ToPixel( a_Shaped.FontSize, m_DPIScale );
-            const f32   msdfScale  = baseSize > 0.f ? fontSizePx.ToFloat() / baseSize : 1.f;
-
-			DrawBatcher& batcher = GetCurrentBatcher();
-            batcher.EnsureMSDFTextBatch( GetPixelClipRect(), GetPixelTransform(), MSDFTextDrawData::From( m_Atlas.GetTexture(), a_Style, msdfScale));
-			batcher.EmitText( a_Shaped, a_Style, ToPixelRect( a_Rect ), m_Atlas, m_DPIScale, a_MaxGlyphs );
+			GetCurrentBatcher().EmitText( a_Shaped, a_Style, ToPixelRect( a_Rect ), m_Atlas, m_DPIScale, 
+                                          GetPixelClipRect(), GetTextPixelTransform(), a_MaxGlyphs );
             return *this;
         }
+
+        GlyphAtlas& GetAtlas() const { return m_Atlas; }
 
         /**
          * @brief Flushes the draw list by executing all recorded draw batches on the given renderer. 
@@ -239,6 +227,7 @@ namespace RatUI
          */
         void Clear()
         {
+            m_Atlas.BeginFrame();
             m_ClipStackSize = 0;
             m_TransformStackSize = 0;
 			m_CurrentLayer = 0;
@@ -323,6 +312,7 @@ namespace RatUI
 
         // TODO: We call these alot, should cache them
 
+        /** @brief Only the translation is in units, so only it gets scaled by the DPI. */
         Mat3f GetPixelTransform() const 
         {
             if ( m_TransformStackSize == 0 )
@@ -332,9 +322,27 @@ namespace RatUI
             Mat3f pixelTransform;
             for ( size i = 0; i < 3; ++i )
                 for ( size j = 0; j < 3; ++j )
-                    pixelTransform[i][j] = ToPixel( currentTransform[i][j], m_DPIScale ).ToFloat();
+                    pixelTransform[i][j] = currentTransform[i][j].ToFloat();
 
+            pixelTransform[2u][0u] *= m_DPIScale;
+            pixelTransform[2u][1u] *= m_DPIScale;
             return pixelTransform;
+        }
+
+        /** @brief Rounds pure translations to whole pixels, so snapped text stays on the pixel grid. */
+        Mat3f GetTextPixelTransform() const
+        {
+            Mat3f transform = GetPixelTransform();
+
+            constexpr f32 c_Epsilon = 1e-4f;
+            const bool translationOnly = std::abs( transform[0u][0u] - 1.f ) < c_Epsilon && std::abs( transform[1u][1u] - 1.f ) < c_Epsilon
+                                      && std::abs( transform[0u][1u] ) < c_Epsilon && std::abs( transform[1u][0u] ) < c_Epsilon;
+            if ( translationOnly )
+            {
+                transform[2u][0u] = std::round( transform[2u][0u] );
+                transform[2u][1u] = std::round( transform[2u][1u] );
+            }
+            return transform;
         }
 
         Optional<Rectu16> GetPixelClipRect() const

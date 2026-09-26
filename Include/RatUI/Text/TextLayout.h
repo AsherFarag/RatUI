@@ -16,12 +16,8 @@
 
 namespace RatUI::TextLayout
 {
-    // TODO: How to handle Rich text with multiple styles?  We could either:
-    //       1. Include style information in TextSegment and pre-measure each segment with its style during Prepare().
-    //          This would allow for accurate measurement of mixed-style text, but would increase the complexity of Prepare() and the size of PreparedText.
-    //       2. Keep RichText as a separate higher-level system?
-    //       I want to support things like image's in text etc.
-    //       I hate text man.
+    // Segments know nothing about styles: measuring by byte range keeps words split across runs unbreakable.
+    // TODO: Inline objects (images in text) could become a segment kind with a fixed width.
 
 
     constexpr Unit c_LineFitEpsilon = 0.01_u; ///< Tolerance for floating-point line-fit checks
@@ -30,50 +26,74 @@ namespace RatUI::TextLayout
     // Prepare phase
     // =========================================================================
 
+    /** @brief Normalises whitespace according to @p a_Wrap. */
+    inline String NormalizeText( StringView a_Text, TextWrap a_Wrap, Array<u32>* o_SourceToNormalized = nullptr )
+    {
+        return Unicode::NormalizeWhitespace( a_Text, a_Wrap.CollapsesSpaces(), a_Wrap.PreservesNewlines(), o_SourceToNormalized );
+    }
+
     /**
-     * @brief Normalises and prepares text for layout, returning a PreparedText with pre-measured segments.
-     * @param a_Text The input text to prepare.
-     * @param a_Wrap The text wrapping mode to use (NoWrap, WrapWord, or WrapChar).
-     * @param a_Measure A callable that takes a StringView and returns its measured width in pixels.  This is used to pre-measure segments during preparation.
-     * @return A PreparedText containing the normalised text and its pre-measured segments.
+     * @brief Splits io_Prepared.NormalizedText into pre-measured segments. Each '\n' becomes a HardBreak.
+     * @param a_Measure Callable `Unit( u32 byteStart, u32 byteLength )` measuring a byte range of NormalizedText.
      */
-	template<typename MeasureFn> requires std::is_invocable_r_v<Unit, MeasureFn, StringView>
-    inline PreparedText Prepare( StringView a_Text, TextWrap a_Wrap, MeasureFn&& a_Measure )
+	template<typename MeasureFn> requires std::is_invocable_r_v<Unit, MeasureFn, u32, u32>
+    inline void Segment( PreparedText& io_Prepared, TextWrap a_Wrap, MeasureFn&& a_Measure )
     {
         // TODO: This doesnt handle 'graphemes' correctly, e.g. emoji sequences with skin-tone modifiers or ZWJ.  
         // The segmentation should ideally be based on extended grapheme clusters (e.g. via ICU) rather than just codepoints, 
         // to avoid splitting user-perceived characters across lines.
         // But I need to research this more.
 
-        PreparedText result;
-        result.NormalizedText = a_Wrap.Prewrap()
-            ? Unicode::NormalizeWhitespacePreWrap( a_Text )
-            : Unicode::NormalizeWhitespace( a_Text );
+        PreparedText& result = io_Prepared;
+        Clear( result.Segments );
 
         const StringView norm = result.NormalizedText; 
 
         if ( Empty( norm ) )
-            return result; // No text, return early with empty segments.
+            return; // No text, return early with empty segments.
 
-        // Pre-measure the hyphen width for potential soft-hyphen support.
-        // TODO: currently don't emit soft hyphens, but we reserve the width here in case we add that later.
-        result.HyphenWidth = a_Measure( StringView{ "-" } );
 
-        // For NoWrap mode, we can skip segmentation and just measure the whole text as a single line.
+        // No wrapping: each line is one unbreakable segment.
         if ( a_Wrap.BreakMode == EBreakMode::None )
         {
-            const Unit lineWidth = a_Measure( norm );
-            PushBack( result.Segments,
-                TextSegment{
-                    .StartByte = 0,
-                    .ByteLength = static_cast<u32>( Size( norm ) ),
-                    .Width      = lineWidth,
-                    .PaintWidth = lineWidth,
-                    .Kind       = ESegmentKind::Text,
-                    .IsCJKChar  = false
+            size lineStart = 0;
+            while ( lineStart <= Size( norm ) )
+            {
+                size lineEnd = norm.find( '\n', lineStart );
+                if ( lineEnd == StringView::npos )
+                    lineEnd = Size( norm );
+
+                if ( lineEnd > lineStart )
+                {
+                    const u32  start = static_cast<u32>( lineStart );
+                    const u32  len   = static_cast<u32>( lineEnd - lineStart );
+                    const Unit width = a_Measure( start, len );
+                    PushBack( result.Segments,
+                        TextSegment{
+                            .StartByte  = start,
+                            .ByteLength = len,
+                            .Width      = width,
+                            .PaintWidth = width,
+                            .Kind       = ESegmentKind::Text,
+                            .IsCJKChar  = false
+                        }
+                    );
                 }
-            );
-            return result;
+
+                if ( lineEnd < Size( norm ) )
+                {
+                    PushBack( result.Segments,
+                        TextSegment{
+                            .StartByte  = static_cast<u32>( lineEnd ),
+                            .ByteLength = 1,
+                            .Kind       = ESegmentKind::HardBreak,
+                        }
+                    );
+                }
+
+                lineStart = lineEnd + 1;
+            }
+            return;
         }
 
         // For WrapWord and WrapChar modes, scan codepoint by codepoint.
@@ -88,7 +108,7 @@ namespace RatUI::TextLayout
 
             const u32  start = static_cast<u32>( wordStartByteOffset );
             const u32  len   = static_cast<u32>( upTo - wordStartByteOffset );
-            const Unit width = a_Measure( StringView{ Data( norm ) + start, len } );
+            const Unit width = a_Measure( start, len );
 
             PushBack( result.Segments,
                 TextSegment{ 
@@ -118,8 +138,8 @@ namespace RatUI::TextLayout
             const size idx = it.ByteIndex();
             const size len = it.SequenceByteLength();
 
-            // Pre-wrap newline -> HardBreak segment
-            if ( a_Wrap.Prewrap() && cp == U'\n' )
+            // Preserved newline -> HardBreak segment
+            if ( cp == U'\n' )
             {
                 flushWord( idx );
                 PushBack( result.Segments,
@@ -137,20 +157,24 @@ namespace RatUI::TextLayout
                 continue;
             }
 
-            // Whitespace -> Space segment (absorbs a run of spaces)
+            // Whitespace -> Space segment (never absorbs a newline)
             if ( Unicode::IsWhitespace( cp ) )
             {
                 flushWord( idx );
                 const size spaceStart = idx;
 
+                // Preserved leading spaces are indentation, so they're painted rather than dropped at a wrap.
+                const bool indentation = !a_Wrap.CollapsesSpaces()
+                    && ( Empty( result.Segments ) || Back( result.Segments ).Kind == ESegmentKind::HardBreak );
+
                 // Consume the entire run of whitespace as part of this space segment
-                while ( it && Unicode::IsWhitespace( *it ) )
+                while ( it && Unicode::IsWhitespace( *it ) && *it != U'\n' )
                     ++it;
 
                 const size spaceEnd = it.ByteIndex();
                 const u32  sStart   = static_cast<u32>( spaceStart );
                 const u32  sLen     = static_cast<u32>( spaceEnd - spaceStart );
-                const Unit sw       = a_Measure( StringView{ Data( norm ) + sStart, sLen } );
+                const Unit sw       = a_Measure( sStart, sLen );
 
                 // PaintWidth is 0: trailing spaces are invisible (they hang off the edge).
                 PushBack( result.Segments,
@@ -158,10 +182,10 @@ namespace RatUI::TextLayout
                         .StartByte = sStart,
                         .ByteLength = sLen,
                         .Width = sw,
-                        .PaintWidth = 0_u,
-                        .Kind = ESegmentKind::Space,
-                        .IsCJKChar = false 
-                    } 
+                        .PaintWidth = indentation ? sw : 0_u,
+                        .Kind = indentation ? ESegmentKind::Text : ESegmentKind::Space,
+                        .IsCJKChar = false
+                    }
                 );
 
                 wordStartByteOffset = spaceEnd;
@@ -175,7 +199,7 @@ namespace RatUI::TextLayout
                 flushWord( idx );
 
                 const bool isCJK = Unicode::IsCJK( cp );
-                const Unit w     = a_Measure( StringView{ Data( norm ) + idx, static_cast<u32>( len ) } );
+                const Unit w     = a_Measure( static_cast<u32>( idx ), static_cast<u32>( len ) );
 
                 PushBack( result.Segments,
                     TextSegment{ 
@@ -197,7 +221,7 @@ namespace RatUI::TextLayout
             if ( Unicode::IsCJK( cp ) )
             {
                 flushWord( idx );
-                const Unit w = a_Measure( StringView{ Data( norm ) + idx, static_cast<u32>( len ) } );
+                const Unit w = a_Measure( static_cast<u32>( idx ), static_cast<u32>( len ) );
 
                 PushBack( result.Segments,
                     TextSegment{ 
@@ -221,7 +245,18 @@ namespace RatUI::TextLayout
 
         // Flush any pending word at the end of the text.
         flushWord( Size( norm ) );
+    }
 
+    /**
+     * @brief Normalises and prepares text for layout, returning a PreparedText with pre-measured segments (no runs).
+     * @param a_Measure Callable `Unit( u32 byteStart, u32 byteLength )` measuring a byte range of the normalised text.
+     */
+	template<typename MeasureFn> requires std::is_invocable_r_v<Unit, MeasureFn, u32, u32>
+    inline PreparedText Prepare( StringView a_Text, TextWrap a_Wrap, MeasureFn&& a_Measure )
+    {
+        PreparedText result;
+        result.NormalizedText = NormalizeText( a_Text, a_Wrap );
+        Segment( result, a_Wrap, std::forward<MeasureFn>( a_Measure ) );
         return result;
     }
 

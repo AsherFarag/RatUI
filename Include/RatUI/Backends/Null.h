@@ -14,12 +14,4 @@ namespace RatUI::Null
         Optional<TextureInfo> QueryTextureInfo( const TextureHandle& ) const override { return NullOpt; }
     };
 
-    class NullTextMetrics : public ITextMetrics
-    {
-    public:
-        Optional<PreparedText> Prepare( StringView, const TextLayoutStyle& ) override { return NullOpt; }
-        Optional<ShapedText> Shape( const PreparedText&, const TextLayoutStyle&, Vec2<Unit> ) override { return NullOpt; }
-        bool RasterizeGlyph( FontHandle, GlyphID, u32, const Color*&, u32&, u32&, Vec2<FontUnit>&, FontUnit& ) override { return false; }
-    };
-
 } // namespace RatUI::Null

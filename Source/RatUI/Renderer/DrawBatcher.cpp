@@ -1,47 +1,46 @@
 #include <RatUI/Renderer/DrawBatcher.h>
 
 #include <algorithm>
+#include <cmath>
 
 namespace RatUI
 {
-    MSDFTextDrawData MSDFTextDrawData::From( TextureHandle a_FontAtlas, const TextRenderStyle& a_Style, f32 a_MSDFScale )
+    MSDFTextDrawData MSDFTextDrawData::From( TextureHandle a_Page, const TextRenderStyle& a_Style, f32 a_PxRange, u16 a_PageSize )
     {
         MSDFTextDrawData result{
-            .FontAtlas = std::move( a_FontAtlas ),
-            .Scale = a_MSDFScale,
+            .FontAtlas  = std::move( a_Page ),
+            .PixelRange = a_PxRange,
         };
 
-        result.FillColor = a_Style.FillColor;
-        result.FillSoftness = a_Style.FillSoftness;
+        result.FillSoftness  = a_Style.FillSoftness;
         result.FillThreshold = a_Style.FillThreshold;
 
         result.OutlineEnable = a_Style.Outline;
         if ( a_Style.Outline )
         {
-            result.OutlineColor = a_Style.OutlineColor;
-            result.OutlineWidth = a_Style.OutlineWidth;
+            result.OutlineColor    = a_Style.OutlineColor;
+            result.OutlineWidth    = a_Style.OutlineWidth;
             result.OutlineSoftness = a_Style.OutlineSoftness;
         }
 
         result.ShadowEnable = a_Style.Shadow;
         if ( a_Style.Shadow )
         {
-            result.ShadowColor = a_Style.ShadowColor;
+            result.ShadowColor    = a_Style.ShadowColor;
             result.ShadowSoftness = a_Style.ShadowSoftness;
-            result.ShadowSpread = a_Style.ShadowSpread;
+            result.ShadowSpread   = a_Style.ShadowSpread;
 
-            result.ShadowOffsetUV = Vec2f{
-                a_Style.ShadowOffset[0],
-                a_Style.ShadowOffset[1],
-            };
+            // ShadowOffset is in atlas pixels; the shader works in UV.
+            const f32 rcpPage = a_PageSize > 0 ? 1.f / static_cast<f32>( a_PageSize ) : 0.f;
+            result.ShadowOffsetUV = Vec2f{ a_Style.ShadowOffset[0] * rcpPage, a_Style.ShadowOffset[1] * rcpPage };
         }
 
         result.GlowEnable = a_Style.Glow;
         if ( a_Style.Glow )
         {
-            result.GlowColor = a_Style.GlowColor;
+            result.GlowColor  = a_Style.GlowColor;
             result.GlowSpread = a_Style.GlowSpread;
-            result.GlowPower = a_Style.GlowPower;
+            result.GlowPower  = a_Style.GlowPower;
         }
 
         return result;
@@ -49,7 +48,7 @@ namespace RatUI
 
     bool MSDFTextDrawData::CanFlattenWith( const MSDFTextDrawData& a_Other ) const
     {
-        if ( FontAtlas != a_Other.FontAtlas || PixelRange != a_Other.PixelRange || Scale != a_Other.Scale )
+        if ( FontAtlas != a_Other.FontAtlas || PixelRange != a_Other.PixelRange )
             return false;
 
         if ( OutlineEnable != a_Other.OutlineEnable )
@@ -58,11 +57,7 @@ namespace RatUI
             return false;
         if ( GlowEnable != a_Other.GlowEnable )
             return false;
-        if ( InnerGlowEnable != a_Other.InnerGlowEnable )
-            return false;
 
-        if ( FillColor != a_Other.FillColor )
-            return false;
         if ( FillSoftness != a_Other.FillSoftness )
             return false;
         if ( FillThreshold != a_Other.FillThreshold )
@@ -129,11 +124,6 @@ namespace RatUI
     DrawBatch& DrawBatcher::EnsureSDFBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, TextureView a_Texture )
     {
         return EnsureBatch( a_ClipRect, a_Transform, SDFDrawData{ .Texture = std::move( a_Texture ) } );
-    }
-
-    DrawBatch& DrawBatcher::EnsureMSDFTextBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, const MSDFTextDrawData& a_Data )
-    {
-        return EnsureBatch( a_ClipRect, a_Transform, a_Data );
     }
 
     void DrawBatcher::EmitRect( Rect<Pixel> a_Rect, Color a_FillColor, Pixel a_BorderThickness, Color a_BorderColor, Vec4<Pixel> a_Rounding, Rect<f32> a_UVRect )
@@ -359,170 +349,455 @@ namespace RatUI
         TryFlatten();
     }
 
-    void DrawBatcher::EmitText( 
-        const ShapedText& a_Text, 
-        const TextRenderStyle& a_Style, 
-        Rect<Pixel> a_LayoutRect, 
-        GlyphAtlas& a_Atlas, 
-        f32 a_DpiScale, 
-        u32 a_MaxGlyphs )
+    // =========================================================================
+    // Text
+    // =========================================================================
+
+    namespace
     {
-        if ( Empty( a_Text.Glyphs ) || Empty( a_Text.Lines ) )
-            return;
-    
-        const f32 atlasW    = static_cast<f32>( a_Atlas.GetConfig().AtlasWidth );
-        const f32 atlasH    = static_cast<f32>( a_Atlas.GetConfig().AtlasHeight );
-        const f32 rcpAtlasW = atlasW > 0.f ? 1.f / atlasW : 0.f;
-        const f32 rcpAtlasH = atlasH > 0.f ? 1.f / atlasH : 0.f;
-    
-        const Unit  fontSize   = a_Text.FontSize;
-        const Pixel textHeight = ToPixel( a_Text.TotalHeight, a_DpiScale );
-        const Pixel ascender   = ToPixel( a_Text.Ascender, a_DpiScale );
-    
-        const f32 baseSize   = a_Atlas.GetConfig().BaseSize.ToFloat();
-        const f32 rcpBase    = baseSize > 0.f ? 1.f / baseSize : 0.f;
-        const f32 fontSizePx = ToPixel( fontSize, a_DpiScale ).ToFloat();
-    
-        const bool isSingleLine   = a_Text.LineCount() == 1;
-        const bool overflowsY     = textHeight > a_LayoutRect.Size[1];
-        const bool fadeHorizontal = isSingleLine;
-        const bool fadeVertical   = !isSingleLine && overflowsY;
-    
-        // Horizontal fade setup (single-line only)
-        const Pixel layoutRight = a_LayoutRect.Right();
-        const f32   fadePct     = fadeHorizontal ? std::clamp( a_Style.FadePercentage, 0.0f, 1.0f ) : 0.f;
-        const Pixel fadeStartX  = layoutRight - a_LayoutRect.Size[0] * fadePct;
-        const Pixel fadeEndX    = layoutRight;
-    
-        // Vertical fade setup (multi-line overflow only)
-        const Pixel layoutBottom  = a_LayoutRect.Bottom();
-        const f32   fadePctV      = fadeVertical ? std::clamp( a_Style.FadePercentage, 0.0f, 1.0f ) : 0.f;
-        const Pixel fadeStartY    = layoutBottom - a_LayoutRect.Size[1] * fadePctV;
-        const Pixel fadeEndY      = layoutBottom;
-    
-        auto computeFadeAlpha = [&]( Pixel x, Pixel y ) -> u8
+        /** @brief Screen pixels per native pixel: the largest whole number that fits, so fractional DPIs never blur. */
+        f32 PixelScale( const IFontFace& a_Face, Unit a_Size, f32 a_DpiScale )
         {
-            f32 alpha = static_cast<f32>( a_Style.FillColor[3] );
-    
-            if ( fadeHorizontal && fadePct > 0.f && x > fadeStartX )
+            const f32 native = std::max( a_Face.Metrics().NativePixelSize, 1.f );
+            return std::max( 1.f, std::floor( a_Size.ToFloat() / native * a_DpiScale + 1e-3f ) );
+        }
+
+        /** @brief Whole-pixel pen for pixel runs, so glyph spacing always matches the glyph scale. */
+        struct PixelPen
+        {
+            bool Active{ false };
+            f32  Origin{ 0.f };     ///< Run start, in screen pixels.
+            f32  Scale{ 1.f };      ///< Screen pixels per native pixel.
+            Unit NativeUnit{ 0_u }; ///< Layout units per native pixel.
+            f32  Native{ 0.f };     ///< Pen offset from Origin, in native pixels.
+
+            PixelPen( const IFontFace* a_Face, Unit a_Size, f32 a_DpiScale, f32 a_PenX )
             {
-                if ( x >= fadeEndX )
-                    return 0;
-                const f32 t = ( x - fadeStartX ).ToFloat() / ( fadeEndX - fadeStartX ).ToFloat();
-                alpha = ( 1.0f - t ) * alpha;
+                if ( !a_Face || !TextShaping::IsPixelFace( *a_Face ) )
+                    return;
+
+                Active     = true;
+                Origin     = std::round( a_PenX );
+                Scale      = PixelScale( *a_Face, a_Size, a_DpiScale );
+                NativeUnit = TextShaping::NativePixelUnit( *a_Face, a_Size );
             }
-    
-            if ( fadeVertical && fadePctV > 0.f && y > fadeStartY )
-            {
-                if ( y >= fadeEndY )
-                    return 0;
-                const f32 t = ( y - fadeStartY ).ToFloat() / ( fadeEndY - fadeStartY ).ToFloat();
-                alpha = ( 1.0f - t ) * alpha;
-            }
-    
-            return static_cast<u8>( std::clamp( alpha, 0.0f, 255.0f ) );
+
+            f32 ToNative( Unit a_Value ) const { return std::round( a_Value.ToFloat() / NativeUnit.ToFloat() ); }
+
+            f32 GlyphX( Unit a_XOffset ) const { return Origin + ( Native + ToNative( a_XOffset ) ) * Scale; }
+            f32 GlyphYOffset( Unit a_YOffset ) const { return ToNative( a_YOffset ) * Scale; }
+            void Advance( Unit a_XAdvance ) { Native += ToNative( a_XAdvance ); }
+            f32 End() const { return Origin + Native * Scale; }
         };
-    
-        Pixel baselineY = a_LayoutRect.Origin[1];
+
+        /** @brief */
+        i32 ToWholeSteps( f32 a_Value )
+        {
+            if ( a_Value == 0.f )
+                return 0;
+            const i32 steps = static_cast<i32>( std::round( a_Value ) );
+            return steps != 0 ? steps : ( a_Value > 0.f ? 1 : -1 );
+        }
+    }
+
+    DrawBatcher::BitmapEffects DrawBatcher::ComputeBitmapEffects( const TextRenderStyle& a_Style, const IFontFace& a_Face, Unit a_Size, f32 a_DpiScale, const GlyphAtlasConfig& a_Config ) const
+    {
+        BitmapEffects effects;
+        if ( a_Face.GetMode() == EGlyphRenderMode::MTSDF )
+            return effects; // Done in the shader.
+
+        // Sizes are relative to the em, snapped to whole native (Pixel) or screen (Raster) pixels.
+        const bool pixel    = TextShaping::IsPixelFace( a_Face );
+        const f32  stepPx   = pixel ? PixelScale( a_Face, a_Size, a_DpiScale ) : 1.f;
+        const f32  stepsPerEm = pixel ? a_Face.Metrics().NativePixelSize : ToPixel( a_Size, a_DpiScale ).ToFloat();
+        const f32  rcpBase  = a_Config.SDFBaseSize > 0 ? 1.f / static_cast<f32>( a_Config.SDFBaseSize ) : 0.f;
+
+        if ( a_Style.Shadow && a_Style.ShadowColor[3] > 0 )
+        {
+            effects.ShadowDX = static_cast<i16>( ToWholeSteps( a_Style.ShadowOffset[0] * rcpBase * stepsPerEm ) * stepPx );
+            effects.ShadowDY = static_cast<i16>( ToWholeSteps( a_Style.ShadowOffset[1] * rcpBase * stepsPerEm ) * stepPx );
+        }
+
+        if ( a_Style.Outline && a_Style.OutlineColor[3] > 0 && a_Style.OutlineWidth > 0.f )
+        {
+            const f32 outlineEm = a_Style.OutlineWidth * a_Config.SDFPixelRange * rcpBase;
+            effects.OutlineStep   = static_cast<i16>( stepPx );
+            effects.OutlineRadius = static_cast<u8>( std::clamp( ToWholeSteps( outlineEm * stepsPerEm ), 1, 2 ) );
+        }
+
+        return effects;
+    }
+
+    void DrawBatcher::PlaceGlyph( GlyphAtlas& a_Atlas, const IFontFace& a_Face, const ResolvedFace& a_Resolved, GlyphID a_Glyph,
+                                  Unit a_Size, f32 a_PenX, f32 a_BaselineY, f32 a_DpiScale, Color a_Color, const BitmapEffects& a_Effects )
+    {
+        const GlyphAtlasConfig& config = a_Atlas.GetConfig();
+        const EGlyphRenderMode  mode   = a_Face.GetMode();
+        const f32               sizePx = ToPixel( a_Size, a_DpiScale ).ToFloat();
+
+        TextQuad quad{};
+        quad.FillColor     = a_Color;
+        quad.BaselineY     = a_BaselineY;
+        quad.ShadowDX      = a_Effects.ShadowDX;
+        quad.ShadowDY      = a_Effects.ShadowDY;
+        quad.OutlineStep   = a_Effects.OutlineStep;
+        quad.OutlineRadius = a_Effects.OutlineRadius;
+
+        Optional<AtlasGlyph> glyph;
+        switch ( mode )
+        {
+            case EGlyphRenderMode::MTSDF:
+            {
+                glyph = a_Atlas.GetOrRasterizeGlyph( GlyphCacheKey::For( a_Resolved, a_Glyph, mode, 0 ) );
+                if ( !glyph || glyph->IsBlank() )
+                    return;
+
+                const f32 scale = sizePx / static_cast<f32>( config.SDFBaseSize );
+                quad.X0 = a_PenX + glyph->Bearing[0] * sizePx;
+                quad.Y0 = a_BaselineY - glyph->Bearing[1] * sizePx;
+                quad.X1 = quad.X0 + static_cast<f32>( glyph->Rect.Size[0] ) * scale;
+                quad.Y1 = quad.Y0 + static_cast<f32>( glyph->Rect.Size[1] ) * scale;
+                quad.SDF = true;
+
+                // Faux bold: grow each edge by half the stroke growth, in SDF units.
+                if ( a_Resolved.SynthBold )
+                {
+                    const f32 emPerSDFUnit = config.SDFPixelRange / static_cast<f32>( config.SDFBaseSize );
+                    quad.Weight = TextShaping::SynthBoldEm( a_Size ) * 0.5f / emPerSDFUnit;
+                }
+                quad.Skew = a_Resolved.SynthItalic ? TextShaping::c_SynthItalicSlant : 0.f;
+                break;
+            }
+
+            case EGlyphRenderMode::Raster:
+            {
+                const u16 ppem = static_cast<u16>( std::clamp( std::round( sizePx ), 1.f, 1024.f ) );
+                glyph = a_Atlas.GetOrRasterizeGlyph( GlyphCacheKey::For( a_Resolved, a_Glyph, mode, ppem ) );
+                if ( !glyph || glyph->IsBlank() )
+                    return;
+
+                // Drawn 1:1 on whole pixels.
+                quad.X0 = std::round( a_PenX ) + glyph->Bearing[0];
+                quad.Y0 = std::round( a_BaselineY ) - glyph->Bearing[1];
+                quad.X1 = quad.X0 + static_cast<f32>( glyph->Rect.Size[0] );
+                quad.Y1 = quad.Y0 + static_cast<f32>( glyph->Rect.Size[1] );
+                break;
+            }
+
+            case EGlyphRenderMode::Pixel:
+            default:
+            {
+                const f32 scale  = PixelScale( a_Face, a_Size, a_DpiScale );
+                glyph = a_Atlas.GetOrRasterizeGlyph( GlyphCacheKey::For( a_Resolved, a_Glyph, EGlyphRenderMode::Pixel, 0 ) );
+                if ( !glyph || glyph->IsBlank() )
+                    return;
+
+                // Whole-number scale on a whole pixel.
+                quad.X0 = std::round( a_PenX ) + glyph->Bearing[0] * scale;
+                quad.Y0 = std::round( a_BaselineY ) - glyph->Bearing[1] * scale;
+                quad.X1 = quad.X0 + static_cast<f32>( glyph->Rect.Size[0] ) * scale;
+                quad.Y1 = quad.Y0 + static_cast<f32>( glyph->Rect.Size[1] ) * scale;
+                break;
+            }
+        }
+
+        const f32 rcpPage = 1.f / static_cast<f32>( config.PageSize );
+        quad.Page = glyph->Page;
+        quad.U0   = static_cast<f32>( glyph->Rect.Origin[0] ) * rcpPage;
+        quad.V0   = static_cast<f32>( glyph->Rect.Origin[1] ) * rcpPage;
+        quad.U1   = static_cast<f32>( glyph->Rect.Origin[0] + glyph->Rect.Size[0] ) * rcpPage;
+        quad.V1   = static_cast<f32>( glyph->Rect.Origin[1] + glyph->Rect.Size[1] ) * rcpPage;
+
+        if ( quad.Page )
+            PushBack( m_TextQuads, quad );
+    }
+
+    void DrawBatcher::PlaceDecoration( GlyphAtlas& a_Atlas, const IFontFace& a_Face, Unit a_Size, u8 a_Decoration,
+                                       f32 a_X0, f32 a_X1, f32 a_BaselineY, f32 a_DpiScale, Color a_Color, const BitmapEffects& a_Effects )
+    {
+        const EGlyphRenderMode mode = a_Face.GetMode();
+        const Optional<AtlasGlyph> white = a_Atlas.GetWhiteBlock( mode );
+        if ( !white || !white->Page || a_X1 <= a_X0 )
+            return;
+
+        const FontFaceMetrics& metrics = a_Face.Metrics();
+        const bool underline = ( a_Decoration & ETextDecoration::Underline ) != 0;
+        const f32  positionEm  = ( underline ? metrics.UnderlinePosition : metrics.StrikeoutPosition ).ToFloat();
+        const f32  thicknessEm = ( underline ? metrics.UnderlineThickness : metrics.StrikeoutThickness ).ToFloat();
+
+        TextQuad quad{};
+        quad.FillColor     = a_Color;
+        quad.BaselineY     = a_BaselineY;
+        quad.ShadowDX      = a_Effects.ShadowDX;
+        quad.ShadowDY      = a_Effects.ShadowDY;
+        quad.OutlineStep   = a_Effects.OutlineStep;
+        quad.OutlineRadius = a_Effects.OutlineRadius;
+        quad.SDF           = mode == EGlyphRenderMode::MTSDF;
+
+        if ( TextShaping::IsPixelFace( a_Face ) )
+        {
+            // At least one native pixel thick, on the native grid.
+            const f32 native     = metrics.NativePixelSize;
+            const f32 scale      = PixelScale( a_Face, a_Size, a_DpiScale );
+            const f32 thickness  = std::max( 1.f, std::round( thicknessEm * native ) );
+            const f32 topNative  = std::round( positionEm * native + thickness * 0.5f ); // Y-up
+            quad.X0 = std::round( a_X0 );
+            quad.X1 = std::round( a_X1 );
+            quad.Y0 = std::round( a_BaselineY ) - topNative * scale;
+            quad.Y1 = quad.Y0 + thickness * scale;
+        }
+        else
+        {
+            // At least one pixel thick, snapped.
+            const f32 sizePx    = ToPixel( a_Size, a_DpiScale ).ToFloat();
+            const f32 thickness = std::max( 1.f, std::round( thicknessEm * sizePx ) );
+            const f32 centre    = a_BaselineY - positionEm * sizePx;
+            quad.X0 = a_X0;
+            quad.X1 = a_X1;
+            quad.Y0 = std::round( centre - thickness * 0.5f );
+            quad.Y1 = quad.Y0 + thickness;
+        }
+
+        // Constant UV in the white block, so the quad is solid.
+        const f32 texel = static_cast<f32>( white->Rect.Origin[0] + 1 ) / static_cast<f32>( a_Atlas.GetConfig().PageSize );
+        quad.Page = white->Page;
+        quad.U0 = quad.U1 = texel;
+        quad.V0 = quad.V1 = texel;
+
+        PushBack( m_TextQuads, quad );
+    }
+
+    void DrawBatcher::SplitCurrentBatch()
+    {
+        RATUI_ASSERT( !Empty( m_Batches ), "SplitCurrentBatch requires an active batch." );
+        DrawBatch next = Back( m_Batches );
+        next.VertexByteOffset = static_cast<u32>( Size( m_Vertices ) );
+        next.IndexOffset      = static_cast<u32>( Size( m_Indices ) );
+        next.IndexCount       = 0;
+        PushBack( m_Batches, std::move( next ) );
+    }
+
+    void DrawBatcher::FlushTextQuads( const TextEmitParams& a_Params )
+    {
+        if ( Empty( m_TextQuads ) )
+            return;
+
+        const TextRenderStyle&  style  = *a_Params.Style;
+        const GlyphAtlasConfig& config = a_Params.Atlas->GetConfig();
+
+        const TextureHandle* currentPage = nullptr;
+        bool currentSDF = false;
+
+        const auto ensureBatch = [&]( const TextQuad& a_Quad )
+        {
+            if ( currentPage == a_Quad.Page && currentSDF == a_Quad.SDF && !Empty( m_Batches ) )
+                return;
+
+            if ( a_Quad.SDF )
+                EnsureBatch( a_Params.ClipRect, a_Params.Transform, MSDFTextDrawData::From( *a_Quad.Page, style, config.SDFPixelRange, config.PageSize ) );
+            else
+                EnsureBatch( a_Params.ClipRect, a_Params.Transform, BitmapTextDrawData{ *a_Quad.Page } );
+
+            currentPage = a_Quad.Page;
+            currentSDF  = a_Quad.SDF;
+        };
+
+        // ETextOverflow::Fade: opacity ramps to 0 over the last FadePercent of the box.
+        const Rect<Pixel>& fadeRect = a_Params.FadeRect;
+        const f32 fadeEndX   = fadeRect.Right().ToFloat();
+        const f32 fadeStartX = fadeEndX - fadeRect.Size[0].ToFloat() * a_Params.FadePercent;
+        const f32 fadeEndY   = fadeRect.Bottom().ToFloat();
+        const f32 fadeStartY = fadeEndY - fadeRect.Size[1].ToFloat() * a_Params.FadePercent;
+
+        const auto fadeAt = [&]( f32 a_X, f32 a_Y ) -> f32
+        {
+            f32 opacity = 1.f;
+            if ( a_Params.FadeHorizontal && a_X > fadeStartX )
+                opacity *= a_X >= fadeEndX ? 0.f : 1.f - ( a_X - fadeStartX ) / std::max( fadeEndX - fadeStartX, 1e-3f );
+            if ( a_Params.FadeVertical && a_Y > fadeStartY )
+                opacity *= a_Y >= fadeEndY ? 0.f : 1.f - ( a_Y - fadeStartY ) / std::max( fadeEndY - fadeStartY, 1e-3f );
+            return opacity;
+        };
+
+        const auto emitQuad = [&]( const TextQuad& a_Quad, f32 a_DX, f32 a_DY, Color a_Color, f32 a_Weight )
+        {
+            ensureBatch( a_Quad );
+
+            u32 vertexBase = ( static_cast<u32>( Size( m_Vertices ) ) - Back( m_Batches ).VertexByteOffset ) / sizeof( TextVertex );
+            if ( vertexBase + 4 > Limits<u16>::max() )
+            {
+                SplitCurrentBatch();
+                vertexBase = 0;
+            }
+
+            const f32 x0 = a_Quad.X0 + a_DX, x1 = a_Quad.X1 + a_DX;
+            const f32 y0 = a_Quad.Y0 + a_DY, y1 = a_Quad.Y1 + a_DY;
+
+            // Faux italic: shear around the baseline.
+            const f32 skewTop    = a_Quad.Skew * ( a_Quad.BaselineY + a_DY - y0 );
+            const f32 skewBottom = a_Quad.Skew * ( a_Quad.BaselineY + a_DY - y1 );
+
+            auto verts = ReserveVertices<TextVertex>( 4 );
+            verts[0] = TextVertex{ { Pixel{ x0 + skewTop },    Pixel{ y0 } }, { a_Quad.U0, a_Quad.V0 }, a_Color, a_Weight, fadeAt( x0, y0 ) };
+            verts[1] = TextVertex{ { Pixel{ x1 + skewTop },    Pixel{ y0 } }, { a_Quad.U1, a_Quad.V0 }, a_Color, a_Weight, fadeAt( x1, y0 ) };
+            verts[2] = TextVertex{ { Pixel{ x0 + skewBottom }, Pixel{ y1 } }, { a_Quad.U0, a_Quad.V1 }, a_Color, a_Weight, fadeAt( x0, y1 ) };
+            verts[3] = TextVertex{ { Pixel{ x1 + skewBottom }, Pixel{ y1 } }, { a_Quad.U1, a_Quad.V1 }, a_Color, a_Weight, fadeAt( x1, y1 ) };
+
+            auto idx = ReserveIndices( 6 );
+            idx[0] = static_cast<u16>( vertexBase + 0 );
+            idx[1] = static_cast<u16>( vertexBase + 1 );
+            idx[2] = static_cast<u16>( vertexBase + 2 );
+            idx[3] = static_cast<u16>( vertexBase + 1 );
+            idx[4] = static_cast<u16>( vertexBase + 3 );
+            idx[5] = static_cast<u16>( vertexBase + 2 );
+            AddIndicesToCurrentBatch( 6 );
+        };
+
+        const auto withAlpha = []( Color a_Effect, Color a_Fill ) -> Color
+        {
+            a_Effect[3] = static_cast<u8>( ( static_cast<u32>( a_Effect[3] ) * a_Fill[3] + 127 ) / 255 );
+            return a_Effect;
+        };
+
+        // All bitmap shadows first, so no shadow covers a neighbouring glyph.
+        if ( style.Shadow && style.ShadowColor[3] > 0 )
+        {
+            for ( const TextQuad& quad : m_TextQuads )
+            {
+                if ( !quad.SDF && ( quad.ShadowDX != 0 || quad.ShadowDY != 0 ) )
+                    emitQuad( quad, quad.ShadowDX, quad.ShadowDY, withAlpha( style.ShadowColor, quad.FillColor ), 1.f );
+            }
+        }
+
+        // Then bitmap outlines, as silhouettes offset around the glyph.
+        if ( style.Outline && style.OutlineColor[3] > 0 )
+        {
+            for ( const TextQuad& quad : m_TextQuads )
+            {
+                if ( quad.SDF || quad.OutlineStep == 0 )
+                    continue;
+
+                const i32 radius = quad.OutlineRadius;
+                const Color color = withAlpha( style.OutlineColor, quad.FillColor );
+                for ( i32 dy = -radius; dy <= radius; ++dy )
+                    for ( i32 dx = -radius; dx <= radius; ++dx )
+                        if ( dx != 0 || dy != 0 )
+                            emitQuad( quad, static_cast<f32>( dx * quad.OutlineStep ), static_cast<f32>( dy * quad.OutlineStep ), color, 1.f );
+            }
+        }
+
+        // Then fills. MTSDF quads draw their own effects in the shader.
+        for ( const TextQuad& quad : m_TextQuads )
+            emitQuad( quad, 0.f, 0.f, quad.FillColor, quad.SDF ? quad.Weight : 0.f );
+
+        ::RatUI::Clear( m_TextQuads );
+    }
+
+    void DrawBatcher::EmitText(
+        const ShapedText&        a_Text,
+        const TextRenderStyle&   a_Style,
+        Rect<Pixel>              a_LayoutRect,
+        GlyphAtlas&              a_Atlas,
+        f32                      a_DpiScale,
+        const Optional<Rectu16>& a_ClipRect,
+        const Mat3f&             a_Transform,
+        u32                      a_MaxGlyphs )
+    {
+        if ( Empty( a_Text.Lines ) )
+            return;
+
+        FontLibrary& fonts = a_Atlas.GetFontLibrary();
+        const Pixel textHeight = ToPixel( a_Text.TotalHeight, a_DpiScale );
+        const bool  singleLine = a_Text.LineCount() == 1;
+        const f32   fadePct    = std::clamp( a_Style.FadePercentage, 0.f, 1.f );
+
+        TextEmitParams params{
+            .Style          = &a_Style,
+            .Atlas          = &a_Atlas,
+            .ClipRect       = a_ClipRect,
+            .Transform      = a_Transform,
+            .FadeRect       = a_LayoutRect,
+            .FadeHorizontal = singleLine && fadePct > 0.f,
+            .FadeVertical   = !singleLine && fadePct > 0.f && textHeight > a_LayoutRect.Size[1],
+            .FadePercent    = fadePct,
+        };
+
+        f32 top = a_LayoutRect.Origin[1].ToFloat();
         switch ( a_Style.Baseline )
         {
+            case ETextBaseline::Middle:     top += ( a_LayoutRect.Size[1] - textHeight ).ToFloat() * 0.5f; break;
+            case ETextBaseline::Bottom:     top += ( a_LayoutRect.Size[1] - textHeight ).ToFloat(); break;
+            case ETextBaseline::Alphabetic: top -= ToPixel( a_Text.Lines[0].Baseline, a_DpiScale ).ToFloat(); break; // First baseline on the box top.
             case ETextBaseline::Top:
             case ETextBaseline::Hanging:
-                baselineY += ascender;
-                break;
-            case ETextBaseline::Middle:
-                baselineY += ( a_LayoutRect.Size[1] - textHeight ) * 0.5f + ascender;
-                break;
-            case ETextBaseline::Bottom:
-                baselineY += a_LayoutRect.Size[1] - textHeight + ascender;
-                break;
-            case ETextBaseline::Alphabetic:
-            default:
-                break;
+            default: break;
         }
-    
-        Pixel penY = baselineY;
-        u32 numGlyphs = 0;
 
-        for ( u32 lineIdx = 0; lineIdx < a_Text.LineCount(); ++lineIdx )
+        const u8 styleDecorations = ( a_Style.Underline ? ETextDecoration::Underline : 0 )
+                                  | ( a_Style.Strikethrough ? ETextDecoration::Strikethrough : 0 );
+
+        u32  glyphCount = 0;
+        bool reachedLimit = false;
+
+        for ( const ShapedLine& line : a_Text.Lines )
         {
-            const ShapedLine& line = a_Text.Lines[lineIdx];
-    
-            Pixel lineX = a_LayoutRect.Origin[0];
+            f32 penX = a_LayoutRect.Origin[0].ToFloat();
             switch ( a_Style.Align )
             {
-                case ETextAlign::Center:
-                    lineX += ( a_LayoutRect.Size[0] - ToPixel( line.Width, a_DpiScale ) ) * 0.5f;
-                    break;
-                case ETextAlign::Right:
-                    lineX += a_LayoutRect.Size[0] - ToPixel( line.Width, a_DpiScale );
-                    break;
-                default:
-                    break;
+                case ETextAlign::Center: penX += ( a_LayoutRect.Size[0] - ToPixel( line.Width, a_DpiScale ) ).ToFloat() * 0.5f; break;
+                case ETextAlign::Right:  penX += ( a_LayoutRect.Size[0] - ToPixel( line.Width, a_DpiScale ) ).ToFloat(); break;
+                default: break; // TODO: Justify.
             }
-    
-            Pixel penX = lineX;
-    
-            u32 vertexBase = ( static_cast<u32>( Size( m_Vertices ) ) - Back( m_Batches ).VertexByteOffset ) / sizeof( TextVertex );
-    
-            for ( u32 g = line.Start; g < line.End; ++g )
+
+            const f32 baselineY = top + ToPixel( line.Baseline, a_DpiScale ).ToFloat();
+
+            for ( u32 r = line.RunStart; r < line.RunEnd && !reachedLimit; ++r )
             {
-                // Even if a glyph is skipped due to missing metrics, we still count it towards the total glyph limit.
-                // By doing this, we ensure that the glyph limit is respected even if some glyphs cannot be rendered.
-                if ( numGlyphs++ >= a_MaxGlyphs )
-                    break; // Stop processing glyphs if we've reached the maximum glyph limit
+                const ShapedRun& run  = a_Text.Runs[r];
+                const IFontFace* face = fonts.GetFace( run.Face.Face );
+                const Color      color = run.HasFillColor ? run.FillColor : a_Style.FillColor;
+                const BitmapEffects effects = face ? ComputeBitmapEffects( a_Style, *face, run.Size, a_DpiScale, a_Atlas.GetConfig() ) : BitmapEffects{};
+                const f32 runStartX = penX;
+                PixelPen  pixelPen( face, run.Size, a_DpiScale, penX );
 
-                const ShapedGlyph& sg = a_Text.Glyphs[g];
-    
-                Optional<GlyphMetrics> gr = a_Atlas.GetOrRasterizeGlyph( a_Text.Font, sg.GlyphIndex );
-                if ( !gr || gr->AtlasRect.Size[0] == 0 || gr->AtlasRect.Size[1] == 0 )
+                for ( u32 g = run.GlyphStart; g < run.GlyphEnd; ++g )
                 {
-                    penX += ToPixel( sg.XAdvance, fontSize, a_DpiScale );
-                    continue;
+                    if ( glyphCount >= a_MaxGlyphs )
+                    {
+                        reachedLimit = true;
+                        break;
+                    }
+                    ++glyphCount;
+
+                    const ShapedGlyph& glyph = a_Text.Glyphs[g];
+                    if ( face )
+                    {
+                        const f32 x = pixelPen.Active ? pixelPen.GlyphX( glyph.XOffset ) : penX + ToPixel( glyph.XOffset, a_DpiScale ).ToFloat();
+                        const f32 y = baselineY + ( pixelPen.Active ? pixelPen.GlyphYOffset( glyph.YOffset ) : ToPixel( glyph.YOffset, a_DpiScale ).ToFloat() );
+                        PlaceGlyph( a_Atlas, *face, run.Face, glyph.GlyphIndex, run.Size, x, y, a_DpiScale, color, effects );
+                    }
+
+                    // Keep following the layout, so later runs stay where layout put them.
+                    penX += ToPixel( glyph.XAdvance, a_DpiScale ).ToFloat();
+                    pixelPen.Advance( glyph.XAdvance );
                 }
-    
-                const Pixel gx = penX + ToPixel( sg.XOffset + gr->Bearing[0], fontSize, a_DpiScale );
-                const Pixel gy = penY + ToPixel( sg.YOffset - gr->Bearing[1], fontSize, a_DpiScale );
-                const Pixel gw = static_cast<Pixel>( gr->AtlasRect.Size[0] ) * rcpBase * fontSizePx;
-                const Pixel gh = static_cast<Pixel>( gr->AtlasRect.Size[1] ) * rcpBase * fontSizePx;
-    
-                const f32 u0 = static_cast<f32>( gr->AtlasRect.Origin[0] ) * rcpAtlasW;
-                const f32 v0 = static_cast<f32>( gr->AtlasRect.Origin[1] ) * rcpAtlasH;
-                const f32 u1 = static_cast<f32>( gr->AtlasRect.Origin[0] + gr->AtlasRect.Size[0] ) * rcpAtlasW;
-                const f32 v1 = static_cast<f32>( gr->AtlasRect.Origin[1] + gr->AtlasRect.Size[1] ) * rcpAtlasH;
-    
-                // Sample fade at all four corners to correctly interpolate across the glyph quad
-                const f32 opacityTL = computeFadeAlpha( gx,      gy      ) / 255.0f;
-                const f32 opacityTR = computeFadeAlpha( gx + gw, gy      ) / 255.0f;
-                const f32 opacityBL = computeFadeAlpha( gx,      gy + gh ) / 255.0f;
-                const f32 opacityBR = computeFadeAlpha( gx + gw, gy + gh ) / 255.0f;
-    
-                auto verts = ReserveVertices<TextVertex>( 4 );
-                verts[0] = TextVertex{ Vec2<Pixel>{ gx,      gy      }, opacityTL, Vec2f{ u0, v0 } };
-                verts[1] = TextVertex{ Vec2<Pixel>{ gx + gw, gy      }, opacityTR, Vec2f{ u1, v0 } };
-                verts[2] = TextVertex{ Vec2<Pixel>{ gx,      gy + gh }, opacityBL, Vec2f{ u0, v1 } };
-                verts[3] = TextVertex{ Vec2<Pixel>{ gx + gw, gy + gh }, opacityBR, Vec2f{ u1, v1 } };
-    
-                auto idx = ReserveIndices( 6 );
-                idx[0] = vertexBase + 0;
-                idx[1] = vertexBase + 1;
-                idx[2] = vertexBase + 2;
-                idx[3] = vertexBase + 1;
-                idx[4] = vertexBase + 3;
-                idx[5] = vertexBase + 2;
-                AddIndicesToCurrentBatch( 6 );
-    
-                penX += ToPixel( sg.XAdvance, fontSize, a_DpiScale );
-                vertexBase += 4;
+
+                const u8  decorations = run.Decorations | styleDecorations;
+                const f32 runEndX     = pixelPen.Active ? pixelPen.End() : penX;
+                if ( face && decorations != 0 )
+                {
+                    if ( decorations & ETextDecoration::Underline )
+                        PlaceDecoration( a_Atlas, *face, run.Size, ETextDecoration::Underline, runStartX, runEndX, baselineY, a_DpiScale, color, effects );
+                    if ( decorations & ETextDecoration::Strikethrough )
+                        PlaceDecoration( a_Atlas, *face, run.Size, ETextDecoration::Strikethrough, runStartX, runEndX, baselineY, a_DpiScale, color, effects );
+                }
             }
 
-            if ( numGlyphs >= a_MaxGlyphs )
-                break; // Stop processing lines if we've reached the maximum glyph limit
-    
-            penY += ToPixel( a_Text.LineHeight, a_DpiScale );
+            if ( reachedLimit )
+                break;
         }
-    
-        TryFlatten();
+
+        FlushTextQuads( params );
     }
 
     void DrawBatcher::TryFlatten()

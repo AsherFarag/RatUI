@@ -37,18 +37,29 @@ RatUI
 ```cpp
 auto renderer = RatUI::OpenGL::OpenGLRenderer{ 1920, 1080 };
 
-auto fontCache = RatUI::FreeType::FontCache{};
-fontCache->RegisterFontHandle( FontHandle{1}, "Path/To/Font.ttf" );
+// Fonts are grouped into families and requested by (family, weight, style), CSS-style.
+// Bold / italic are synthesized only when the family has no matching face.
+RatUI::FontLibrary fonts;
+RatUI::FreeType::FontLoader loader;
 
-auto textMetrics = RatUI::FreeType::TextMetrics{ fontCache };
-auto atlas = RatUI::GlyphAtlas{ renderer, textMetrics };
-auto drawList = RatUI::DrawList{ atlas };
+auto ui = fonts.RegisterFamily( "Inter"_id );
+fonts.AddFaceToFamily( ui, loader.LoadFromFile( "Inter-Regular.ttf" ), { EFontWeight::Regular } );
+fonts.AddFaceToFamily( ui, loader.LoadFromFile( "Inter-Bold.ttf" ),    { EFontWeight::Bold } );
+
+// Pixel-art fonts: native grid auto-detected, drawn at whole-number scales, never blurry.
+auto pixel = fonts.RegisterFamily( "PixelFont"_id );
+fonts.AddFaceToFamily( pixel, loader.LoadFromFile( "PixelFont.ttf", { .Mode = EGlyphRenderMode::Pixel } ) );
+
+auto textMetrics = RatUI::TextMetrics{ fonts };
+auto atlas       = RatUI::GlyphAtlas{ renderer, fonts };
+auto drawList    = RatUI::DrawList{ atlas };
 
 auto scene = RatUI::Scene{};
-scene.TextMetrics = textMetrics;
+scene.TextMetrics = &textMetrics;
+
+scene.CreateRootWidget<RatUI::TextWidget>( "HP 42", RatUI::TextLayoutStyle{ .Family = ui, .Size = 18_u } );
 
 // TODO Finish this example
-
 ```
 
 ## Building from Source
@@ -84,8 +95,8 @@ ctest --preset dev
 | Option | Default | Description |
 | --- | --- | --- |
 | `RATUI_FETCH_DEPENDENCIES` | `ON` (standalone) | Download and build any dependency `find_package()` cannot locate |
-| `RATUI_BACKEND_FREETYPE` | `OFF` | FreeType text backend (FreeType + HarfBuzz + msdfgen) |
-| `RATUI_BACKEND_OPENGL` | `OFF` | OpenGL renderer backend (GLEW + OpenGL; implies the FreeType backend) |
+| `RATUI_BACKEND_FREETYPE` | `OFF` | FreeType font loading (FreeType + HarfBuzz + msdfgen): TTF / OTF faces in MTSDF, Raster or Pixel mode |
+| `RATUI_BACKEND_OPENGL` | `OFF` | OpenGL renderer backend (GLEW + OpenGL) |
 | `RATUI_BACKEND_BGFX` | `OFF` | bgfx renderer backend |
 | `RATUI_BUILD_TESTS` | `OFF` | Build the Catch2 test suite |
 | `RATUI_BUILD_EXAMPLES` | `OFF` | Build the SDL2 sandbox (enables the OpenGL backend if no renderer is selected) |

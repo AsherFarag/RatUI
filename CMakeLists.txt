@@ -31,7 +31,7 @@ option(RATUI_FETCH_DEPENDENCIES
 # --- Backends ----------------------------------------------------------------
 # Each backend is opt-in and pulls in exactly the third party libraries it needs.
 option(RATUI_BACKEND_FREETYPE "Enable the FreeType text backend (FreeType + HarfBuzz + msdfgen)" OFF)
-option(RATUI_BACKEND_OPENGL   "Enable the OpenGL renderer backend (implies the FreeType backend)" OFF)
+option(RATUI_BACKEND_OPENGL   "Enable the OpenGL renderer backend"                                OFF)
 option(RATUI_BACKEND_BGFX     "Enable the bgfx renderer backend"                                  OFF)
 
 # --- What to build -----------------------------------------------------------
@@ -55,9 +55,9 @@ if(RATUI_BUILD_EXAMPLES AND NOT RATUI_BACKEND_OPENGL AND NOT RATUI_BACKEND_BGFX)
     set(RATUI_BACKEND_OPENGL ON)
 endif()
 
-# The OpenGL renderer uses the FreeType glyph cache directly.
-if(RATUI_BACKEND_OPENGL AND NOT RATUI_BACKEND_FREETYPE)
-    message(STATUS "RatUI: OpenGL backend requires the FreeType backend, enabling it")
+# The examples load TTF fonts through the FreeType backend.
+if(RATUI_BUILD_EXAMPLES AND NOT RATUI_BACKEND_FREETYPE)
+    message(STATUS "RatUI: examples requested, enabling the FreeType backend")
     set(RATUI_BACKEND_FREETYPE ON)
 endif()
 
@@ -83,7 +83,11 @@ set(RATUI_SOURCES
     Source/RatUI/Layout/Layout.cpp
     Source/RatUI/Layout/LayoutEngine.cpp
     Source/RatUI/Renderer/DrawBatcher.cpp
+    Source/RatUI/Text/FontLibrary.cpp
+    Source/RatUI/Text/GlyphAtlas.cpp
+    Source/RatUI/Text/SpriteSheetFont.cpp
     Source/RatUI/Text/TextEdit.cpp
+    Source/RatUI/Text/TextMetrics.cpp
     Source/RatUI/Widget/IWidget.cpp
     Source/RatUI/Widget/Scene.cpp
     Source/RatUI/Widget/Theme.cpp
@@ -152,16 +156,16 @@ if(RATUI_BACKEND_FREETYPE)
     )
 
     target_sources(RatUI PRIVATE
-        Source/RatUI/Backends/FreeType/FontCache.cpp
-        Source/RatUI/Backends/FreeType/TextMetrics.cpp
-        Source/RatUI/Backends/FreeType/TextUtil.cpp
+        Source/RatUI/Backends/FreeType/FontLoader.cpp
     )
 
-    # The public headers of this backend include <ft2build.h>, <hb.h> and
-    # <msdfgen.h>, so these dependencies have to be PUBLIC.
+    # The public header of this backend includes <ft2build.h> and <hb.h>, so
+    # those dependencies have to be PUBLIC. msdfgen is only used internally.
     target_link_libraries(RatUI PUBLIC
         Freetype::Freetype
         harfbuzz::harfbuzz
+    )
+    target_link_libraries(RatUI PRIVATE
         msdfgen::msdfgen
     )
     target_compile_definitions(RatUI PUBLIC RATUI_BACKEND_FREETYPE=1)

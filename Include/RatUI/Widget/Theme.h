@@ -15,7 +15,7 @@ namespace RatUI
         X(CornerRadius,    Radius,    Radii      ) \
         X(TextRenderStyle, TextStyle, TextStyles ) \
         X(Unit,            Metric,    Metrics    ) \
-        X(FontHandle,      Font,      Fonts      ) \
+        X(FontFamilyHandle, FontFamily, FontFamilies ) \
         X(Brush,           Brush,     Brushes    )
 
     /**
@@ -348,9 +348,9 @@ namespace RatUI
             inline constexpr StringID SliderMinThumbSize    = "Slider.MinThumbSize"_id;
         }
 
-		namespace Font 
+		namespace FontFamily
         {
-			inline constexpr StringID Default = "Default"_id;
+			inline constexpr StringID Default = "Default"_id; ///< Font family used by TextWidget unless the theme overrides it per widget.
 		}
 
         namespace Brush

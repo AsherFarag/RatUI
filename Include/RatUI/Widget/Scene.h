@@ -4,7 +4,7 @@
 #include "../Input/InputEvent.h"
 #include "../Input/Navigation.h"
 #include "../Input/InputState.h"
-#include "../Text/ITextMetrics.h"
+#include "../Text/TextMetrics.h"
 #include "IWidget.h"
 
 #include <iterator>
@@ -41,10 +41,10 @@ namespace RatUI
         Scene( Scene&& ) = default;
         Scene& operator=( Scene&& ) = default;
 
-        NodeID         RootWidget{};   ///< The NodeID of the root widget in the scene, which serves as the entry point for layout and rendering.
-        ITextMetrics*  TextMetrics{};  ///< Pointer to a text metrics provider used for measuring text during layout, set by the user.
-        InputState     Input{};        ///< The current input state. Prefer Scene's methods (SetFocus, Navigate, etc.) over mutating this directly.
-        ThemeHandle    DefaultTheme{}; ///< Widgets (with ThemeMixin) will be set automatically to this theme before OnConstruct() is called, if they don't have a theme set already.
+        NodeID              RootWidget{};   ///< The NodeID of the root widget in the scene, which serves as the entry point for layout and rendering.
+        RatUI::TextMetrics* TextMetrics{};  ///< Text layout used by text widgets, set by the user.
+        InputState          Input{};        ///< The current input state. Prefer Scene's methods (SetFocus, Navigate, etc.) over mutating this directly.
+        ThemeHandle         DefaultTheme{}; ///< Widgets (with ThemeMixin) will be set automatically to this theme before OnConstruct() is called, if they don't have a theme set already.
 
         // - Scene Management
 

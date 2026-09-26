@@ -1,17 +1,18 @@
 #pragma once
 #include "Texture.h"
 #include "../Text/GlyphAtlas.h"
+#include "../Text/TextShaping.h"
 
 namespace RatUI
 {
-    /**
-     * @brief Represents a single vertex in the rendering pipeline, containing position, color, and texture coordinates.
-     */
+    /** @brief Vertex for both text pipelines (MTSDF and bitmap). */
     struct TextVertex
     {
         Vec2<Pixel> Position;
-        f32         Opacity;  ///< The opacity of the vertex, used for fading effects. Range [0, 1].
         Vec2f       UV;
+        Color       Tint;
+        f32         Weight;  ///< MTSDF: SDF threshold offset (synthetic bold). Bitmap: 1 = alpha-only silhouette (shadow / outline).
+        f32         Opacity; ///< Fade multiplier for every layer.
     };
 
     /**
@@ -61,55 +62,51 @@ namespace RatUI
         }
     };
 
-    /**
-     * @brief Represents the draw data for rendering MSDF text.
-     */
+    /** @brief MTSDF text batch. Colour and weight are per vertex, the effects are per batch. */
     struct MSDFTextDrawData
     {
-        TextureHandle FontAtlas{}; ///< The texture handle of the font atlas to use for rendering the text.
-
-        f32 PixelRange{ c_MsdfPxRange };
-        f32 Scale{ 1.f };
+        TextureHandle FontAtlas{};
+        f32           PixelRange{ 16.f };
 
         bool OutlineEnable : 1 = false;
         bool ShadowEnable  : 1 = false;
         bool GlowEnable    : 1 = false;
-        bool InnerGlowEnable : 1 = false;
 
-        // - Fill properties
+        // - Fill
 
-        Color FillColor    { Colors::White }; ///< The color used for filling the text glyphs. Default is white.
-        f32   FillSoftness { 0.5f };          ///< Edge anti-alias softness for the fill, in SDF units [0, 0.5].
-        f32   FillThreshold{ 0.5f };          ///< The threshold for determining the filled area of the text, in SDF units [0, 1], typically 0.5.
+        f32   FillSoftness { 0.5f };
+        f32   FillThreshold{ 0.5f };
 
-        // - Outline properties
+        // - Outline
 
-        Color OutlineColor   { Colors::Transparent }; ///< The color used for the text outline. Default is white.
-        f32   OutlineWidth   { 0.f };                 ///< The width of the text outline, in SDF units [0, 0.5], typically 0.05-0.2.
-        f32   OutlineSoftness{ 0.f };                 ///< Edge anti-alias softness for the outline, in SDF units [0, 0.5].
+        Color OutlineColor   { Colors::Transparent };
+        f32   OutlineWidth   { 0.f };
+        f32   OutlineSoftness{ 0.f };
 
-        // - Shadow properties
+        // - Shadow
 
-        Color ShadowColor   { Colors::Transparent }; ///< The color used for the text shadow. Default is black.
-        Vec2f ShadowOffsetUV{ 0.f, 0.f }; ///< Precomputed UV offset for drop shadow (atlas UV space).
-        f32   ShadowSoftness{ 0.f };      ///< Edge anti-alias softness for the shadow, in SDF units [0, 0.5], typically 0.1-0.4.
-        f32   ShadowSpread  { 0.f };      ///< The expansion of the shadow's SDF threshold, in SDF units [0, 0.5], typically 0.05-0.2.
+        Color ShadowColor   { Colors::Transparent };
+        Vec2f ShadowOffsetUV{ 0.f, 0.f };
+        f32   ShadowSoftness{ 0.f };
+        f32   ShadowSpread  { 0.f };
 
-        // - Glow properties
+        // - Glow
 
-        Color GlowColor { Colors::Transparent }; ///< The color used for the text glow. Default is white.
-        f32   GlowSpread{ 0.f };                 ///< How far glow extends beyond outline (0.0-0.5).
-        f32   GlowPower { 0.0f };                ///< The falloff curve of the glow. Higher values create a tighter and brighter core, 
-                                                 ///< while lower values create a softer glow. Typically in the range of 1.0 to 4.0.
+        Color GlowColor { Colors::Transparent };
+        f32   GlowSpread{ 0.f };
+        f32   GlowPower { 0.0f };
 
-        static MSDFTextDrawData From( TextureHandle a_FontAtlas, const TextRenderStyle& a_Style, f32 a_MSDFScale );
+        static MSDFTextDrawData From( TextureHandle a_Page, const TextRenderStyle& a_Style, f32 a_PxRange, u16 a_PageSize );
 
-        /** 
-         * @brief Determines if this MSDFTextDrawData can be flattened with another, 
-         * meaning they can be drawn together in the same batch without causing visual artifacts.
-         * This is true if all properties that affect the visual output are equal between the two draw 
-         */
         bool CanFlattenWith( const MSDFTextDrawData& a_Other ) const;
+    };
+
+    /** @brief Raster / Pixel text batch: textured, per-vertex coloured quads. The page's sampler picks the filtering. */
+    struct BitmapTextDrawData
+    {
+        TextureHandle Page{};
+
+        bool CanFlattenWith( const BitmapTextDrawData& a_Other ) const { return Page == a_Other.Page; }
     };
 
     /**
@@ -127,7 +124,8 @@ namespace RatUI
 
         Variant<
             SDFDrawData, 
-            MSDFTextDrawData> Data;
+            MSDFTextDrawData,
+            BitmapTextDrawData> Data;
 
         /** @brief Checks if this batch can be flattened with another batch. */
         bool CanFlattenWith( const DrawBatch& a_Other ) const;
@@ -149,8 +147,6 @@ namespace RatUI
 
         void Clear();
         DrawBatch& EnsureSDFBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, TextureView a_Texture );
-        DrawBatch& EnsureMSDFTextBatch( const Optional<Rectu16>& a_ClipRect, const Mat3f& a_Transform, const MSDFTextDrawData& a_Data );
-
         void EmitRect( Rect<Pixel> a_Rect,
                        Color a_FillColor,
                        Pixel a_BorderThickness = 0_px,
@@ -164,18 +160,73 @@ namespace RatUI
                              Color a_Tint = Colors::White,
                              Rect<f32> a_UVRect = Rect<f32>{ Vec2f{ 0.f, 0.f }, Vec2f{ 1.f, 1.f } } );
 
+        /** @brief Draws shaped text in @p a_LayoutRect, stopping after @p a_MaxGlyphs glyphs. */
         void EmitText(
-            const ShapedText&      a_Text,
-            const TextRenderStyle& a_Style,
-            Rect<Pixel>            a_LayoutRect,
-            GlyphAtlas&            a_Atlas,
-            f32                    a_DpiScale,
-            u32                    a_MaxGlyphs = Limits<u32>::max() );
+            const ShapedText&        a_Text,
+            const TextRenderStyle&   a_Style,
+            Rect<Pixel>              a_LayoutRect,
+            GlyphAtlas&              a_Atlas,
+            f32                      a_DpiScale,
+            const Optional<Rectu16>& a_ClipRect,
+            const Mat3f&             a_Transform,
+            u32                      a_MaxGlyphs = Limits<u32>::max() );
 
     protected:
         Array<byte>      m_Vertices;
         Array<u16>       m_Indices;
         Array<DrawBatch> m_Batches;
+
+        /** @brief A placed glyph / decoration quad. Collected first so bitmap effects can be drawn in passes. */
+        struct TextQuad
+        {
+            const TextureHandle* Page{ nullptr };
+            bool                 SDF{ false };
+            f32                  X0, Y0, X1, Y1;
+            f32                  U0, V0, U1, V1;
+            f32                  BaselineY;       ///< Shear pivot for synthetic italic.
+            f32                  Skew{ 0.f };     ///< Synthetic italic, MTSDF only.
+            f32                  Weight{ 0.f };   ///< Synthetic bold, MTSDF only.
+            Color                FillColor;
+            i16                  ShadowDX{ 0 }, ShadowDY{ 0 };
+            i16                  OutlineStep{ 0 };
+            u8                   OutlineRadius{ 0 };
+        };
+
+        struct TextEmitParams
+        {
+            const TextRenderStyle* Style{ nullptr };
+            GlyphAtlas*            Atlas{ nullptr };
+            Optional<Rectu16>      ClipRect;
+            Mat3f                  Transform;
+            Rect<Pixel>            FadeRect{};
+            bool                   FadeHorizontal{ false };
+            bool                   FadeVertical{ false };
+            f32                    FadePercent{ 0.f };
+        };
+
+        /** @brief Bitmap shadow / outline offsets for a run, in whole pixels. */
+        struct BitmapEffects
+        {
+            i16 ShadowDX{ 0 }, ShadowDY{ 0 };
+            i16 OutlineStep{ 0 };
+            u8  OutlineRadius{ 0 };
+        };
+
+        Array<TextQuad> m_TextQuads;
+
+        BitmapEffects ComputeBitmapEffects( const TextRenderStyle& a_Style, const IFontFace& a_Face, Unit a_Size, f32 a_DpiScale, const GlyphAtlasConfig& a_Config ) const;
+
+        void PlaceGlyph( GlyphAtlas& a_Atlas, const IFontFace& a_Face, const ResolvedFace& a_Resolved, GlyphID a_Glyph,
+                         Unit a_Size, f32 a_PenX, f32 a_BaselineY, f32 a_DpiScale, Color a_Color, const BitmapEffects& a_Effects );
+
+        void PlaceDecoration( GlyphAtlas& a_Atlas, const IFontFace& a_Face, Unit a_Size, u8 a_Decoration,
+                              f32 a_X0, f32 a_X1, f32 a_BaselineY, f32 a_DpiScale, Color a_Color, const BitmapEffects& a_Effects );
+
+        /** @brief Turns m_TextQuads into vertices: bitmap shadows, then bitmap outlines, then fills. */
+        void FlushTextQuads( const TextEmitParams& a_Params );
+
+        /** @brief Continues the current batch in a new one, before it overflows u16 indices. */
+        void SplitCurrentBatch();
 
         void TryFlatten();
 
