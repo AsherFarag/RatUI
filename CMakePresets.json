@@ -28,7 +28,7 @@
       "name": "examples",
       "inherits": "base",
       "displayName": "Examples",
-      "description": "OpenGL + FreeType backends and the SDL2 sandbox",
+      "description": "OpenGL + FreeType backends and the examples app",
       "cacheVariables": { "RATUI_BUILD_EXAMPLES": "ON" }
     },
     {
@@ -48,6 +48,19 @@
       "inherits": "dev",
       "displayName": "Everything (Release)",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "web",
+      "inherits": "base",
+      "displayName": "Web (Emscripten)",
+      "description": "Examples app built to WebAssembly; run from an emsdk environment, needs Ninja",
+      "generator": "Ninja",
+      "toolchainFile": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "MinSizeRel",
+        "RATUI_BUILD_EXAMPLES": "ON",
+        "RATUI_INSTALL": "OFF"
+      }
     }
   ],
   "buildPresets": [
@@ -55,7 +68,8 @@
     { "name": "tests", "configurePreset": "tests" },
     { "name": "examples", "configurePreset": "examples" },
     { "name": "dev", "configurePreset": "dev" },
-    { "name": "release", "configurePreset": "release", "configuration": "Release" }
+    { "name": "release", "configurePreset": "release", "configuration": "Release" },
+    { "name": "web", "configurePreset": "web" }
   ],
   "testPresets": [
     {

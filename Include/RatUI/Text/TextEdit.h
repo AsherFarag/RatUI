@@ -162,11 +162,11 @@ namespace RatUI
         bool Commited = false; ///< Whether the edit was committed (true) or not (false). For example, pressing Enter in a single-line text edit would commit the edit.
         bool Canceled = false; ///< Whether the edit was canceled (true) or not (false). For example, pressing Escape in a text edit would cancel the edit.
 
-        static constexpr TextEditOutcome Unhandle()                       { return { false, false, false, false }; }
-        static constexpr TextEditOutcome Handle()                         { return { true,  false, false, false }; }
-        static constexpr TextEditOutcome Change( bool a_Changed  = true ) { return { true,  a_Changed, false, false }; }
-        static constexpr TextEditOutcome Commit( bool a_Commited = true ) { return { true,  false, a_Commited, false }; }
-        static constexpr TextEditOutcome Cancel( bool a_Canceled = true ) { return { true,  false, false, a_Canceled }; }
+        [[nodiscard]] static constexpr TextEditOutcome Unhandle()                       { return { false, false, false, false }; }
+        [[nodiscard]] static constexpr TextEditOutcome Handle()                         { return { true,  false, false, false }; }
+        [[nodiscard]] static constexpr TextEditOutcome Change( bool a_Changed  = true ) { return { true,  a_Changed, false, false }; }
+        [[nodiscard]] static constexpr TextEditOutcome Commit( bool a_Commited = true ) { return { true,  false, a_Commited, false }; }
+        [[nodiscard]] static constexpr TextEditOutcome Cancel( bool a_Canceled = true ) { return { true,  false, false, a_Canceled }; }
     };
 
     /**
@@ -181,10 +181,10 @@ namespace RatUI
         virtual ~ITextEditPolicy() = default;
 
         /** @brief Returns whether the text edit policy allows for multi-line text input. */
-        virtual bool MultiLine() const = 0;
+        [[nodiscard]] virtual bool MultiLine() const = 0;
 
         /** @brief Returns whether the given character is accepted by the text edit policy. */
-        virtual bool AcceptChar( codepoint a_Char ) const = 0;
+        [[nodiscard]] virtual bool AcceptChar( codepoint a_Char ) const = 0;
 
         /** 
          * @brief Handles a key event operation on a TextEditModel, returning a TextEditOutcome indicating the result of the operation.
@@ -192,7 +192,7 @@ namespace RatUI
          * @param a_Event The TextInputEvent representing the key event to handle.
          * @return A TextEditOutcome indicating whether the operation was handled, changed the text, committed the edit, or canceled the edit.
          */
-        virtual TextEditOutcome HandleKey( TextEditModel& a_Model, const TextInputEvent& a_Event );
+        [[nodiscard]] virtual TextEditOutcome HandleKey( TextEditModel& a_Model, const TextInputEvent& a_Event ) const;
     };
 
     /**
@@ -203,14 +203,14 @@ namespace RatUI
     class SingleLineTextEditPolicy : public ITextEditPolicy
     {
     public:
-        bool MultiLine() const override { return false; }
+        [[nodiscard]] bool MultiLine() const override { return false; }
 
-        bool AcceptChar( codepoint a_Char ) const override
+        [[nodiscard]] bool AcceptChar( codepoint a_Char ) const override
         {
             return a_Char != U'\n' && a_Char != U'\r';
         }
 
-        TextEditOutcome HandleKey( TextEditModel& a_Model, const TextInputEvent& a_Event ) override
+        [[nodiscard]] TextEditOutcome HandleKey( TextEditModel& a_Model, const TextInputEvent& a_Event ) const override
         {
             switch ( a_Event.Button )
             {
@@ -234,11 +234,11 @@ namespace RatUI
     class MultiLineTextEditPolicy : public ITextEditPolicy
     {
     public:
-        bool MultiLine() const override { return true; }
+        [[nodiscard]] bool MultiLine() const override { return true; }
 
-        bool AcceptChar( codepoint a_Char ) const override { return true; }
+        [[nodiscard]] bool AcceptChar( codepoint a_Char ) const override { return true; }
 
-        TextEditOutcome HandleKey( TextEditModel& a_Model, const TextInputEvent& a_Event ) override
+        [[nodiscard]] TextEditOutcome HandleKey( TextEditModel& a_Model, const TextInputEvent& a_Event ) const override
         {
             switch ( a_Event.Button )
             {
@@ -275,9 +275,9 @@ namespace RatUI
     class NumericTextEditPolicy : public ITextEditPolicy
     {
     public:
-        bool MultiLine() const override { return false; }
+        [[nodiscard]] bool MultiLine() const override { return false; }
 
-        bool AcceptChar( codepoint a_Char ) const override
+        [[nodiscard]] bool AcceptChar( codepoint a_Char ) const override
         {
             if ( a_Char >= U'0' && a_Char <= U'9' ) 
                 return true;
@@ -296,7 +296,7 @@ namespace RatUI
             return false;
         }
 
-        TextEditOutcome HandleKey( TextEditModel& a_Model, const TextInputEvent& a_Event ) override
+        [[nodiscard]] TextEditOutcome HandleKey( TextEditModel& a_Model, const TextInputEvent& a_Event ) const override
         {
             switch ( a_Event.Button )
             {

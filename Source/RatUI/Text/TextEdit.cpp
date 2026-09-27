@@ -334,7 +334,7 @@ namespace RatUI
     // ITextEditPolicy
     // ============================================================
 
-    TextEditOutcome ITextEditPolicy::HandleKey( TextEditModel& a_Model, const TextInputEvent& a_Event )
+    TextEditOutcome ITextEditPolicy::HandleKey( TextEditModel& a_Model, const TextInputEvent& a_Event ) const
     {
 		const bool isCtrl = HasFlag( a_Event.Modifiers, EModifier::Ctrl );
 		const bool isShift = HasFlag( a_Event.Modifiers, EModifier::Shift );

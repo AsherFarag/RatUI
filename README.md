@@ -3,6 +3,8 @@
 RatUI is a Retained-Mode Graphical User Interface library built for C++20.
 It's designed for games and aims to integrate into your codebase rather than the other way around.
 
+**[▶ Try Me](https://asherfarag.github.io/RatUI/)** — the examples running live in your browser (WebGL2).
+
 ---
 ![RatUI_Sandbox_LeObF4pG9w](https://github.com/user-attachments/assets/c17694b1-c2f8-42b1-94c2-398375ee9c72)
 ---
@@ -88,7 +90,7 @@ ctest --preset dev
 | `RATUI_BACKEND_OPENGL` | `OFF` | OpenGL renderer backend (GLEW + OpenGL; implies the FreeType backend) |
 | `RATUI_BACKEND_BGFX` | `OFF` | bgfx renderer backend |
 | `RATUI_BUILD_TESTS` | `OFF` | Build the Catch2 test suite |
-| `RATUI_BUILD_EXAMPLES` | `OFF` | Build the SDL2 sandbox (enables the OpenGL backend if no renderer is selected) |
+| `RATUI_BUILD_EXAMPLES` | `OFF` | Build the examples app (enables the OpenGL backend if no renderer is selected) |
 | `RATUI_ENABLE_ASSERTS` | `ON` | Enable RatUI runtime assertions |
 | `RATUI_INSTALL` | `ON` (standalone) | Generate install/export rules |
 
@@ -112,6 +114,17 @@ The fetched versions are pinned in cache variables (`RATUI_FREETYPE_TAG`,
 > Install rules are skipped automatically when a dependency was fetched, because
 > a fetched dependency cannot be exported. Install the dependencies properly to
 > produce an installable RatUI package.
+
+### Web (WebAssembly)
+
+The `web` preset builds the examples app with [Emscripten](https://emscripten.org/docs/getting_started/downloads.html)
+(needs emsdk activated and Ninja). CI publishes it to GitHub Pages on every push to `main`.
+
+```bash
+cmake --preset web
+cmake --build --preset web --target RatUI_Examples
+python -m http.server -d build/web/Examples   # open RatUI_Examples.html
+```
 
 ### Using RatUI in your project
 

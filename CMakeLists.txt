@@ -168,7 +168,11 @@ if(RATUI_BACKEND_FREETYPE)
 endif()
 
 # --- OpenGL renderer backend -------------------------------------------------
-if(RATUI_BACKEND_OPENGL)
+if(RATUI_BACKEND_OPENGL AND EMSCRIPTEN)
+    # WebGL2 is provided by the browser, so there is nothing to find or load.
+    target_link_options(RatUI PUBLIC -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2)
+    target_compile_definitions(RatUI PUBLIC RATUI_BACKEND_OPENGL=1)
+elseif(RATUI_BACKEND_OPENGL)
     find_package(OpenGL REQUIRED)
 
     # The GLEW release archive ships sources only, so the target is built here.
