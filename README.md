@@ -5,6 +5,8 @@ It's designed for games and aims to integrate into your codebase rather than the
 
 **[▶ Try Me](https://asherfarag.github.io/RatUI/)** — the examples running live in your browser (WebGL2).
 
+> **Early days:** RatUI is pre-1.0. Expect breaking API changes between minor versions (0.1 → 0.2); see the [CHANGELOG](CHANGELOG.md).
+
 ---
 ![RatUI_Sandbox_LeObF4pG9w](https://github.com/user-attachments/assets/c17694b1-c2f8-42b1-94c2-398375ee9c72)
 ---
@@ -12,20 +14,26 @@ It's designed for games and aims to integrate into your codebase rather than the
 
 ## Features
 
-* Retained-mode UI architecture
-* Math and Container (String, etc) types are user overridable, defaults to STL implementations
-
-Hopefully some soon.
+* **Retained-mode widgets:** panels, buttons, text, text input, sliders and scroll containers, with a `Scene` that owns them and handles input, layout and drawing.
+* **Layout engine:** horizontal, vertical, overlay and grid layouts, with content, fixed, percent and flex sizing, padding, margins, spacing, size constraints and anchored positioning.
+* **Text:** MTSDF glyphs that stay sharp at any size, HarfBuzz shaping, word wrapping (including CJK line breaking rules), clip/ellipsis/fade overflow, outlines, drop shadows and per-glyph reveal for dialogue.
+* **Theming:** colors, brushes, corner radii, fonts and text styles are looked up by key, so swapping a theme restyles the whole scene live.
+* **Input and navigation:** mouse, keyboard and gamepad input; focus scopes and directional navigation for controller-driven menus.
+* **Animation:** easing curves and interpolation for animating widget properties.
+* **Backend-agnostic core:** the core has no third party dependencies. FreeType/HarfBuzz text and an OpenGL 3.3 / WebGL2 renderer are opt-in backends, and you can plug in your own through `IRenderer` and `ITextMetrics`.
+* **Bring your own types:** math and container types (`String`, `Array`, ...) are user overridable and default to the STL.
+* **Runs on the web:** the examples build to WebAssembly with Emscripten.
 
 ## Repository Structure
 
  ```bash
 RatUI
  ├───Examples      # Example apps using RatUI
- ├───Include/RatUI # Public API (*Note: This is all you need to use this library)
+ ├───Include/RatUI # Public API
+ ├───Source/RatUI  # Library sources
  ├───Scripts       # Build and utility scripts
  ├───cmake         # CMake helper modules and the package config template
- └───Tests         # Unit and integration tests
+ └───Tests         # Unit tests, plus a find_package() consumer in Tests/Package
  ```
 
 ## Requirements
@@ -36,22 +44,62 @@ RatUI
 
 ## Example
 
+A button with a label, using the OpenGL and FreeType backends. RatUI doesn't create windows or read input
+itself: you give it an OpenGL context and translate your platform's events into `InputEvent`s.
+[`Examples/Application`](Examples/Application/Application.cpp) is a complete SDL2 host to copy from.
+
 ```cpp
-auto renderer = RatUI::OpenGL::OpenGLRenderer{ 1920, 1080 };
+#include <RatUI/RatUI.h>
+#include <RatUI/Backends/FreeType/TextMetrics.h>
+#include <RatUI/Backends/OpenGL/OpenGLRenderer.h>
+#include <RatUI/Widget/ButtonWidget.h>
+#include <RatUI/Widget/PanelWidget.h>
+#include <RatUI/Widget/TextWidget.h>
+#include <cstdio>
 
-auto fontCache = RatUI::FreeType::FontCache{};
-fontCache->RegisterFontHandle( FontHandle{1}, "Path/To/Font.ttf" );
+using namespace RatUI;
 
-auto textMetrics = RatUI::FreeType::TextMetrics{ fontCache };
-auto atlas = RatUI::GlyphAtlas{ renderer, textMetrics };
-auto drawList = RatUI::DrawList{ atlas };
+// --- Setup (once you have a window and an OpenGL 3.3 context) ---
+OpenGL::OpenGLRenderer renderer;
+FreeType::FontCache    fontCache;
+fontCache.RegisterFontHandle( FontHandle{ 1 }, "Fonts/Roboto-Medium.ttf" );
 
-auto scene = RatUI::Scene{};
-scene.TextMetrics = textMetrics;
+FreeType::TextMetrics textMetrics{ fontCache };
+GlyphAtlas            atlas{ renderer, textMetrics };
+DrawList              drawList{ atlas };
 
-// TODO Finish this example
+Scene scene;
+scene.TextMetrics  = &textMetrics;
+scene.DefaultTheme = Themes::Dark();
 
+// --- Build the UI ---
+PanelWidget* root = scene.CreateRootWidget<PanelWidget>();
+root->GetLayout()
+    .LayoutType( ELayoutType::Vertical )
+    .Padding( Edges::All( 16_u ) )
+    .Spacing( 8_u );
+
+ButtonWidget* button = scene.CreateWidget<ButtonWidget>( root->GetLayoutID(), []( ButtonBaseWidget& ) { std::puts( "Clicked!" ); } );
+button->GetLayout().FixedWidth( 160_u ).FixedHeight( 40_u ).ChildAlign( EAlign::Center );
+
+TextLayoutStyle labelStyle{};
+labelStyle.Font = FontHandle{ 1 };
+labelStyle.Size = 16_u;
+TextWidget* label = scene.CreateWidget<TextWidget>( button->GetLayoutID(), Text{ "Click me" }, labelStyle );
+label->GetLayout().Visibility( EVisibility::HitTestInvisible ); // Let clicks through to the button.
+
+// --- Every frame ---
+scene.DispatchInputEvent( event ); // Your platform's input, translated to RatUI InputEvents.
+scene.UpdateLayout( { Unit{ (f32)width }, Unit{ (f32)height } } );
+scene.Tick( deltaSeconds );
+
+renderer.SetViewport( width, height );
+drawList.Clear();
+scene.Render( drawList, deltaSeconds );
+drawList.Flush( renderer );
 ```
+
+`OpenGLRenderer.h` includes `<GL/glew.h>` by default; define `RATUI_OPENGL_INCLUDE` (e.g. `-DRATUI_OPENGL_INCLUDE=<glad/gl.h>`) to use a different loader.
 
 ## Building from Source
 
@@ -88,7 +136,7 @@ ctest --preset dev
 | `RATUI_FETCH_DEPENDENCIES` | `ON` (standalone) | Download and build any dependency `find_package()` cannot locate |
 | `RATUI_BACKEND_FREETYPE` | `OFF` | FreeType text backend (FreeType + HarfBuzz + msdfgen) |
 | `RATUI_BACKEND_OPENGL` | `OFF` | OpenGL renderer backend (GLEW + OpenGL; implies the FreeType backend) |
-| `RATUI_BACKEND_BGFX` | `OFF` | bgfx renderer backend |
+| `RATUI_BACKEND_BGFX` | `OFF` | bgfx renderer backend (**experimental**: not built in CI yet) |
 | `RATUI_BUILD_TESTS` | `OFF` | Build the Catch2 test suite |
 | `RATUI_BUILD_EXAMPLES` | `OFF` | Build the examples app (enables the OpenGL backend if no renderer is selected) |
 | `RATUI_ENABLE_ASSERTS` | `ON` | Enable RatUI runtime assertions |
@@ -134,7 +182,7 @@ With `FetchContent`:
 include(FetchContent)
 FetchContent_Declare(RatUI
     GIT_REPOSITORY https://github.com/AsherFarag/RatUI.git
-    GIT_TAG        main)
+    GIT_TAG        v0.1.0)
 set(RATUI_BACKEND_OPENGL ON)
 set(RATUI_FETCH_DEPENDENCIES ON)
 FetchContent_MakeAvailable(RatUI)
@@ -149,7 +197,7 @@ find_package(RatUI REQUIRED)
 target_link_libraries(MyApp PRIVATE RatUI::RatUI)
 ```
 
-# Contributing
+## Contributing
 
 Contributions are welcome.
 
@@ -160,6 +208,6 @@ For now:
 
 More detailed guidelines coming soon.
 
-# License
+## License
 
 RatUI is licensed under the **MIT License** - see the [LICENSE](https://github.com/AsherFarag/RatUI/blob/main/LICENSE) file for details.

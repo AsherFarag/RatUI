@@ -112,7 +112,8 @@ namespace RatUI
             const u32 min = SelectionStart(), max = SelectionEnd();
             const TextView oldText( m_Text.data() + min, max - min );
 
-            m_Caret = min + static_cast<u32>( a_New.size() );
+            m_Caret  = min + static_cast<u32>( a_New.size() );
+            m_Anchor = m_Caret;
             RecordAction( min, oldText, a_New );
 
             m_Text.replace( min, max - min, a_New );
@@ -121,12 +122,12 @@ namespace RatUI
         {
             const u32 where = m_Caret;
             m_Caret += static_cast<u32>( a_New.size() );
+            m_Anchor = m_Caret;
             RecordAction( where, TextView(), a_New );
 
             m_Text.insert( where, a_New );
         }
 
-        m_Anchor = m_Caret;
         m_PreferredColumnValid = false;
         return true;
     }

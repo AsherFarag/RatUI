@@ -1,7 +1,20 @@
 cmake_minimum_required(VERSION 3.16)
 
+# Give URL downloads (GLEW) fresh timestamps so a changed archive triggers a rebuild.
+if(POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW)
+endif()
+
+# The version lives in Config.h so code and package agree; bump it there.
+file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/Include/RatUI/Core/Config.h" _ratui_version_lines
+    REGEX "^#define RATUI_VERSION_(MAJOR|MINOR|PATCH) [0-9]+")
+foreach(_part MAJOR MINOR PATCH)
+    string(REGEX MATCH "RATUI_VERSION_${_part} ([0-9]+)" _ "${_ratui_version_lines}")
+    set(_ratui_version_${_part} ${CMAKE_MATCH_1})
+endforeach()
+
 project(RatUI
-    VERSION     0.1.0
+    VERSION     ${_ratui_version_MAJOR}.${_ratui_version_MINOR}.${_ratui_version_PATCH}
     LANGUAGES   CXX
     DESCRIPTION "A lightweight, retained-mode C++ UI library"
 )
@@ -32,7 +45,7 @@ option(RATUI_FETCH_DEPENDENCIES
 # Each backend is opt-in and pulls in exactly the third party libraries it needs.
 option(RATUI_BACKEND_FREETYPE "Enable the FreeType text backend (FreeType + HarfBuzz + msdfgen)" OFF)
 option(RATUI_BACKEND_OPENGL   "Enable the OpenGL renderer backend (implies the FreeType backend)" OFF)
-option(RATUI_BACKEND_BGFX     "Enable the bgfx renderer backend"                                  OFF)
+option(RATUI_BACKEND_BGFX     "Enable the bgfx renderer backend (experimental)"                   OFF)
 
 # --- What to build -----------------------------------------------------------
 option(RATUI_BUILD_TESTS    "Build the RatUI test suite"          OFF)
@@ -67,7 +80,7 @@ endif()
 set(RATUI_FREETYPE_TAG "VER-2-13-2"     CACHE STRING "FreeType git tag used when fetching")
 set(RATUI_HARFBUZZ_TAG "8.3.0"          CACHE STRING "HarfBuzz git tag used when fetching")
 set(RATUI_MSDFGEN_TAG  "v1.12"          CACHE STRING "msdfgen git tag used when fetching")
-set(RATUI_BGFX_TAG     "master"         CACHE STRING "bgfx.cmake git tag used when fetching")
+set(RATUI_BGFX_TAG     "v1.161.9510-579" CACHE STRING "bgfx.cmake git tag used when fetching")
 set(RATUI_SDL2_TAG     "release-2.30.9" CACHE STRING "SDL2 git tag used when fetching")
 set(RATUI_CATCH2_TAG   "v3.5.0"         CACHE STRING "Catch2 git tag used when fetching")
 set(RATUI_GLEW_URL "https://downloads.sourceforge.net/project/glew/glew/2.2.0/glew-2.2.0.tgz"
@@ -189,7 +202,8 @@ elseif(RATUI_BACKEND_OPENGL)
         enable_language(C)
         add_library(RatUI_glew STATIC "${glew_SOURCE_DIR}/src/glew.c")
         target_include_directories(RatUI_glew PUBLIC "${glew_SOURCE_DIR}/include")
-        target_compile_definitions(RatUI_glew PUBLIC GLEW_STATIC)
+        # GLEW_NO_GLU: RatUI never uses GLU, so don't make glew.h require its headers.
+        target_compile_definitions(RatUI_glew PUBLIC GLEW_STATIC GLEW_NO_GLU)
         target_link_libraries(RatUI_glew PUBLIC OpenGL::GL)
         add_library(GLEW::GLEW ALIAS RatUI_glew)
     endif()

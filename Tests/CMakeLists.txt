@@ -9,6 +9,7 @@ ratui_require_dependency(
 file(GLOB_RECURSE RATUI_TEST_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
 )
+list(FILTER RATUI_TEST_SOURCES EXCLUDE REGEX "/Package/") # Standalone find_package() consumer.
 
 add_executable(RatUI_Tests ${RATUI_TEST_SOURCES})
 
