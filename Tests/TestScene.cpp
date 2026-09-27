@@ -7,7 +7,7 @@
  */
 struct ButtonSceneFixture
 {
-    Scene         Scene;
+    RatUI::Scene  Scene;
     ButtonWidget* First{ nullptr };
     ButtonWidget* Second{ nullptr };
     int           FirstClicks{ 0 };
