@@ -24,19 +24,45 @@ namespace RatUI
             , m_LayoutStyle( a_Style )
         {}
 
+        TextWidget( StyledText a_Text, const TextLayoutStyle& a_Style = {} )
+            : m_Text       ( std::move( a_Text.Content ) )
+            , m_Spans      ( std::move( a_Text.Spans ) )
+            , m_LayoutStyle( a_Style )
+        {}
+
         ~TextWidget() override = default;
 
         /** @brief Gets the current text content. */
         const Text& GetText() const { return m_Text; }
 
+        /** @brief Gets the current style spans (byte offsets into the resolved text). */
+        const Array<TextSpan>& GetSpans() const { return m_Spans; }
+
         /**
-         * @brief Replaces the text content.
+         * @brief Replaces the text content and clears any spans (they referred to the old text).
          * Triggers full re-prepare + re-shape.
          */
         void SetText( Text a_Text )
         {
             m_Text = std::move( a_Text );
+            ::RatUI::Clear( m_Spans );
             m_ResolvedText = NullOpt;
+            InvalidatePrepared();
+        }
+
+        /** @brief Replaces the text content and its spans. */
+        void SetStyledText( StyledText a_Text )
+        {
+            m_Text  = std::move( a_Text.Content );
+            m_Spans = std::move( a_Text.Spans );
+            m_ResolvedText = NullOpt;
+            InvalidatePrepared();
+        }
+
+        /** @brief Replaces only the style spans, keeping the text. */
+        void SetSpans( Array<TextSpan> a_Spans )
+        {
+            m_Spans = std::move( a_Spans );
             InvalidatePrepared();
         }
 
@@ -80,7 +106,7 @@ namespace RatUI
             const TextLayoutStyle effectiveStyle = GetEffectiveLayoutStyle();
             if ( !m_PreparedText || effectiveStyle != m_LastLayoutStyle )
             {
-                m_PreparedText = metrics->Prepare( m_ResolvedText->Data, effectiveStyle );
+                m_PreparedText = metrics->Prepare( StyledTextView{ m_ResolvedText->Data, m_Spans }, effectiveStyle );
                 if ( !m_PreparedText )
                     return { 0_u, 0_u };
 
@@ -175,6 +201,7 @@ namespace RatUI
         }
 
         Text                   m_Text;
+        Array<TextSpan>        m_Spans;
         /// Cached result of the last ResolveText() call.
         /// Version is compared each frame to detect localisation/binding changes.
         Optional<ResolvedText> m_ResolvedText;

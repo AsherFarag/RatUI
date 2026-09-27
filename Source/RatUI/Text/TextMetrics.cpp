@@ -53,30 +53,47 @@ namespace RatUI
     // Prepare
     // =========================================================================
 
-    Optional<PreparedText> TextMetrics::Prepare( StringView a_Text, const TextLayoutStyle& a_Style )
+    Optional<PreparedText> TextMetrics::Prepare( const StyledTextView& a_Text, const TextLayoutStyle& a_Style )
     {
-        if ( Empty( a_Text ) )
+        if ( Empty( a_Text.Text ) )
             return NullOpt;
 
         const ResolvedFace baseFace = m_Fonts.Resolve( a_Style.GetFontQuery() );
         if ( !baseFace.IsValid() )
             return NullOpt; // No fonts.
 
+        // The ASCII transform keeps byte offsets, so spans stay valid.
         String transformed;
-        StringView text = a_Text;
+        StringView text = a_Text.Text;
         if ( a_Style.Transform != ETextTransform::None )
         {
             transformed = Unicode::ApplyTextTransformASCII( String{ text }, a_Style.Transform );
             text = transformed;
         }
 
+        // Normalise whitespace and remap the spans into the normalised text.
+        const bool hasSpans = !Empty( a_Text.Spans );
+
         PreparedText result;
-        result.NormalizedText = TextLayout::NormalizeText( text, a_Style.Wrap );
+        result.NormalizedText = TextLayout::NormalizeText( text, a_Style.Wrap, hasSpans ? &m_OffsetMap : nullptr );
+
+        Clear( m_RemappedSpans );
+        if ( hasSpans )
+        {
+            const u32 sourceLength = static_cast<u32>( Size( text ) );
+            for ( const TextSpan& span : a_Text.Spans )
+            {
+                const u32 start = m_OffsetMap[std::min( span.StartByte, sourceLength )];
+                const u32 end   = m_OffsetMap[std::min( span.EndByte, sourceLength )];
+                if ( start < end )
+                    PushBack( m_RemappedSpans, TextSpan{ start, end, span.Style } );
+            }
+        }
 
         if ( Empty( result.NormalizedText ) )
             return result;
 
-        Itemize( result.NormalizedText, a_Style, result.Runs );
+        Itemize( result.NormalizedText, a_Style, m_RemappedSpans, result.Runs );
 
         TextLayout::Segment( result, a_Style.Wrap, [&]( u32 a_Start, u32 a_Length )
         {
@@ -92,7 +109,7 @@ namespace RatUI
         return result;
     }
 
-    void TextMetrics::Itemize( StringView a_Text, const TextLayoutStyle& a_Style, Array<TextRun>& o_Runs ) const
+    void TextMetrics::Itemize( StringView a_Text, const TextLayoutStyle& a_Style, Span<const TextSpan> a_Spans, Array<TextRun>& o_Runs ) const
     {
         Clear( o_Runs );
 
@@ -100,49 +117,109 @@ namespace RatUI
         if ( length == 0 )
             return;
 
-        const FontQuery    query   = a_Style.GetFontQuery();
-        const ResolvedFace primary = m_Fonts.Resolve( query );
+        // Every span edge starts a new interval.
+        Array<u32> bounds{ 0u, length };
+        for ( const TextSpan& span : a_Spans )
+        {
+            const u32 start = std::min( span.StartByte, length );
+            const u32 end   = std::min( span.EndByte, length );
+            if ( start < end )
+            {
+                PushBack( bounds, start );
+                PushBack( bounds, end );
+            }
+        }
+        std::sort( Begin( bounds ), End( bounds ) );
+        bounds.erase( std::unique( Begin( bounds ), End( bounds ) ), End( bounds ) );
 
-        const auto emitRun = [&]( u32 a_Start, u32 a_End, const ResolvedFace& a_Face )
+        const auto emitRun = [&]( u32 a_Start, u32 a_End, const ResolvedFace& a_Face, Unit a_Size, Unit a_LetterSpacing, const TextSpanStyle& a_Span )
         {
             if ( a_Start >= a_End )
                 return;
 
             const IFontFace* face = m_Fonts.GetFace( a_Face.Face );
-            PushBack( o_Runs, TextRun{
+            TextRun run{
                 .StartByte     = a_Start,
                 .EndByte       = a_End,
                 .Face          = a_Face,
-                .Size          = face ? TextShaping::EffectiveSize( *face, a_Style.Size ) : a_Style.Size,
-                .LetterSpacing = a_Style.LetterSpacing,
-            } );
+                .Size          = face ? TextShaping::EffectiveSize( *face, a_Size ) : a_Size,
+                .LetterSpacing = a_LetterSpacing,
+                .FillColor     = a_Span.FillColor ? *a_Span.FillColor : Colors::White,
+                .HasFillColor  = HasValue( a_Span.FillColor ),
+                .Decorations   = a_Span.Decorations ? *a_Span.Decorations : ETextDecoration::None,
+            };
+
+            // Merge with the previous run if only the range differs.
+            if ( !Empty( o_Runs ) )
+            {
+                TextRun& prev = Back( o_Runs );
+                TextRun probe = run;
+                probe.StartByte = prev.StartByte;
+                probe.EndByte   = prev.EndByte;
+                if ( prev.EndByte == a_Start && probe == prev )
+                {
+                    prev.EndByte = a_End;
+                    return;
+                }
+            }
+
+            PushBack( o_Runs, run );
         };
 
-        // Split wherever font fallback picks a different face.
-        ResolvedFace current = primary;
-        u32 runStart = 0;
-
-        for ( Unicode::UTF8Iterator it( a_Text ); it; ++it )
+        for ( size b = 0; b + 1 < Size( bounds ); ++b )
         {
-            const codepoint cp  = *it;
-            const u32       pos = static_cast<u32>( it.ByteIndex() );
+            const u32 intervalStart = bounds[b];
+            const u32 intervalEnd   = bounds[b + 1];
 
-            // Combining marks etc. stay with their base character's face.
-            const ResolvedFace face = ( pos > 0 && Unicode::IsClusterExtender( cp ) )
-                ? current
-                : m_Fonts.ResolveCodepoint( query, primary, cp );
-
-            if ( pos == 0 )
-                current = face;
-            else if ( face != current )
+            // Later spans win.
+            TextSpanStyle merged{};
+            for ( const TextSpan& span : a_Spans )
             {
-                emitRun( runStart, pos, current );
-                current = face;
-                runStart = pos;
+                if ( span.StartByte <= intervalStart && span.EndByte >= intervalEnd )
+                    merged.Merge( span.Style );
             }
-        }
 
-        emitRun( runStart, length, current );
+            FontQuery query = a_Style.GetFontQuery();
+            if ( merged.Family ) query.Family = *merged.Family;
+            if ( merged.Weight ) query.Weight = *merged.Weight;
+            if ( merged.Style )  query.Style  = *merged.Style;
+
+            const Unit size          = merged.Size ? *merged.Size : a_Style.Size;
+            const Unit letterSpacing = merged.LetterSpacing ? *merged.LetterSpacing : a_Style.LetterSpacing;
+            const ResolvedFace primary = m_Fonts.Resolve( query );
+
+            // Split wherever font fallback picks a different face.
+            const StringView interval{ Data( a_Text ) + intervalStart, intervalEnd - intervalStart };
+            ResolvedFace current{};
+            bool haveCurrent = false;
+            u32 runStart = intervalStart;
+
+            for ( Unicode::UTF8Iterator it( interval ); it; ++it )
+            {
+                const codepoint cp  = *it;
+                const u32       pos = intervalStart + static_cast<u32>( it.ByteIndex() );
+
+                // Combining marks etc. stay with their base character's face.
+                const ResolvedFace face = ( haveCurrent && Unicode::IsClusterExtender( cp ) )
+                    ? current
+                    : m_Fonts.ResolveCodepoint( query, primary, cp );
+
+                if ( !haveCurrent )
+                {
+                    current = face;
+                    haveCurrent = true;
+                    runStart = pos;
+                }
+                else if ( face != current )
+                {
+                    emitRun( runStart, pos, current, size, letterSpacing, merged );
+                    current = face;
+                    runStart = pos;
+                }
+            }
+
+            emitRun( runStart, intervalEnd, haveCurrent ? current : primary, size, letterSpacing, merged );
+        }
     }
 
     Unit TextMetrics::ShapeRunRange( const PreparedText& a_Prepared, const TextRun& a_Run, const TextLayoutStyle& a_Style,

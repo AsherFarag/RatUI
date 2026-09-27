@@ -14,7 +14,12 @@ namespace RatUI
         explicit TextMetrics( FontLibrary& a_Fonts ) : m_Fonts( a_Fonts ) {}
 
         /** @brief Normalises, splits into styled runs and pre-measures text. Cache the result until the text or style changes. */
-        RATUI_NODISCARD Optional<PreparedText> Prepare( StringView a_Text, const TextLayoutStyle& a_Style );
+        RATUI_NODISCARD Optional<PreparedText> Prepare( const StyledTextView& a_Text, const TextLayoutStyle& a_Style );
+
+        RATUI_NODISCARD Optional<PreparedText> Prepare( StringView a_Text, const TextLayoutStyle& a_Style )
+        {
+            return Prepare( StyledTextView{ a_Text }, a_Style );
+        }
 
         /** @brief Breaks prepared text into lines that fit @p a_MaxSize and positions the glyphs. */
         RATUI_NODISCARD Optional<ShapedText> Shape( const PreparedText& a_Prepared, const TextLayoutStyle& a_Style, Vec2<Unit> a_MaxSize = { Limits<Unit>::max(), Limits<Unit>::max() } );
@@ -22,7 +27,7 @@ namespace RatUI
         FontLibrary& GetFontLibrary() const { return m_Fonts; }
 
         /** @brief Splits normalised text into runs of one style and face (spans + font fallback). */
-        void Itemize( StringView a_Text, const TextLayoutStyle& a_Style, Array<TextRun>& o_Runs ) const;
+        void Itemize( StringView a_Text, const TextLayoutStyle& a_Style, Span<const TextSpan> a_Spans, Array<TextRun>& o_Runs ) const;
 
     protected:
         /** @brief Width of a byte range, summed across the runs it touches. */
@@ -36,6 +41,8 @@ namespace RatUI
 
         FontLibrary&       m_Fonts;
         Array<ShapedGlyph> m_Scratch;
+        Array<u32>         m_OffsetMap;
+        Array<TextSpan>    m_RemappedSpans;
     };
 
 } // namespace RatUI

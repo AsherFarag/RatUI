@@ -231,6 +231,64 @@ namespace RatUI
         constexpr u8 Strikethrough = 1 << 1;
     }
 
+    /**
+     * @brief Overrides for part of a text. Unset fields are inherited from the base style.
+     * TODO: Should we use bitfields instead? Every Optional adds a bool + padding, so this is a lot bigger than it needs to be.
+     */
+    struct TextSpanStyle
+    {
+        Optional<FontFamilyHandle> Family;
+        Optional<Unit>             Size;
+        Optional<EFontWeight>      Weight;
+        Optional<EFontStyle>       Style;
+        Optional<Color>            FillColor;
+        Optional<u8>               Decorations;   ///< ETextDecoration flags, added to inherited decorations.
+        Optional<Unit>             LetterSpacing;
+
+        TextSpanStyle& SetFamily( FontFamilyHandle a_Family ) { Family = a_Family; return *this; }
+        TextSpanStyle& SetSize( Unit a_Size )                 { Size = a_Size; return *this; }
+        TextSpanStyle& SetWeight( EFontWeight a_Weight )      { Weight = a_Weight; return *this; }
+        TextSpanStyle& SetStyle( EFontStyle a_Style )         { Style = a_Style; return *this; }
+        TextSpanStyle& SetColor( Color a_Color )              { FillColor = a_Color; return *this; }
+        TextSpanStyle& SetLetterSpacing( Unit a_Spacing )     { LetterSpacing = a_Spacing; return *this; }
+        TextSpanStyle& AddDecoration( u8 a_Decoration )
+        {
+            Decorations = static_cast<u8>( ( Decorations ? *Decorations : ETextDecoration::None ) | a_Decoration );
+            return *this;
+        }
+
+        /** @brief Applies @p a_Other on top. */
+        TextSpanStyle& Merge( const TextSpanStyle& a_Other )
+        {
+            if ( a_Other.Family )        Family        = a_Other.Family;
+            if ( a_Other.Size )          Size          = a_Other.Size;
+            if ( a_Other.Weight )        Weight        = a_Other.Weight;
+            if ( a_Other.Style )         Style         = a_Other.Style;
+            if ( a_Other.FillColor )     FillColor     = a_Other.FillColor;
+            if ( a_Other.LetterSpacing ) LetterSpacing = a_Other.LetterSpacing;
+            if ( a_Other.Decorations )   AddDecoration( *a_Other.Decorations );
+            return *this;
+        }
+
+        bool operator==( const TextSpanStyle& ) const = default;
+    };
+
+    /** @brief Styles the bytes [StartByte, EndByte). Spans can overlap, later ones win. */
+    struct TextSpan
+    {
+        u32           StartByte{ 0 };
+        u32           EndByte  { 0 };
+        TextSpanStyle Style{};
+
+        bool operator==( const TextSpan& ) const = default;
+    };
+
+    struct StyledTextView
+    {
+        StringView           Text;
+        Span<const TextSpan> Spans{};
+    };
+
 	/**
 	 * @brief A struct that encapsulates the styling information for rendering of text, such as color and decorations.
      */
@@ -403,6 +461,12 @@ namespace RatUI
 
 		/** @brief Returns the number of lines in the shaped text, which can be used for layout and spacing calculations. */
 		u32 LineCount() const { return static_cast<u32>( Size( Lines ) ); }
+    };
+
+    struct StyledText
+    {
+        Text            Content{};
+        Array<TextSpan> Spans;
     };
 
 } // namespace RatUI
