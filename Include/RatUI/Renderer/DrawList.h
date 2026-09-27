@@ -320,12 +320,13 @@ namespace RatUI
 
             const Mat3<Unit>& currentTransform = m_TransformStack[m_TransformStackSize - 1];
             Mat3f pixelTransform;
+            // Only the translation column is a length; the linear part is unitless and must not be DPI scaled.
             for ( size i = 0; i < 3; ++i )
                 for ( size j = 0; j < 3; ++j )
-                    pixelTransform[i][j] = currentTransform[i][j].ToFloat();
+                    pixelTransform[i][j] = ( i == 2 && j < 2 )
+                        ? ToPixel( currentTransform[i][j], m_DPIScale ).ToFloat()
+                        : currentTransform[i][j].ToFloat();
 
-            pixelTransform[2u][0u] *= m_DPIScale;
-            pixelTransform[2u][1u] *= m_DPIScale;
             return pixelTransform;
         }
 

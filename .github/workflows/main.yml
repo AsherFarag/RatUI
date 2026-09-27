@@ -7,42 +7,77 @@ on:
     branches: [ main, dev ]
 
 jobs:
-  test:
+  # The core library on its own: no backends, no third party dependencies besides Catch2.
+  core:
+    name: Core (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        compiler: [gcc, clang]
-        exclude:
-          - os: macos-latest
-            compiler: gcc
-          - os: windows-latest
-            compiler: clang
+        include:
+          - { name: Linux GCC,     os: ubuntu-latest,  cc: gcc,   cxx: g++ }
+          - { name: Linux Clang,   os: ubuntu-latest,  cc: clang, cxx: clang++ }
+          - { name: macOS Clang,   os: macos-latest,   cc: clang, cxx: clang++ }
+          - { name: Windows MSVC,  os: windows-latest }
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
 
     steps:
-      # Step 1: Checkout repository
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      # Step 2: Setup compiler
-      - name: Setup Compiler
-        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
-        run: |
-          if [ "${{ matrix.compiler }}" == "gcc" ]; then
-            sudo apt-get update || true
-            sudo apt-get install -y build-essential gcc g++ || true
-          elif [ "${{ matrix.compiler }}" == "clang" ]; then
-            sudo apt-get update || true
-            sudo apt-get install -y clang || true
-          fi
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DRATUI_BUILD_TESTS=ON -DRATUI_INSTALL=OFF
 
-      # Step 3: Configure CMake
-      - name: Configure CMake
-        run: cmake -B build -DRATUI_BUILD_TESTS=ON -DRATUI_INSTALL=OFF
+      - name: Build
+        run: cmake --build build --config Release --parallel
 
-      # Step 4: Build project
-      - name: Build project
-        run: cmake --build build --config Release
-
-      # Step 5: Run tests
-      - name: Run tests
+      - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
+
+  # Every backend plus the examples app, with dependencies fetched where they are not installed.
+  backends:
+    name: Backends + Examples (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Windows MSVC, os: windows-latest }
+          - { name: Linux GCC,    os: ubuntu-latest }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system packages
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libgl-dev
+
+      - name: Configure
+        run: cmake --preset dev
+
+      - name: Build
+        run: cmake --build --preset dev --parallel
+
+      - name: Test
+        run: ctest --preset dev
+
+  # Installs the core library and builds a separate project against it with find_package().
+  package:
+    name: Install + find_package
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and install RatUI
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel
+          cmake --install build --prefix "$PWD/install"
+
+      - name: Build and run the consumer
+        run: |
+          cmake -S Tests/Package -B build-consumer -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$PWD/install"
+          cmake --build build-consumer --parallel
+          ctest --test-dir build-consumer --output-on-failure

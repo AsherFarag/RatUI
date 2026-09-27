@@ -1,9 +1,14 @@
 #pragma once
 #include "../../RatUI.h"
 #include "../../Renderer/Shaders/GLSL.h"
+#include <cstdio>
 
 #ifdef RATUI_OPENGL_INCLUDE
 #   include RATUI_OPENGL_INCLUDE
+#elif defined( __EMSCRIPTEN__ )
+#   include <GLES3/gl3.h>
+#else
+#   include <GL/glew.h> // Define RATUI_OPENGL_INCLUDE to use a different loader.
 #endif
 
 namespace RatUI::OpenGL
@@ -18,10 +23,12 @@ namespace RatUI::OpenGL
     {
         OpenGLRenderer* Renderer{ nullptr };
         GLuint ID{ 0 };
+        TextureInfo Info{}; ///< Kept CPU-side since GLES/WebGL2 cannot query texture size or format.
 
-        Texture( OpenGLRenderer& a_Renderer, GLuint a_GLTextureID )
+        Texture( OpenGLRenderer& a_Renderer, GLuint a_GLTextureID, TextureInfo a_Info )
             : Renderer( &a_Renderer )
             , ID( a_GLTextureID )
+            , Info( a_Info )
         {}
 
         ~Texture()
@@ -36,14 +43,15 @@ namespace RatUI::OpenGL
 
     /**
      * @brief Create a TextureHandle from an OpenGL texture ID, which will be managed by the given OpenGLRenderer.
+     * @param a_Info  Size and format of the texture; GLES/WebGL2 cannot query these back.
      */
-    RATUI_NODISCARD inline TextureHandle MakeTextureHandle( OpenGLRenderer& a_Renderer, GLuint a_GLTextureID )
+    RATUI_NODISCARD inline TextureHandle MakeTextureHandle( OpenGLRenderer& a_Renderer, GLuint a_GLTextureID, TextureInfo a_Info )
     {
-        return MakeShared<Texture>( a_Renderer, a_GLTextureID );
+        return MakeShared<Texture>( a_Renderer, a_GLTextureID, a_Info );
     }
 
     /**
-     * @brief OpenGL 3.3 renderer for RatUI.
+     * @brief OpenGL 3.3 (or WebGL2 under Emscripten) renderer for RatUI.
      *
      * Maintains two VAOs — one for SDF shapes (SDFVertex), one for text
      * (TextVertex, shared by the MTSDF and bitmap text programs) — both sharing
@@ -74,6 +82,9 @@ namespace RatUI::OpenGL
 
         OpenGLRenderer( const OpenGLRenderer& )            = delete;
         OpenGLRenderer& operator=( const OpenGLRenderer& ) = delete;
+
+        /** @brief False if a shader failed to compile or link; nothing will render. */
+        bool IsValid() const { return m_SDFProgram != 0 && m_MSDFProgram != 0; }
 
         /** @brief Updates the orthographic projection to match a new framebuffer size. */
         void SetViewport( int a_Width, int a_Height );
@@ -155,21 +166,25 @@ namespace RatUI::OpenGL
          * @brief Compile a GLSL shader of the given type from source, with error checking.
          * @param a_Type  GL_VERTEX_SHADER or GL_FRAGMENT_SHADER.
          * @param a_Src   Null-terminated GLSL source string.
-         * @return OpenGL shader object ID.
+         * @return OpenGL shader object ID, or 0 on failure (the log is written to stderr).
          */
         GLuint CompileShader( GLenum a_Type, const char* a_Src )
         {
             GLuint shader = glCreateShader( a_Type );
-            glShaderSource( shader, 1, &a_Src, nullptr );
+            const char* sources[] = { GLSL::c_VersionHeader, a_Src };
+            glShaderSource( shader, 2, sources, nullptr );
             glCompileShader( shader );
 
             GLint ok = 0;
             glGetShaderiv( shader, GL_COMPILE_STATUS, &ok );
             if ( !ok )
             {
-                char log[512];
+                char log[1024];
                 glGetShaderInfoLog( shader, sizeof( log ), nullptr, log );
+                std::fprintf( stderr, "RatUI OpenGLRenderer: shader compile error:\n%s\n", log );
                 RATUI_ASSERT( false, "OpenGLRenderer: shader compile error" );
+                glDeleteShader( shader );
+                return 0;
             }
 
             return shader;
@@ -179,12 +194,18 @@ namespace RatUI::OpenGL
          * @brief Link a GLSL program from vertex and fragment shader sources, with error checking.
          * @param a_VertSrc  Null-terminated vertex shader GLSL source.
          * @param a_FragSrc  Null-terminated fragment shader GLSL source.
-         * @return OpenGL program object ID.
+         * @return OpenGL program object ID, or 0 on failure (the log is written to stderr).
          */
         GLuint LinkProgram( const char* a_VertSrc, const char* a_FragSrc )
         {
             GLuint vert = CompileShader( GL_VERTEX_SHADER, a_VertSrc );
             GLuint frag = CompileShader( GL_FRAGMENT_SHADER, a_FragSrc );
+            if ( !vert || !frag )
+            {
+                glDeleteShader( vert ); // Deleting 0 is a no-op.
+                glDeleteShader( frag );
+                return 0;
+            }
 
             GLuint prog = glCreateProgram();
             glAttachShader( prog, vert );
@@ -193,15 +214,19 @@ namespace RatUI::OpenGL
 
             GLint ok = 0;
             glGetProgramiv( prog, GL_LINK_STATUS, &ok );
-            if ( !ok )
-            {
-                char log[512];
-                glGetProgramInfoLog( prog, sizeof( log ), nullptr, log );
-                RATUI_ASSERT( false, "OpenGLRenderer: program link error" );
-            }
-
             glDeleteShader( vert );
             glDeleteShader( frag );
+
+            if ( !ok )
+            {
+                char log[1024];
+                glGetProgramInfoLog( prog, sizeof( log ), nullptr, log );
+                std::fprintf( stderr, "RatUI OpenGLRenderer: program link error:\n%s\n", log );
+                RATUI_ASSERT( false, "OpenGLRenderer: program link error" );
+                glDeleteProgram( prog );
+                return 0;
+            }
+
             return prog;
         }
 
@@ -398,7 +423,7 @@ namespace RatUI::OpenGL
 
         glBindTexture( GL_TEXTURE_2D, 0 );
 
-		return MakeTextureHandle( *this, texID );
+		return MakeTextureHandle( *this, texID, a_Info );
     }
 
     bool OpenGLRenderer::UpdateTexture( const TextureHandle& a_Texture, u32 /*a_MipLevel*/, Rectu a_Region, const void* a_Data, size a_DataSizeBytes )
@@ -455,66 +480,7 @@ namespace RatUI::OpenGL
         if ( !IsValidTexture( a_Texture ) )
             return NullOpt;
 
-        const Texture* tex = static_cast<const Texture*>( a_Texture.get() );
-        glBindTexture( GL_TEXTURE_2D, static_cast<GLuint>( tex->ID ) );
-
-        TextureInfo info{};
-
-        // Size
-        GLint width = 0;
-        GLint height = 0;
-
-        glGetTexLevelParameteriv( GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width );
-        glGetTexLevelParameteriv( GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &height );
-
-        info.Size = Vec2u(
-            static_cast<u32>( width ),
-            static_cast<u32>( height )
-        );
-
-        // Format
-        GLint internalFormat = 0;
-        glGetTexLevelParameteriv(
-            GL_TEXTURE_2D,
-            0,
-            GL_TEXTURE_INTERNAL_FORMAT,
-            &internalFormat
-        );
-
-        switch ( internalFormat )
-        {
-            case GL_R8:    info.Format = ETextureFormat::R8; break;
-            case GL_RG8:   info.Format = ETextureFormat::RG8; break;
-            case GL_RGB8:  info.Format = ETextureFormat::RGB8; break;
-            case GL_RGBA8: info.Format = ETextureFormat::RGBA8; break;
-            default:       info.Format = ETextureFormat::Unknown; break;
-        }
-
-        // Filter
-        GLint minFilter = 0;
-        glGetTexParameteriv(
-            GL_TEXTURE_2D,
-            GL_TEXTURE_MIN_FILTER,
-            &minFilter
-        );
-
-        switch ( minFilter )
-        {
-            case GL_NEAREST:
-            case GL_NEAREST_MIPMAP_NEAREST:
-            case GL_NEAREST_MIPMAP_LINEAR:
-                info.Sampler.Filter = ETextureFilter::Nearest;
-                break;
-
-            case GL_LINEAR:
-            case GL_LINEAR_MIPMAP_NEAREST:
-            case GL_LINEAR_MIPMAP_LINEAR:
-            default:
-                info.Sampler.Filter = ETextureFilter::Linear;
-                break;
-        }
-
-        return info;
+        return static_cast<const Texture*>( a_Texture.get() )->Info;
     }
 
     void OpenGLRenderer::DispatchBatch( const SDFDrawData& a_Data, u32 a_VertexByteOffset, const f32 a_PVM[16] )

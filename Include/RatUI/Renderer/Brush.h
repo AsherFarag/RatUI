@@ -4,7 +4,6 @@
 
 namespace RatUI
 {
-    // TODO: Implement brushes
 
     struct SolidBrush
     {

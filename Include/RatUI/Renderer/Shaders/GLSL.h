@@ -2,6 +2,13 @@
 
 namespace RatUI::GLSL
 {
+    /** @brief Prepended to every shader; WebGL2 needs GLSL ES 3.00. */
+#ifdef __EMSCRIPTEN__
+    inline constexpr const char* c_VersionHeader = "#version 300 es\nprecision highp float;\n";
+#else
+    inline constexpr const char* c_VersionHeader = "#version 330 core\n";
+#endif
+
     enum ESDFUniform
     {
         ESDFUniform_PVM = 0,
@@ -80,7 +87,6 @@ namespace RatUI::GLSL
      * @brief Vertex shader for SDF shapes (SDFVertex layout).
      */
     inline constexpr const char* c_SDFVertSrc = R"(
-    #version 330 core
     layout(location = 0) in vec2  a_Pos;
     layout(location = 1) in vec2  a_LocalPos;
     layout(location = 2) in vec2  a_UV;
@@ -126,7 +132,6 @@ namespace RatUI::GLSL
      * SDF convention: d < 0 = inside, d > 0 = outside.
      */
     inline constexpr const char* c_SDFFragSrc = R"(
-    #version 330 core
 
     in vec2  v_LocalPos;
     in vec2  v_UV;
@@ -198,7 +203,6 @@ namespace RatUI::GLSL
 
     /** @brief Shared by both text pipelines. */
     inline constexpr const char* c_TextVertSrc = R"(
-    #version 330 core
     layout(location = 0) in vec2  a_Pos;
     layout(location = 1) in vec2  a_UV;
     layout(location = 2) in vec4  a_Color;
@@ -231,7 +235,6 @@ namespace RatUI::GLSL
      * display size.
      */
     inline constexpr const char* c_TextFragSrc = R"(
-    #version 330 core
 
     in vec2  v_UV;
     in vec4  v_Color;
@@ -271,7 +274,7 @@ namespace RatUI::GLSL
     //  Helper: screen-space derivative scale -> converts SDF units to pixels.
     float ScreenPxRange(vec2 a_UV )
     {
-        vec2 unitRange = vec2(u_PxRange) / textureSize(u_Atlas, 0).xy;
+        vec2 unitRange = vec2(u_PxRange) / vec2(textureSize(u_Atlas, 0));
         vec2 screenTexSize = vec2(1.0) / fwidth(a_UV);
         return max(0.5 * dot(unitRange, screenTexSize), 1.0);
     }

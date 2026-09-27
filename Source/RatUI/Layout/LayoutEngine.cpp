@@ -536,11 +536,12 @@ namespace
 
             const EAlign align = ResolveAlign( child, a_Node );
 
-            // Cross-axis flex/stretch fills the full cross-axis extent.
+            // Cross-axis flex/stretch fills the full cross-axis extent, within the child's SizeConstraints.
+            const Constraints& crossConstraints = child.Style.SizeConstraints;
             if (isHz && (HasFlag( align, EAlign::VStretch ) || child.Style.HeightMode == ESizing::Flex))
-                childSize[1] = std::max( 0_u, a_Inner.Size[1] - child.Style.Margin.Vertical() );
+                childSize[1] = std::clamp( std::max( 0_u, a_Inner.Size[1] - child.Style.Margin.Vertical() ), crossConstraints.Min[1], crossConstraints.Max[1] );
             if (!isHz && (HasFlag( align, EAlign::HStretch ) || child.Style.WidthMode == ESizing::Flex))
-                childSize[0] = std::max( 0_u, a_Inner.Size[0] - child.Style.Margin.Horizontal() );
+                childSize[0] = std::clamp( std::max( 0_u, a_Inner.Size[0] - child.Style.Margin.Horizontal() ), crossConstraints.Min[0], crossConstraints.Max[0] );
 
             Rect<Unit> childRect;
 
