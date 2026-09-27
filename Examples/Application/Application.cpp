@@ -10,6 +10,7 @@
 #include <RatUI/Backends/FreeType/TextMetrics.h>
 #include <RatUI/Backends/OpenGL/OpenGLRenderer.h>
 #include <SDL2/SDL.h>
+#include <algorithm>
 #include <iostream>
 
 namespace
@@ -17,6 +18,11 @@ namespace
     constexpr const char* c_WindowTitle  = "RatUI Examples";
     constexpr int         c_WindowWidth  = 1280;
     constexpr int         c_WindowHeight = 720;
+
+    // Smallest space (in Units) the examples are laid out in. Smaller screens, such as phones,
+    // scale the whole UI down to fit instead of cutting it off.
+    constexpr f32 c_MinLayoutWidth  = 480.f;
+    constexpr f32 c_MinLayoutHeight = 700.f;
 
     // -------------------------------------------------------------------------
     // SDL -> RatUI conversions
@@ -87,9 +93,9 @@ namespace
     }
 
     // -------------------------------------------------------------------------
-    // DPI
+    // Scaling
     //
-    // Layout and input work in Units; drawing works in drawable pixels (Unit x DPI scale).
+    // Layout and input work in Units; drawing works in drawable pixels (Unit x GetPixelsPerUnit).
     // -------------------------------------------------------------------------
 
     /** @brief Drawable pixels per SDL window coordinate (devicePixelRatio in the browser, else 1). */
@@ -112,6 +118,14 @@ namespace
             dpi = 96.f;
         return dpi / 96.f; // 96 DPI is 1:1.
 #endif
+    }
+
+    /** @brief Drawable pixels per Unit: the DPI scale, lowered if the layout would be smaller than the minimum size. */
+    f32 GetPixelsPerUnit( SDL_Window* a_Window )
+    {
+        int width, height;
+        SDL_GL_GetDrawableSize( a_Window, &width, &height );
+        return std::min( { GetDPIScale( a_Window ), width / c_MinLayoutWidth, height / c_MinLayoutHeight } );
     }
 }
 
@@ -233,12 +247,12 @@ void Application::Frame()
 
     int width, height;
     SDL_GL_GetDrawableSize( m_Window, &width, &height );
-    const f32 dpiScale = GetDPIScale( m_Window );
+    const f32 pixelsPerUnit = GetPixelsPerUnit( m_Window );
 
     // Update and lay out in Units...
     Scene& scene = m_Example->GetScene();
     m_Example->Update( deltaSeconds );
-    scene.UpdateLayout( { Unit{ width / dpiScale }, Unit{ height / dpiScale } } );
+    scene.UpdateLayout( { Unit{ width / pixelsPerUnit }, Unit{ height / pixelsPerUnit } } );
     scene.Tick( deltaSeconds );
 
     // ...then draw in pixels.
@@ -249,7 +263,7 @@ void Application::Frame()
     glClearColor( clear[0], clear[1], clear[2], clear[3] );
     glClear( GL_COLOR_BUFFER_BIT );
 
-    m_DrawList->SetDPIScale( dpiScale );
+    m_DrawList->SetDPIScale( pixelsPerUnit );
     m_DrawList->Clear();
     m_DrawList->SetDebugEnabled( m_DebugDraw );
     scene.Render( *m_DrawList, deltaSeconds );
@@ -263,7 +277,7 @@ void Application::ProcessEvents()
     Scene& scene = m_Example->GetScene();
 
     // SDL reports window coordinates; RatUI input is in Units.
-    const f32  windowToUnits = GetPixelScale( m_Window ) / GetDPIScale( m_Window );
+    const f32  windowToUnits = GetPixelScale( m_Window ) / GetPixelsPerUnit( m_Window );
     const auto toUnits       = [windowToUnits]( Sint32 a_X, Sint32 a_Y ) { return Vec2<Unit>{ Unit{ a_X * windowToUnits }, Unit{ a_Y * windowToUnits } }; };
 
     SDL_Event event;

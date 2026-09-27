@@ -7,7 +7,10 @@
     <style>
         html, body { margin: 0; height: 100%; overflow: hidden; background: #111; color: #ccc; font-family: sans-serif; }
         /* SDL sizes the backbuffer to the CSS size (x devicePixelRatio) because the window is resizable. */
-        canvas { display: block; width: 100vw !important; height: 100vh !important; outline: none; }
+        /* dvh is the visible height on phones (vh includes the area under the URL bar). */
+        canvas { display: block; width: 100vw !important; height: 100vh !important; height: 100dvh !important; outline: none; }
+        /* Drags go to the app instead of scrolling or zooming the page. */
+        canvas { touch-action: none; }
         #status { position: absolute; top: 50%; width: 100%; text-align: center; }
     </style>
 </head>

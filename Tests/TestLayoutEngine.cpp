@@ -304,6 +304,19 @@ TEST_CASE( "VStretch on a Horizontal child's cross axis fills the container heig
     REQUIRE_UNIT( child.Layout.FinalRect.Size[1], 100.f );
 }
 
+TEST_CASE( "Cross-axis flex stretch is clamped by the child's SizeConstraints", "[layout-engine][alignment]" )
+{
+    LayoutFixture fx;
+    LayoutNode parent, child;
+    parent.PushBackChild( child );
+    parent.LayoutType( ELayoutType::Vertical ).FixedWidth( 400_u ).FixedHeight( 100_u );
+    child.FlexWidth().FixedHeight( 20_u ).SizeConstraints( Constraints::AtMost( Vec2<Unit>{ 150_u, Limits<Unit>::max() } ) );
+
+    RunLayout( parent, Vec2<Unit>{ 400_u, 100_u }, fx );
+
+    REQUIRE_UNIT( child.Layout.FinalRect.Size[0], 150.f );
+}
+
 // =============================================================================
 // Overlay
 // =============================================================================

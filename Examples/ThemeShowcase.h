@@ -29,7 +29,8 @@ public:
             .FocusScope( true );
 
         AddText( root, "Theme Showcase", 30_u );
-        m_Status = AddText( root, "", 16_u );
+        m_Status = AddText( root, "", 16_u, TextWrap::WrapWord() );
+        m_Status->GetLayout().WidthMode( ESizing::Flex );
 
         PanelWidget* themeButtons = AddPanel( root, ELayoutType::Horizontal );
         themeButtons->GetLayout().HeightMode( ESizing::Content ).FocusScope( true );
@@ -61,7 +62,7 @@ public:
             "My game dialogue uses the visible glyphs system. This only affects the rendering of the text, not the layout "
             "or shaped text data, which is useful for text revealed over time, such as in a dialogue system.",
             16_u, TextWrap::WrapWord() );
-        m_Typewriter->GetLayout().FixedWidth( 280_u ).FlexHeight();
+        m_Typewriter->GetLayout().WidthMode( ESizing::Flex ).FlexHeight().SizeConstraints( Constraints::AtMost( { 280_u, Limits<Unit>::max() } ) );
 
         AddText( preview, "This is an example of a long text string that will exceed its box and fade out instead of being cut off.",
                  16_u, TextWrap::WrapWord(), ETextOverflow::Fade )->GetLayout().FixedWidth( 100_u ).FixedHeight( 100_u );
@@ -132,12 +133,14 @@ private:
         return text;
     }
 
-    ButtonWidget* AddButton( IWidget* a_Parent, String a_Label, Unit a_Width, ButtonWidget::OnClickCallback a_OnClick )
+    /** @brief A button that grows up to a_MaxWidth and shrinks on narrow screens. */
+    ButtonWidget* AddButton( IWidget* a_Parent, String a_Label, Unit a_MaxWidth, ButtonWidget::OnClickCallback a_OnClick )
     {
         ButtonWidget* button = m_Scene.CreateWidget<ButtonWidget>( a_Parent->GetLayoutID(), std::move( a_OnClick ) );
         button->GetLayout()
-            .FixedWidth( a_Width )
+            .WidthMode( ESizing::Flex )
             .FixedHeight( 38_u )
+            .SizeConstraints( Constraints::AtMost( { a_MaxWidth, Limits<Unit>::max() } ) )
             .ChildAlign( EAlign::Center );
 
         // The label must not steal clicks from the button.
