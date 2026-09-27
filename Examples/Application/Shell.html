@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RatUI Examples</title>
+    <style>
+        html, body { margin: 0; height: 100%; overflow: hidden; background: #111; color: #ccc; font-family: sans-serif; }
+        /* SDL sizes the backbuffer to the CSS size (x devicePixelRatio) because the window is resizable. */
+        canvas { display: block; width: 100vw !important; height: 100vh !important; outline: none; }
+        #status { position: absolute; top: 50%; width: 100%; text-align: center; }
+    </style>
+</head>
+<body>
+    <div id="status">Loading...</div>
+    <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+    <script>
+        var Module = {
+            canvas: document.getElementById( "canvas" ),
+            failed: false,
+            setStatus: function( a_Text ) { if ( !Module.failed ) document.getElementById( "status" ).textContent = a_Text; },
+            // Errors stay on screen; Emscripten would otherwise clear the status once main() returns.
+            fail: function( a_Text ) { Module.setStatus( a_Text ); Module.failed = true; },
+            onStartupFailed: function() { Module.fail( "Could not start the demo. It needs a browser with WebGL2; see the console for details." ); },
+            print: console.log,
+            printErr: console.error
+        };
+        window.onerror = function() { Module.fail( "Something went wrong, see the browser console." ); };
+    </script>
+    {{{ SCRIPT }}}
+</body>
+</html>
