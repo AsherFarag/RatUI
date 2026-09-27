@@ -1,0 +1,40 @@
+# Pushing a version tag (e.g. v0.1.0) creates a GitHub Release with that version's CHANGELOG
+# entry as its notes and a prebuilt Windows copy of the examples app attached.
+name: Release
+
+on:
+  push:
+    tags: [ 'v*' ]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build examples
+        run: |
+          cmake --preset release
+          cmake --build --preset release --target RatUI_Examples --parallel
+
+      - name: Package examples
+        shell: pwsh
+        run: |
+          $dir = "RatUI-Examples-$env:GITHUB_REF_NAME-windows"
+          New-Item -ItemType Directory $dir | Out-Null
+          Copy-Item build/release/Examples/Release/RatUI_Examples.exe $dir
+          Copy-Item -Recurse Examples/Resources $dir
+          Compress-Archive $dir "$dir.zip"
+
+      - name: Create release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # The notes are everything under "## [<version>]" up to the next version heading or the link list.
+          awk -v h="## [$version]" 'index( $0, h ) == 1 { found = 1; next } /^(## )?\[/ { found = 0 } found' CHANGELOG.md > notes.md
+          gh release create "$GITHUB_REF_NAME" RatUI-Examples-*.zip --title "RatUI $GITHUB_REF_NAME" --notes-file notes.md

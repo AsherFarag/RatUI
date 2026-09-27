@@ -8,6 +8,8 @@
 #   include RATUI_OPENGL_INCLUDE
 #elif defined( __EMSCRIPTEN__ )
 #   include <GLES3/gl3.h>
+#else
+#   include <GL/glew.h> // Define RATUI_OPENGL_INCLUDE to use a different loader.
 #endif
 
 namespace RatUI::OpenGL

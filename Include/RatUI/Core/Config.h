@@ -16,11 +16,12 @@
  */
 
 // === RatUI Version ===
+// CMake reads the project version from these, so this is the only place to bump it.
 
 #define RATUI_VERSION_MAJOR 0
-#define RATUI_VERSION_MINOR 0
+#define RATUI_VERSION_MINOR 1
 #define RATUI_VERSION_PATCH 0
-#define RATUI_VERSION_STRING "0.0.0"
+#define RATUI_VERSION_STRING "0.1.0"
 
 // === Configuration Options ===
 
