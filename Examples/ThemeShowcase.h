@@ -13,7 +13,7 @@
 class ThemeShowcase : public Example
 {
 public:
-    explicit ThemeShowcase( ITextMetrics& a_TextMetrics )
+    explicit ThemeShowcase( TextMetrics& a_TextMetrics )
         : Example( a_TextMetrics )
     {
         // Every widget shares m_ActiveTheme, so copying another theme into it restyles the whole scene.
@@ -122,8 +122,8 @@ private:
     TextWidget* AddText( IWidget* a_Parent, String a_String, Unit a_Size,
                          TextWrap a_Wrap = TextWrap::NoWrap(), ETextOverflow a_Overflow = ETextOverflow::Clip )
     {
+        // Family is left unset so the active theme's ThemeKey::FontFamily::Default decides (e.g. the pixel font in "Minecraft").
         TextLayoutStyle style{};
-        style.Font     = Fonts::Roboto;
         style.Size     = a_Size;
         style.Wrap     = a_Wrap;
         style.Overflow = a_Overflow;
@@ -181,7 +181,7 @@ private:
     static Shared<Theme> MakeDarkTheme()
     {
         Shared<Theme> theme = MakeShared<Theme>( *Themes::Dark() );
-        theme->SetFont( ThemeKey::Font::Default, Fonts::Roboto );
+        theme->SetFontFamily( ThemeKey::FontFamily::Default, Fonts::Roboto );
         theme->SetColors( {
             { ThemeKey::Color::SliderThumbHover,   Colors::LightBlue  },
             { ThemeKey::Color::SliderThumbPressed, Colors::AccentBlue },
@@ -194,7 +194,7 @@ private:
     static Shared<Theme> MakeLightTheme()
     {
         Shared<Theme> theme = MakeShared<Theme>( *Themes::Dark() );
-        theme->SetFont( ThemeKey::Font::Default, Fonts::Roboto );
+        theme->SetFontFamily( ThemeKey::FontFamily::Default, Fonts::Roboto );
         theme->SetColors( {
             { ThemeKey::Color::FocusOutline,       Colors::DarkBlue   },
             { ThemeKey::Color::SliderTrack,        Colors::Silver     },
@@ -216,7 +216,7 @@ private:
     static Shared<Theme> MakeNeonTheme()
     {
         Shared<Theme> theme = MakeShared<Theme>( *Themes::Dark() );
-        theme->SetFont( ThemeKey::Font::Default, Fonts::Roboto );
+        theme->SetFontFamily( ThemeKey::FontFamily::Default, Fonts::Roboto );
         theme->SetColors( {
             { ThemeKey::Color::FocusOutline,       Colors::AccentRose                  },
             { ThemeKey::Color::SliderTrack,        FromColorF32( 0.10f, 0.10f, 0.20f ) },
@@ -244,7 +244,7 @@ private:
     static Shared<Theme> MakeMinecraftTheme()
     {
         Shared<Theme> theme = MakeDarkTheme();
-        theme->SetFont( ThemeKey::Font::Default, Fonts::Minecraft );
+        theme->SetFontFamily( ThemeKey::FontFamily::Default, Fonts::Minecraft );
         for ( const auto& [key, value] : theme->GetRadii() )
             theme->SetRadius( key, CornerRadius::None() ); // Sharp corners everywhere.
 

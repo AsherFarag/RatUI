@@ -3,11 +3,12 @@
 
 using namespace RatUI;
 
-/** @brief Fonts the Application loads from Resources/Fonts. */
+/** @brief Font families the Application registers from Resources/Fonts, set before any Example is created. */
 namespace Fonts
 {
-    inline constexpr FontHandle Roboto   { 1 };
-    inline constexpr FontHandle Minecraft{ 2 };
+    inline FontFamilyHandle Roboto;
+    inline FontFamilyHandle RobotoRaster;
+    inline FontFamilyHandle Minecraft;
 }
 
 /**
@@ -19,11 +20,14 @@ namespace Fonts
 class Example
 {
 public:
-    explicit Example( ITextMetrics& a_TextMetrics ) { m_Scene.TextMetrics = &a_TextMetrics; }
+    explicit Example( TextMetrics& a_TextMetrics ) { m_Scene.TextMetrics = &a_TextMetrics; }
     virtual ~Example() = default;
 
     /** @brief Called once per frame, before layout. */
     virtual void Update( f32 a_DeltaSeconds ) {}
+
+    /** @brief Draws the scene. Override to draw extra things on top, e.g. fast text. */
+    virtual void Render( DrawList& a_DrawList, f32 a_DeltaSeconds ) { m_Scene.Render( a_DrawList, a_DeltaSeconds ); }
 
     Scene& GetScene() { return m_Scene; }
 

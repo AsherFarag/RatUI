@@ -44,7 +44,7 @@ RatUI
 
 ## Example
 
-A button with a label, using the OpenGL and FreeType backends. RatUI doesn't create windows or read input
+Fonts and text, using the OpenGL and FreeType backends. RatUI doesn't create windows or read input
 itself: you give it an OpenGL context and translate your platform's events into `InputEvent`s.
 [`Examples/Application`](Examples/Application/Application.cpp) is a complete SDL2 host to copy from.
 
@@ -77,9 +77,13 @@ auto drawList    = RatUI::DrawList{ atlas };
 auto scene = RatUI::Scene{};
 scene.TextMetrics = &textMetrics;
 
-scene.CreateRootWidget<RatUI::TextWidget>( "HP 42", RatUI::TextLayoutStyle{ .Family = ui, .Size = 18_u } );
+// Rich text is the default: spans restyle parts of a string.
+scene.CreateRootWidget<RatUI::TextWidget>(
+    RatUI::StyledText{ .Content = { "HP 42" }, .Spans = { { 3, 5, { .Weight = EFontWeight::Bold, .FillColor = Colors::Red } } } },
+    RatUI::TextLayoutStyle{ .Family = ui, .Size = 18_u } );
 
-// TODO Finish this example
+// Fast text: no layout pass, for text that changes every frame.
+drawList.AddFastText( "-128", { 100_u, 40_u }, { .Family = pixel, .Size = 16_u } );
 ```
 
 `OpenGLRenderer.h` includes `<GL/glew.h>` by default; define `RATUI_OPENGL_INCLUDE` (e.g. `-DRATUI_OPENGL_INCLUDE=<glad/gl.h>`) to use a different loader.

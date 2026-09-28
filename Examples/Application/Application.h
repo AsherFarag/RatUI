@@ -2,7 +2,6 @@
 #include "../Example.h"
 
 struct SDL_Window;
-namespace RatUI::FreeType { class FontCache; class TextMetrics; }
 namespace RatUI::OpenGL   { class OpenGLRenderer; }
 
 /**
@@ -21,14 +20,15 @@ public:
     template<typename TExample>
     bool Run()
     {
-        return Run( []( ITextMetrics& a_TextMetrics ) -> Unique<Example> { return MakeUnique<TExample>( a_TextMetrics ); } );
+        return Run( []( TextMetrics& a_TextMetrics ) -> Unique<Example> { return MakeUnique<TExample>( a_TextMetrics ); } );
     }
 
 private:
-    using ExampleFactory = Unique<Example>( * )( ITextMetrics& );
+    using ExampleFactory = Unique<Example>( * )( TextMetrics& );
 
     bool Run( ExampleFactory a_MakeExample );
     bool Initialize();
+    void LoadFonts();
     void Shutdown();
     void Frame();
     void ProcessEvents();
@@ -40,8 +40,8 @@ private:
     void*       m_GLContext{ nullptr }; ///< SDL_GLContext
 
     Unique<OpenGL::OpenGLRenderer> m_Renderer;
-    Unique<FreeType::FontCache>    m_FontCache;
-    Unique<FreeType::TextMetrics>  m_TextMetrics;
+    FontLibrary                    m_Fonts;
+    Unique<TextMetrics>            m_TextMetrics;
     Unique<GlyphAtlas>             m_Atlas;
     Unique<DrawList>               m_DrawList;
     Unique<Example>                m_Example;

@@ -24,6 +24,12 @@ target_link_libraries(RatUI_Tests
         Catch2::Catch2WithMain
 )
 
+# Font tests load the example fonts when the FreeType backend is enabled.
+target_compile_definitions(RatUI_Tests
+    PRIVATE
+        RATUI_TEST_FONTS_DIR="${PROJECT_SOURCE_DIR}/Examples/Resources/Fonts"
+)
+
 # The fetched Catch2 does not add its helper scripts to the module path itself.
 if(DEFINED Catch2_SOURCE_DIR AND EXISTS "${Catch2_SOURCE_DIR}/extras/Catch.cmake")
     list(APPEND CMAKE_MODULE_PATH "${Catch2_SOURCE_DIR}/extras")

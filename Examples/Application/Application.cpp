@@ -7,7 +7,7 @@
 #include <GL/glew.h>
 #endif
 
-#include <RatUI/Backends/FreeType/TextMetrics.h>
+#include <RatUI/Backends/FreeType/FontLoader.h>
 #include <RatUI/Backends/OpenGL/OpenGLRenderer.h>
 #include <SDL2/SDL.h>
 #include <algorithm>
@@ -34,6 +34,8 @@ namespace
             return static_cast<EButtonID>( (int)EButtonID::KeyA + ( a_Key - SDLK_a ) );
         if ( a_Key >= SDLK_0 && a_Key <= SDLK_9 )
             return static_cast<EButtonID>( (int)EButtonID::Key0 + ( a_Key - SDLK_0 ) );
+        if ( a_Key >= SDLK_F1 && a_Key <= SDLK_F12 )
+            return static_cast<EButtonID>( (int)EButtonID::KeyF1 + ( a_Key - SDLK_F1 ) );
 
         switch ( a_Key )
         {
@@ -207,14 +209,37 @@ bool Application::Initialize()
         return false;
     }
 
-    m_FontCache = MakeUnique<FreeType::FontCache>();
-    m_FontCache->RegisterFontHandle( Fonts::Roboto,    "Resources/Fonts/Roboto-Medium.ttf" );
-    m_FontCache->RegisterFontHandle( Fonts::Minecraft, "Resources/Fonts/Minecraft.ttf" );
+    LoadFonts();
 
-    m_TextMetrics = MakeUnique<FreeType::TextMetrics>( *m_FontCache );
-    m_Atlas       = MakeUnique<GlyphAtlas>( *m_Renderer, *m_TextMetrics );
+    m_TextMetrics = MakeUnique<TextMetrics>( m_Fonts );
+    m_Atlas       = MakeUnique<GlyphAtlas>( *m_Renderer, m_Fonts );
     m_DrawList    = MakeUnique<DrawList>( *m_Atlas );
     return true;
+}
+
+void Application::LoadFonts()
+{
+    FreeType::FontLoader loader; // Faces keep FreeType alive, so the loader can be temporary.
+
+    Fonts::Roboto = m_Fonts.RegisterFamily( "Roboto"_id );
+    m_Fonts.AddFaceToFamily( Fonts::Roboto, loader.LoadFromFile( "Resources/Fonts/Roboto-Regular.ttf" ),    { EFontWeight::Regular, EFontStyle::Normal } );
+    m_Fonts.AddFaceToFamily( Fonts::Roboto, loader.LoadFromFile( "Resources/Fonts/Roboto-Medium.ttf" ),     { EFontWeight::Medium,  EFontStyle::Normal } );
+    m_Fonts.AddFaceToFamily( Fonts::Roboto, loader.LoadFromFile( "Resources/Fonts/Roboto-Bold.ttf" ),       { EFontWeight::Bold,    EFontStyle::Normal } );
+    m_Fonts.AddFaceToFamily( Fonts::Roboto, loader.LoadFromFile( "Resources/Fonts/Roboto-Italic.ttf" ),     { EFontWeight::Regular, EFontStyle::Italic } );
+    m_Fonts.AddFaceToFamily( Fonts::Roboto, loader.LoadFromFile( "Resources/Fonts/Roboto-BoldItalic.ttf" ), { EFontWeight::Bold,    EFontStyle::Italic } );
+
+    // Hinted bitmaps are sharper than MTSDF for small text. No italic face, so italic is synthesized.
+    Fonts::RobotoRaster = m_Fonts.RegisterFamily( "Roboto Raster"_id );
+    m_Fonts.AddFaceToFamily( Fonts::RobotoRaster, loader.LoadFromFile( "Resources/Fonts/Roboto-Regular.ttf", { .Mode = EGlyphRenderMode::Raster } ), { EFontWeight::Regular } );
+    m_Fonts.AddFaceToFamily( Fonts::RobotoRaster, loader.LoadFromFile( "Resources/Fonts/Roboto-Bold.ttf",    { .Mode = EGlyphRenderMode::Raster } ), { EFontWeight::Bold } );
+
+    // Pixel-art TTF, native grid auto-detected.
+    Fonts::Minecraft = m_Fonts.RegisterFamily( "Minecraft"_id );
+    m_Fonts.AddFaceToFamily( Fonts::Minecraft, loader.LoadFromFile( "Resources/Fonts/Minecraft.ttf", { .Mode = EGlyphRenderMode::Pixel } ) );
+
+    // Characters Roboto lacks fall back to the pixel font.
+    m_Fonts.SetFallbacks( Fonts::Roboto, { Fonts::Minecraft } );
+    m_Fonts.SetDefaultFamily( Fonts::Roboto );
 }
 
 void Application::Shutdown()
@@ -224,7 +249,6 @@ void Application::Shutdown()
     m_DrawList.reset();
     m_Atlas.reset();
     m_TextMetrics.reset();
-    m_FontCache.reset();
     m_Renderer.reset();
 
     if ( m_GLContext )
@@ -266,7 +290,7 @@ void Application::Frame()
     m_DrawList->SetDPIScale( pixelsPerUnit );
     m_DrawList->Clear();
     m_DrawList->SetDebugEnabled( m_DebugDraw );
-    scene.Render( *m_DrawList, deltaSeconds );
+    m_Example->Render( *m_DrawList, deltaSeconds );
     m_DrawList->Flush( *m_Renderer );
 
     SDL_GL_SwapWindow( m_Window );

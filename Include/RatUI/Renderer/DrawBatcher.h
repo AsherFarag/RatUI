@@ -109,6 +109,19 @@ namespace RatUI
         bool CanFlattenWith( const BitmapTextDrawData& a_Other ) const { return Page == a_Other.Page; }
     };
 
+    /** @brief Font for DrawList::AddFastText(). */
+    struct FastTextStyle
+    {
+        FontFamilyHandle Family{};
+        EFontWeight      Weight{ EFontWeight::Regular };
+        EFontStyle       Style{ EFontStyle::Normal };
+        FontSynthesis    Synthesis{};
+        Unit             Size{ 16_u };
+        Unit             LetterSpacing{ 0_u };
+
+        constexpr FontQuery GetFontQuery() const { return FontQuery{ Family, Weight, Style, Synthesis }; }
+    };
+
     /**
      * @brief Represents a batch of draw calls that can be executed together. 
      * Each batch contains information about the clipping rectangle, transformation, texture, 
@@ -171,6 +184,17 @@ namespace RatUI
             const Mat3f&             a_Transform,
             u32                      a_MaxGlyphs = Limits<u32>::max() );
 
+        /** @brief Shapes a single-style string without a layout pass and draws it at @p a_Anchor, aligned by a_Render.Align. */
+        void EmitFastText(
+            StringView               a_Text,
+            Vec2<Pixel>              a_Anchor,
+            const FastTextStyle&     a_Style,
+            const TextRenderStyle&   a_Render,
+            GlyphAtlas&              a_Atlas,
+            f32                      a_DpiScale,
+            const Optional<Rectu16>& a_ClipRect,
+            const Mat3f&             a_Transform );
+
     protected:
         Array<byte>      m_Vertices;
         Array<u16>       m_Indices;
@@ -213,6 +237,7 @@ namespace RatUI
         };
 
         Array<TextQuad> m_TextQuads;
+        ShapedText      m_FastText;
 
         BitmapEffects ComputeBitmapEffects( const TextRenderStyle& a_Style, const IFontFace& a_Face, Unit a_Size, f32 a_DpiScale, const GlyphAtlasConfig& a_Config ) const;
 

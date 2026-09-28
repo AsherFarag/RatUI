@@ -208,6 +208,14 @@ namespace RatUI
             return *this;
         }
 
+        /** @brief Draws a string with no layout pass, for text that changes every frame. Lines are aligned on @p a_Anchor. */
+        DrawList& AddFastText( StringView a_Text, Vec2<Unit> a_Anchor, const FastTextStyle& a_Style, const TextRenderStyle& a_Render = {} )
+        {
+            GetCurrentBatcher().EmitFastText( a_Text, ToPixelVec2( a_Anchor ), a_Style, a_Render, m_Atlas, m_DPIScale,
+                                              GetPixelClipRect(), GetTextPixelTransform() );
+            return *this;
+        }
+
         GlyphAtlas& GetAtlas() const { return m_Atlas; }
 
         /**

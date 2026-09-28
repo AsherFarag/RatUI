@@ -397,8 +397,6 @@ namespace RatUI::GLSL
     )";
     /** @brief Bitmap glyphs (Raster / Pixel). v_Weight = 1 draws an alpha-only silhouette for shadows / outlines. */
     inline constexpr const char* c_BitmapTextFragSrc = R"(
-    #version 330 core
-
     in vec2  v_UV;
     in vec4  v_Color;
     in float v_Weight;

@@ -800,6 +800,111 @@ namespace RatUI
         FlushTextQuads( params );
     }
 
+    void DrawBatcher::EmitFastText(
+        StringView               a_Text,
+        Vec2<Pixel>              a_Anchor,
+        const FastTextStyle&     a_Style,
+        const TextRenderStyle&   a_Render,
+        GlyphAtlas&              a_Atlas,
+        f32                      a_DpiScale,
+        const Optional<Rectu16>& a_ClipRect,
+        const Mat3f&             a_Transform )
+    {
+        FontLibrary& fonts = a_Atlas.GetFontLibrary();
+        const FontQuery    query       = a_Style.GetFontQuery();
+        const ResolvedFace primary     = fonts.Resolve( query );
+        const IFontFace*   primaryFace = fonts.GetFace( primary.Face );
+        if ( Empty( a_Text ) || !primaryFace )
+            return;
+
+        // Every line uses the primary face's metrics.
+        const FontFaceMetrics& metrics = primaryFace->Metrics();
+        const Unit fontSize   = TextShaping::EffectiveSize( *primaryFace, a_Style.Size );
+        const Unit lineHeight = TextShaping::EmToUnit( *primaryFace, metrics.LineHeight(), fontSize );
+        const Unit halfGap    = TextShaping::IsPixelFace( *primaryFace ) ? 0_u : TextShaping::EmToUnit( *primaryFace, metrics.LineGap, fontSize ) * 0.5f;
+        const Unit ascent     = TextShaping::EmToUnit( *primaryFace, metrics.Ascender, fontSize ) + halfGap;
+
+        // Build the ShapedText directly (no Prepare / wrapping) and draw it like any other text.
+        ShapedText& shaped = m_FastText;
+        ::RatUI::Clear( shaped.Glyphs );
+        ::RatUI::Clear( shaped.Runs );
+        ::RatUI::Clear( shaped.Lines );
+        shaped.MaxWidth = 0_u;
+
+        const auto addRun = [&]( const ResolvedFace& a_Face, size a_Start, size a_End ) -> Unit
+        {
+            IFontFace* face = fonts.GetFace( a_Face.Face );
+            if ( !face || a_Start >= a_End )
+                return 0_u;
+
+            const Unit runSize    = TextShaping::EffectiveSize( *face, a_Style.Size );
+            const u32  glyphStart = static_cast<u32>( Size( shaped.Glyphs ) );
+            const Unit width      = TextShaping::ShapePiece( *face, a_Text.substr( a_Start, a_End - a_Start ), static_cast<u32>( a_Start ),
+                { .Face = a_Face, .Size = runSize, .LetterSpacing = a_Style.LetterSpacing, .SimpleShaping = true }, shaped.Glyphs );
+
+            PushBack( shaped.Runs, ShapedRun{
+                .GlyphStart = glyphStart,
+                .GlyphEnd   = static_cast<u32>( Size( shaped.Glyphs ) ),
+                .Face       = a_Face,
+                .Mode       = face->GetMode(),
+                .Size       = runSize,
+            } );
+            return width;
+        };
+
+        Unit top = 0_u;
+        for ( size lineStart = 0; lineStart <= Size( a_Text ); )
+        {
+            size lineEnd = a_Text.find( '\n', lineStart );
+            if ( lineEnd == StringView::npos )
+                lineEnd = Size( a_Text );
+
+            ShapedLine line{
+                .Start    = static_cast<u32>( Size( shaped.Glyphs ) ),
+                .RunStart = static_cast<u32>( Size( shaped.Runs ) ),
+                .Top      = top,
+                .Baseline = top + ascent,
+                .Height   = lineHeight,
+            };
+
+            // New run wherever font fallback picks a different face.
+            ResolvedFace current{};
+            size runStart = lineStart;
+            for ( Unicode::UTF8Iterator it( a_Text.substr( lineStart, lineEnd - lineStart ) ); it; ++it )
+            {
+                const size position = lineStart + it.ByteIndex();
+                const ResolvedFace face = ( position > lineStart && Unicode::IsClusterExtender( *it ) )
+                    ? current
+                    : fonts.ResolveCodepoint( query, primary, *it );
+
+                if ( position > runStart && face != current )
+                {
+                    line.Width += addRun( current, runStart, position );
+                    runStart = position;
+                }
+                current = face;
+            }
+            line.Width += addRun( current, runStart, lineEnd );
+
+            line.End    = static_cast<u32>( Size( shaped.Glyphs ) );
+            line.RunEnd = static_cast<u32>( Size( shaped.Runs ) );
+            shaped.MaxWidth = std::max( shaped.MaxWidth, line.Width );
+            PushBack( shaped.Lines, line );
+
+            top      += lineHeight;
+            lineStart = lineEnd + 1;
+        }
+        shaped.TotalHeight = top;
+
+        // A zero-width box at the anchor, so Left / Center / Right line up on it.
+        TextRenderStyle render = a_Render;
+        render.Baseline       = ETextBaseline::Top;
+        render.FadePercentage = 0.f;
+
+        const Rect<Pixel> box{ a_Anchor, { 0_px, ToPixel( shaped.TotalHeight, a_DpiScale ) } };
+        EmitText( shaped, render, box, a_Atlas, a_DpiScale, a_ClipRect, a_Transform );
+    }
+
     void DrawBatcher::TryFlatten()
     {
         if ( Size( m_Batches ) < 2 )
