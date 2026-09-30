@@ -33,11 +33,12 @@ ratui_require_dependency(
     [SOURCE_ONLY]                     # only populate sources; caller makes TARGET
     [CACHE_ARGS     <VAR VALUE>...]   # cache variables forced before fetching
     [FEATURE        <human readable name of the feature that needs this>]
+    [OPTIMIZE_DEBUG]                  # build the fetched code optimized in Debug too
 )
 ]]
 function(ratui_require_dependency)
     cmake_parse_arguments(ARG
-        "SOURCE_ONLY"
+        "SOURCE_ONLY;OPTIMIZE_DEBUG"
         "NAME;TARGET;FETCH_NAME;GIT_REPOSITORY;GIT_TAG;URL;ALIAS_FROM;FEATURE"
         "CACHE_ARGS"
         ${ARGN})
@@ -96,6 +97,20 @@ function(ratui_require_dependency)
     # subproject; it does not affect RatUI itself.
     if(NOT DEFINED CMAKE_POLICY_VERSION_MINIMUM)
         set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+    endif()
+
+    # Hot code that is unusable unoptimized. Only the optimizer flags change (the
+    # runtime and iterator debug level stay), so it still links with Debug RatUI.
+    # Function scope keeps this local to the fetched subproject.
+    if(ARG_OPTIMIZE_DEBUG)
+        foreach(_lang C CXX)
+            if(MSVC)
+                string(REGEX REPLACE "/RTC[1csu]+|/Od|/Ob0" "" _flags "${CMAKE_${_lang}_FLAGS_DEBUG}")
+                set(CMAKE_${_lang}_FLAGS_DEBUG "${_flags} /O2 /Ob2")
+            else()
+                set(CMAKE_${_lang}_FLAGS_DEBUG "${CMAKE_${_lang}_FLAGS_DEBUG} -O2")
+            endif()
+        endforeach()
     endif()
 
     if(ARG_URL)
