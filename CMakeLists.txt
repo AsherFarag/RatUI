@@ -154,6 +154,7 @@ if(RATUI_BACKEND_FREETYPE)
         FEATURE        "the FreeType text backend"
         GIT_REPOSITORY https://github.com/Chlumsky/msdfgen.git
         GIT_TAG        ${RATUI_MSDFGEN_TAG}
+        OPTIMIZE_DEBUG
         CACHE_ARGS
             MSDFGEN_BUILD_STANDALONE OFF
             MSDFGEN_INSTALL          OFF
