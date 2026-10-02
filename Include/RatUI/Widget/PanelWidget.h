@@ -47,9 +47,9 @@ namespace RatUI
                 }
             }
 
-            if ( std::holds_alternative<SolidBrush>( FillBrush ) )
+            if ( Holds<SolidBrush>( FillBrush ) )
             {
-                const SolidBrush& solid = std::get<SolidBrush>( FillBrush );
+                const SolidBrush& solid = Get<SolidBrush>( FillBrush );
                 a_Event.Drawer.AddRect( rect, 
                 {
                     .FillColor = solid.Fill,
@@ -58,9 +58,9 @@ namespace RatUI
                     .Radius = Radius
                 } );
             }
-            else if ( std::holds_alternative<TextureBrush>( FillBrush ) )
+            else if ( Holds<TextureBrush>( FillBrush ) )
             {
-                const TextureBrush& texture = std::get<TextureBrush>( FillBrush );
+                const TextureBrush& texture = Get<TextureBrush>( FillBrush );
                 a_Event.Drawer.AddRect( rect, 
                 {
                     .FillColor = texture.Tint,
@@ -70,9 +70,9 @@ namespace RatUI
                     .Texture = texture.Texture
                 } );
             }
-            else if ( std::holds_alternative<NineSliceBrush>( FillBrush ) )
+            else if ( Holds<NineSliceBrush>( FillBrush ) )
             {
-                const NineSliceBrush& nineSlice = std::get<NineSliceBrush>( FillBrush );
+                const NineSliceBrush& nineSlice = Get<NineSliceBrush>( FillBrush );
                 a_Event.Drawer.AddSlicedRect( rect, 
                 {
                     .Texture = nineSlice.Texture,

@@ -108,15 +108,15 @@ namespace RatUI
         if ( ClipRect != a_Other.ClipRect || Transform != a_Other.Transform )
             return false;
 
-        return std::visit( [&]( const auto& a_Data )
-                           {
+        return Visit( Data, [&]( const auto& a_Data )
+        {
             using T = std::decay_t<decltype( a_Data )>;
-            if ( !std::holds_alternative<T>( a_Other.Data ) )
+            if ( !Holds<T>( a_Other.Data ) )
                 return false;
 
-            const T& otherData = std::get<T>( a_Other.Data );
-            return a_Data.CanFlattenWith( otherData ); },
-                           Data );
+            const T& otherData = Get<T>( a_Other.Data );
+            return a_Data.CanFlattenWith( otherData );
+        } );
     }
 
     void DrawBatcher::Clear()

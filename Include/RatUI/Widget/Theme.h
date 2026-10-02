@@ -109,8 +109,8 @@ namespace RatUI
         }                                                                                   \
         const Type* TryGet##Singular( StringID a_ID ) const                                 \
         {                                                                                   \
-            if ( auto it = Find( m_##Plural, a_ID ); it != End( m_##Plural ) )              \
-                return &it->second;                                                         \
+            if ( const Type* v = FindValue( m_##Plural, a_ID ) )                            \
+                return v;                                                                   \
             return m_Parent ? m_Parent->TryGet##Singular( a_ID ) : nullptr;                 \
         }                                                                                   \
         Theme& Set##Singular( StringID a_ID, Type a_Value )                                 \

@@ -146,8 +146,7 @@ namespace RatUI::FreeType
         if ( !a_Handle.IsValid() )
             return nullptr;
 
-        auto it = Find( m_Cache, a_Handle );
-        return it != End( m_Cache ) ? &it->second : nullptr;
+        return FindValue( m_Cache, a_Handle );
     }
 
     Font* FontCache::GetOrLoadFont( FontHandle a_Handle )
@@ -155,17 +154,20 @@ namespace RatUI::FreeType
         if ( Font* cachedFont = GetFont( a_Handle ) )
             return cachedFont;
 
-        auto pathIt = Find( m_HandleToPath, a_Handle );
-        if ( pathIt == End( m_HandleToPath ) )
+        const String* filePath = FindValue( m_HandleToPath, a_Handle );
+        if ( !filePath )
             return nullptr;
 
-        const String& filePath = pathIt->second;
-        auto fontOpt = Font::LoadFromFile( m_Library, CStr( filePath ) );
+        auto fontOpt = Font::LoadFromFile( m_Library, CStr( *filePath ) );
         if ( !fontOpt )
             return nullptr;
 
         auto [insertIt, success] = Emplace( m_Cache, a_Handle, std::move( *fontOpt ) );
-        return success ? &insertIt->second : nullptr;
+        if ( !success )
+            return nullptr;
+
+        auto& [_, font] = *insertIt;
+        return &font;
     }
 
     void FontCache::Evict( FontHandle a_Handle )

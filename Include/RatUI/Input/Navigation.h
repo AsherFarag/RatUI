@@ -171,8 +171,8 @@ namespace RatUI
          */
         RATUI_NODISCARD ENavAction Resolve( EButtonID a_Button ) const
         {
-            auto it = Find( ButtonMap, a_Button );
-            return it != End( ButtonMap ) ? it->second : ENavAction::None;
+            const ENavAction* action = FindValue( ButtonMap, a_Button );
+            return action ? *action : ENavAction::None;
         }
 
         /**

@@ -366,9 +366,8 @@ namespace RatUI::OpenGL
             const GLvoid* indexByteOffset = reinterpret_cast<const GLvoid*>(
                 static_cast<uintptr_t>( batch.IndexOffset ) * sizeof( u16 ) );
 
-            std::visit( [&]( const auto& a_Data )
-                        { DispatchBatch( a_Data, batch.VertexByteOffset, pvm ); },
-                        batch.Data );
+            Visit( batch.Data, [&]( const auto& a_Data )
+                   { DispatchBatch( a_Data, batch.VertexByteOffset, pvm ); } );
 
             glDrawElements( GL_TRIANGLES,
                             static_cast<GLsizei>( batch.IndexCount ),
