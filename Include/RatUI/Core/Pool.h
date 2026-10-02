@@ -215,7 +215,7 @@ namespace RatUI
         }
     };
 
-    using NodeID = typename Pool<class LayoutNode>::PoolID;
+    using NodeID = typename Pool<struct LayoutNode>::PoolID;
 	static constexpr NodeID c_InvalidNodeID{};
 
 } // namespace RatUI

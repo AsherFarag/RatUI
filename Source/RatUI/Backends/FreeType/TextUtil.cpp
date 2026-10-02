@@ -51,7 +51,7 @@ namespace RatUI::FreeType::TextUtil
         }
 
         if ( a_Style.LetterSpacing != 0_u && clusterCount > 1 )
-            width += a_Style.LetterSpacing * ( clusterCount - 1 );
+            width += a_Style.LetterSpacing * static_cast<f32>( clusterCount - 1 );
 
         if ( a_Style.WordSpacing != 0_u && spaceClusterCount > 0 )
             width += a_Style.WordSpacing * static_cast<f32>( spaceClusterCount );

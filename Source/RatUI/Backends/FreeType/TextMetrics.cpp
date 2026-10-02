@@ -150,7 +150,7 @@ namespace RatUI::FreeType
         const f32 sdfPadDisplay = sdfPadEm * a_Style.Size.ToFloat();
 
         result.Ascender += Unit{ sdfPadDisplay };
-        result.TotalHeight = result.LineHeight * result.LineCount() + Unit{ std::abs( result.Descender.ToFloat() ) + sdfPadDisplay };
+        result.TotalHeight = result.LineHeight * static_cast<f32>( result.LineCount() ) + Unit{ std::abs( result.Descender.ToFloat() ) + sdfPadDisplay };
 
         return result;
     }
@@ -232,8 +232,8 @@ namespace RatUI::FreeType
         o_Height = static_cast<u32>( h );
 
         o_Bearing = Vec2<FontUnit>{
-            static_cast<FontUnit>( l - padEm ),
-            static_cast<FontUnit>( t + padEm ),
+            FontUnit{ static_cast<f32>( l - padEm ) },
+            FontUnit{ static_cast<f32>( t + padEm ) },
         };
 
         return true;
