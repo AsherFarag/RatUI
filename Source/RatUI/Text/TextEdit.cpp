@@ -9,15 +9,15 @@ namespace RatUI
 
     void TextEditHistory::Reset()
     {
-        ActionStack.clear();
-        CharStorage.clear();
+        Clear( ActionStack );
+        Clear( CharStorage );
         Index = 0;
     }
 
     void TextEditHistory::Push( u32 a_Where, CharView a_OldText, CharView a_NewText, u32 a_Caret, u32 a_Anchor )
     {
         // A new edit invalidates redo history and the char storage backing it.
-        if ( Index < ActionStack.size() )
+        if ( Index < Size( ActionStack ) )
         {
             Resize( ActionStack, Index );
             Resize( CharStorage, Empty( ActionStack ) ? 0
@@ -303,7 +303,7 @@ namespace RatUI
         if ( !m_History.CanUndo() ) return false;
 
         const auto& action = m_History.Undo();
-        const TextView oldText( m_History.CharStorage.data() + action.CharStorage, action.DeleteLength );
+        const TextView oldText( Data( m_History.CharStorage ) + action.CharStorage, action.DeleteLength );
 
         m_Text.erase( action.Where, action.InsertLength );
         m_Text.insert( action.Where, oldText );
@@ -320,7 +320,7 @@ namespace RatUI
         if ( !m_History.CanRedo() ) return false;
 
         const auto& action = m_History.Redo();
-        const TextView newText( m_History.CharStorage.data() + action.CharStorage + action.DeleteLength, action.InsertLength );
+        const TextView newText( Data( m_History.CharStorage ) + action.CharStorage + action.DeleteLength, action.InsertLength );
 
         m_Text.erase( action.Where, action.DeleteLength );
         m_Text.insert( action.Where, newText );

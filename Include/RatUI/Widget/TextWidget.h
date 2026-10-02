@@ -61,7 +61,7 @@ namespace RatUI
             if ( !metrics ) return { 0_u, 0_u };
 
             const Optional<ResolvedText> resolved = ResolveText( m_Text );
-            if ( !resolved || resolved->Data.empty() ) return { 0_u, 0_u };
+            if ( !resolved || Empty( resolved->Data ) ) return { 0_u, 0_u };
 
             if ( !m_ResolvedText || resolved->Version != m_ResolvedText->Version )
             {

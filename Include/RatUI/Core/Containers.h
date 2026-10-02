@@ -396,15 +396,15 @@ namespace RatUI
 
 namespace RatUI
 {
-    template<typename Key, typename Value,
-        typename Hash = std::hash<Key>,
-        typename KeyEqual = std::equal_to<Key>>
-    using HashMapImpl = std::unordered_map<Key, Value, Hash, KeyEqual>;
+    // Variadic so HashMap<Key, Value, Rest...> can forward its optional parameters
+    // (hash, key equality) and std::unordered_map supplies the defaults.
+    template<typename Key, typename Value, typename... Rest>
+    using HashMapImpl = std::unordered_map<Key, Value, Rest...>;
 
-    template<typename Key, typename Value, typename Hash, typename KeyEqual>
-    struct CoreTraits<HashMapImpl<Key, Value, Hash, KeyEqual>> : StdContainerTraits<HashMapImpl<Key, Value, Hash, KeyEqual>>
+    template<typename Key, typename Value, typename Hash, typename KeyEqual, typename Alloc>
+    struct CoreTraits<std::unordered_map<Key, Value, Hash, KeyEqual, Alloc>> : StdContainerTraits<std::unordered_map<Key, Value, Hash, KeyEqual, Alloc>>
     {
-        using Type       = HashMapImpl<Key, Value, Hash, KeyEqual>;
+        using Type       = std::unordered_map<Key, Value, Hash, KeyEqual, Alloc>;
         using KeyType    = typename Type::key_type;
         using MappedType = typename Type::mapped_type;
     };
@@ -436,7 +436,7 @@ namespace RatUI
 
 #endif // Default to std::string if no custom string implementation is provided.
 
-#ifndef RATUI_STRING_VIEW_IMPL
+#ifndef RATUI_OVERRIDE_STRING_VIEW_IMPL
 #include <string_view>
 
 namespace RatUI
@@ -513,6 +513,12 @@ namespace RatUI
         {
             return std::get<I>(a_Variant);
         }
+
+        template<typename _Variant, typename _Visitor>
+        static constexpr decltype(auto) Visit(_Variant&& a_Variant, _Visitor&& a_Visitor)
+        {
+            return std::visit(std::forward<_Visitor>(a_Visitor), std::forward<_Variant>(a_Variant));
+        }
     };
 }
 
@@ -559,7 +565,7 @@ namespace RatUI
 
     /** 
      * @brief Span is a non-owning view over a contiguous sequence of elements.
-     * It is implemented using std::span by default, but can be customized by defining RATUI_SPAN_IMPL before including this header.
+     * It is implemented using std::span by default, but can be customized by defining RATUI_OVERRIDE_SPAN_IMPL in RatUIContainerImpl.h.
      * @tparam T The type of elements in the span.
      */
     template<typename T>
@@ -567,7 +573,7 @@ namespace RatUI
 
     /** 
      * @brief Array is a dynamically sized array container.
-     * It is implemented using std::vector by default, but can be customized by defining RATUI_ARRAY_IMPL before including this header.
+     * It is implemented using std::vector by default, but can be customized by defining RATUI_OVERRIDE_ARRAY_IMPL in RatUIContainerImpl.h.
      * @tparam T The type of elements stored in the array.
      */ 
     template<typename T>
@@ -575,7 +581,7 @@ namespace RatUI
 
     /** 
      * @brief FixedArray is a statically sized array container.
-     * It is implemented using std::array by default, but can be customized by defining RATUI_FIXED_ARRAY_IMPL before including this header.
+     * It is implemented using std::array by default, but can be customized by defining RATUI_OVERRIDE_FIXED_ARRAY_IMPL in RatUIContainerImpl.h.
      * @tparam T The type of elements stored in the array.
      * @tparam N The number of elements in the array.
      */
@@ -594,14 +600,13 @@ namespace RatUI
 
     /**
      * @brief HashMap is a hash table based associative container that contains key-value pairs with unique keys.
-     * It is implemented using std::unordered_map by default, but can be customized by defining RATUI_HASHMAP_IMPL before including this header.
+     * It is implemented using std::unordered_map by default, but can be customized by defining RATUI_OVERRIDE_HASHMAP_IMPL in RatUIContainerImpl.h.
      * @tparam Key The type of the keys in the map.
      * @tparam Value The type of the values in the map.
-     * @tparam Hash The type of the hash function used to hash the keys. Defaults to std::hash<Key>.
-     * @tparam KeyEqual The type of the equality function used to compare keys. Defaults to std::equal_to<Key>.
+     * @tparam Rest Optional extra parameters (e.g. hash and key equality) passed through to the implementation, which supplies their defaults.
      */
-    template<typename Key, typename Value, typename Hash = HashMapImpl<Key, Value>::hasher, typename KeyEqual = HashMapImpl<Key, Value>::key_equal>
-    using HashMap = HashMapImpl<Key, Value, Hash, KeyEqual>;
+    template<typename Key, typename Value, typename... Rest>
+    using HashMap = HashMapImpl<Key, Value, Rest...>;
 
     /**
      * @brief String is a dynamic array of characters
@@ -831,6 +836,25 @@ namespace RatUI
         return CoreTraits<Container>::Find(a_Container, std::forward<decltype(a_Args)>(a_Args)...);
     }
 
+    /**
+     * @brief Looks up a_Key in a map.
+     * Works with any map whose entries are pair-like (std::pair, or a custom pair usable with structured bindings).
+     * @return A pointer to the mapped value, or nullptr if the key isn't in the map.
+     */
+    template<typename Container, typename Key>
+    constexpr auto FindValue( Container& a_Container, const Key& a_Key )
+    {
+        using MappedType = typename CoreTraits<std::remove_const_t<Container>>::MappedType;
+        using ResultType = std::conditional_t<std::is_const_v<Container>, const MappedType*, MappedType*>;
+
+        auto it = Find( a_Container, a_Key );
+        if ( it == End( a_Container ) )
+            return ResultType{ nullptr };
+
+        auto& [_, value] = *it;
+        return ResultType{ &value };
+    }
+
     // === Variant Access ===
 
 	template<typename Container>
@@ -862,6 +886,13 @@ namespace RatUI
     {
         return CoreTraits<std::remove_cvref_t<Container>>::template Get<I>( std::forward<Container>( a_Container ) );
 	}
+
+    /** @brief Calls a_Visitor with the alternative a_Container currently holds, like std::visit. */
+    template<typename Container, typename Visitor>
+    constexpr decltype(auto) Visit( Container&& a_Container, Visitor&& a_Visitor )
+    {
+        return CoreTraits<std::remove_cvref_t<Container>>::Visit( std::forward<Container>( a_Container ), std::forward<Visitor>( a_Visitor ) );
+    }
 
     // === Optional Access ===
 

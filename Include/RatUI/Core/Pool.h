@@ -52,8 +52,8 @@ namespace RatUI
             FixedArray<u8, c_ItemsPerBucket> Versions{};
             std::bitset<   c_ItemsPerBucket> Occupancy{};
 
-            RATUI_NODISCARD T* GetItems() { return reinterpret_cast<T*>( RawData.data() ); }
-            RATUI_NODISCARD const T* GetItems() const { return reinterpret_cast<const T*>( RawData.data() ); }
+            RATUI_NODISCARD T* GetItems() { return reinterpret_cast<T*>( Data( RawData ) ); }
+            RATUI_NODISCARD const T* GetItems() const { return reinterpret_cast<const T*>( Data( RawData ) ); }
 
             RATUI_NODISCARD bool IsOccupied( u32 a_LocalIndex ) const
             {
@@ -150,8 +150,8 @@ namespace RatUI
         /** @brief Clears all items from the pool and resets it to an empty state. */
         void Clear()
         {
-            Buckets.clear();
-            FreeList.clear();
+            ::RatUI::Clear( Buckets );
+            ::RatUI::Clear( FreeList );
         }
 
         template<std::invocable<T&> Func>

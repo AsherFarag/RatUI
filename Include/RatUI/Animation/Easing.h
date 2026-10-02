@@ -128,7 +128,7 @@ namespace RatUI
 
         constexpr f32 Evaluate( f32 a_Time ) const noexcept
         {
-            return std::visit( [&]( const auto& a_Func ) { return a_Func( a_Time ); }, Function );
+            return Visit( Function, [&]( const auto& a_Func ) { return a_Func( a_Time ); } );
         }
 
         constexpr f32 operator()( f32 a_Time ) const noexcept   

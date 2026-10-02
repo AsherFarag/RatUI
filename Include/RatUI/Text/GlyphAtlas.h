@@ -83,8 +83,8 @@ namespace RatUI
         {
             const GlyphKey key{ a_Font, a_GlyphIndex };
 
-            if ( const auto it = Find( m_GlyphMap, key ); it != End( m_GlyphMap ) )
-                return it->second;
+            if ( const auto* metrics = FindValue( m_GlyphMap, key ) )
+                return *metrics;
 
             if ( !m_Texture )
                 return NullOpt; // Can't upload if texture is invalid.
