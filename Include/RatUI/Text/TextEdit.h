@@ -35,14 +35,14 @@ namespace RatUI
 
         TextEditHistory( u32 a_MaxActions, u32 a_MaxCharStorage )
         {
-            ActionStack.reserve( a_MaxActions );
-            CharStorage.reserve( a_MaxCharStorage );
+            Reserve( ActionStack, a_MaxActions );
+            Reserve( CharStorage, a_MaxCharStorage );
         }
 
         void Reset();
 
         bool CanUndo() const noexcept { return Index > 0; }
-        bool CanRedo() const noexcept { return Index < ActionStack.size(); }
+        bool CanRedo() const noexcept { return Index < Size( ActionStack ); }
 
         const Action& Undo() noexcept { return ActionStack[--Index]; }
         const Action& Redo() noexcept { return ActionStack[Index++]; }

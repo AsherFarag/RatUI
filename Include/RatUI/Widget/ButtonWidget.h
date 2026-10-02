@@ -132,9 +132,9 @@ namespace RatUI
 			// Fill brush based on state: pressed > hovered > normal
             const Brush& fillBrush = m_IsPressed ? PressedBrush : ( m_IsHovered ? HoverBrush : NormalBrush );
 
-            if ( std::holds_alternative<SolidBrush>( fillBrush ) )
+            if ( Holds<SolidBrush>( fillBrush ) )
             {
-                const SolidBrush& solid = std::get<SolidBrush>( fillBrush );
+                const SolidBrush& solid = Get<SolidBrush>( fillBrush );
                 a_Event.Drawer.AddRect( rect, 
                 {
                     .FillColor = solid.Fill,
@@ -143,9 +143,9 @@ namespace RatUI
                     .Radius = Radius
                 } );
             }
-            else if ( std::holds_alternative<TextureBrush>( fillBrush ) )
+            else if ( Holds<TextureBrush>( fillBrush ) )
             {
-                const TextureBrush& texture = std::get<TextureBrush>( fillBrush );
+                const TextureBrush& texture = Get<TextureBrush>( fillBrush );
                 a_Event.Drawer.AddRect( rect, 
                 {
                     .FillColor = texture.Tint,
@@ -155,9 +155,9 @@ namespace RatUI
                     .Texture = texture.Texture
                 } );
             }
-            else if ( std::holds_alternative<NineSliceBrush>( fillBrush ) )
+            else if ( Holds<NineSliceBrush>( fillBrush ) )
             {
-                const NineSliceBrush& nineSlice = std::get<NineSliceBrush>( fillBrush );
+                const NineSliceBrush& nineSlice = Get<NineSliceBrush>( fillBrush );
                 a_Event.Drawer.AddSlicedRect( rect, 
                 {
                     .Texture = nineSlice.Texture,

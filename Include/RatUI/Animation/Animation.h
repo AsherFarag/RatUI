@@ -115,7 +115,7 @@ namespace RatUI
 
             for ( TrackVariant& track : m_Tracks )
             {
-                std::visit( [&]( auto& a_Track ) { a_Track.ApplyFrom(); }, track );
+                Visit( track, [&]( auto& a_Track ) { a_Track.ApplyFrom(); } );
             }
 
             if ( OnStart ) OnStart();
@@ -145,7 +145,7 @@ namespace RatUI
 
                 for ( TrackVariant& track : m_Tracks )
                 {
-                    std::visit( [&]( auto& a_Track ) { a_Track.ApplyTo(); }, track );
+                    Visit( track, [&]( auto& a_Track ) { a_Track.ApplyTo(); } );
                 }
 
                 if ( OnComplete ) OnComplete();
@@ -175,7 +175,7 @@ namespace RatUI
             const f32 easedTime = EasingFn( time );
             for ( TrackVariant& track : m_Tracks )
             {
-                std::visit( [&]( auto& a_Track ) { a_Track.Apply( easedTime ); }, track );
+                Visit( track, [&]( auto& a_Track ) { a_Track.Apply( easedTime ); } );
             }
 
             m_Progress = time;
@@ -264,13 +264,12 @@ namespace RatUI
 
         AnimationClip* TryGetClip( StringID a_ID )
         {
-            auto it = m_Clips.find( a_ID );
-            return ( it != m_Clips.end() ) ? &it->second : nullptr;
+            return FindValue( m_Clips, a_ID );
         }
 
         void RemoveClip( StringID a_ID )
         {
-            m_Clips.erase( a_ID );
+            Erase( m_Clips, a_ID );
         }
 
         void Play( StringID a_ID, u32 a_RepeatCount = 1 )
