@@ -182,6 +182,7 @@ namespace RatUI::FreeType
         if ( shape.contours.empty() )
             return true;
 
+        shape.orientContours();
         msdfgen::edgeColoringSimple( shape, 3.0 );
 
         f64 l = 0.0, b = 0.0, r = 0.0, t = 0.0;
