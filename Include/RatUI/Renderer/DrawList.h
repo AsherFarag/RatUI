@@ -1,5 +1,6 @@
 #pragma once
 #include "../Core.h"
+#include "Brush.h"
 #include "DrawBatcher.h"
 #include "RenderTransform.h"
 #include "IRenderer.h"
@@ -173,7 +174,53 @@ namespace RatUI
 
 			return *this;
 		}
-        
+
+        /**
+         * @brief Adds a rectangle filled with @p a_Brush.
+         * @note Nine-slice brushes ignore the border and radius.
+         */
+        DrawList& AddBrushRect( Rect<Unit> a_Rect, const Brush& a_Brush,
+                                Color a_BorderColor = Colors::Transparent, Unit a_BorderThickness = 0_u,
+                                CornerRadius a_Radius = CornerRadius::None() )
+        {
+            if ( Holds<SolidBrush>( a_Brush ) )
+            {
+                return AddRect( a_Rect,
+                {
+                    .FillColor       = Get<SolidBrush>( a_Brush ).Fill,
+                    .BorderColor     = a_BorderColor,
+                    .BorderThickness = a_BorderThickness,
+                    .Radius          = a_Radius
+                } );
+            }
+
+            if ( Holds<TextureBrush>( a_Brush ) )
+            {
+                const TextureBrush& texture = Get<TextureBrush>( a_Brush );
+                return AddRect( a_Rect,
+                {
+                    .FillColor       = texture.Tint,
+                    .BorderColor     = a_BorderColor,
+                    .BorderThickness = a_BorderThickness,
+                    .Radius          = a_Radius,
+                    .Texture         = texture.Texture
+                } );
+            }
+
+            if ( Holds<NineSliceBrush>( a_Brush ) )
+            {
+                const NineSliceBrush& nineSlice = Get<NineSliceBrush>( a_Brush );
+                return AddSlicedRect( a_Rect,
+                {
+                    .Texture = nineSlice.Texture,
+                    .Slice   = nineSlice.Slice,
+                    .Tint    = nineSlice.Tint
+                } );
+            }
+
+            return *this;
+        }
+
         /**
 		 * @brief Adds a circle to the draw list with the specified style.
 		 * @note This is the same as calling AddRect with a square rect and uniform corner rounding equal to the radius, 

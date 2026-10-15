@@ -132,39 +132,7 @@ namespace RatUI
 			// Fill brush based on state: pressed > hovered > normal
             const Brush& fillBrush = m_IsPressed ? PressedBrush : ( m_IsHovered ? HoverBrush : NormalBrush );
 
-            if ( Holds<SolidBrush>( fillBrush ) )
-            {
-                const SolidBrush& solid = Get<SolidBrush>( fillBrush );
-                a_Event.Drawer.AddRect( rect, 
-                {
-                    .FillColor = solid.Fill,
-                    .BorderColor = BorderColor,
-                    .BorderThickness = BorderThickness,
-                    .Radius = Radius
-                } );
-            }
-            else if ( Holds<TextureBrush>( fillBrush ) )
-            {
-                const TextureBrush& texture = Get<TextureBrush>( fillBrush );
-                a_Event.Drawer.AddRect( rect, 
-                {
-                    .FillColor = texture.Tint,
-                    .BorderColor = BorderColor,
-                    .BorderThickness = BorderThickness,
-                    .Radius = Radius,
-                    .Texture = texture.Texture
-                } );
-            }
-            else if ( Holds<NineSliceBrush>( fillBrush ) )
-            {
-                const NineSliceBrush& nineSlice = Get<NineSliceBrush>( fillBrush );
-                a_Event.Drawer.AddSlicedRect( rect, 
-                {
-                    .Texture = nineSlice.Texture,
-                    .Slice = nineSlice.Slice,
-                    .Tint = nineSlice.Tint,
-                } );
-            }
+            a_Event.Drawer.AddBrushRect( rect, fillBrush, BorderColor, BorderThickness, Radius );
 
             // Draw focus ring 
             // TODO: Should this be a util or even handled here?

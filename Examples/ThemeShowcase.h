@@ -182,10 +182,10 @@ private:
     {
         Shared<Theme> theme = MakeShared<Theme>( *Themes::Dark() );
         theme->SetFont( ThemeKey::Font::Default, Fonts::Roboto );
-        theme->SetColors( {
-            { ThemeKey::Color::SliderThumbHover,   Colors::LightBlue  },
-            { ThemeKey::Color::SliderThumbPressed, Colors::AccentBlue },
-            { ThemeKey::Color::SliderTrackFill,    Colors::AccentBlue }
+        theme->SetBrushes( {
+            { ThemeKey::Brush::SliderThumbHover,   SolidBrush{ Colors::LightBlue  } },
+            { ThemeKey::Brush::SliderThumbPressed, SolidBrush{ Colors::AccentBlue } },
+            { ThemeKey::Brush::SliderTrackFill,    SolidBrush{ Colors::AccentBlue } }
         } );
         theme->SetTextStyle( ThemeKey::TextStyle::Default, TextRenderStyle{ .FillColor = Colors::White } );
         return theme;
@@ -196,14 +196,14 @@ private:
         Shared<Theme> theme = MakeShared<Theme>( *Themes::Dark() );
         theme->SetFont( ThemeKey::Font::Default, Fonts::Roboto );
         theme->SetColors( {
-            { ThemeKey::Color::FocusOutline,       Colors::DarkBlue   },
-            { ThemeKey::Color::SliderTrack,        Colors::Silver     },
-            { ThemeKey::Color::SliderTrackFill,    Colors::DarkBlue   },
-            { ThemeKey::Color::SliderThumb,        Colors::AccentBlue },
-            { ThemeKey::Color::SliderThumbHover,   Colors::Blue       },
-            { ThemeKey::Color::SliderThumbPressed, Colors::DarkBlue   }
+            { ThemeKey::Color::FocusOutline,       Colors::DarkBlue   }
         } );
         theme->SetBrushes( {
+            { ThemeKey::Brush::SliderTrack,        SolidBrush{ Colors::Silver     } },
+            { ThemeKey::Brush::SliderTrackFill,    SolidBrush{ Colors::DarkBlue   } },
+            { ThemeKey::Brush::SliderThumb,        SolidBrush{ Colors::AccentBlue } },
+            { ThemeKey::Brush::SliderThumbHover,   SolidBrush{ Colors::Blue       } },
+            { ThemeKey::Brush::SliderThumbPressed, SolidBrush{ Colors::DarkBlue   } },
             { ThemeKey::Brush::PanelNormal,   SolidBrush{ Colors::LightGray  } },
             { ThemeKey::Brush::ButtonNormal,  SolidBrush{ Colors::White      } },
             { ThemeKey::Brush::ButtonHover,   SolidBrush{ Colors::PowderBlue } },
@@ -218,12 +218,7 @@ private:
         Shared<Theme> theme = MakeShared<Theme>( *Themes::Dark() );
         theme->SetFont( ThemeKey::Font::Default, Fonts::Roboto );
         theme->SetColors( {
-            { ThemeKey::Color::FocusOutline,       Colors::AccentRose                  },
-            { ThemeKey::Color::SliderTrack,        FromColorF32( 0.10f, 0.10f, 0.20f ) },
-            { ThemeKey::Color::SliderTrackFill,    Colors::AccentRose                  },
-            { ThemeKey::Color::SliderThumb,        Colors::AccentSky                   },
-            { ThemeKey::Color::SliderThumbHover,   Colors::LightCyan                   },
-            { ThemeKey::Color::SliderThumbPressed, Colors::AccentRose                  }
+            { ThemeKey::Color::FocusOutline,       Colors::AccentRose }
         } );
         theme->SetRadii( {
             { ThemeKey::Radii::Panel,       CornerRadius::All( 12_u ) },
@@ -232,6 +227,11 @@ private:
             { ThemeKey::Radii::SliderThumb, CornerRadius::All(  8_u ) }
         } );
         theme->SetBrushes( {
+            { ThemeKey::Brush::SliderTrack,        SolidBrush{ FromColorF32( 0.10f, 0.10f, 0.20f ) } },
+            { ThemeKey::Brush::SliderTrackFill,    SolidBrush{ Colors::AccentRose } },
+            { ThemeKey::Brush::SliderThumb,        SolidBrush{ Colors::AccentSky } },
+            { ThemeKey::Brush::SliderThumbHover,   SolidBrush{ Colors::LightCyan } },
+            { ThemeKey::Brush::SliderThumbPressed, SolidBrush{ Colors::AccentRose } },
             { ThemeKey::Brush::PanelNormal,   SolidBrush{ FromColorF32( 0.07f, 0.03f, 0.10f ) } },
             { ThemeKey::Brush::ButtonNormal,  SolidBrush{ FromColorF32( 0.20f, 0.05f, 0.28f ) } },
             { ThemeKey::Brush::ButtonHover,   SolidBrush{ FromColorF32( 0.30f, 0.08f, 0.45f ) } },
@@ -248,11 +248,11 @@ private:
         for ( const auto& [key, value] : theme->GetRadii() )
             theme->SetRadius( key, CornerRadius::None() ); // Sharp corners everywhere.
 
-        theme->SetColors( {
-            { ThemeKey::Color::SliderTrackFill,    FromColorF32( 0.1f, 0.5f, 0.1f ) },
-            { ThemeKey::Color::SliderThumb,        FromColorF32( 0.9f, 0.9f, 0.9f ) },
-            { ThemeKey::Color::SliderThumbHover,   FromColorF32( 0.8f, 0.8f, 0.8f ) },
-            { ThemeKey::Color::SliderThumbPressed, FromColorF32( 1.f,  1.f,  1.f  ) }
+        theme->SetBrushes( {
+            { ThemeKey::Brush::SliderTrackFill,    SolidBrush{ FromColorF32( 0.1f, 0.5f, 0.1f ) } },
+            { ThemeKey::Brush::SliderThumb,        SolidBrush{ FromColorF32( 0.9f, 0.9f, 0.9f ) } },
+            { ThemeKey::Brush::SliderThumbHover,   SolidBrush{ FromColorF32( 0.8f, 0.8f, 0.8f ) } },
+            { ThemeKey::Brush::SliderThumbPressed, SolidBrush{ FromColorF32( 1.f,  1.f,  1.f  ) } }
         } );
         return theme;
     }

@@ -318,11 +318,8 @@ namespace RatUI
 
             inline constexpr StringID PanelBorder = "Panel.Border"_id;
 
-            inline constexpr StringID SliderTrack        = "Slider.Track"_id;
-            inline constexpr StringID SliderTrackFill    = "Slider.TrackFill"_id;
-            inline constexpr StringID SliderThumb        = "Slider.Thumb"_id;
-            inline constexpr StringID SliderThumbHover   = "Slider.ThumbHover"_id;
-            inline constexpr StringID SliderThumbPressed = "Slider.ThumbPressed"_id;
+            inline constexpr StringID SliderThumbBorder        = "Slider.ThumbBorder"_id;
+            inline constexpr StringID SliderThumbBorderPressed = "Slider.ThumbBorderPressed"_id;
         }
 
         namespace Radii
@@ -345,7 +342,10 @@ namespace RatUI
             inline constexpr StringID ButtonBorderThickness = "Button.BorderThickness"_id;
             inline constexpr StringID PanelBorderThickness  = "Panel.BorderThickness"_id;
             inline constexpr StringID SliderTrackThickness  = "Slider.TrackThickness"_id;
+            inline constexpr StringID SliderThumbSize       = "Slider.ThumbSize"_id;
             inline constexpr StringID SliderMinThumbSize    = "Slider.MinThumbSize"_id;
+            inline constexpr StringID SliderThumbBorderThickness        = "Slider.ThumbBorderThickness"_id;
+            inline constexpr StringID SliderThumbBorderThicknessPressed = "Slider.ThumbBorderThicknessPressed"_id;
         }
 
 		namespace Font 
@@ -360,6 +360,12 @@ namespace RatUI
             inline constexpr StringID ButtonPressed = "Button.Pressed"_id;
 
             inline constexpr StringID PanelNormal   = "Panel.Normal"_id;
+
+            inline constexpr StringID SliderTrack        = "Slider.Track"_id;
+            inline constexpr StringID SliderTrackFill    = "Slider.TrackFill"_id;
+            inline constexpr StringID SliderThumb        = "Slider.Thumb"_id;
+            inline constexpr StringID SliderThumbHover   = "Slider.ThumbHover"_id;
+            inline constexpr StringID SliderThumbPressed = "Slider.ThumbPressed"_id;
         }
     }
 

@@ -47,39 +47,7 @@ namespace RatUI
                 }
             }
 
-            if ( Holds<SolidBrush>( FillBrush ) )
-            {
-                const SolidBrush& solid = Get<SolidBrush>( FillBrush );
-                a_Event.Drawer.AddRect( rect, 
-                {
-                    .FillColor = solid.Fill,
-                    .BorderColor = BorderColor,
-                    .BorderThickness = BorderThickness,
-                    .Radius = Radius
-                } );
-            }
-            else if ( Holds<TextureBrush>( FillBrush ) )
-            {
-                const TextureBrush& texture = Get<TextureBrush>( FillBrush );
-                a_Event.Drawer.AddRect( rect, 
-                {
-                    .FillColor = texture.Tint,
-                    .BorderColor = BorderColor,
-                    .BorderThickness = BorderThickness,
-                    .Radius = Radius,
-                    .Texture = texture.Texture
-                } );
-            }
-            else if ( Holds<NineSliceBrush>( FillBrush ) )
-            {
-                const NineSliceBrush& nineSlice = Get<NineSliceBrush>( FillBrush );
-                a_Event.Drawer.AddSlicedRect( rect, 
-                {
-                    .Texture = nineSlice.Texture,
-                    .Slice = nineSlice.Slice,
-                    .Tint = nineSlice.Tint
-                } );
-            }
+            a_Event.Drawer.AddBrushRect( rect, FillBrush, BorderColor, BorderThickness, Radius );
 
             if ( scene.GetFocusedNode() == GetLayoutID() )
             {
