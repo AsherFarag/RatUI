@@ -41,6 +41,7 @@ namespace RatUI
          */
         RATUI_NODISCARD NodeID      GetContentNodeID() const { return m_ContentNodeID; }
         RATUI_NODISCARD LayoutNode* GetContentNode() { return GetScene().GetLayoutNode( m_ContentNodeID ); }
+        RATUI_NODISCARD const LayoutNode* GetContentNode() const { return GetScene().GetLayoutNode( m_ContentNodeID ); }
 
         RATUI_NODISCARD EScrollbarMode GetVScrollbarMode() const { return m_VScrollbarMode; }
 
