@@ -1,7 +1,11 @@
 #include <RatUI/Layout/Layout.h>
+#include <RatUI/Widget/IWidget.h>
 
 namespace RatUI
 {
+    LayoutNode::LayoutNode( NodeID a_ID, LayoutStyle a_Style ) : ID( a_ID ), Style( a_Style ) {}
+    LayoutNode::~LayoutNode() = default;
+
     void LayoutNode::MarkDirty()
     {
         Layout.IsDirty = true;

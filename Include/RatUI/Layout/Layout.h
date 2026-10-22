@@ -1,5 +1,7 @@
 #pragma once
 #include "../Core.h"
+#include "NodeID.h"
+#include <bitset>
 #include <concepts>
 
 namespace RatUI
@@ -394,10 +396,10 @@ namespace RatUI
      */
     struct LayoutNode
     {
-        NodeID ID{};                               ///< The pool ID of this node, this is set automatically by the scene.
-		LayoutStyle Style{};                       ///< @warning Any changes to this struct should be followed by a call to MarkDirty() to ensure the layout is recalculated. 
-                                                   ///< Or use the factory-style setters below which automatically mark the node as dirty.
-        LayoutResult Layout{};                     ///< The cached layout result for this widget computed during the layout process.
+        const NodeID ID;              ///< The pool ID of this node, this is set automatically by the scene.
+		LayoutStyle Style{};          ///< @warning Any changes to this struct should be followed by a call to MarkDirty() to ensure the layout is recalculated. 
+                                      ///< Or use the factory-style setters below which automatically mark the node as dirty.
+        LayoutResult Layout{};        ///< The cached layout result for this widget computed during the layout process.
         Unique<class IWidget> Widget;
 
         // TODO: Im not a big fan of this, but it's the only solution I can think of for now. 
@@ -406,6 +408,13 @@ namespace RatUI
         // If we don't account for this, the hit test will fail for those children. 
         // So we need to apply the ChildHitTestOffset to the logical position before recursing into children.
         Vec2<Unit> ChildHitTestOffset{ 0_u, 0_u }; ///< The offset to apply to child hit-testing, allowing for custom hit-test regions that differ from the layout bounds.
+
+        LayoutNode( NodeID a_ID = {}, LayoutStyle a_Style = {} ); // Defined in Layout.cpp, IWidget is incomplete here.
+        ~LayoutNode();
+        LayoutNode( const LayoutNode& ) = delete;
+        LayoutNode( LayoutNode&& ) = delete;
+        LayoutNode& operator=( const LayoutNode& ) = delete;
+        LayoutNode& operator=( LayoutNode&& ) = delete;
 
         /** @brief Factory-style setter methods for layout properties - automatically marks the node as dirty when a property is changed. */
 
@@ -562,5 +571,195 @@ namespace RatUI
             child.ForEachDescendant( std::forward<Func>( a_Func ) );
         } );
     }
+
+    /**
+     * @brief A versioned, bucket-based pool allocator for LayoutNodes providing stable pointers and safe handle validation via NodeID.
+     * Grows by allocating new buckets on the heap - existing bucket pointers and item references are never invalidated.
+     */
+    class NodePool
+    {
+    public:
+        /** @brief Checks if the given NodeID is valid (i.e., refers to an allocated item in the pool). */
+        RATUI_NODISCARD bool IsValid( NodeID a_ID ) const
+        {
+            const Bucket* bucket = BucketAt( Traits::Index( a_ID ) / c_ItemsPerBucket );
+            return bucket && bucket->IsValid( a_ID );
+        }
+
+        /** @brief Retrieves a pointer to the item associated with the given NodeID, or nullptr if the ID is invalid. */
+        RATUI_NODISCARD LayoutNode* Get( NodeID a_ID )
+        {
+            Bucket* bucket = BucketAt( Traits::Index( a_ID ) / c_ItemsPerBucket );
+            if ( !bucket || !bucket->IsValid( a_ID ) ) return nullptr;
+            return bucket->Get( Traits::Index( a_ID ) );
+        }
+
+        /** @brief Retrieves a const pointer to the item associated with the given NodeID, or nullptr if the ID is invalid. */
+        RATUI_NODISCARD const LayoutNode* Get( NodeID a_ID ) const
+        {
+            const Bucket* bucket = BucketAt( Traits::Index( a_ID ) / c_ItemsPerBucket );
+            if ( !bucket || !bucket->IsValid( a_ID ) ) return nullptr;
+            return bucket->Get( Traits::Index( a_ID ) );
+        }
+
+        /** @brief Allocates a new item in the pool with the given arguments, returning a NodeID that can be used to access it. */
+        template<typename... Args>
+        RATUI_NODISCARD NodeID Allocate( Args&&... a_Args )
+        {
+            if ( Empty( FreeList ) )
+                Grow();
+
+            // Only pop once construction succeeded, so a throwing constructor doesn't leak the slot.
+            u32 index = Back( FreeList );
+            NodeID id = BucketForItem( index )->Allocate( index, std::forward<Args>( a_Args )... );
+            PopBack( FreeList );
+            return id;
+        }
+
+        /** @brief Deallocates the item associated with the given NodeID, making its slot available for future allocations. */
+        void Deallocate( NodeID a_ID )
+        {
+            Bucket* bucket = BucketAt( Traits::Index( a_ID ) / c_ItemsPerBucket );
+            if ( !bucket || !bucket->IsValid( a_ID ) ) return;
+            bucket->Deallocate( Traits::Index( a_ID ) );
+			PushBack( FreeList, static_cast<u32>( Traits::Index( a_ID ) ) );
+        }
+
+        /** @brief Destroys all items and frees every slot. Buckets and their versions are kept so previously issued NodeIDs stay stale. */
+        void Clear()
+        {
+            ::RatUI::Clear( FreeList );
+            for ( u32 b = static_cast<u32>( Size( Buckets ) ); b-- > 0; )
+            {
+                Bucket& bucket = *Buckets[ b ];
+                for ( u32 i = c_ItemsPerBucket; i-- > 0; )
+                {
+                    if ( bucket.Occupancy.test( i ) )
+                        bucket.Deallocate( b * c_ItemsPerBucket + i );
+
+                    PushBack( FreeList, b * c_ItemsPerBucket + i ); // Reverse so lowest index is popped first
+                }
+            }
+        }
+
+        template<std::invocable<LayoutNode&> Func>
+        void ForEach( Func&& a_Func ) { ForEachImpl( *this, a_Func ); }
+
+        template<std::invocable<const LayoutNode&> Func>
+        void ForEach( Func&& a_Func ) const { ForEachImpl( *this, a_Func ); }
+
+    private:
+        using Traits = NodeIDTraits<NodeID>;
+
+        static constexpr u32 c_ItemsPerBucket = 4096;
+
+        static constexpr u32 NextVersion( u32 a_Version )
+        {
+            return ( a_Version + 1 ) & Traits::VersionMask;
+        }
+
+        /**
+         * @brief A bucket containing a fixed number of items, along with versioning and occupancy tracking for safe allocation and deallocation.
+         */
+        struct Bucket
+        {
+            alignas(LayoutNode) FixedArray<byte, c_ItemsPerBucket * sizeof(LayoutNode)> RawData{};
+            FixedArray<u32, c_ItemsPerBucket> Versions{};
+            std::bitset<   c_ItemsPerBucket> Occupancy{};
+
+            RATUI_NODISCARD LayoutNode* GetItems() { return reinterpret_cast<LayoutNode*>( Data( RawData ) ); }
+            RATUI_NODISCARD const LayoutNode* GetItems() const { return reinterpret_cast<const LayoutNode*>( Data( RawData ) ); }
+
+            RATUI_NODISCARD bool IsOccupied( u32 a_LocalIndex ) const
+            {
+                return Occupancy.test( a_LocalIndex );
+            }
+
+            RATUI_NODISCARD bool IsValid( NodeID a_ID ) const
+            {
+                u32 local = Traits::Index( a_ID ) % c_ItemsPerBucket;
+                return IsOccupied( local ) && Versions[ local ] == Traits::Version( a_ID );
+            }
+
+            template<typename... Args>
+            RATUI_NODISCARD NodeID Allocate( u32 a_GlobalIndex, Args&&... a_Args )
+            {
+                u32 local = a_GlobalIndex % c_ItemsPerBucket;
+                const NodeID id = Traits::Construct( a_GlobalIndex, NextVersion( Versions[ local ] ) );
+                std::construct_at( GetItems() + local, id, std::forward<Args>( a_Args )... );
+                Versions[ local ] = Traits::Version( id );
+                Occupancy.set( local );
+                return id;
+            }
+
+            void Deallocate( u32 a_GlobalIndex )
+            {
+                u32 local = a_GlobalIndex % c_ItemsPerBucket;
+                std::destroy_at( GetItems() + local );
+                Versions[ local ] = NextVersion( Versions[ local ] ); // invalidate existing NodeIDs
+                Occupancy.reset( local );
+            }
+
+
+            RATUI_NODISCARD LayoutNode*       Get( u32 a_GlobalIndex )       { return GetItems() + ( a_GlobalIndex % c_ItemsPerBucket ); }
+            RATUI_NODISCARD const LayoutNode* Get( u32 a_GlobalIndex ) const { return GetItems() + ( a_GlobalIndex % c_ItemsPerBucket ); }
+
+            Bucket() = default;
+            ~Bucket()
+            {
+                // Destroy any occupied items in the bucket
+                for ( u32 i = 0; i < c_ItemsPerBucket; ++i )
+                {
+                    if ( Occupancy.test( i ) )
+                        std::destroy_at( GetItems() + i );
+                }
+            }
+        };
+
+        Array<Unique<Bucket>> Buckets{};
+        Array<u32>            FreeList{};
+
+        template<typename Self, typename Func>
+        static void ForEachImpl( Self& a_Self, Func& a_Func )
+        {
+            for ( const auto& bucket : a_Self.Buckets )
+            {
+                if ( bucket == nullptr )
+                    continue;
+
+                for ( u32 i = 0; i < c_ItemsPerBucket; ++i )
+                {
+                    if ( bucket->Occupancy.test( i ) )
+                        a_Func( bucket->GetItems()[ i ] );
+                }
+            }
+        }
+
+        Bucket* BucketAt( u32 a_BucketIndex )
+        {
+            if ( a_BucketIndex >= Size( Buckets ) ) return nullptr;
+            return Buckets[ a_BucketIndex ].get();
+        }
+
+        const Bucket* BucketAt( u32 a_BucketIndex ) const
+        {
+            if ( a_BucketIndex >= Size( Buckets ) ) return nullptr;
+            return Buckets[ a_BucketIndex ].get();
+        }
+
+        Bucket*       BucketForItem( u32 a_ItemIndex )       { return BucketAt( a_ItemIndex / c_ItemsPerBucket ); }
+        const Bucket* BucketForItem( u32 a_ItemIndex ) const { return BucketAt( a_ItemIndex / c_ItemsPerBucket ); }
+
+        void Grow()
+        {
+            u32 newBucketIndex = static_cast<u32>( Size( Buckets ) );
+            EmplaceBack( Buckets, MakeUnique<Bucket>() );
+
+            // Push in reverse so lowest index is popped first
+            Reserve( FreeList, Size( FreeList ) + c_ItemsPerBucket );
+            for ( u32 i = c_ItemsPerBucket; i-- > 0; )
+                PushBack( FreeList, newBucketIndex * c_ItemsPerBucket + i );
+        }
+    };
 
 } // namespace RatUI

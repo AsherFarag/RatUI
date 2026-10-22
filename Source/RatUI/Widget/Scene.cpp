@@ -623,12 +623,9 @@ namespace RatUI
 
     LayoutNode& Scene::CreateLayoutNode( LayoutStyle a_Style, NodeID a_ParentID )
     {
-        NodeID nodeID = m_Layouts.Allocate();
+        NodeID nodeID = m_Layouts.Allocate( a_Style );
         LayoutNode* node = m_Layouts.Get( nodeID );
         RATUI_ASSERT( node, "Failed to allocate layout node." );
-        
-        node->ID = nodeID;
-        node->Style = a_Style;
 
         if ( a_ParentID != c_InvalidNodeID )
         {

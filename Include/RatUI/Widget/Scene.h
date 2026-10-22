@@ -12,7 +12,6 @@
 
 namespace RatUI
 {
-    using LayoutNodePool = Pool<LayoutNode>;
 
     /**
      * @brief Represents a UI scene containing a hierarchy of widgets and their associated layout nodes.
@@ -137,7 +136,7 @@ namespace RatUI
     protected:
         // --- Internal State ---
 
-        LayoutNodePool m_Layouts{};      ///< Pool of layout nodes representing the hierarchical structure and layout information of widgets in the scene.
+        NodePool m_Layouts{};      ///< Pool of layout nodes representing the hierarchical structure and layout information of widgets in the scene.
         Array<NodeID>  m_ToDestroy;
 		f64            m_ClockSeconds{ 0.0 };
 

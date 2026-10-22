@@ -1,5 +1,6 @@
 #pragma once
 #include "../Core.h"
+#include "../Layout/NodeID.h"
 
 namespace RatUI
 {
