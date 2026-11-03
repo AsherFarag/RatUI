@@ -20,7 +20,7 @@ namespace RatUI
         u16 Right{ 0 };  ///< The number of pixels from the right edge of the texture that defines the right border region.
         u16 Bottom{ 0 }; ///< The number of pixels from the bottom edge of the texture that defines the bottom border region.
 
-		Vec2f Scale{ 1.f, 1.f }; ///< Scale factor applied to the entire nine-slice image. 
+		Vec2f Scale{ 1.f, 1.f }; ///< Units per texel, applied to the entire nine-slice image (multiplied by the DPI scale when drawn).
                                  ///< This allows for resizing the image while maintaining the proportions of the corners and edges.
 
         // TODO: Support tiling?

@@ -164,10 +164,14 @@ namespace RatUI
 
             const Rect<f32> uvRect = ComputeUVRect( a_Style.Texture.Region, texInfo->Size );
 
+            // Slice scale is in units per texel, so the art grows with the DPI scale like everything else
+            NineSlice pixelSlice = a_Style.Slice;
+            pixelSlice.Scale = { pixelSlice.Scale[0] * m_DPIScale, pixelSlice.Scale[1] * m_DPIScale };
+
             DrawBatcher& batcher = GetCurrentBatcher();
             batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), a_Style.Texture );
             batcher.EmitSlicedRect( ToPixelRect( a_Rect ),
-                a_Style.Slice,
+                pixelSlice,
 				sliceSize,
                 a_Style.Tint,
                 uvRect );
