@@ -1,55 +1,445 @@
 #pragma once
-#include "IWidget.h"
+#include "../Text/Text.h"
 #include "../Text/TextEdit.h"
+#include "../Text/TextLayout.h"
+#include "Theme.h"
+#include "Scene.h"
+#include "FocusRing.h"
+#include "IWidget.h"
 
-class InputTextWidget : public IWidget
+#include <unordered_map>
+
+namespace RatUI
 {
-public:
-    using TextBuffer = TextEditModel::TextBuffer;
-
-    Unique<ITextEditPolicy>     Policy;
-    Callback<const TextBuffer&> OnChanged; ///< Called whenever the buffer changes.
-    Callback<const TextBuffer&> OnSubmit;  ///< Called on Enter in single-line mode.
-
-    InputTextWidget( Unique<ITextEditPolicy> a_Policy = MakeUnique<SingleLineTextEditPolicy>() )
-        : Policy( std::move( a_Policy ) )
-    {}
-
-    const TextEditModel& GetModel()  const noexcept { return m_Model; }
-
-    bool IsInteractable() const override { return true; }
-    bool IsFocusable()    const override { return true; }
-
-    Reply OnTextInput( const TextInputEvent& a_Event ) override
+    /**
+     * @brief An editable text field. Click it (or navigate to it) to focus, then type.
+     * Editing behaviour (single-line, multi-line, numeric) comes from the ITextEditPolicy.
+     *
+     * Typed characters arrive as TextInputEvents; editing keys (Backspace, arrows, Ctrl+Z...)
+     * arrive as ButtonEvents. While focused, the widget receives keys before navigation and
+     * only lets through keys its policy leaves unhandled (e.g. Up/Down in a single-line field).
+     */
+    class InputTextWidget : public IWidget
     {
-        if ( !Policy )
-            return Reply::Unhandled();
+    public:
+        using TextBuffer = TextEditModel::TextBuffer;
 
-        const TextEditOutcome outcome = Policy->HandleKey( m_Model, a_Event );
-        if ( outcome.Handled )
+        Unique<ITextEditPolicy> Policy;
+        Callback<const String&> OnChanged; ///< Called with the new text (UTF-8) whenever it changes.
+        Callback<const String&> OnSubmit;  ///< Called with the text (UTF-8) when the policy commits (Enter in single-line mode).
+
+        // --------------------------------------------------------------------
+        // Render Properties
+        // --------------------------------------------------------------------
+
+        TextRenderStyle RenderStyle{};
+        Brush        FillBrush{ SolidBrush{ Colors::Surface800 } };
+        Color        BorderColor{ Colors::Surface500 };
+        Unit         BorderThickness{ 1_u };
+        CornerRadius Radius{ CornerRadius::None() };
+        Optional<Color> CaretColor{};                                   ///< Unset: use the text colour.
+        Color        SelectionColor{ Color{ 61, 130, 255, 96 } }; ///< AccentBlue, translucent. Themed by ThemeKey::Color::TextSelection.
+        Unit         CaretWidth{ 1.5_u };
+        Unit         MinWidth{ 120_u };
+        FocusRingStyle FocusRing{};                                  ///< Drawn while the field has focus (theme: FocusOutline keys).
+
+        explicit InputTextWidget( Unique<ITextEditPolicy> a_Policy = MakeUnique<SingleLineTextEditPolicy>() )
+            : Policy( std::move( a_Policy ) )
         {
-            if ( outcome.Changed && OnChanged )
-                OnChanged( m_Model.GetTextBuffer() );
-
-            if ( outcome.Commited && OnSubmit )
-                OnSubmit( m_Model.GetTextBuffer() );
-
-            GetLayout().MarkDirty();
+            // Preserve spaces and newlines so the caret and the rendered text agree.
+            // Shaping uses unlimited width, so there are no soft wraps.
+            m_LayoutStyle.Wrap = TextWrap::PreWrap();
         }
 
-        return Reply::Handled();
-    }
+        // --------------------------------------------------------------------
+        // Text
+        // --------------------------------------------------------------------
 
-protected:
+        const TextEditModel& GetModel() const noexcept { return m_Model; }
 
-    void OnPaint( const PaintEvent& a_Event ) override
-    {}
+        /** @brief Returns the current text, UTF-8 encoded. */
+        const String& GetText() const noexcept { return m_Utf8; }
 
-protected:
-    TextEditModel           m_Model;
-};
+        /** @brief Replaces the text (UTF-8), clearing undo history and moving the caret to the end. Line breaks become '\n'. */
+        void SetText( StringView a_Text )
+        {
+            TextBuffer buffer = DecodeEditText( a_Text );
 
-template<typename ValueType>
-    requires ( std::floating_point<ValueType> || std::integral<ValueType> )
-class InputValueWidget : public IWidget
-{};
+            const u32 length = static_cast<u32>( buffer.size() );
+            m_Model.SetTextBuffer( std::move( buffer ) );
+            m_Model.SetCaret( length );
+            OnTextChanged();
+        }
+
+        const TextLayoutStyle& GetLayoutStyle() const noexcept { return m_LayoutStyle; }
+
+        /** @brief Replaces the layout style. Wrap is forced to TextWrap::PreWrap() so whitespace is kept. */
+        void SetLayoutStyle( const TextLayoutStyle& a_Style )
+        {
+            m_LayoutStyle      = a_Style;
+            m_LayoutStyle.Wrap = TextWrap::PreWrap();
+            InvalidateFont();
+        }
+
+        bool HasFocus() const { return GetScene().GetFocusedNode() == GetLayoutID(); }
+
+        // --------------------------------------------------------------------
+        // IWidget overrides
+        // --------------------------------------------------------------------
+
+        bool IsInteractable() const override { return true; }
+        bool IsFocusable()    const override { return true; }
+        bool WantsTextInput() const override { return HasFocus(); }
+
+        Reply OnButtonPressed( const ButtonEvent& a_Event ) override
+        {
+            if ( IsPointerButton( a_Event.Button ) )
+            {
+                if ( a_Event.Button != EButtonID::MouseLeft )
+                    return Reply::Unhandled();
+
+                // TODO: Place the caret under the pointer instead of at the end.
+                if ( !HasFocus() )
+                    m_Model.SetCaret( static_cast<u32>( m_Model.GetTextBuffer().size() ) );
+                return Reply::Handled().SetFocus( GetLayoutID() );
+            }
+
+            if ( !Policy )
+                return Reply::Unhandled();
+
+            const TextEditOutcome outcome = Policy->HandleKey( m_Model, a_Event );
+            if ( !outcome.Handled )
+                return PassesThrough( a_Event.Button ) ? Reply::Unhandled() : Reply::Handled();
+
+            if ( outcome.Changed )
+                OnTextChanged();
+
+            // Holding Enter shouldn't submit again with every key repeat.
+            if ( outcome.Commited && !a_Event.Repeat )
+                if ( OnSubmit ) OnSubmit( m_Utf8 );
+
+            if ( outcome.Canceled )
+                return Reply::Handled().ClearFocus();
+
+            return Reply::Handled();
+        }
+
+        Reply OnButtonReleased( const ButtonEvent& a_Event ) override
+        {
+            // Releases of keys this field took on press are routed back here by the Scene;
+            // there is nothing to do on release.
+            return a_Event.Button == EButtonID::MouseLeft ? Reply::Handled() : Reply::Unhandled();
+        }
+
+        Reply OnTextInput( const TextInputEvent& a_Event ) override
+        {
+            if ( !Policy )
+                return Reply::Unhandled();
+
+            // No modifier filtering here: platforms don't send text for shortcuts like Ctrl+A,
+            // and Alt/Option (or AltGr) combinations that do produce text should be typed.
+            const TextEditOutcome outcome = Policy->HandleText( m_Model, a_Event.Text );
+            if ( outcome.Changed )
+                OnTextChanged();
+
+            return Reply::Handled();
+        }
+
+        Vec2<Unit> OnMeasureContent( const LayoutNode& a_Node, Vec2<Unit>, const LayoutContext& ) override
+        {
+            HandleThemeUpdate();
+            EnsureShaped();
+
+            // Measure each line including trailing spaces (ShapedText::MaxWidth drops them),
+            // so the caret after trailing spaces stays inside the field.
+            // Line widths are cached by content, so an edit only reshapes the line it changed.
+            const TextBuffer& text  = m_Model.GetTextBuffer();
+            Unit              width = 0_u;
+            u32               lines = 1;
+            LineWidthMap      current;
+            for ( u32 lineStart = 0;; )
+            {
+                u32 lineEnd = lineStart;
+                while ( lineEnd < text.size() && text[lineEnd] != U'\n' )
+                    ++lineEnd;
+
+                width = std::max( width, MeasureLine( lineStart, lineEnd, current ) );
+                if ( lineEnd >= text.size() )
+                    break;
+
+                lineStart = lineEnd + 1;
+                ++lines;
+            }
+            m_LineWidths = std::move( current ); // Drop lines that no longer exist.
+
+            const Vec2<Unit> padding = a_Node.Style.Padding.Total();
+            return Vec2<Unit>{ std::max( width + CaretWidth, MinWidth ) + padding[0], m_LineHeight * static_cast<f32>( lines ) + padding[1] };
+        }
+
+    protected:
+
+        void OnPaint( const PaintEvent& a_Event ) override
+        {
+            HandleThemeUpdate();
+            EnsureShaped();
+
+            const LayoutNode& node     = GetLayout();
+            const Rect<Unit>& rect     = node.Layout.FinalRect;
+            const Rect<Unit>  textRect = node.Style.Padding.Apply( rect );
+            const bool        focused  = HasFocus();
+
+            a_Event.Drawer.AddBrushRect( rect, FillBrush, BorderColor, BorderThickness, Radius );
+            if ( focused )
+                FocusRing.Draw( a_Event.Drawer, rect, Radius );
+
+            a_Event.Drawer.PushClipRect( textRect );
+
+            // Selection highlight, one rect per line touched.
+            if ( focused && m_Model.HasSelection() )
+            {
+                const TextBuffer& text  = m_Model.GetTextBuffer();
+                const u32         start = m_Model.SelectionStart();
+                const u32         end   = m_Model.SelectionEnd();
+
+                u32 lineStart = 0, lineIndex = 0;
+                while ( lineStart <= text.size() )
+                {
+                    u32 lineEnd = lineStart;
+                    while ( lineEnd < text.size() && text[lineEnd] != U'\n' )
+                        ++lineEnd;
+
+                    if ( lineEnd >= start && lineStart <= end )
+                    {
+                        const u32  from = std::max( start, lineStart );
+                        const u32  to   = std::min( end, lineEnd );
+                        const Unit x0   = MeasureRange( lineStart, from );
+                        // Show a sliver for selected newlines so empty selected lines are visible.
+                        const Unit x1   = MeasureRange( lineStart, to ) + ( end > lineEnd ? Unit{ 4.f } : 0_u );
+
+                        a_Event.Drawer.AddRect(
+                            Rect<Unit>{ Vec2<Unit>{ textRect.Origin[0] + x0, textRect.Origin[1] + m_LineHeight * static_cast<f32>( lineIndex ) },
+                                        Vec2<Unit>{ x1 - x0, m_LineHeight } },
+                            { .FillColor = SelectionColor } );
+                    }
+
+                    if ( lineEnd >= end || lineEnd >= text.size() )
+                        break;
+
+                    lineStart = lineEnd + 1;
+                    ++lineIndex;
+                }
+            }
+
+            if ( m_ShapedText )
+                a_Event.Drawer.AddText( *m_ShapedText, RenderStyle, textRect );
+
+            if ( focused )
+            {
+                const TextBuffer& text  = m_Model.GetTextBuffer();
+                const u32         caret = m_Model.Caret();
+
+                u32 lineStart = 0, lineIndex = 0;
+                for ( u32 i = 0; i < caret; ++i )
+                {
+                    if ( text[i] == U'\n' )
+                    {
+                        lineStart = i + 1;
+                        ++lineIndex;
+                    }
+                }
+
+                const Unit x = MeasureRange( lineStart, caret );
+                a_Event.Drawer.AddRect(
+                    Rect<Unit>{ Vec2<Unit>{ textRect.Origin[0] + x, textRect.Origin[1] + m_LineHeight * static_cast<f32>( lineIndex ) },
+                                Vec2<Unit>{ CaretWidth, m_LineHeight } },
+                    { .FillColor = CaretColor.value_or( RenderStyle.FillColor ) } );
+            }
+
+            a_Event.Drawer.PopClipRect();
+        }
+
+        /** @brief Keys the widget lets fall through to navigation when its policy doesn't use them; it keeps all others. */
+        static constexpr bool PassesThrough( EButtonID a_Button )
+        {
+            switch ( a_Button )
+            {
+                case EButtonID::KeyUp:
+                case EButtonID::KeyDown:
+                case EButtonID::KeyTab:
+                case EButtonID::Unknown:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        void OnTextChanged()
+        {
+            m_Utf8 = Unicode::EncodeUTF8( m_Model.GetTextBuffer().data(), m_Model.GetTextBuffer().size() );
+            InvalidateShaped();
+            if ( OnChanged ) OnChanged( m_Utf8 );
+        }
+
+        /** @brief The text changed: reshape it. Per-line widths are kept (they are keyed by content). */
+        void InvalidateShaped()
+        {
+            m_ShapedText = NullOpt;
+            m_Shaped     = false;
+            m_PrefixWidths.clear();
+            if ( m_Scene )
+                GetLayout().MarkDirty();
+        }
+
+        /** @brief The font or style changed: every cached measurement is stale. */
+        void InvalidateFont()
+        {
+            m_LineHeightValid = false;
+            m_SentinelWidth   = Unit{ -1.f };
+            m_LineWidths.clear();
+            InvalidateShaped();
+        }
+
+        void HandleThemeUpdate()
+        {
+            if constexpr ( HasMixin<ThemeMixin> )
+            {
+                if ( !Theme.Update() )
+                    return;
+
+                RenderStyle     = Theme.GetTextStyle( ThemeKey::TextStyle::Default, RenderStyle );
+                FillBrush       = Theme.GetBrush( ThemeKey::Brush::ButtonNormal, FillBrush );
+                BorderColor     = Theme.GetColor( ThemeKey::Color::ButtonBorder, BorderColor );
+                BorderThickness = std::max( 1_u, Theme.GetMetric( ThemeKey::Metric::ButtonBorderThickness, BorderThickness ) );
+                Radius          = Theme.GetRadius( ThemeKey::Radii::Button, Radius );
+                FocusRing.UpdateFromTheme( Theme );
+                SelectionColor  = Theme.GetColor( ThemeKey::Color::TextSelection, SelectionColor );
+
+                if ( const FontHandle* font = Theme.TryGetFont( ThemeKey::Font::Default ) )
+                {
+                    if ( m_LayoutStyle.Font != *font )
+                    {
+                        m_LayoutStyle.Font = *font;
+                        InvalidateFont();
+                    }
+                }
+            }
+        }
+
+        /** @brief Shapes the whole buffer (and the line height) if it changed since the last call. */
+        void EnsureShaped()
+        {
+            if ( m_Shaped || !m_Scene )
+                return;
+
+            ITextMetrics* metrics = GetScene().TextMetrics;
+            if ( !metrics )
+                return;
+
+            m_Shaped = true;
+
+            // Line height comes from shaping a single space, so an empty field still has a height.
+            // It only depends on the font, so it is not redone on every edit.
+            if ( !m_LineHeightValid )
+            {
+                if ( Optional<ShapedText> probe = Shape( " " ) )
+                    m_LineHeight = probe->LineHeight;
+                m_LineHeightValid = true;
+            }
+
+            if ( !m_Utf8.empty() )
+                m_ShapedText = Shape( m_Utf8 );
+        }
+
+        Optional<ShapedText> Shape( StringView a_Text ) const
+        {
+            ITextMetrics* metrics = m_Scene ? m_Scene->TextMetrics : nullptr;
+            if ( !metrics )
+                return NullOpt;
+
+            Optional<PreparedText> prepared = metrics->Prepare( a_Text, m_LayoutStyle );
+            if ( !prepared )
+                return NullOpt;
+
+            return metrics->Shape( *prepared, m_LayoutStyle );
+        }
+
+        /** @brief Width of the codepoints [a_Begin, a_End) of one line, cached until the text changes. */
+        Unit MeasureRange( u32 a_Begin, u32 a_End )
+        {
+            if ( a_End <= a_Begin )
+                return 0_u;
+
+            const u64 key = ( static_cast<u64>( a_Begin ) << 32 ) | a_End;
+            if ( auto it = m_PrefixWidths.find( key ); it != m_PrefixWidths.end() )
+                return it->second;
+
+            const Optional<Unit> width = MeasureCodepoints( a_Begin, a_End );
+            if ( width )
+                m_PrefixWidths[key] = *width; // Not cached without text metrics, so it is measured once they exist.
+            return width.value_or( 0_u );
+        }
+
+        using LineWidthMap = std::unordered_map<TextBuffer, Unit>;
+
+        /** @brief Width of the line [a_Begin, a_End), looked up by its content; records it in a_Current. */
+        Unit MeasureLine( u32 a_Begin, u32 a_End, LineWidthMap& a_Current )
+        {
+            TextBuffer line( m_Model.GetTextBuffer().data() + a_Begin, a_End - a_Begin );
+            if ( auto it = a_Current.find( line ); it != a_Current.end() )
+                return it->second;
+
+            Optional<Unit> width;
+            if ( auto it = m_LineWidths.find( line ); it != m_LineWidths.end() )
+                width = it->second;
+            else
+                width = MeasureCodepoints( a_Begin, a_End );
+
+            if ( width )
+                a_Current.emplace( std::move( line ), *width );
+            return width.value_or( 0_u );
+        }
+
+        /** @brief Shapes the codepoints [a_Begin, a_End), or NullOpt without text metrics. */
+        Optional<Unit> MeasureCodepoints( u32 a_Begin, u32 a_End )
+        {
+            if ( a_End <= a_Begin )
+                return 0_u;
+
+            // Shaped line widths leave out trailing whitespace, so measure with a sentinel glyph
+            // appended and subtract the sentinel's own width.
+            const String utf8 = Unicode::EncodeUTF8( m_Model.GetTextBuffer().data() + a_Begin, a_End - a_Begin ) + c_Sentinel;
+            Optional<ShapedText> shaped = Shape( utf8 );
+            if ( !shaped )
+                return NullOpt;
+
+            return std::max( 0_u, shaped->MaxWidth - SentinelWidth() );
+        }
+
+        static constexpr const char* c_Sentinel = "|";
+
+        Unit SentinelWidth()
+        {
+            if ( m_SentinelWidth < 0_u )
+            {
+                Optional<ShapedText> shaped = Shape( c_Sentinel );
+                if ( !shaped )
+                    return 0_u; // No text metrics yet; measure again later.
+                m_SentinelWidth = shaped->MaxWidth;
+            }
+            return m_SentinelWidth;
+        }
+
+    protected:
+        TextEditModel          m_Model;
+        String                 m_Utf8;           ///< UTF-8 copy of the model's buffer, for shaping and callbacks.
+        TextLayoutStyle        m_LayoutStyle{};
+        Optional<ShapedText>   m_ShapedText;
+        bool                   m_Shaped{ false };
+        Unit                   m_LineHeight{ 20_u };
+        bool                   m_LineHeightValid{ false };
+        Unit                   m_SentinelWidth{ -1.f };
+        std::unordered_map<u64, Unit> m_PrefixWidths; ///< (begin << 32 | end) -> width; cleared on every edit.
+        LineWidthMap           m_LineWidths;     ///< Line content -> width; kept across edits, cleared on font change.
+    };
+
+} // namespace RatUI

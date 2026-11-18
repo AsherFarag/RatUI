@@ -1,10 +1,23 @@
 #include <RatUI/Widget/Scene.h>
 
+#include <algorithm>
+
 namespace RatUI
 {
     // TODO: Make this a reusable utility?
     namespace 
     {
+        /** @brief The ButtonEvent a widget receives for ENavAction::ActivatePressed/ActivateReleased. */
+        ButtonEvent MakeActivateEvent( bool a_Pressed )
+        {
+            return ButtonEvent{
+                .Button   = EButtonID::KeyEnter,
+                .Pressed  = a_Pressed,
+                .Released = !a_Pressed,
+                .Held     = a_Pressed,
+            };
+        }
+
         struct LayoutChildIterator
         {
             using iterator_concept = std::forward_iterator_tag;
@@ -164,9 +177,48 @@ namespace RatUI
             prev->OnFocusLost( FocusEvent{} );
 
         Input.FocusedWidget = a_Node;
+        SyncNavScopes( a_Node );
 
         if ( IWidget* next = GetWidget( a_Node ) )
             next->OnFocusReceived( FocusEvent{} );
+    }
+
+    void Scene::SyncNavScopes( NodeID a_Focused )
+    {
+        LayoutNode* node = m_Layouts.Get( a_Focused );
+        if ( !node )
+            return; // Clearing focus leaves the scopes as they are.
+
+        // Ancestors of the focused widget, outermost first.
+        Array<LayoutNode*> path;
+        for ( LayoutNode* parent = node->Parent(); parent; parent = parent->Parent() )
+            PushBack( path, parent );
+        std::reverse( path.begin(), path.end() );
+
+        const auto IsOnPath = [&]( NodeID a_ID )
+        {
+            return std::any_of( path.begin(), path.end(), [&]( const LayoutNode* a_Node ) { return a_Node->ID == a_ID; } );
+        };
+
+        // Keep the scopes that still contain the widget (this also keeps scopes pushed by hand,
+        // e.g. a dialog with a custom restore target); drop the rest.
+        size keep = 0;
+        while ( keep < Size( Input.NavStack ) && IsOnPath( Input.NavStack[keep].Scope ) )
+            ++keep;
+        while ( Size( Input.NavStack ) > keep )
+            PopBack( Input.NavStack );
+
+        // Push the focus scopes between the innermost kept scope (or the root) and the widget.
+        // Each one restores to itself on pop, as if it had been entered with Activate.
+        const NodeID innermost = keep > 0 ? Input.NavStack[keep - 1].Scope : RootWidget;
+        bool         below     = false;
+        for ( LayoutNode* scope : path )
+        {
+            if ( below && scope->Style.IsFocusScope )
+                Input.PushNavScope( scope->ID, scope->ID );
+            if ( scope->ID == innermost )
+                below = true;
+        }
     }
 
     void Scene::EnsureInitialFocus()
@@ -174,12 +226,17 @@ namespace RatUI
         if ( Input.FocusedWidget != c_InvalidNodeID )
             return;
 
-        LayoutNode* root = m_Layouts.Get( RootWidget );
-        if ( !root )
-            return;
-
+        // Start in the current nav scope (e.g. the group of a text field that Escape just left),
+        // and only fall back to the whole scene if that scope has nothing focusable.
         Array<const LayoutNode*> candidates;
-        CollectFocusableCandidates( *root, candidates );
+        if ( LayoutNode* scope = m_Layouts.Get( GetCurrentNavScope() ) )
+            CollectFocusableCandidates( *scope, candidates );
+
+        if ( Empty( candidates ) )
+        {
+            if ( LayoutNode* root = m_Layouts.Get( RootWidget ) )
+                CollectFocusableCandidates( *root, candidates );
+        }
 
         if ( !Empty( candidates ) )
             SetFocus( candidates[0]->Widget->GetLayoutID() );
@@ -236,7 +293,42 @@ namespace RatUI
 		if ( Holds<ButtonEvent>( a_Event.Payload ) )
 			return ProcessButtonEvent( Get<ButtonEvent>( a_Event.Payload ) );
 
+		if ( Holds<TextInputEvent>( a_Event.Payload ) )
+			return ProcessTextInputEvent( Get<TextInputEvent>( a_Event.Payload ) );
+
 		return false;
+    }
+
+    bool Scene::WantsTextInput() const
+    {
+        const IWidget* focused = GetWidget( Input.FocusedWidget );
+        return focused && focused->WantsTextInput();
+    }
+
+    void Scene::ReleaseAllKeys()
+    {
+        Input.KeyPresses.clear();
+        Input.ModifierState     = EModifier::None;
+        Input.DropNextTextInput = false;
+    }
+
+    bool Scene::ProcessTextInputEvent( const TextInputEvent& a_Event )
+    {
+        // Text produced by a key that navigation used (e.g. Space activating a group, which may
+        // focus a text field before the " " arrives) is not typed.
+        if ( Input.DropNextTextInput )
+        {
+            Input.DropNextTextInput = false;
+            return true;
+        }
+
+        IWidget* focused = GetWidget( Input.FocusedWidget );
+        if ( !focused )
+            return false;
+
+        const Reply reply = focused->OnTextInput( a_Event );
+        ApplyReply( reply );
+        return reply.IsHandled();
     }
 
     bool Scene::ProcessPointerEvent( const PointerEvent& a_Event )
@@ -320,17 +412,73 @@ namespace RatUI
         if ( a_Event.Pressed || a_Event.Released )
             Input.UpdateModifiers( a_Event.Button, a_Event.Pressed );
 
+        const bool isKey = !IsPointerButton( a_Event.Button );
+
+        // A key's text arrives between its press and release, so a later key event ends the window
+        // in which text is dropped (see ProcessTextInputEvent).
+        if ( isKey )
+            Input.DropNextTextInput = false;
+
+        // --- Key release: goes to the widget that took the press, even if focus moved since ---
+        if ( isKey && a_Event.Released )
+        {
+            if ( auto it = Input.KeyPresses.find( a_Event.Button ); it != Input.KeyPresses.end() )
+            {
+                const KeyPressTarget press = it->second;
+                Input.KeyPresses.erase( it );
+
+                if ( IWidget* target = GetWidget( press.Widget ) )
+                    ApplyReply( target->OnButtonReleased( press.Activate ? MakeActivateEvent( false ) : a_Event ) );
+                return true;
+            }
+        }
+
+        // The focused widget, if it was already offered this key below; it isn't offered it twice.
+        NodeID alreadyOffered = c_InvalidNodeID;
+
+        // --- Text input gets key presses before navigation ---
+        if ( isKey && a_Event.Pressed && WantsTextInput() )
+        {
+            const NodeID focusedID = Input.FocusedWidget;
+            if ( IWidget* focused = GetWidget( focusedID ) )
+            {
+                const Reply reply = focused->OnButtonPressed( a_Event );
+                ApplyReply( reply );
+                if ( reply.IsHandled() )
+                {
+                    Input.KeyPresses[a_Event.Button] = { .Widget = focusedID };
+                    return true;
+                }
+                alreadyOffered = focusedID;
+            }
+        }
+
 		// --- Navigation mapping ---
         const ENavAction navAction = Input.NavMap.Resolve( a_Event.Button );
         if ( navAction != ENavAction::None )
         {
             Input.InputMode = EInputMode::Navigation;
-            EnsureInitialFocus();
+            if ( a_Event.Pressed )
+            {
+                Input.DropNextTextInput = isKey;
+                EnsureInitialFocus(); // Not on release, or releasing Escape would re-focus what it just unfocused.
+            }
 
             if ( navAction == ENavAction::ActivatePressed || navAction == ENavAction::ActivateReleased )
             {
-                if ( a_Event.Pressed )  Navigate( ENavAction::ActivatePressed );
-                if ( a_Event.Released ) Navigate( ENavAction::ActivateReleased );
+                // Releases of presses a widget took were routed above. An unmatched release had no
+                // press target, so it is dropped rather than activating whatever is focused now.
+                // Holding the key down activates once, not once per key repeat.
+                if ( a_Event.Pressed && !a_Event.Repeat )
+                {
+                    const NodeID      target     = Input.FocusedWidget;
+                    const LayoutNode* targetNode = m_Layouts.Get( target );
+                    const bool        getsPress  = targetNode && targetNode->Widget && !targetNode->Style.IsFocusScope;
+
+                    Navigate( ENavAction::ActivatePressed );
+                    if ( getsPress )
+                        Input.KeyPresses[a_Event.Button] = { .Widget = target, .Activate = true };
+                }
             }
             else if ( a_Event.Pressed )
             {
@@ -356,6 +504,9 @@ namespace RatUI
         }
 
 		// --- Dispatch to focused widget ---
+        if ( isKey && targetWidget == alreadyOffered && alreadyOffered != c_InvalidNodeID )
+            return false;
+
         if ( IWidget* focused = GetWidget( targetWidget ) )
         {
             Reply reply = Reply::Unhandled();
@@ -365,6 +516,8 @@ namespace RatUI
 				reply = focused->OnButtonReleased( a_Event );
 
             ApplyReply( reply );
+            if ( isKey && a_Event.Pressed && reply.IsHandled() )
+                Input.KeyPresses[a_Event.Button] = { .Widget = targetWidget };
             return reply.IsHandled();
         }
 
@@ -533,12 +686,7 @@ namespace RatUI
                 return;
             }
 
-            const ButtonEvent ev{
-                .Button = EButtonID::KeyEnter,
-                .Pressed = ( a_Action == ENavAction::ActivatePressed ),
-                .Released = ( a_Action == ENavAction::ActivateReleased ),
-                .Held = ( a_Action == ENavAction::ActivatePressed ),
-            };
+            const ButtonEvent ev = MakeActivateEvent( a_Action == ENavAction::ActivatePressed );
 
             // TODO: Shouldnt be making fake events like this, should add something like IWidget::OnPressed/OnHovered etc??
             Reply reply = a_Action == ENavAction::ActivatePressed

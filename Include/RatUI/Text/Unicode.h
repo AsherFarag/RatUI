@@ -637,4 +637,59 @@ namespace RatUI::Unicode
         return std::move( a_Text );
     }
 
+    /**
+     * @brief Appends one codepoint to a UTF-8 string.
+     * Surrogates (U+D800-U+DFFF) and values above U+10FFFF are not valid scalar values
+     * and are written as U+FFFD REPLACEMENT CHARACTER.
+     */
+    inline void AppendUTF8( String& a_Out, codepoint a_CP )
+    {
+        u32 cp = static_cast<u32>( a_CP );
+        if ( cp > 0x10FFFF || ( cp >= 0xD800 && cp <= 0xDFFF ) )
+            cp = 0xFFFD;
+
+        if ( cp < 0x80 )
+        {
+            PushBack( a_Out, static_cast<char>( cp ) );
+        }
+        else if ( cp < 0x800 )
+        {
+            PushBack( a_Out, static_cast<char>( 0xC0 | ( cp >> 6 ) ) );
+            PushBack( a_Out, static_cast<char>( 0x80 | ( cp & 0x3F ) ) );
+        }
+        else if ( cp < 0x10000 )
+        {
+            PushBack( a_Out, static_cast<char>( 0xE0 | ( cp >> 12 ) ) );
+            PushBack( a_Out, static_cast<char>( 0x80 | ( ( cp >> 6 ) & 0x3F ) ) );
+            PushBack( a_Out, static_cast<char>( 0x80 | ( cp & 0x3F ) ) );
+        }
+        else
+        {
+            PushBack( a_Out, static_cast<char>( 0xF0 | ( cp >> 18 ) ) );
+            PushBack( a_Out, static_cast<char>( 0x80 | ( ( cp >> 12 ) & 0x3F ) ) );
+            PushBack( a_Out, static_cast<char>( 0x80 | ( ( cp >> 6 ) & 0x3F ) ) );
+            PushBack( a_Out, static_cast<char>( 0x80 | ( cp & 0x3F ) ) );
+        }
+    }
+
+    /** @brief Encodes a run of codepoints as UTF-8 (see AppendUTF8 for invalid values). */
+    inline String EncodeUTF8( const codepoint* a_Data, size a_Count )
+    {
+        String out;
+        Reserve( out, a_Count );
+        for ( size i = 0; i < a_Count; ++i )
+            AppendUTF8( out, a_Data[i] );
+        return out;
+    }
+
+    /**
+     * @brief True for codepoints that NormalizeWhitespacePreWrap() turns into a line break:
+     * '\n', '\r', '\f', U+0085, U+2028 and U+2029.
+     */
+    constexpr inline bool IsLineBreak( codepoint a_CP )
+    {
+        return a_CP == U'\n' || a_CP == U'\r' || a_CP == U'\f' ||
+               a_CP == 0x0085 || a_CP == 0x2028 || a_CP == 0x2029;
+    }
+
 } // namespace RatUI::Unicode

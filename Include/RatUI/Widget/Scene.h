@@ -86,6 +86,15 @@ namespace RatUI
         /** @brief Whether input is currently pointer-driven or navigation-driven; useful for widgets deciding whether to show a focus ring. */
         RATUI_NODISCARD EInputMode GetInputMode() const { return Input.InputMode; }
 
+        /** @brief Whether the focused widget wants keyboard/text input (e.g. a text field). Platform layers can use this to skip their own key shortcuts. */
+        RATUI_NODISCARD bool WantsTextInput() const;
+
+        /**
+         * @brief Forgets held keys and modifiers without sending releases. Call when the window loses
+         * keyboard focus, since the releases of keys held at that moment go to another window.
+         */
+        void ReleaseAllKeys();
+
         // - Navigation
 
         void Navigate( ENavAction a_Action );
@@ -145,8 +154,16 @@ namespace RatUI
         void ApplyReply( const Reply& a_Reply );
         NavReply QueryBoundaryReply( ENavAction a_Action, NodeID a_Focused );
 
+        /**
+         * @brief Makes the nav scope stack match the newly focused widget's position in the tree.
+         * Scopes that don't contain the widget are dropped, and its enclosing focus scopes are pushed,
+         * so arrow keys move between its siblings after it was focused by a click or SetFocus().
+         */
+        void SyncNavScopes( NodeID a_Focused );
+
         bool ProcessPointerEvent( const PointerEvent& a_Event );
         bool ProcessButtonEvent( const ButtonEvent& a_Event );
+        bool ProcessTextInputEvent( const TextInputEvent& a_Event );
         void UpdateGestureState( const ButtonEvent& a_Event );
         NodeID HitTest( NodeID a_ID, Vec2<Unit> a_LogicalPos );
 
@@ -162,6 +179,10 @@ namespace RatUI
 
             if (a_Node.Widget)
                 a_Node.Widget->OnDestroy();
+
+            // A held key's release must not reach a later widget that reuses this NodeID.
+            for ( auto it = Input.KeyPresses.begin(); it != Input.KeyPresses.end(); )
+                it = it->second.Widget == a_Node.ID ? Input.KeyPresses.erase( it ) : std::next( it );
 
             m_Layouts.Deallocate( a_Node.ID );
         }

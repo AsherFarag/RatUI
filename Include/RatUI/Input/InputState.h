@@ -45,6 +45,13 @@ namespace RatUI
         NodeID Restored{ c_InvalidNodeID }; ///< The widget to restore on pop
     };
 
+    /** @brief The widget that took a held key's press; the key's release goes to the same widget. */
+    struct KeyPressTarget
+    {
+        NodeID Widget{ c_InvalidNodeID };
+        bool   Activate{ false }; ///< Pressed through ENavAction::ActivatePressed, so release as ActivateReleased.
+    };
+
     /**
      * @brief Represents the current state of input devices and navigation.
      */
@@ -60,6 +67,8 @@ namespace RatUI
         NodeID CapturedWidget{ c_InvalidNodeID };
 
         PointerEvent LastPointerEvent{};
+        HashMap<EButtonID, KeyPressTarget> KeyPresses{}; ///< Held keyboard keys whose press a widget took, so focus changes can't split a key stroke.
+        bool DropNextTextInput{ false }; ///< The last key press was used by navigation, so the text it produces (e.g. Space's " ") is not typed.
         HashMap<PointerID, PointerGestureState> PointerStates{};
         Array<NavScope> NavStack{};
 

@@ -1,6 +1,7 @@
 #pragma once
 #include "Example.h"
 #include <RatUI/Widget/ButtonWidget.h>
+#include <RatUI/Widget/InputTextWidget.h>
 #include <RatUI/Widget/PanelWidget.h>
 #include <RatUI/Widget/SliderWidget.h>
 #include <RatUI/Widget/TextWidget.h>
@@ -72,6 +73,14 @@ public:
             m_Status->SetText( Text{ "Theme applied: " + m_Themes[m_ThemeIndex].Name + " (preview button clicked)" } );
         } );
 
+        // Text input: Enter in the single-line field submits to the status line.
+        AddText( preview, "Text Input", 20_u );
+        InputTextWidget* name = AddInput( preview, MakeUnique<SingleLineTextEditPolicy>() );
+        name->SetText( "Type here" );
+        name->OnSubmit = [this]( const String& a_Text ) { m_Status->SetText( Text{ "Submitted: " + a_Text } ); };
+
+        AddInput( preview, MakeUnique<MultiLineTextEditPolicy>() )->SetText( "Multi-line field.\nEnter adds a line." );
+
         ApplyTheme( 0 );
     }
 
@@ -131,6 +140,17 @@ private:
         TextWidget* text = m_Scene.CreateWidget<TextWidget>( a_Parent->GetLayoutID(), Text{ std::move( a_String ) }, style );
         text->GetLayout().HeightMode( ESizing::Content );
         return text;
+    }
+
+    InputTextWidget* AddInput( IWidget* a_Parent, Unique<ITextEditPolicy> a_Policy )
+    {
+        InputTextWidget* input = m_Scene.CreateWidget<InputTextWidget>( a_Parent->GetLayoutID(), std::move( a_Policy ) );
+        input->GetLayout()
+            .WidthMode( ESizing::Flex )
+            .HeightMode( ESizing::Content )
+            .Padding( Edges::All( 6_u ) )
+            .SizeConstraints( Constraints::AtMost( { 280_u, Limits<Unit>::max() } ) );
+        return input;
     }
 
     /** @brief A button that grows up to a_MaxWidth and shrinks on narrow screens. */

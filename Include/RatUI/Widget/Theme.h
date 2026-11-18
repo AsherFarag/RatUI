@@ -318,6 +318,8 @@ namespace RatUI
 
             inline constexpr StringID PanelBorder = "Panel.Border"_id;
 
+            inline constexpr StringID TextSelection = "Text.Selection"_id;
+
             inline constexpr StringID SliderThumbBorder        = "Slider.ThumbBorder"_id;
             inline constexpr StringID SliderThumbBorderPressed = "Slider.ThumbBorderPressed"_id;
         }

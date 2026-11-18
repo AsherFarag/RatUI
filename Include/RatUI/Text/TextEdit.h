@@ -151,6 +151,13 @@ namespace RatUI
     };
 
     /**
+     * @brief Decodes UTF-8 into a text buffer, turning every line break ("\r\n", '\r', '\f', U+0085,
+     * U+2028, U+2029) into a single '\n'. The buffer then matches how pre-wrap text is shaped,
+     * so caret and line positions agree with what is drawn.
+     */
+    [[nodiscard]] TextEditModel::TextBuffer DecodeEditText( StringView a_Text );
+
+    /**
      * @brief Represents the outcome of a text edit operation, indicating whether the operation was handled, 
      * changed the text, committed the edit, or canceled the edit.
      * This is used by text edit policies to communicate the result of handling a key event or other input.
@@ -189,16 +196,25 @@ namespace RatUI
         /** 
          * @brief Handles a key event operation on a TextEditModel, returning a TextEditOutcome indicating the result of the operation.
          * @param a_Model The TextEditModel to operate on.
-         * @param a_Event The TextInputEvent representing the key event to handle.
+         * @param a_Event The ButtonEvent representing the key event to handle.
          * @return A TextEditOutcome indicating whether the operation was handled, changed the text, committed the edit, or canceled the edit.
          */
-        [[nodiscard]] virtual TextEditOutcome HandleKey( TextEditModel& a_Model, const TextInputEvent& a_Event ) const;
+        [[nodiscard]] virtual TextEditOutcome HandleKey( TextEditModel& a_Model, const ButtonEvent& a_Event ) const;
+
+        /**
+         * @brief Inserts typed text into a TextEditModel, replacing the selection.
+         * Line breaks are normalised to '\n' (see DecodeEditText), then codepoints rejected by AcceptChar() are dropped.
+         * @param a_Model The TextEditModel to operate on.
+         * @param a_Text  The typed text, UTF-8 encoded (e.g. TextInputEvent::Text).
+         * @return Change() if any text was inserted, otherwise Unhandle().
+         */
+        [[nodiscard]] TextEditOutcome HandleText( TextEditModel& a_Model, StringView a_Text ) const;
     };
 
     /**
      * @brief A text edit policy that allows for single-line text input,
      * where pressing Enter commits the edit and pressing Escape cancels it.
-     * This policy does not allow for multi-line input, and ignores Up/Down arrow keys to prevent navigation in multi-line text.
+     * This policy does not allow for multi-line input, and leaves Up/Down arrow keys unhandled so navigation can move focus.
      */
     class SingleLineTextEditPolicy : public ITextEditPolicy
     {
@@ -210,7 +226,7 @@ namespace RatUI
             return a_Char != U'\n' && a_Char != U'\r';
         }
 
-        [[nodiscard]] TextEditOutcome HandleKey( TextEditModel& a_Model, const TextInputEvent& a_Event ) const override
+        [[nodiscard]] TextEditOutcome HandleKey( TextEditModel& a_Model, const ButtonEvent& a_Event ) const override
         {
             switch ( a_Event.Button )
             {
@@ -218,7 +234,7 @@ namespace RatUI
                 case EButtonID::KeyEscape: return TextEditOutcome::Cancel();
                 case EButtonID::KeyUp:
                 case EButtonID::KeyDown:
-                    return TextEditOutcome::Handle(); // no-op, but consume so focus/nav doesn't react
+                    return TextEditOutcome::Unhandle(); // no lines to move between; leave to navigation
                 default:
                     return ITextEditPolicy::HandleKey( a_Model, a_Event );
             }
@@ -238,7 +254,7 @@ namespace RatUI
 
         [[nodiscard]] bool AcceptChar( codepoint a_Char ) const override { return true; }
 
-        [[nodiscard]] TextEditOutcome HandleKey( TextEditModel& a_Model, const TextInputEvent& a_Event ) const override
+        [[nodiscard]] TextEditOutcome HandleKey( TextEditModel& a_Model, const ButtonEvent& a_Event ) const override
         {
             switch ( a_Event.Button )
             {
@@ -249,11 +265,11 @@ namespace RatUI
                     return TextEditOutcome::Cancel();
 
                 case EButtonID::KeyUp:
-					a_Model.MoveUp( HasFlag( a_Event.Modifiers, EModifier::Shift ) );
+					a_Model.MoveUp( HasAnyFlag( a_Event.Modifiers, EModifier::Shift ) );
                     return TextEditOutcome::Handle();
 
                 case EButtonID::KeyDown:
-					a_Model.MoveDown( HasFlag( a_Event.Modifiers, EModifier::Shift ) );
+					a_Model.MoveDown( HasAnyFlag( a_Event.Modifiers, EModifier::Shift ) );
                     return TextEditOutcome::Handle();
 
                 default:
@@ -296,7 +312,7 @@ namespace RatUI
             return false;
         }
 
-        [[nodiscard]] TextEditOutcome HandleKey( TextEditModel& a_Model, const TextInputEvent& a_Event ) const override
+        [[nodiscard]] TextEditOutcome HandleKey( TextEditModel& a_Model, const ButtonEvent& a_Event ) const override
         {
             switch ( a_Event.Button )
             {

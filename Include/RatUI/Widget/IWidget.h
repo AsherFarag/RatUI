@@ -174,7 +174,16 @@ namespace RatUI
         /** @brief Called when an input button is released while this widget is focused. */
         virtual Reply OnButtonReleased( const ButtonEvent& a_Event ) { return Reply::Unhandled(); }
 
+        /** @brief Called with typed text (UTF-8) while this widget is focused. */
         virtual Reply OnTextInput( const TextInputEvent& a_Event ) { return Reply::Unhandled(); }
+
+        /**
+         * @brief Whether this widget currently wants keyboard input before navigation does (e.g. a focused text field).
+         * When true and the widget is focused, key presses reach OnButtonPressed before navigation, and only
+         * fall through to navigation if the widget leaves them unhandled. The release of a key whose press a
+         * widget handled is always sent to that widget, even if focus has moved since.
+         */
+        virtual bool WantsTextInput() const { return false; }
 
 		// - Navigation: Only called for widgets that return true from IsNavigationBoundary()
 

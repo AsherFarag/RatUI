@@ -1,6 +1,7 @@
 #pragma once
 #include "Theme.h"
 #include "Scene.h"
+#include "FocusRing.h"
 
 namespace RatUI
 {
@@ -105,6 +106,7 @@ namespace RatUI
         Color BorderColor{ Colors::Transparent };               ///< The color of the panel's border
         Unit  BorderThickness{ 0_u };                           ///< The thickness of the panel's border
         CornerRadius Radius{ CornerRadius::None() };            ///< The corner rounding
+        FocusRingStyle FocusRing{};                             ///< Drawn while the widget has focus (theme: FocusOutline keys)
 
         // --------------------------------------------------------------------
         // IWidget Overrides
@@ -126,6 +128,7 @@ namespace RatUI
                     BorderColor = Theme.GetColor( ThemeKey::Color::ButtonBorder, BorderColor );
                     BorderThickness = Theme.GetMetric( ThemeKey::Metric::ButtonBorderThickness, BorderThickness );
                     Radius = Theme.GetRadius( ThemeKey::Radii::Button, Radius );
+                    FocusRing.UpdateFromTheme( Theme );
                 }
             }
 
@@ -134,18 +137,9 @@ namespace RatUI
 
             a_Event.Drawer.AddBrushRect( rect, fillBrush, BorderColor, BorderThickness, Radius );
 
-            // Draw focus ring 
-            // TODO: Should this be a util or even handled here?
+            // Draw focus ring
             if ( scene.GetFocusedNode() == GetLayoutID() )
-            {
-                a_Event.Drawer.AddRect( rect,
-                {
-                    .FillColor = Colors::Transparent,
-                    .BorderColor = BorderColor,
-                    .BorderThickness = BorderThickness,
-                    .Radius = Radius
-                } );
-            }
+                FocusRing.Draw( a_Event.Drawer, rect, Radius );
 
             PaintChildren( a_Event );
         }

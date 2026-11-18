@@ -335,10 +335,10 @@ namespace RatUI
     // ITextEditPolicy
     // ============================================================
 
-    TextEditOutcome ITextEditPolicy::HandleKey( TextEditModel& a_Model, const TextInputEvent& a_Event ) const
+    TextEditOutcome ITextEditPolicy::HandleKey( TextEditModel& a_Model, const ButtonEvent& a_Event ) const
     {
-		const bool isCtrl = HasFlag( a_Event.Modifiers, EModifier::Ctrl );
-		const bool isShift = HasFlag( a_Event.Modifiers, EModifier::Shift );
+		const bool isCtrl = HasAnyFlag( a_Event.Modifiers, EModifier::Ctrl );
+		const bool isShift = HasAnyFlag( a_Event.Modifiers, EModifier::Shift );
 
         switch ( a_Event.Button )
         {
@@ -389,6 +389,39 @@ namespace RatUI
             default:
                 return TextEditOutcome::Unhandle();
         }
+    }
+
+    TextEditModel::TextBuffer DecodeEditText( StringView a_Text )
+    {
+        TextEditModel::TextBuffer out;
+        bool afterCR = false;
+        for ( const codepoint cp : Unicode::UTF8Range( a_Text ) )
+        {
+            if ( cp == U'\n' && afterCR )
+            {
+                afterCR = false; // second half of "\r\n"
+                continue;
+            }
+
+            afterCR = cp == U'\r';
+            out.push_back( Unicode::IsLineBreak( cp ) ? U'\n' : cp );
+        }
+        return out;
+    }
+
+    TextEditOutcome ITextEditPolicy::HandleText( TextEditModel& a_Model, StringView a_Text ) const
+    {
+        TextEditModel::TextBuffer accepted;
+        for ( const codepoint cp : DecodeEditText( a_Text ) )
+        {
+            if ( AcceptChar( cp ) )
+                accepted.push_back( cp );
+        }
+
+        if ( accepted.empty() )
+            return TextEditOutcome::Unhandle();
+
+        return TextEditOutcome::Change( a_Model.ReplaceSelection( accepted ) );
     }
 
 } // namespace RatUI

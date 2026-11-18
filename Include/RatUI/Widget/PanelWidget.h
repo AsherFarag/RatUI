@@ -1,6 +1,7 @@
 #pragma once
 #include "Theme.h"
 #include "Scene.h"
+#include "FocusRing.h"
 #include "IWidget.h"
 
 namespace RatUI
@@ -21,6 +22,7 @@ namespace RatUI
         Color BorderColor{ Colors::Transparent };            ///< The color of the panel's border
         Unit  BorderThickness{ 0_u };                        ///< The thickness of the panel's border
         CornerRadius Radius{ CornerRadius::None() };         ///< The corner rounding
+        FocusRingStyle FocusRing{};                          ///< Drawn while the widget has focus (theme: FocusOutline keys)
 
         // --------------------------------------------------------------------
         // IWidget Overrides
@@ -44,23 +46,17 @@ namespace RatUI
                     BorderColor = Theme.GetColor( ThemeKey::Color::PanelBorder, BorderColor );
                     BorderThickness = Theme.GetMetric( ThemeKey::Metric::PanelBorderThickness, BorderThickness );
                     Radius = Theme.GetRadius( ThemeKey::Radii::Panel, Radius );
+                    FocusRing.UpdateFromTheme( Theme );
                 }
             }
 
             a_Event.Drawer.AddBrushRect( rect, FillBrush, BorderColor, BorderThickness, Radius );
 
-            if ( scene.GetFocusedNode() == GetLayoutID() )
-            {
-                a_Event.Drawer.AddRect( rect,
-                {
-					.FillColor = Colors::Transparent,
-					.BorderColor = BorderColor,
-					.BorderThickness = BorderThickness,
-                    .Radius = Radius
-                } );
-            }
-
             PaintChildren( a_Event );
+
+            // Focus ring after the children, so they don't cover it.
+            if ( scene.GetFocusedNode() == GetLayoutID() )
+                FocusRing.Draw( a_Event.Drawer, rect, Radius );
         }
     };
 
