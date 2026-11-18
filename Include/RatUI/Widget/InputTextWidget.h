@@ -38,6 +38,7 @@ namespace RatUI
         Unit         BorderThickness{ 1_u };
         CornerRadius Radius{ CornerRadius::None() };
         Optional<Color> CaretColor{};                                   ///< Unset: use the text colour.
+        Optional<Color> PlaceholderColor{};                             ///< Unset: the text colour at 60% opacity. Themed by ThemeKey::Color::TextPlaceholder.
         Color        SelectionColor{ Color{ 61, 130, 255, 96 } }; ///< AccentBlue, translucent. Themed by ThemeKey::Color::TextSelection.
         Unit         CaretWidth{ 1.5_u };
         Unit         MinWidth{ 120_u };
@@ -79,6 +80,21 @@ namespace RatUI
             m_LayoutStyle      = a_Style;
             m_LayoutStyle.Wrap = TextWrap::PreWrap();
             InvalidateFont();
+        }
+
+        /** @brief Hint text (UTF-8) shown greyed out while the field is empty, e.g. "Leave empty for a random seed". */
+        const String& GetPlaceholder() const noexcept { return m_Placeholder; }
+
+        void SetPlaceholder( StringView a_Text )
+        {
+            if ( m_Placeholder == a_Text )
+                return;
+
+            m_Placeholder       = String( a_Text );
+            m_ShapedPlaceholder = NullOpt;
+            m_PlaceholderShaped = false;
+            if ( m_Scene )
+                GetLayout().MarkDirty(); // A content-sized field fits its placeholder.
         }
 
         bool HasFocus() const { return GetScene().GetFocusedNode() == GetLayoutID(); }
@@ -145,7 +161,7 @@ namespace RatUI
             return Reply::Handled();
         }
 
-        Vec2<Unit> OnMeasureContent( const LayoutNode& a_Node, Vec2<Unit>, const LayoutContext& ) override
+        Vec2<Unit> OnMeasureContent( const LayoutNode&, Vec2<Unit>, const LayoutContext& ) override
         {
             HandleThemeUpdate();
             EnsureShaped();
@@ -172,8 +188,16 @@ namespace RatUI
             }
             m_LineWidths = std::move( current ); // Drop lines that no longer exist.
 
-            const Vec2<Unit> padding = a_Node.Style.Padding.Total();
-            return Vec2<Unit>{ std::max( width + CaretWidth, MinWidth ) + padding[0], m_LineHeight * static_cast<f32>( lines ) + padding[1] };
+            // A content-sized field fits its placeholder, whether or not it is showing, so the
+            // field doesn't change size when the first character is typed.
+            if ( const ShapedText* placeholder = GetShapedPlaceholder() )
+            {
+                width = std::max( width, placeholder->MaxWidth );
+                lines = std::max( lines, placeholder->LineCount() );
+            }
+
+            // Content size only: the layout engine adds the padding.
+            return Vec2<Unit>{ std::max( width + CaretWidth, MinWidth ), m_LineHeight * static_cast<f32>( lines ) };
         }
 
     protected:
@@ -185,14 +209,14 @@ namespace RatUI
 
             const LayoutNode& node     = GetLayout();
             const Rect<Unit>& rect     = node.Layout.FinalRect;
-            const Rect<Unit>  textRect = node.Style.Padding.Apply( rect );
+            const Rect<Unit>  textRect = GetTextRect( node.Style.Padding.Apply( rect ) );
             const bool        focused  = HasFocus();
 
             a_Event.Drawer.AddBrushRect( rect, FillBrush, BorderColor, BorderThickness, Radius );
             if ( focused )
                 FocusRing.Draw( a_Event.Drawer, rect, Radius );
 
-            a_Event.Drawer.PushClipRect( textRect );
+            a_Event.Drawer.PushClipRect( node.Style.Padding.Apply( rect ) );
 
             // Selection highlight, one rect per line touched.
             if ( focused && m_Model.HasSelection() )
@@ -230,8 +254,19 @@ namespace RatUI
                 }
             }
 
+            // Line boxes start at textRect; move the glyphs so they sit in the middle of them.
+            Rect<Unit> glyphRect = textRect;
+            glyphRect.Origin[1] += m_GlyphOffset;
+
             if ( m_ShapedText )
-                a_Event.Drawer.AddText( *m_ShapedText, RenderStyle, textRect );
+            {
+                a_Event.Drawer.AddText( *m_ShapedText, GetDrawStyle( RenderStyle.FillColor ), glyphRect );
+            }
+            else if ( m_Model.GetTextBuffer().empty() )
+            {
+                if ( const ShapedText* placeholder = GetShapedPlaceholder() )
+                    a_Event.Drawer.AddText( *placeholder, GetDrawStyle( GetPlaceholderColor() ), glyphRect );
+            }
 
             if ( focused )
             {
@@ -256,6 +291,60 @@ namespace RatUI
             }
 
             a_Event.Drawer.PopClipRect();
+        }
+
+        /**
+         * @brief The area the lines are laid out in: the padded rect, with a single-line field's line
+         * centred vertically when the field is taller than its text. Multi-line text stays at the top.
+         */
+        Rect<Unit> GetTextRect( Rect<Unit> a_Padded ) const
+        {
+            if ( Policy && !Policy->MultiLine() )
+            {
+                const Unit spare = a_Padded.Size[1] - m_LineHeight;
+                if ( spare > 0_u )
+                    a_Padded.Origin[1] += spare * 0.5f;
+            }
+            return a_Padded;
+        }
+
+        /**
+         * @brief RenderStyle as the field draws it: left/top aligned, because the caret and selection are
+         * measured from the left edge and the top of each line, and without the overflow fade, since
+         * text past the edge is clipped (a fade would dim the characters next to the caret).
+         */
+        TextRenderStyle GetDrawStyle( Color a_Fill ) const
+        {
+            TextRenderStyle style = RenderStyle;
+            style.FillColor       = a_Fill;
+            style.Align           = ETextAlign::Left;
+            style.Baseline        = ETextBaseline::Top;
+            style.FadePercentage  = 0.f;
+            return style;
+        }
+
+        Color GetPlaceholderColor() const
+        {
+            if ( PlaceholderColor )
+                return *PlaceholderColor;
+
+            Color color = RenderStyle.FillColor;
+            color[3]    = static_cast<u8>( color[3] * 0.6f );
+            return color;
+        }
+
+        /** @brief The shaped placeholder, or null if there is none (or no text metrics yet). */
+        const ShapedText* GetShapedPlaceholder()
+        {
+            if ( m_Placeholder.empty() )
+                return nullptr;
+
+            if ( !m_PlaceholderShaped )
+            {
+                m_ShapedPlaceholder = Shape( m_Placeholder );
+                m_PlaceholderShaped = m_ShapedPlaceholder.has_value(); // Retried until text metrics exist.
+            }
+            return m_ShapedPlaceholder ? &*m_ShapedPlaceholder : nullptr;
         }
 
         /** @brief Keys the widget lets fall through to navigation when its policy doesn't use them; it keeps all others. */
@@ -293,7 +382,9 @@ namespace RatUI
         /** @brief The font or style changed: every cached measurement is stale. */
         void InvalidateFont()
         {
-            m_LineHeightValid = false;
+            m_ShapedPlaceholder = NullOpt;
+            m_PlaceholderShaped = false;
+            m_LineHeightValid   = false;
             m_SentinelWidth   = Unit{ -1.f };
             m_LineWidths.clear();
             InvalidateShaped();
@@ -313,6 +404,8 @@ namespace RatUI
                 Radius          = Theme.GetRadius( ThemeKey::Radii::Button, Radius );
                 FocusRing.UpdateFromTheme( Theme );
                 SelectionColor  = Theme.GetColor( ThemeKey::Color::TextSelection, SelectionColor );
+                if ( const Color* placeholder = Theme.TryGetColor( ThemeKey::Color::TextPlaceholder ) )
+                    PlaceholderColor = *placeholder;
 
                 if ( const FontHandle* font = Theme.TryGetFont( ThemeKey::Font::Default ) )
                 {
@@ -337,13 +430,27 @@ namespace RatUI
 
             m_Shaped = true;
 
-            // Line height comes from shaping a single space, so an empty field still has a height.
+            // Line metrics come from shaping one glyph, so an empty field still has a height.
             // It only depends on the font, so it is not redone on every edit.
             if ( !m_LineHeightValid )
             {
-                if ( Optional<ShapedText> probe = Shape( " " ) )
-                    m_LineHeight = probe->LineHeight;
-                m_LineHeightValid = true;
+                // Not marked valid on failure (e.g. the font isn't loaded yet), so it is retried.
+                if ( Optional<ShapedText> probe = Shape( c_Sentinel ) ) // A visible glyph: whitespace alone may not shape.
+                {
+                    // Shaped text puts its first baseline at Ascender, which includes GlyphPadding.
+                    // Shift the glyphs up by that padding, then down by half of any line gap, so the
+                    // ink of each line sits in the middle of its LineHeight box.
+                    const Unit descent = Unit{ std::abs( probe->Descender.ToFloat() ) };
+                    const Unit ascent  = probe->Ascender - probe->GlyphPadding;
+                    m_LineHeight       = probe->LineHeight;
+                    m_GlyphOffset      = ( probe->LineHeight - ( ascent + descent ) ) * 0.5f - probe->GlyphPadding;
+                    m_LineHeightValid  = true;
+                }
+                else
+                {
+                    m_Shaped = false; // Try again next measure/paint.
+                    return;
+                }
             }
 
             if ( !m_Utf8.empty() )
@@ -437,6 +544,10 @@ namespace RatUI
         bool                   m_Shaped{ false };
         Unit                   m_LineHeight{ 20_u };
         bool                   m_LineHeightValid{ false };
+        Unit                   m_GlyphOffset{ 0_u };   ///< Vertical shift that puts each line's glyphs in the middle of its line box (see EnsureShaped).
+        String                 m_Placeholder;
+        Optional<ShapedText>   m_ShapedPlaceholder;
+        bool                   m_PlaceholderShaped{ false };
         Unit                   m_SentinelWidth{ -1.f };
         std::unordered_map<u64, Unit> m_PrefixWidths; ///< (begin << 32 | end) -> width; cleared on every edit.
         LineWidthMap           m_LineWidths;     ///< Line content -> width; kept across edits, cleared on font change.

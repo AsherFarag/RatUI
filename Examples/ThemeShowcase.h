@@ -76,7 +76,7 @@ public:
         // Text input: Enter in the single-line field submits to the status line.
         AddText( preview, "Text Input", 20_u );
         InputTextWidget* name = AddInput( preview, MakeUnique<SingleLineTextEditPolicy>() );
-        name->SetText( "Type here" );
+        name->SetPlaceholder( "Type here and press Enter" );
         name->OnSubmit = [this]( const String& a_Text ) { m_Status->SetText( Text{ "Submitted: " + a_Text } ); };
 
         AddInput( preview, MakeUnique<MultiLineTextEditPolicy>() )->SetText( "Multi-line field.\nEnter adds a line." );

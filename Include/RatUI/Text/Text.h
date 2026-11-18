@@ -361,8 +361,9 @@ namespace RatUI
 
         Unit FontSize   { 0_u }; ///< The font size used for shaping the text, which is needed for rendering and layout calculations.
         Unit LineHeight { 0_u };
-        Unit Ascender   { 0_u };
+        Unit Ascender   { 0_u }; ///< Distance from the top of the block to the first baseline. Includes GlyphPadding.
         Unit Descender  { 0_u };
+        Unit GlyphPadding{ 0_u }; ///< Space reserved above the first line (and in TotalHeight) for the edges of SDF glyph quads.
 
         Unit MaxWidth          { 0_u }; ///< The maximum line width, used for overflow checks when rendering.
         Unit TotalHeight       { 0_u }; ///< The total height of the shaped text block, used for vertical alignment and spacing calculations.

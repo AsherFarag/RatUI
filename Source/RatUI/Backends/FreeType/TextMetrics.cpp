@@ -149,7 +149,8 @@ namespace RatUI::FreeType
         const f32 sdfPadEm = static_cast<f32>( c_MsdfPxRange ) / baseSize;
         const f32 sdfPadDisplay = sdfPadEm * a_Style.Size.ToFloat();
 
-        result.Ascender += Unit{ sdfPadDisplay };
+        result.GlyphPadding = Unit{ sdfPadDisplay };
+        result.Ascender    += result.GlyphPadding;
         result.TotalHeight = result.LineHeight * static_cast<f32>( result.LineCount() ) + Unit{ std::abs( result.Descender.ToFloat() ) + sdfPadDisplay };
 
         return result;
