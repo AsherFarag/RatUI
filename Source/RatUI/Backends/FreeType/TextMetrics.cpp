@@ -44,7 +44,8 @@ namespace RatUI::FreeType
         ShapedText result;
         result.Font = a_Style.Font;
         result.FontSize = a_Style.Size;
-        result.LineHeight = GetLineHeight( face, a_Style ) + a_Style.LineSpacing;
+        result.LineHeight = GetLineHeight( face, a_Style );
+        result.LineSpacing = a_Style.LineSpacing;
         result.Ascender = Unit{ ( static_cast<f32>( face->ascender ) / unitsPerEM ) * a_Style.Size.ToFloat() };
         result.Descender = Unit{ ( static_cast<f32>( face->descender ) / unitsPerEM ) * a_Style.Size.ToFloat() };
         result.UnderlinePosition = Unit{ -( static_cast<f32>( face->underline_position ) / unitsPerEM ) * a_Style.Size.ToFloat() };
@@ -145,14 +146,8 @@ namespace RatUI::FreeType
         if ( Empty( result.Lines ) )
             return NullOpt;
 
-        const f32 baseSize = static_cast<f32>( c_MsdfPxRange * 2 );
-        const f32 sdfPadEm = static_cast<f32>( c_MsdfPxRange ) / baseSize;
-        const f32 sdfPadDisplay = sdfPadEm * a_Style.Size.ToFloat();
-
-        result.GlyphPadding = Unit{ sdfPadDisplay };
-        result.Ascender    += result.GlyphPadding;
-        result.TotalHeight = result.LineHeight * static_cast<f32>( result.LineCount() ) + Unit{ std::abs( result.Descender.ToFloat() ) + sdfPadDisplay };
-
+        // The block height comes from ShapedText::TotalHeight(). The SDF padding around each glyph quad is a
+        // rendering detail: the quads overhang the block with transparent edges and don't affect layout.
         return result;
     }
 

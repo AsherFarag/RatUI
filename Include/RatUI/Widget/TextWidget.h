@@ -93,7 +93,7 @@ namespace RatUI
             if ( !m_ShapedText )
                 return { 0_u, 0_u };
 
-            return Vec2<Unit>{ m_ShapedText->MaxWidth, m_ShapedText->TotalHeight };
+            return Vec2<Unit>{ m_ShapedText->MaxWidth, m_ShapedText->TotalHeight() };
         }
 
         bool HasWidthDependentContent() const override { return true; }

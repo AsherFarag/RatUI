@@ -379,9 +379,9 @@ namespace RatUI
         const f32 rcpAtlasW = atlasW > 0.f ? 1.f / atlasW : 0.f;
         const f32 rcpAtlasH = atlasH > 0.f ? 1.f / atlasH : 0.f;
     
-        const Unit  fontSize   = a_Text.FontSize;
-        const Pixel textHeight = ToPixel( a_Text.TotalHeight, a_DpiScale );
-        const Pixel ascender   = ToPixel( a_Text.Ascender, a_DpiScale );
+        const Unit  fontSize      = a_Text.FontSize;
+        const Pixel textHeight    = ToPixel( a_Text.TotalHeight(), a_DpiScale );
+        const Pixel firstBaseline =ToPixel( a_Text.FirstBaseline(), a_DpiScale ); // Top of the block to the first baseline.
     
         const f32 baseSize   = a_Atlas.GetConfig().BaseSize.ToFloat();
         const f32 rcpBase    = baseSize > 0.f ? 1.f / baseSize : 0.f;
@@ -432,13 +432,13 @@ namespace RatUI
         {
             case ETextBaseline::Top:
             case ETextBaseline::Hanging:
-                baselineY += ascender;
+                baselineY += firstBaseline;
                 break;
             case ETextBaseline::Middle:
-                baselineY += ( a_LayoutRect.Size[1] - textHeight ) * 0.5f + ascender;
+                baselineY += ( a_LayoutRect.Size[1] - textHeight ) * 0.5f + firstBaseline;
                 break;
             case ETextBaseline::Bottom:
-                baselineY += a_LayoutRect.Size[1] - textHeight + ascender;
+                baselineY += a_LayoutRect.Size[1] - textHeight + firstBaseline;
                 break;
             case ETextBaseline::Alphabetic:
             default:
@@ -523,7 +523,7 @@ namespace RatUI
             if ( numGlyphs >= a_MaxGlyphs )
                 break; // Stop processing lines if we've reached the maximum glyph limit
     
-            penY += ToPixel( a_Text.LineHeight, a_DpiScale );
+            penY += ToPixel( a_Text.LineAdvance(), a_DpiScale );
         }
     
         TryFlatten();

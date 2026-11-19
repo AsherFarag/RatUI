@@ -3,6 +3,8 @@
 #include "Font.h"
 #include "Script.h"
 
+#include <cmath>
+
 namespace RatUI
 {
     /**
@@ -209,7 +211,7 @@ namespace RatUI
     {
         FontHandle     Font              {}; ///< The font to use for rendering the text, specified as a FontHandle. If not set, a default font will be used.
         Unit           Size        { 16_u }; ///< The size of the font in points, which determines the height of the characters. Default is 16.0f.          
-        Unit           LineHeight   { 0_u }; ///< The height of each line of text, including spacing. If set to 0, it will be automatically calculated based on the font size and metrics.
+        Unit           LineHeight   { 0_u }; ///< The height of each line box, not counting LineSpacing. If set to 0, it will be automatically calculated based on the font size and metrics.
         Unit           LetterSpacing{ 0_u }; ///< The spacing between characters in the text, specified in points. Default is 0.0f.
 		Unit           WordSpacing  { 0_u }; ///< The spacing between words in the text, specified in points. Default is 0.0f.
 		Unit           LineSpacing  { 0_u }; ///< The additional spacing between lines of text, specified in points. Default is 0.0f.
@@ -360,18 +362,48 @@ namespace RatUI
         FontHandle         Font{}; ///< The font used for shaping the text, which is needed for rendering and glyph atlas lookups.
 
         Unit FontSize   { 0_u }; ///< The font size used for shaping the text, which is needed for rendering and layout calculations.
-        Unit LineHeight { 0_u };
-        Unit Ascender   { 0_u }; ///< Distance from the top of the block to the first baseline. Includes GlyphPadding.
-        Unit Descender  { 0_u };
-        Unit GlyphPadding{ 0_u }; ///< Space reserved above the first line (and in TotalHeight) for the edges of SDF glyph quads.
+        // Backends fill these from the font and style; the block height and baselines are derived from them
+        // (TotalHeight(), FirstBaseline(), LineAdvance()) so every backend lays text out the same way.
+        Unit LineHeight { 0_u }; ///< Height of each line box (TextLayoutStyle::LineHeight, or the font's height). Excludes LineSpacing.
+        Unit LineSpacing{ 0_u }; ///< Extra space between consecutive lines (TextLayoutStyle::LineSpacing). Not added above the first or below the last line.
+        Unit Ascender   { 0_u }; ///< The font's ascent: distance from a baseline up to the top of the font's glyphs.
+        Unit Descender  { 0_u }; ///< The font's descent: distance from a baseline down to the bottom of its glyphs (negative, FreeType convention).
 
         Unit MaxWidth          { 0_u }; ///< The maximum line width, used for overflow checks when rendering.
-        Unit TotalHeight       { 0_u }; ///< The total height of the shaped text block, used for vertical alignment and spacing calculations.
         Unit UnderlinePosition { 0_u }; ///< The vertical position of the underline relative to the baseline, used for rendering underlines.
         Unit UnderlineThickness{ 0_u }; ///< The thickness of the underline, used for rendering underlines.
 
 		/** @brief Returns the number of lines in the shaped text, which can be used for layout and spacing calculations. */
 		u32 LineCount() const { return static_cast<u32>( Size( Lines ) ); }
+
+        /** @brief Distance from one line's top (or baseline) to the next's: LineHeight + LineSpacing. */
+        Unit LineAdvance() const { return LineHeight + LineSpacing; }
+
+        /**
+         * @brief Height of the text block: one line box per line, with LineSpacing only between lines.
+         * Glyph ink (and the transparent edges of SDF glyph quads) may overhang it, as in CSS.
+         */
+        Unit TotalHeight() const { return BlockHeight( LineCount() ); }
+
+        /** @brief Height of a block of @p a_Lines lines with these metrics (0 for no lines). */
+        Unit BlockHeight( u32 a_Lines ) const
+        {
+            if ( a_Lines == 0 )
+                return 0_u;
+            return LineHeight * static_cast<f32>( a_Lines ) + LineSpacing * static_cast<f32>( a_Lines - 1 );
+        }
+
+        /**
+         * @brief Distance from the top of a line box to its baseline: half the leading, then the ascent, so the
+         * glyphs sit in the middle of the line box (as in CSS). Line N's baseline is this plus N * LineAdvance().
+         * If a backend leaves LineHeight at 0, the line box is taken to be the ascent plus the descent.
+         */
+        Unit FirstBaseline() const
+        {
+            const Unit content = Ascender + Unit{ std::abs( Descender.ToFloat() ) };
+            const Unit box     = LineHeight > 0_u ? LineHeight : content;
+            return ( box - content ) * 0.5f + Ascender;
+        }
     };
 
 } // namespace RatUI

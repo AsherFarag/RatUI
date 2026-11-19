@@ -194,8 +194,10 @@ namespace RatUI
                 lines = std::max( lines, placeholder->LineCount() );
             }
 
-            // Content size only: the layout engine adds the padding.
-            return Vec2<Unit>{ std::max( width + CaretWidth, MinWidth ), m_LineHeight * static_cast<f32>( lines ) };
+            // Content size only: the layout engine adds the padding. One line box per line, the same as
+            // ShapedText::TotalHeight, so a field and a label with the same style are the same height.
+            const Unit height = m_LineHeight * static_cast<f32>( lines ) + m_LineSpacing * static_cast<f32>( lines - 1 );
+            return Vec2<Unit>{ std::max( width + CaretWidth, MinWidth ), height };
         }
 
     protected:
@@ -214,7 +216,12 @@ namespace RatUI
             if ( focused )
                 FocusRing.Draw( a_Event.Drawer, rect, Radius );
 
-            a_Event.Drawer.PushClipRect( node.Style.Padding.Apply( rect ) );
+            // Clip text at the padding horizontally (it scrolls past the edges) but only at the border
+            // vertically, so ascenders and descenders that overhang a tight line box stay visible.
+            const Rect<Unit> padded = node.Style.Padding.Apply( rect );
+            const Unit       inset  = std::min( BorderThickness, rect.Size[1] * 0.5f );
+            a_Event.Drawer.PushClipRect( Rect<Unit>{ Vec2<Unit>{ padded.Origin[0], rect.Origin[1] + inset },
+                                                     Vec2<Unit>{ padded.Size[0], rect.Size[1] - inset * 2.f } } );
 
             // Selection highlight, one rect per line touched.
             if ( focused && m_Model.HasSelection() )
@@ -239,7 +246,7 @@ namespace RatUI
                         const Unit x1   = MeasureRange( lineStart, to ) + ( end > lineEnd ? Unit{ 4.f } : 0_u );
 
                         a_Event.Drawer.AddRect(
-                            Rect<Unit>{ Vec2<Unit>{ textRect.Origin[0] + x0, textRect.Origin[1] + m_LineHeight * static_cast<f32>( lineIndex ) },
+                            Rect<Unit>{ Vec2<Unit>{ textRect.Origin[0] + x0, textRect.Origin[1] + ( m_LineHeight + m_LineSpacing ) * static_cast<f32>( lineIndex ) },
                                         Vec2<Unit>{ x1 - x0, m_LineHeight } },
                             { .FillColor = SelectionColor } );
                     }
@@ -252,18 +259,15 @@ namespace RatUI
                 }
             }
 
-            // Line boxes start at textRect; move the glyphs so they sit in the middle of them.
-            Rect<Unit> glyphRect = textRect;
-            glyphRect.Origin[1] += m_GlyphOffset;
-
+            // Line boxes start at textRect; the renderer centres the glyphs in each of them.
             if ( m_ShapedText )
             {
-                a_Event.Drawer.AddText( *m_ShapedText, GetDrawStyle( RenderStyle.FillColor ), glyphRect );
+                a_Event.Drawer.AddText( *m_ShapedText, GetDrawStyle( RenderStyle.FillColor ), textRect );
             }
             else if ( m_Model.GetTextBuffer().empty() )
             {
                 if ( const ShapedText* placeholder = GetShapedPlaceholder() )
-                    a_Event.Drawer.AddText( *placeholder, GetDrawStyle( GetPlaceholderColor() ), glyphRect );
+                    a_Event.Drawer.AddText( *placeholder, GetDrawStyle( GetPlaceholderColor() ), textRect );
             }
 
             if ( focused )
@@ -283,7 +287,7 @@ namespace RatUI
 
                 const Unit x = MeasureRange( lineStart, caret );
                 a_Event.Drawer.AddRect(
-                    Rect<Unit>{ Vec2<Unit>{ textRect.Origin[0] + x, textRect.Origin[1] + m_LineHeight * static_cast<f32>( lineIndex ) },
+                    Rect<Unit>{ Vec2<Unit>{ textRect.Origin[0] + x, textRect.Origin[1] + ( m_LineHeight + m_LineSpacing ) * static_cast<f32>( lineIndex ) },
                                 Vec2<Unit>{ CaretWidth, m_LineHeight } },
                     { .FillColor = CaretColor.value_or( RenderStyle.FillColor ) } );
             }
@@ -435,14 +439,11 @@ namespace RatUI
                 // Not marked valid on failure (e.g. the font isn't loaded yet), so it is retried.
                 if ( Optional<ShapedText> probe = Shape( c_Sentinel ) ) // A visible glyph: whitespace alone may not shape.
                 {
-                    // Shaped text puts its first baseline at Ascender, which includes GlyphPadding.
-                    // Shift the glyphs up by that padding, then down by half of any line gap, so the
-                    // ink of each line sits in the middle of its LineHeight box.
-                    const Unit descent = Unit{ std::abs( probe->Descender.ToFloat() ) };
-                    const Unit ascent  = probe->Ascender - probe->GlyphPadding;
-                    m_LineHeight       = probe->LineHeight;
-                    m_GlyphOffset      = ( probe->LineHeight - ( ascent + descent ) ) * 0.5f - probe->GlyphPadding;
-                    m_LineHeightValid  = true;
+                    // The renderer centres each line's glyphs in its LineHeight box (ShapedText::FirstBaseline),
+                    // so the caret and selection boxes line up with the text without any offset.
+                    m_LineHeight      = probe->LineHeight;
+                    m_LineSpacing     = probe->LineSpacing;
+                    m_LineHeightValid = true;
                 }
                 else
                 {
@@ -541,8 +542,8 @@ namespace RatUI
         Optional<ShapedText>   m_ShapedText;
         bool                   m_Shaped{ false };
         Unit                   m_LineHeight{ 20_u };
+        Unit                   m_LineSpacing{ 0_u }; ///< Extra space between lines (ShapedText::LineSpacing).
         bool                   m_LineHeightValid{ false };
-        Unit                   m_GlyphOffset{ 0_u };   ///< Vertical shift that puts each line's glyphs in the middle of its line box (see EnsureShaped).
         String                 m_Placeholder;
         Optional<ShapedText>   m_ShapedPlaceholder;
         bool                   m_PlaceholderShaped{ false };
