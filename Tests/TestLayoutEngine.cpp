@@ -480,6 +480,141 @@ TEST_CASE( "An Anchored child is skipped by flow layout entirely and does not co
     REQUIRE_RECT( anchored.Layout.FinalRect, 0.f, 0.f, 20.f, 20.f );
 }
 
+TEST_CASE( "Anchored TopRight with a margin is inset from the container's top and right edges", "[layout-engine][anchor]" )
+{
+    LayoutFixture fx;
+    LayoutNode parent, child;
+    parent.PushBackChild( child );
+    parent.FixedWidth( 200_u ).FixedHeight( 200_u );
+    child.FixedWidth( 30_u ).FixedHeight( 30_u )
+         .Margin( Edges{ .T = 5_u, .R = 10_u } )
+         .PositionMode( EPositioning::Anchored )
+         .Anchor( Anchor::TopRight() );
+
+    RunLayout( parent, Vec2<Unit>{ 200_u, 200_u }, fx );
+
+    // Margin shrinks the anchor container to (0,5)-(190,200); the right edge sits at 190.
+    REQUIRE_RECT( child.Layout.FinalRect, 160.f, 5.f, 30.f, 30.f );
+}
+
+TEST_CASE( "Anchored StretchAll with an uneven margin insets each edge independently, inside the parent's padding", "[layout-engine][anchor]" )
+{
+    LayoutFixture fx;
+    LayoutNode parent, child;
+    parent.PushBackChild( child );
+    parent.FixedWidth( 200_u ).FixedHeight( 150_u ).Padding( Edges::All( 10_u ) );
+    child.Margin( Edges{ .T = 0_u, .R = 15_u, .B = 20_u, .L = 5_u } )
+         .PositionMode( EPositioning::Anchored )
+         .Anchor( Anchor::StretchAll() );
+
+    RunLayout( parent, Vec2<Unit>{ 200_u, 150_u }, fx );
+
+    // Padded inner rect (10,10,180,130), then margin L5 R15 T0 B20.
+    REQUIRE_RECT( child.Layout.FinalRect, 15.f, 10.f, 160.f, 110.f );
+}
+
+TEST_CASE( "Anchored Percent sizing is relative to the parent's padded inner rect", "[layout-engine][anchor]" )
+{
+    LayoutFixture fx;
+    LayoutNode parent, child;
+    parent.PushBackChild( child );
+    parent.FixedWidth( 200_u ).FixedHeight( 100_u ).Padding( Edges::All( 10_u ) );
+    child.PercentWidth( 1.0f ).FixedHeight( 20_u )
+         .PositionMode( EPositioning::Anchored )
+         .Anchor( Anchor::TopLeft() );
+
+    RunLayout( parent, Vec2<Unit>{ 200_u, 100_u }, fx );
+
+    // 100% of the 180-wide inner rect, not the 200-wide outer size.
+    REQUIRE_UNIT( child.Layout.DesiredSize[0], 180.f );
+    REQUIRE_RECT( child.Layout.FinalRect, 10.f, 10.f, 180.f, 20.f );
+}
+
+TEST_CASE( "Anchored StretchAll respects SizeConstraints and places the clamped node by its pivot", "[layout-engine][anchor]" )
+{
+    LayoutFixture fx;
+    LayoutNode parent, child;
+    parent.PushBackChild( child );
+    parent.FixedWidth( 200_u ).FixedHeight( 100_u );
+    child.SizeConstraints( Constraints{ .Min = { 0_u, 0_u }, .Max = { 100_u, Limits<Unit>::max() } } )
+         .PositionMode( EPositioning::Anchored )
+         .Anchor( Anchor::StretchAll() );
+
+    RunLayout( parent, Vec2<Unit>{ 200_u, 100_u }, fx );
+
+    // Width clamps 200 -> 100 and the 0.5 pivot centers it within the stretched span.
+    REQUIRE_RECT( child.Layout.FinalRect, 50.f, 0.f, 100.f, 100.f );
+}
+
+TEST_CASE( "Anchored StretchAll applies Offset on top of an uneven margin", "[layout-engine][anchor]" )
+{
+    LayoutFixture fx;
+    LayoutNode parent, child;
+    parent.PushBackChild( child );
+    parent.FixedWidth( 200_u ).FixedHeight( 200_u );
+
+    Anchor anchor = Anchor::StretchAll();
+    anchor.Offset = { 5_u, 5_u };
+    child.Margin( Edges{ .L = 10_u } )
+         .PositionMode( EPositioning::Anchored )
+         .Anchor( anchor );
+
+    RunLayout( parent, Vec2<Unit>{ 200_u, 200_u }, fx );
+
+    // Margin gives a (10,0)-(200,200) container; the offset then insets each stretched edge by 5.
+    REQUIRE_RECT( child.Layout.FinalRect, 15.f, 5.f, 180.f, 190.f );
+}
+
+TEST_CASE( "Anchored Percent sizing is still clamped by SizeConstraints", "[layout-engine][anchor]" )
+{
+    LayoutFixture fx;
+    LayoutNode parent, child;
+    parent.PushBackChild( child );
+    parent.FixedWidth( 200_u ).FixedHeight( 200_u );
+    child.PercentWidth( 1.0f ).FixedHeight( 20_u )
+         .SizeConstraints( Constraints{ .Min = { 0_u, 0_u }, .Max = { 100_u, Limits<Unit>::max() } } )
+         .PositionMode( EPositioning::Anchored )
+         .Anchor( Anchor::TopLeft() );
+
+    RunLayout( parent, Vec2<Unit>{ 200_u, 200_u }, fx );
+
+    REQUIRE_RECT( child.Layout.FinalRect, 0.f, 0.f, 100.f, 20.f );
+}
+
+TEST_CASE( "Anchored StretchAll with a Min larger than the span starts at the span's start", "[layout-engine][anchor]" )
+{
+    LayoutFixture fx;
+    LayoutNode parent, child;
+    parent.PushBackChild( child );
+    parent.FixedWidth( 200_u ).FixedHeight( 100_u );
+    child.SizeConstraints( Constraints{ .Min = { 300_u, 0_u }, .Max = { Limits<Unit>::max(), Limits<Unit>::max() } } )
+         .PositionMode( EPositioning::Anchored )
+         .Anchor( Anchor::StretchAll() );
+
+    RunLayout( parent, Vec2<Unit>{ 200_u, 100_u }, fx );
+
+    // Overflows past the right edge rather than being shifted left of the container by the pivot.
+    REQUIRE_RECT( child.Layout.FinalRect, 0.f, 0.f, 300.f, 100.f );
+}
+
+TEST_CASE( "Anchored Flex sizing is treated as Content sizing", "[layout-engine][anchor]" )
+{
+    LayoutFixture fx;
+    LayoutNode parent, anchored, content;
+    parent.PushBackChild( anchored );
+    anchored.PushBackChild( content );
+    parent.FixedWidth( 200_u ).FixedHeight( 200_u );
+    anchored.WidthMode( ESizing::Flex ).FixedHeight( 20_u )
+            .PositionMode( EPositioning::Anchored )
+            .Anchor( Anchor::TopLeft() );
+    content.FixedWidth( 40_u ).FixedHeight( 20_u );
+
+    RunLayout( parent, Vec2<Unit>{ 200_u, 200_u }, fx );
+
+    // No flow space to share, so Flex sizes to its children rather than filling or collapsing.
+    REQUIRE_RECT( anchored.Layout.FinalRect, 0.f, 0.f, 40.f, 20.f );
+}
+
 // =============================================================================
 // Grid
 // =============================================================================

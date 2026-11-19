@@ -60,8 +60,19 @@ namespace RatUI
      */
     enum class EPositioning : u8
     {
-        Flow,     ///< Participates in parent's stack/flex layout.
-        Anchored, ///< Positioned based on its Anchor relative to the parent.
+        /**
+		 * @brief Positioned in the parent's stack/flex layout, 
+         * based on the parent's layout type and the element's alignment.
+         */
+        Flow,
+        /**
+         * Positioned based on its Anchor relative to the parent's padded inner rect, outside of flow layout.
+         * The element's Margin insets that rect before anchoring, Percent sizes are relative to it, and
+         * SizeConstraints apply (including on stretched axes, where the clamped element is placed by its Pivot).
+         * Flex sizing is treated as Content - use a stretch anchor (Min != Max) to fill instead.
+         * SelfAlign and the parent's ChildAlign are ignored; use the Pivot.
+         */
+        Anchored,
     };
 
     /** 

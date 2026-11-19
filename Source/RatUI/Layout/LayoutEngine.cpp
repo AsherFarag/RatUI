@@ -27,6 +27,18 @@ namespace
     }
 
     /**
+     * @brief The size an anchored child is measured against: the parent's padded
+     * inner size, less the child's own margin (which insets its anchor container).
+     */
+    static Vec2<Unit> AnchoredAvailableSize( const LayoutNode& a_Child, Vec2<Unit> a_InnerSize )
+    {
+        return {
+            std::max( 0_u, a_InnerSize[0] - a_Child.Style.Margin.Horizontal() ),
+            std::max( 0_u, a_InnerSize[1] - a_Child.Style.Margin.Vertical() )
+        };
+    }
+
+    /**
      * @brief Resolves the grid column/row counts from the layout style and
      * the number of flow children.  At least one of GridColumns / GridRows
      * must be non-zero.  The other dimension is auto-calculated.  If both
@@ -195,7 +207,7 @@ namespace
 
                 if ( child.Style.PositionMode == EPositioning::Anchored )
                 {
-                    MeasureLayoutNode( child, a_AvailableSize, a_Ctx );
+                    MeasureLayoutNode( child, AnchoredAvailableSize( child, childAvailSize ), a_Ctx );
                     return;
                 }
 
@@ -294,7 +306,7 @@ namespace
 
                 if ( child.Style.PositionMode == EPositioning::Anchored )
                 {
-                    MeasureLayoutNode( child, a_AvailableSize, a_Ctx );
+                    MeasureLayoutNode( child, AnchoredAvailableSize( child, childAvailSize ), a_Ctx );
                     return;
                 }
 
@@ -349,8 +361,10 @@ namespace
 
         contentSize = contentSize + padding;
 
-        if ( s.WidthMode  == ESizing::Content ) desired[0] = contentSize[0];
-        if ( s.HeightMode == ESizing::Content ) desired[1] = contentSize[1];
+        // Anchored nodes sit outside flow layout, so there is no space for Flex to share - treat it as Content.
+        const bool isAnchored = s.PositionMode == EPositioning::Anchored;
+        if ( s.WidthMode  == ESizing::Content || ( isAnchored && s.WidthMode  == ESizing::Flex ) ) desired[0] = contentSize[0];
+        if ( s.HeightMode == ESizing::Content || ( isAnchored && s.HeightMode == ESizing::Flex ) ) desired[1] = contentSize[1];
 
         // - Step 3:
         // Clamp the desired size to the node's size constraints, and store the final desired size in the layout node.
@@ -418,37 +432,39 @@ namespace
 
     static bool ArrangeAnchored( LayoutNode& a_Node, Rect<Unit> a_Container, LayoutContext& a_Ctx )
     {
-        const Anchor&    anchor   = a_Node.Style.PositionAnchor;
-        const Vec2<Unit> parentSz = a_Container.Size;
+        const LayoutStyle& s      = a_Node.Style;
+        const Anchor&      anchor = s.PositionAnchor;
 
-        const bool stretchX = anchor.Min[0] != anchor.Max[0];
-        const bool stretchY = anchor.Min[1] != anchor.Max[1];
+        // The node's margin insets the space its anchors are resolved against.
+        const Rect<Unit> container{
+            .Origin = a_Container.Origin + Vec2<Unit>{ s.Margin.L, s.Margin.T },
+            .Size   = AnchoredAvailableSize( a_Node, a_Container.Size )
+        };
 
         Vec2<Unit> origin{ 0_u, 0_u };
-        Vec2<Unit> size = a_Node.Layout.DesiredSize;
+        Vec2<Unit> size = ResolveChildArrangeSize( a_Node, container.Size );
 
-        if ( stretchX )
+        for ( u32 axis = 0; axis < 2; ++axis )
         {
-            origin[0]  = a_Container.Origin[0] + ( parentSz[0] * anchor.Min[0] ) + anchor.Offset[0];
-            Unit right = a_Container.Origin[0] + ( parentSz[0] * anchor.Max[0] ) - anchor.Offset[0];
-            size[0]    = std::max( 0_u, right - origin[0] );
-        }
-        else
-        {
-            const Unit anchorX = a_Container.Origin[0] + ( parentSz[0] * anchor.Min[0] );
-            origin[0] = anchorX - ( size[0] * anchor.Pivot[0] ) + anchor.Offset[0];
-        }
+            const Unit minEdge = container.Origin[axis] + ( container.Size[axis] * anchor.Min[axis] );
 
-        if ( stretchY )
-        {
-            origin[1]    = a_Container.Origin[1] + ( parentSz[1] * anchor.Min[1] ) + anchor.Offset[1];
-            Unit bottom  = a_Container.Origin[1] + ( parentSz[1] * anchor.Max[1] ) - anchor.Offset[1];
-            size[1]      = std::max( 0_u, bottom - origin[1] );
-        }
-        else
-        {
-            const Unit anchorY = a_Container.Origin[1] + ( parentSz[1] * anchor.Min[1] );
-            origin[1] = anchorY - ( size[1] * anchor.Pivot[1] ) + anchor.Offset[1];
+            if ( anchor.Min[axis] != anchor.Max[axis] ) // Stretch
+            {
+                const Unit start = minEdge + anchor.Offset[axis];
+                const Unit end   = container.Origin[axis] + ( container.Size[axis] * anchor.Max[axis] ) - anchor.Offset[axis];
+                const Unit span  = std::max( 0_u, end - start );
+
+                // Constraints still apply. A node clamped smaller than the span is placed within it by its pivot;
+                // one forced larger (by Min) starts at the span's start and overflows past its end.
+                size[axis]   = std::clamp( span, s.SizeConstraints.Min[axis], s.SizeConstraints.Max[axis] );
+                origin[axis] = start + std::max( 0_u, span - size[axis] ) * anchor.Pivot[axis];
+            }
+            else
+            {
+                // Percent sizes are re-resolved here, so re-apply the constraints measure clamped them to.
+                size[axis]   = std::clamp( size[axis], s.SizeConstraints.Min[axis], s.SizeConstraints.Max[axis] );
+                origin[axis] = minEdge - ( size[axis] * anchor.Pivot[axis] ) + anchor.Offset[axis];
+            }
         }
 
         return ArrangeLayoutNode( a_Node, Rect<Unit>{ origin, size }, a_Ctx );
