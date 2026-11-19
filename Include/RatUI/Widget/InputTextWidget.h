@@ -7,8 +7,6 @@
 #include "FocusRing.h"
 #include "IWidget.h"
 
-#include <unordered_map>
-
 namespace RatUI
 {
     /**
@@ -336,13 +334,13 @@ namespace RatUI
         /** @brief The shaped placeholder, or null if there is none (or no text metrics yet). */
         const ShapedText* GetShapedPlaceholder()
         {
-            if ( m_Placeholder.empty() )
+            if ( Empty( m_Placeholder ) )
                 return nullptr;
 
             if ( !m_PlaceholderShaped )
             {
                 m_ShapedPlaceholder = Shape( m_Placeholder );
-                m_PlaceholderShaped = m_ShapedPlaceholder.has_value(); // Retried until text metrics exist.
+                m_PlaceholderShaped = HasValue( m_ShapedPlaceholder ); // Retried until text metrics exist.
             }
             return m_ShapedPlaceholder ? &*m_ShapedPlaceholder : nullptr;
         }
@@ -374,7 +372,7 @@ namespace RatUI
         {
             m_ShapedText = NullOpt;
             m_Shaped     = false;
-            m_PrefixWidths.clear();
+            ::RatUI::Clear( m_PrefixWidths );
             if ( m_Scene )
                 GetLayout().MarkDirty();
         }
@@ -386,7 +384,7 @@ namespace RatUI
             m_PlaceholderShaped = false;
             m_LineHeightValid   = false;
             m_SentinelWidth   = Unit{ -1.f };
-            m_LineWidths.clear();
+            ::RatUI::Clear( m_LineWidths );
             InvalidateShaped();
         }
 
@@ -453,7 +451,7 @@ namespace RatUI
                 }
             }
 
-            if ( !m_Utf8.empty() )
+            if ( !Empty( m_Utf8 ) )
                 m_ShapedText = Shape( m_Utf8 );
         }
 
@@ -477,32 +475,32 @@ namespace RatUI
                 return 0_u;
 
             const u64 key = ( static_cast<u64>( a_Begin ) << 32 ) | a_End;
-            if ( auto it = m_PrefixWidths.find( key ); it != m_PrefixWidths.end() )
-                return it->second;
+            if ( const Unit* cached = FindValue( m_PrefixWidths, key ) )
+                return *cached;
 
             const Optional<Unit> width = MeasureCodepoints( a_Begin, a_End );
             if ( width )
-                m_PrefixWidths[key] = *width; // Not cached without text metrics, so it is measured once they exist.
+                Emplace( m_PrefixWidths, key, *width ); // Not cached without text metrics, so it is measured once they exist.
             return width.value_or( 0_u );
         }
 
-        using LineWidthMap = std::unordered_map<TextBuffer, Unit>;
+        using LineWidthMap = HashMap<TextBuffer, Unit>;
 
         /** @brief Width of the line [a_Begin, a_End), looked up by its content; records it in a_Current. */
         Unit MeasureLine( u32 a_Begin, u32 a_End, LineWidthMap& a_Current )
         {
             TextBuffer line( m_Model.GetTextBuffer().data() + a_Begin, a_End - a_Begin );
-            if ( auto it = a_Current.find( line ); it != a_Current.end() )
-                return it->second;
+            if ( const Unit* cached = FindValue( a_Current, line ) )
+                return *cached;
 
             Optional<Unit> width;
-            if ( auto it = m_LineWidths.find( line ); it != m_LineWidths.end() )
-                width = it->second;
+            if ( const Unit* known = FindValue( m_LineWidths, line ) )
+                width = *known;
             else
                 width = MeasureCodepoints( a_Begin, a_End );
 
             if ( width )
-                a_Current.emplace( std::move( line ), *width );
+                Emplace( a_Current, std::move( line ), *width );
             return width.value_or( 0_u );
         }
 
@@ -549,7 +547,7 @@ namespace RatUI
         Optional<ShapedText>   m_ShapedPlaceholder;
         bool                   m_PlaceholderShaped{ false };
         Unit                   m_SentinelWidth{ -1.f };
-        std::unordered_map<u64, Unit> m_PrefixWidths; ///< (begin << 32 | end) -> width; cleared on every edit.
+        HashMap<u64, Unit>             m_PrefixWidths; ///< (begin << 32 | end) -> width; cleared on every edit.
         LineWidthMap           m_LineWidths;     ///< Line content -> width; kept across edits, cleared on font change.
     };
 
