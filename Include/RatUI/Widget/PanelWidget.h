@@ -55,7 +55,7 @@ namespace RatUI
             PaintChildren( a_Event );
 
             // Focus ring after the children, so they don't cover it.
-            if ( scene.GetFocusedNode() == GetLayoutID() )
+            if ( scene.IsFocusVisible( GetLayoutID() ) )
                 FocusRing.Draw( a_Event.Drawer, rect, Radius );
         }
     };

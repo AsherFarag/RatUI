@@ -137,8 +137,7 @@ namespace RatUI
 
             a_Event.Drawer.AddBrushRect( rect, fillBrush, BorderColor, BorderThickness, Radius );
 
-            // Draw focus ring
-            if ( scene.GetFocusedNode() == GetLayoutID() )
+            if ( scene.IsFocusVisible( GetLayoutID() ) )
                 FocusRing.Draw( a_Event.Drawer, rect, Radius );
 
             PaintChildren( a_Event );

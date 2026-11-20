@@ -71,6 +71,15 @@ namespace RatUI
         /** @brief Returns the NodeID of the currently focused widget, or c_InvalidNodeID if no widget is focused. */
         RATUI_NODISCARD NodeID GetFocusedNode() const { return Input.FocusedWidget; }
 
+        /**
+         * @brief Whether a_Node should draw its focus ring: it has focus and input is navigation-driven.
+         * A click focuses a button too, but pointer users don't need a ring for it.
+         */
+        RATUI_NODISCARD bool IsFocusVisible( NodeID a_Node ) const
+        {
+            return Input.FocusedWidget == a_Node && Input.InputMode == EInputMode::Navigation;
+        }
+
         /** @brief Sets the focus to the specified widget, if it is focusable. Fires OnFocusLost/OnFocusReceived. */
         void SetFocus( NodeID a_Node );
 
