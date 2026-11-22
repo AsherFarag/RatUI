@@ -106,13 +106,16 @@ namespace RatUI
             if ( !a_Event.Pressed )
                 return Reply::Unhandled();
 
-            // Mouse button begins a drag
-            if ( a_Event.Button == EButtonID::MouseLeft )
+            // A pointer press begins a drag, which only that pointer moves and ends
+            if ( a_Event.Button == EButtonID::MouseLeft && !m_IsDragging )
             {
                 m_IsDragging = true;
-                GetScene().CapturePointer( GetLayoutID() );
+                m_DragPointer = a_Event.Pointer.value_or( c_MousePointerID );
+                if ( a_Event.PointerPosition )
+                    m_LastPointerPos = *a_Event.PointerPosition;
+                GetScene().CapturePointer( m_DragPointer, GetLayoutID() );
                 UpdateFromPointer( GetLayout().Layout.FinalRect, m_LastPointerPos );
-                
+
                 return Reply::Handled();
             }
 
@@ -121,10 +124,10 @@ namespace RatUI
 
         Reply OnButtonReleased( const ButtonEvent& a_Event ) override
         {
-            if ( a_Event.Button == EButtonID::MouseLeft && m_IsDragging )
+            if ( a_Event.Button == EButtonID::MouseLeft && m_IsDragging && a_Event.Pointer.value_or( c_MousePointerID ) == m_DragPointer )
             {
                 m_IsDragging = false;
-                GetScene().ReleasePointerCapture();
+                GetScene().ReleasePointerCapture( m_DragPointer );
                 return Reply::Handled();
             }
             
@@ -148,6 +151,9 @@ namespace RatUI
 
         Reply OnPointerMove( const PointerEvent& a_Event ) override
         {
+            if ( m_IsDragging && a_Event.ID != m_DragPointer )
+                return Reply::Unhandled();
+
             m_LastPointerPos = a_Event.Position;
 
             if ( !m_IsDragging )
@@ -177,6 +183,7 @@ namespace RatUI
         bool m_IsHovered      { false };
         bool m_IsThumbPressed { false };
         Vec2<Unit> m_LastPointerPos{ 0_u, 0_u };
+        PointerID  m_DragPointer{ c_MousePointerID }; ///< The pointer dragging the slider, while m_IsDragging
 
         /** @brief Pulls the cached render properties from the theme if it changed. */
         void SyncTheme()

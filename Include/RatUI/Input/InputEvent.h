@@ -6,6 +6,9 @@ namespace RatUI
 {
     using PointerID = u32;
 
+    /// The mouse's pointer. Touches and pens use their own IDs.
+    inline constexpr PointerID c_MousePointerID = 0;
+
     /** 
      * @brief Bitflag enum representing different input devices. Used in input events to indicate the source of the input.
      */ 
@@ -353,18 +356,18 @@ namespace RatUI
         /** @brief Factory method to create an event that was handled; stop propagation. */
         static constexpr Reply Handled() { return Reply{ true }; }
 
-        /** @brief Capture all future pointer events to this widget. */
-        constexpr Reply& CaptureMouse( NodeID a_Widget )
+        /** @brief Capture the replied-to pointer's future events to this widget (the mouse's, for a reply to a key). */
+        constexpr Reply& CapturePointer( NodeID a_Widget )
         {
-            m_MouseCapture = a_Widget;
+            m_PointerCapture = a_Widget;
             m_RequestCapture = true;
             return *this;
         }
 
-        /** @brief Release mouse capture if currently held. */
-        constexpr Reply& ReleaseMouseCapture()
+        /** @brief Release the replied-to pointer's capture, if it holds one. */
+        constexpr Reply& ReleasePointerCapture()
         {
-            m_ReleaseMouse = true;
+            m_ReleasePointer = true;
             return *this;
         }
 
@@ -390,14 +393,14 @@ namespace RatUI
         }
 
         constexpr bool IsHandled()          const { return m_Handled; }
-        constexpr bool ShouldCaptureMouse() const { return m_RequestCapture; }
-        constexpr bool ShouldReleaseMouse() const { return m_ReleaseMouse; }
+        constexpr bool ShouldCapturePointer() const { return m_RequestCapture; }
+        constexpr bool ShouldReleasePointer() const { return m_ReleasePointer; }
         constexpr bool ShouldSetFocus()     const { return m_FocusWidget != c_InvalidNodeID; }
         constexpr bool ShouldClearFocus()   const { return m_ClearFocus; }
         constexpr bool IsDefaultPrevented() const { return m_PreventDefault; }
 
-        /** @brief Get the widget that is currently capturing mouse events. */
-        constexpr NodeID GetMouseCaptureTarget() const { return m_MouseCapture; }
+        /** @brief The widget a capture request sends the replied-to pointer's events to. */
+        constexpr NodeID GetPointerCaptureTarget() const { return m_PointerCapture; }
         
         /** @brief Get the widget that currently has keyboard focus. */
         constexpr NodeID GetFocusTarget()        const { return m_FocusWidget; }
@@ -405,11 +408,11 @@ namespace RatUI
     private:
         constexpr explicit Reply( bool a_Handled ) : m_Handled( a_Handled ) {}
 
-        NodeID m_MouseCapture       { c_InvalidNodeID };
+        NodeID m_PointerCapture     { c_InvalidNodeID };
         NodeID m_FocusWidget        { c_InvalidNodeID };
         bool   m_Handled        : 1 { false };
         bool   m_RequestCapture : 1 { false };
-        bool   m_ReleaseMouse   : 1 { false };
+        bool   m_ReleasePointer : 1 { false };
         bool   m_ClearFocus     : 1 { false };
         bool   m_PreventDefault : 1 { false };
     };

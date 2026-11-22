@@ -107,9 +107,21 @@ namespace RatUI
             if ( IWidget* widget = GetWidget( gesture.PressedWidget ) )
             {
                 LongPressEvent evt{ .Position = gesture.DownPosition, .Modifiers = Input.ModifierState };
-                ApplyReply( widget->OnLongPress( evt ) );
+                ApplyReply( widget->OnLongPress( evt ), pointerID );
             }
         }
+
+        // Touches and pens get a new ID per contact on some platforms, so a pointer that has lifted and can no longer
+        // continue a multi-press is forgotten. The mouse is kept: it is always there.
+        Array<PointerID> finished;
+        for ( const auto& [pointerID, gesture] : Input.PointerStates )
+        {
+            if ( pointerID != c_MousePointerID && !gesture.IsDown && gesture.CapturedWidget == c_InvalidNodeID
+                 && now - gesture.LastPressTime > cfg.MultiPressWindowSeconds )
+                PushBack( finished, pointerID );
+        }
+        for ( const PointerID pointerID : finished )
+            Erase( Input.PointerStates, pointerID );
     }
 
     void Scene::Render( DrawList& a_DrawList, f32 a_DeltaSeconds )
@@ -141,13 +153,13 @@ namespace RatUI
     // Reply Application
     // ========================================================================
 
-    void Scene::ApplyReply( const Reply& a_Reply )
+    void Scene::ApplyReply( const Reply& a_Reply, PointerID a_Pointer )
     {
-        if ( a_Reply.ShouldCaptureMouse() )
-            Input.CapturedWidget = a_Reply.GetMouseCaptureTarget();
+        if ( a_Reply.ShouldCapturePointer() )
+            CapturePointer( a_Pointer, a_Reply.GetPointerCaptureTarget() );
 
-        if ( a_Reply.ShouldReleaseMouse() )
-            Input.CapturedWidget = c_InvalidNodeID;
+        if ( a_Reply.ShouldReleasePointer() )
+            ReleasePointerCapture( a_Pointer );
 
         if ( a_Reply.ShouldSetFocus() )
             SetFocus( a_Reply.GetFocusTarget() );
@@ -338,25 +350,26 @@ namespace RatUI
         if ( a_Event.IsMouse() || Math::LengthSq( a_Event.Delta ) > 0_u )
             Input.InputMode = EInputMode::Pointer;
 
-        const NodeID captured = Input.CapturedWidget;
+        PointerGestureState& gesture = Input.PointerStates[a_Event.ID];
+        const NodeID captured = gesture.CapturedWidget;
         const NodeID target = captured != c_InvalidNodeID ? captured : HitTest( RootWidget, a_Event.Position );
 
         // --- Hover transitions ---
-        if ( captured == c_InvalidNodeID && target != Input.HoveredWidget )
+        // Touches have no hover: a finger only points while it presses, and hover is shared by every pointer.
+        if ( a_Event.Type != EPointerType::Touch && captured == c_InvalidNodeID && target != Input.HoveredWidget )
         {
             if ( IWidget* prev = GetWidget( Input.HoveredWidget ) )
-                ApplyReply( prev->OnPointerExit( a_Event ) );
+                ApplyReply( prev->OnPointerExit( a_Event ), a_Event.ID );
 
             Input.HoveredWidget = target;
 
             if ( IWidget* next = GetWidget( target ) )
-                ApplyReply( next->OnPointerEnter( a_Event ) );
+                ApplyReply( next->OnPointerEnter( a_Event ), a_Event.ID );
         }
 
         bool handled = false;
 
         // --- Drag detection & movement ---
-        PointerGestureState& gesture = Input.PointerStates[a_Event.ID];
         const GestureConfig& cfg = Input.Config;
 
         if ( gesture.IsDown && !gesture.IsDragging )
@@ -373,7 +386,7 @@ namespace RatUI
                         .Delta = a_Event.Position - gesture.DownPosition,  // Initial delta (threshold exceeded)
                         .Modifiers = a_Event.Modifiers
                     };
-                    ApplyReply( widget->OnDragStart( drag ) );
+                    ApplyReply( widget->OnDragStart( drag ), a_Event.ID );
                 }
             }
         }
@@ -389,7 +402,7 @@ namespace RatUI
                     .Delta = a_Event.Delta,  // Per-frame delta
                     .Modifiers = a_Event.Modifiers
                 };
-                ApplyReply( widget->OnDragMove( drag ) );
+                ApplyReply( widget->OnDragMove( drag ), a_Event.ID );
             }
         }
 
@@ -397,10 +410,10 @@ namespace RatUI
         if ( IWidget* widget = GetWidget( target ) )
         {
             if ( a_Event.ScrollDelta[0] != 0_u || a_Event.ScrollDelta[1] != 0_u )
-                ApplyReply( widget->OnPointerScroll( a_Event ) );
+                ApplyReply( widget->OnPointerScroll( a_Event ), a_Event.ID );
 
             Reply moveReply = widget->OnPointerMove( a_Event );
-            ApplyReply( moveReply );
+            ApplyReply( moveReply, a_Event.ID );
             handled = handled || moveReply.IsHandled();
         }
 
@@ -491,9 +504,10 @@ namespace RatUI
         // --- Gesture from button press/release ---
         NodeID targetWidget = Input.FocusedWidget;
 
+        const PointerID pointer = a_Event.Pointer.value_or( c_MousePointerID );
         if ( a_Event.PointerPosition && IsPointerButton( a_Event.Button ) )
         {
-            const NodeID capturedBefore = Input.CapturedWidget;
+            const NodeID capturedBefore = GetCapturedWidget( pointer );
 
             UpdateGestureState( a_Event );
 
@@ -515,7 +529,7 @@ namespace RatUI
 			else if ( a_Event.Released )
 				reply = focused->OnButtonReleased( a_Event );
 
-            ApplyReply( reply );
+            ApplyReply( reply, pointer );
             if ( isKey && a_Event.Pressed && reply.IsHandled() )
                 Input.KeyPresses[a_Event.Button] = { .Widget = targetWidget };
             return reply.IsHandled();
@@ -559,7 +573,7 @@ namespace RatUI
                 // Widget can override capture in OnButtonPressed, but we default-capture
                 // for interactable widgets to ensure drag/click completion
                 if ( widget->IsInteractable() )
-                    Input.CapturedWidget = target;
+                    gesture.CapturedWidget = target;
             }
         }
         else if ( a_Event.Released && gesture.IsDown )
@@ -575,7 +589,7 @@ namespace RatUI
                         .Delta = *a_Event.PointerPosition - gesture.DownPosition,  // Total delta
                         .Modifiers = a_Event.Modifiers
                     };
-                    ApplyReply( widget->OnDragEnd( drag ) );
+                    ApplyReply( widget->OnDragEnd( drag ), *a_Event.Pointer );
                 }
             }
             // --- Click (single, double, triple, etc.) ---
@@ -589,7 +603,7 @@ namespace RatUI
                         .Modifiers = a_Event.Modifiers
                     };
                     Reply reply = widget->OnPress( press );
-                    ApplyReply( reply );
+                    ApplyReply( reply, *a_Event.Pointer );
 
                     if ( widget->IsFocusable() )
                         SetFocus( gesture.PressedWidget );
@@ -600,8 +614,8 @@ namespace RatUI
             gesture.IsDown = false;
             gesture.IsDragging = false;
 
-            // Release capture on button up
-            Input.CapturedWidget = c_InvalidNodeID;
+            // Release this pointer's capture on button up; other pointers keep theirs
+            gesture.CapturedWidget = c_InvalidNodeID;
         }
     }
 

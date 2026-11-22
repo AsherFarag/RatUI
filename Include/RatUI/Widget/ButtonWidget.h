@@ -33,6 +33,7 @@ namespace RatUI
             if ( IsActivationButton( a_Event.Button ) )
             {
                 m_IsPressed = true;
+                m_PressPointer = a_Event.Pointer;
                 return Reply::Handled();
             }
 
@@ -65,7 +66,9 @@ namespace RatUI
         Reply OnPointerExit( const PointerEvent& a_Event ) override
         {
             m_IsHovered = false;
-            m_IsPressed = false;
+            // Only the pointer that pressed the button cancels its press by leaving; another pointer passing by doesn't.
+            if ( m_PressPointer && *m_PressPointer == a_Event.ID )
+                m_IsPressed = false;
             return Reply::Unhandled();
         }
 
@@ -82,6 +85,7 @@ namespace RatUI
 
         bool m_IsHovered{ false };
         bool m_IsPressed{ false };
+        Optional<PointerID> m_PressPointer{}; ///< The pointer that pressed the button; empty for a key.
     };
 
     /**
