@@ -55,6 +55,26 @@ namespace RatUI
     };
     RATUI_ENUM_ENABLE_BITMASK_OPERATORS( EAlign, u8 )
 
+    /**
+     * @brief The screen edges whose safe area (Scene::SetSafeArea) a node keeps its content clear of.
+     * The safe area passes down the tree: a node opting into an edge adds what is left of it to its padding and
+     * clears it for its descendants, so nested nodes don't inset twice. The inset doesn't depend on where the node
+     * sits, so opt in on the containers that touch the screen's edges, such as a HUD root or a top or bottom bar.
+     */
+    enum class ESafeAreaEdges : u8
+    {
+        None   = 0,
+        Top    = 1 << 0,
+        Right  = 1 << 1,
+        Bottom = 1 << 2,
+        Left   = 1 << 3,
+
+        Horizontal = Left | Right,
+        Vertical   = Top | Bottom,
+        All        = Horizontal | Vertical,
+    };
+    RATUI_ENUM_ENABLE_BITMASK_OPERATORS( ESafeAreaEdges, u8 )
+
     /** 
      * @brief Positioning modes define how a UI element is positioned relative to its parent container. 
      */
@@ -229,11 +249,15 @@ namespace RatUI
         /** @brief Calculates the total inset as a vector. */
         RATUI_NODISCARD constexpr Vec2<Unit> Total() const { return { Horizontal(), Vertical() }; }
 
-        /** @brief Applies the edge insets to a given rectangle, returning a new rectangle that is reduced by the specified insets. */
+        /**
+         * @brief Applies the edge insets to a given rectangle, returning a new rectangle that is reduced by the specified insets.
+         * Insets larger than the rectangle leave it zero-sized at the inset min edge rather than inside out.
+         */
         RATUI_NODISCARD constexpr Rect<Unit> Apply( const Rect<Unit>& a_Rect ) const
         {
-			return Rect<Unit>::FromMinMax( a_Rect.Min() + Vec2<Unit>{ L, T },
-                                           a_Rect.Max() - Vec2<Unit>{ R, B } );
+            const Vec2<Unit> min = a_Rect.Min() + Vec2<Unit>{ L, T };
+            const Vec2<Unit> max = a_Rect.Max() - Vec2<Unit>{ R, B };
+			return Rect<Unit>::FromMinMax( min, Vec2<Unit>{ std::max( min[0], max[0] ), std::max( min[1], max[1] ) } );
         }
 
         /** @brief Initializes all edges to the same value. */
@@ -241,6 +265,8 @@ namespace RatUI
 
         /** @brief Initializes horizontal and vertical edges separately. */
 		RATUI_NODISCARD static constexpr Edges Axis( Unit a_Horizontal, Unit a_Vertical ) { return { a_Vertical, a_Horizontal, a_Vertical, a_Horizontal }; }
+
+		RATUI_NODISCARD constexpr bool operator==( const Edges& ) const = default;
 
 		RATUI_NODISCARD constexpr Edges operator+( const Edges& a_Other ) const { return { .T = T + a_Other.T, .R = R + a_Other.R, .B = B + a_Other.B, .L = L + a_Other.L }; }
 		RATUI_NODISCARD constexpr Edges operator-( const Edges& a_Other ) const { return { .T = T - a_Other.T, .R = R - a_Other.R, .B = B - a_Other.B, .L = L - a_Other.L }; }
@@ -328,6 +354,7 @@ namespace RatUI
         EAlign      ChildAlign{ EAlign::TopLeft };      ///< Default alignment for child elements within this container.
 		EVisibility Visibility{ EVisibility::Visible }; ///< The visibility state of the element, which can affect both rendering and layout.
 		bool        IsFocusScope{ false };              ///< Whether this element should be considered a focus scope for navigation.
+		ESafeAreaEdges SafeAreaEdges{ ESafeAreaEdges::None }; ///< Edges whose remaining safe area is added to Padding for this node's content.
 
         /**
          * @note For grid layouts, at least one of GridColumns or GridRows must be set to a non-zero value. 
@@ -389,6 +416,7 @@ namespace RatUI
         Rect<Unit> FinalRect{};          ///< The final position and size of the element after layout, in absolute coordinates. Filled by the Arrange step.
         Vec2<Unit> DesiredSize{};        ///< The desired size of the element based on its content and constraints. Filled by the Measure step.
 		Vec2<Unit> LastAvailableSize{};  ///< The last available size passed to the Measure step. Used to determine if a re-measure is necessary.
+		Edges      LastSafeArea{};       ///< The safe area that reached this node in the last Measure step. Used to determine if a re-measure is necessary.
 
 		LinearAggregate CachedLinear{};  ///< Cached aggregate values for linear layouts, used to optimize layout calculations.
 
@@ -434,6 +462,7 @@ namespace RatUI
         LayoutNode& ChildAlign( EAlign a_ChildAlign )      { Style.ChildAlign = a_ChildAlign; MarkDirty(); return *this; }
         LayoutNode& Visibility( EVisibility a_Visibility ) { Style.Visibility = a_Visibility; MarkDirty(); return *this; }
         LayoutNode& FocusScope( bool a_IsFocusScope )      { Style.IsFocusScope = a_IsFocusScope; MarkDirty(); return *this; }
+        LayoutNode& SafeAreaEdges( ESafeAreaEdges a_Edges ) { Style.SafeAreaEdges = a_Edges; MarkDirty(); return *this; }
 
         LayoutNode& GridColumns( u16 a_GridColumns )  { Style.GridColumns = a_GridColumns; MarkDirty(); return *this; }
         LayoutNode& GridRows( u16 a_GridRows )        { Style.GridRows = a_GridRows; MarkDirty(); return *this; }

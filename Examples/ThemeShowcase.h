@@ -9,7 +9,25 @@
 #include <format>
 
 /**
+ * @brief A panel filled with a warning tint, whatever the theme. As ThemeShowcase's root it clears the safe area, so its
+ * fill shows in the unsafe bands around the content when a safe area is set.
+ */
+class UnsafeAreaBackdrop : public PanelWidget
+{
+public:
+    bool IsFocusable() const override { return false; }
+
+    void OnPaint( const PaintEvent& a_Event ) override
+    {
+        a_Event.Drawer.AddBrushRect( GetLayout().Layout.FinalRect, SolidBrush{ FromColorF32( 1.f, 0.294f, 0.404f, 0.35f ) },
+                                     Colors::Transparent, 0_u, CornerRadius::None() );
+        PaintChildren( a_Event );
+    }
+};
+
+/**
  * @brief Buttons, sliders and text, restyled live by switching between four themes.
+ * The Safe Area button simulates a phone's notch, rounded corners and home bar.
  */
 class ThemeShowcase : public Example
 {
@@ -20,7 +38,16 @@ public:
         // Every widget shares m_ActiveTheme, so copying another theme into it restyles the whole scene.
         m_Scene.DefaultTheme = m_ActiveTheme;
 
-        PanelWidget* root = m_Scene.CreateRootWidget<PanelWidget>();
+        // The root clears the safe area: it keeps the whole window, so its tint fills the unsafe bands, while the
+        // content is laid out clear of them.
+        UnsafeAreaBackdrop* screen = m_Scene.CreateRootWidget<UnsafeAreaBackdrop>();
+        screen->GetLayout()
+            .LayoutType( ELayoutType::Overlay )
+            .WidthMode( ESizing::Flex )
+            .HeightMode( ESizing::Flex )
+            .SafeAreaEdges( ESafeAreaEdges::All );
+
+        PanelWidget* root = m_Scene.CreateWidget<PanelWidget>( screen->GetLayoutID() );
         root->GetLayout()
             .LayoutType( ELayoutType::Vertical )
             .WidthMode( ESizing::Flex )
@@ -37,6 +64,7 @@ public:
         themeButtons->GetLayout().HeightMode( ESizing::Content ).FocusScope( true );
         for ( size i = 0; i < Size( m_Themes ); ++i )
             AddButton( themeButtons, m_Themes[i].Name, 130_u, [this, i]( ButtonBaseWidget& ) { ApplyTheme( i ); } );
+        AddButton( themeButtons, "", 170_u, [this]( ButtonBaseWidget& ) { SetSafeAreaEnabled( !m_SafeAreaEnabled ); }, &m_SafeAreaLabel );
 
         PanelWidget* columns = AddPanel( root, ELayoutType::Horizontal );
         columns->GetLayout().FocusScope( true );
@@ -82,6 +110,7 @@ public:
         AddInput( preview, MakeUnique<MultiLineTextEditPolicy>() )->SetText( "Multi-line field.\nEnter adds a line." );
 
         ApplyTheme( 0 );
+        SetSafeAreaEnabled( false );
     }
 
     void Update( f32 a_DeltaSeconds ) override
@@ -104,6 +133,16 @@ private:
     TextWidget*       m_Status{ nullptr };
     TextWidget*       m_Typewriter{ nullptr };
     f32               m_Time{ 0.f };
+    TextWidget*       m_SafeAreaLabel{ nullptr };
+    bool              m_SafeAreaEnabled{ false };
+
+    /** @brief Toggles a phone-like safe area: a notch on top, a home bar at the bottom and rounded corners at the sides. */
+    void SetSafeAreaEnabled( bool a_Enabled )
+    {
+        m_SafeAreaEnabled = a_Enabled;
+        m_Scene.SetSafeArea( a_Enabled ? Edges{ .T = 44_u, .R = 24_u, .B = 34_u, .L = 24_u } : Edges{} );
+        m_SafeAreaLabel->SetText( Text{ a_Enabled ? "Safe Area: On" : "Safe Area: Off" } );
+    }
 
     void ApplyTheme( size a_Index )
     {
@@ -154,7 +193,8 @@ private:
     }
 
     /** @brief A button that grows up to a_MaxWidth and shrinks on narrow screens. */
-    ButtonWidget* AddButton( IWidget* a_Parent, String a_Label, Unit a_MaxWidth, ButtonWidget::OnClickCallback a_OnClick )
+    ButtonWidget* AddButton( IWidget* a_Parent, String a_Label, Unit a_MaxWidth, ButtonWidget::OnClickCallback a_OnClick,
+                             TextWidget** a_OutLabel = nullptr )
     {
         ButtonWidget* button = m_Scene.CreateWidget<ButtonWidget>( a_Parent->GetLayoutID(), std::move( a_OnClick ) );
         button->GetLayout()
@@ -164,7 +204,10 @@ private:
             .ChildAlign( EAlign::Center );
 
         // The label must not steal clicks from the button.
-        AddText( button, std::move( a_Label ), 16_u )->GetLayout().Visibility( EVisibility::HitTestInvisible );
+        TextWidget* label = AddText( button, std::move( a_Label ), 16_u );
+        label->GetLayout().Visibility( EVisibility::HitTestInvisible );
+        if ( a_OutLabel )
+            *a_OutLabel = label;
         return button;
     }
 

@@ -38,6 +38,17 @@ namespace
         };
     }
 
+    /** @brief Measures @p a_Child with the safe area its parent passes down: what reached the parent, less what the parent cleared. */
+    static Vec2<Unit> MeasureChild( const LayoutNode& a_Parent, LayoutNode& a_Child, Vec2<Unit> a_AvailableSize, LayoutContext& a_Ctx )
+    {
+        const Edges saved = a_Ctx.RemainingSafeArea;
+        a_Ctx.RemainingSafeArea = a_Parent.Layout.LastSafeArea - SafeAreaInsets( a_Parent );
+
+        const Vec2<Unit> desired = MeasureLayoutNode( a_Child, a_AvailableSize, a_Ctx );
+        a_Ctx.RemainingSafeArea = saved;
+        return desired;
+    }
+
     /**
      * @brief Resolves the grid column/row counts from the layout style and
      * the number of flow children.  At least one of GridColumns / GridRows
@@ -105,10 +116,14 @@ namespace
     {
         if ( !a_Node.Layout.IsDirty && 
              !a_Node.Layout.IsDescendantDirty && 
-             a_Node.Layout.LastAvailableSize == a_AvailableSize )
+             a_Node.Layout.LastAvailableSize == a_AvailableSize &&
+             a_Node.Layout.LastSafeArea == a_Ctx.RemainingSafeArea )
         {
             return a_Node.Layout.DesiredSize; // Unchanged, skip entirely
         }
+
+        // The node clears the safe area that reached it on the edges it opts into (SafeAreaInsets); MeasureChild passes the rest down.
+        a_Node.Layout.LastSafeArea = a_Ctx.RemainingSafeArea;
 
         ResolveNodeVisibility( a_Node );
 
@@ -132,13 +147,14 @@ namespace
              if ( s.HeightMode == ESizing::Fixed )   desired[1] = s.FixedHeight;
         else if ( s.HeightMode == ESizing::Percent ) desired[1] = s.PercentHeight * a_AvailableSize[1];
 
+        const Edges      contentPadding = ContentPadding( a_Node );
         const Vec2<Unit> childAvailSize{
             ( s.WidthMode == ESizing::Fixed || s.WidthMode == ESizing::Percent )
-                ? std::max( 0_u, desired[0] - s.Padding.Horizontal() )
-                : std::max( 0_u, a_AvailableSize[0] - s.Padding.Horizontal() ),
+                ? std::max( 0_u, desired[0] - contentPadding.Horizontal() )
+                : std::max( 0_u, a_AvailableSize[0] - contentPadding.Horizontal() ),
             ( s.HeightMode == ESizing::Fixed || s.HeightMode == ESizing::Percent )
-                ? std::max( 0_u, desired[1] - s.Padding.Vertical() )
-                : std::max( 0_u, a_AvailableSize[1] - s.Padding.Vertical() )
+                ? std::max( 0_u, desired[1] - contentPadding.Vertical() )
+                : std::max( 0_u, a_AvailableSize[1] - contentPadding.Vertical() )
         };
 
         Vec2<Unit> contentSize{ 0_u, 0_u };
@@ -151,7 +167,7 @@ namespace
         // - Step 2:
         // Resolve the desired size of the node's children, based on the layout type and available size.
 
-        const Vec2<Unit> padding = s.Padding.Total();
+        const Vec2<Unit> padding = contentPadding.Total();
         u32              numFlow = 0;
 
         const auto computeChildDesired = +[]( const LayoutNode& child ) -> Vec2<Unit>
@@ -207,7 +223,7 @@ namespace
 
                 if ( child.Style.PositionMode == EPositioning::Anchored )
                 {
-                    MeasureLayoutNode( child, AnchoredAvailableSize( child, childAvailSize ), a_Ctx );
+                    MeasureChild( a_Node, child, AnchoredAvailableSize( child, childAvailSize ), a_Ctx );
                     return;
                 }
 
@@ -227,7 +243,7 @@ namespace
                     return; // measured in pass 2, once its share of space is known
                 }
 
-                MeasureLayoutNode( child, childAvailSize, a_Ctx );
+                MeasureChild( a_Node, child, childAvailSize, a_Ctx );
 
                 if ( !isPercentMain )
                     totalFixed += ( isHz ? child.Layout.DesiredSize[0] : child.Layout.DesiredSize[1] ) + marginMain;
@@ -253,7 +269,7 @@ namespace
                 if ( isHz ) flexAvail[0] = std::clamp( share, c.Min[0], c.Max[0] );
                 else        flexAvail[1] = std::clamp( share, c.Min[1], c.Max[1] );
 
-                MeasureLayoutNode( child, flexAvail, a_Ctx );
+                MeasureChild( a_Node, child, flexAvail, a_Ctx );
                 accumulateChild( child );
             }
 
@@ -306,12 +322,12 @@ namespace
 
                 if ( child.Style.PositionMode == EPositioning::Anchored )
                 {
-                    MeasureLayoutNode( child, AnchoredAvailableSize( child, childAvailSize ), a_Ctx );
+                    MeasureChild( a_Node, child, AnchoredAvailableSize( child, childAvailSize ), a_Ctx );
                     return;
                 }
 
                 numFlow++;
-                MeasureLayoutNode( child, childAvailSize, a_Ctx );
+                MeasureChild( a_Node, child, childAvailSize, a_Ctx );
                 accumulateChild( child );
             } );
 
@@ -719,16 +735,17 @@ namespace
         a_Node.Layout.FinalRect = a_AllocatedRect;
     
         bool reflowed = false;
-    
+
         if ( a_Node.Widget && a_Node.Widget->HasWidthDependentContent() )
         {
             const LayoutStyle& s = a_Node.Style;
-            const Vec2<Unit>   contentSize = s.Padding.Apply( a_AllocatedRect ).Size;
+            const Edges        contentPadding = ContentPadding( a_Node );
+            const Vec2<Unit>   contentSize = contentPadding.Apply( a_AllocatedRect ).Size;
             const Vec2<Unit>   newIntrinsic = a_Node.Widget->OnMeasureContent( a_Node, contentSize, a_Ctx );
     
             if ( s.HeightMode == ESizing::Content || s.HeightMode == ESizing::Flex )
             {
-                const Unit newHeight = std::clamp( newIntrinsic[1] + s.Padding.Vertical(),
+                const Unit newHeight = std::clamp( newIntrinsic[1] + contentPadding.Vertical(),
                                                    s.SizeConstraints.Min[1], s.SizeConstraints.Max[1] );
     
                 if ( !IsApproxEqual( newHeight.ToFloat(), a_Node.Layout.DesiredSize[1].ToFloat() ) )
@@ -741,7 +758,7 @@ namespace
     
         if ( a_Node.FirstChild() )
         {
-            const Rect<Unit> inner = a_Node.Style.Padding.Apply( a_AllocatedRect );
+            const Rect<Unit> inner = ContentPadding( a_Node ).Apply( a_AllocatedRect );
     
             switch ( a_Node.Style.LayoutType )
             {

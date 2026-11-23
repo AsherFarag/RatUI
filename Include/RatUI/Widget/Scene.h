@@ -56,6 +56,15 @@ namespace RatUI
          */
         void UpdateLayout( Vec2<Unit> a_AvailableSize );
 
+        /**
+         * @brief Sets the insets from the scene's edges that content should avoid, such as a phone's notch,
+         * rounded corners and home bar, or a TV's overscan. A node opts in per edge with LayoutStyle::SafeAreaEdges and
+         * is inset by what its ancestors haven't already cleared (SafeAreaInsets( node )). Applied by the next
+         * UpdateLayout, which re-measures only the nodes the change reaches.
+         */
+        void SetSafeArea( const Edges& a_SafeArea );
+        RATUI_NODISCARD const Edges& GetSafeArea() const { return m_SafeArea; }
+
         /** @brief Advances the input clock and resolves time-based gestures (currently: long-press). Call once per frame. */
         void Tick( f64 a_DeltaSeconds );
 
@@ -171,6 +180,7 @@ namespace RatUI
         NodePool m_Layouts{};      ///< Pool of layout nodes representing the hierarchical structure and layout information of widgets in the scene.
         Array<NodeID>  m_ToDestroy;
 		f64            m_ClockSeconds{ 0.0 };
+        Edges          m_SafeArea{};
 
         // --- Internal Methods ---
 

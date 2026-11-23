@@ -68,7 +68,30 @@ namespace RatUI
     struct LayoutContext
     {
 		BumpAllocator& Allocator;
+		Edges          RemainingSafeArea{}; ///< The safe area (Scene::SetSafeArea) not yet cleared by an ancestor of the node being measured.
     };
+
+    /**
+     * @brief The safe area a node keeps its content clear of: what reached it in its last measure, on the edges in its
+     * LayoutStyle::SafeAreaEdges. For widgets that place things themselves.
+     */
+    RATUI_NODISCARD inline Edges SafeAreaInsets( const LayoutNode& a_Node )
+    {
+        const Edges&         safe  = a_Node.Layout.LastSafeArea;
+        const ESafeAreaEdges edges = a_Node.Style.SafeAreaEdges;
+        return Edges{
+            .T = HasFlag( edges, ESafeAreaEdges::Top )    ? safe.T : 0_u,
+            .R = HasFlag( edges, ESafeAreaEdges::Right )  ? safe.R : 0_u,
+            .B = HasFlag( edges, ESafeAreaEdges::Bottom ) ? safe.B : 0_u,
+            .L = HasFlag( edges, ESafeAreaEdges::Left )   ? safe.L : 0_u,
+        };
+    }
+
+    /** @brief The padding a node lays its content out in: its own, plus the safe area it keeps clear of. */
+    RATUI_NODISCARD inline Edges ContentPadding( const LayoutNode& a_Node )
+    {
+        return a_Node.Style.Padding + SafeAreaInsets( a_Node );
+    }
 
     /**
      * @brief Measures the desired size of a layout node based on its content and constraints,

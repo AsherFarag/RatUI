@@ -66,9 +66,8 @@ namespace RatUI
 
         alignas( 16 ) static thread_local byte scratchBuffer[1024 * 1024]; // TODO: Make this configurable
 		BumpAllocator allocator{ scratchBuffer, sizeof( scratchBuffer ) };
-		LayoutContext layoutCtx{ allocator };
-
 		const Rect<Unit> rootRect{ Vec2<Unit>{ 0_u, 0_u }, a_AvailableSize };
+		LayoutContext layoutCtx{ allocator, m_SafeArea };
 
         MeasureLayoutNode( *rootNode, a_AvailableSize, layoutCtx );
         const bool needsSecondPass = ArrangeLayoutNode( *rootNode, rootRect, layoutCtx );
@@ -82,8 +81,22 @@ namespace RatUI
 		// For example, if a widget is removed while the pointer is over it, we need to clear the hovered state.
 		// Or if we click and hold a button, move the pointer off it, this re-process helps clear the pressed state.
 		// Otherwise, we would have to wait until the next pointer event to fix the state.
-        if ( Input.LastPointerEvent.Type != EPointerType::Unknown )
-            ProcessPointerEvent( Input.LastPointerEvent );
+        // Only the mouse is replayed unconditionally. A lifted finger points at nothing (touches have no hover), and a
+        // touch or pen that Tick has forgotten must not be brought back, so those replay only while still tracked.
+        const PointerEvent& last = Input.LastPointerEvent;
+        if ( last.Type != EPointerType::Unknown )
+        {
+            const PointerGestureState* gesture = FindValue( Input.PointerStates, last.ID );
+            const bool replay = last.IsMouse() || ( gesture && ( !last.IsTouch() || gesture->IsDown ) );
+            if ( replay )
+                ProcessPointerEvent( last );
+        }
+    }
+
+    void Scene::SetSafeArea( const Edges& a_SafeArea )
+    {
+        // Measure keys its cache on the safe area reaching each node, so nothing needs marking dirty here.
+        m_SafeArea = a_SafeArea;
     }
 
     void Scene::Tick( f64 a_DeltaSeconds )

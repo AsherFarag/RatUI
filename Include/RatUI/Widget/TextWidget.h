@@ -7,6 +7,30 @@
 
 namespace RatUI
 {
+    /**
+     * @brief The clip rect for text in ETextOverflow::Clip mode, or NullOpt when the text fits and needs none.
+     * Clipping only when needed keeps fitting labels in the same draw batch as their neighbours. On an axis the text
+     * overflows it clips at @p a_NodeRect's edge; on an axis it fits it leaves a line's height of room on each side, so
+     * glyphs that overhang a tight line box (ascenders, descenders, italics) stay visible.
+     *
+     * @param a_NodeRect   The text widget's FinalRect.
+     * @param a_TextRect   The rect the text is laid out in (the node rect less its content padding).
+     * @param a_TextSize   The shaped text's width (its widest line) and height (its line boxes).
+     * @param a_LineHeight The height of one line box.
+     */
+    RATUI_NODISCARD inline Optional<Rect<Unit>> TextClipRect( const Rect<Unit>& a_NodeRect, const Rect<Unit>& a_TextRect,
+                                                              Vec2<Unit> a_TextSize, Unit a_LineHeight )
+    {
+        constexpr f32 c_Epsilon = 0.01f;
+        const bool overflowX = a_TextSize[0].ToFloat() > a_TextRect.Size[0].ToFloat() + c_Epsilon;
+        const bool overflowY = a_TextSize[1].ToFloat() > a_TextRect.Size[1].ToFloat() + c_Epsilon;
+        if ( !overflowX && !overflowY )
+            return NullOpt;
+
+        const Vec2<Unit> room{ overflowX ? 0_u : a_LineHeight, overflowY ? 0_u : a_LineHeight };
+        return Rect<Unit>::FromMinMax( a_NodeRect.Min() - room, a_NodeRect.Max() + room );
+    }
+
     class TextWidget : public IWidget
     {
     public:
@@ -107,7 +131,7 @@ namespace RatUI
 
             Scene& scene = GetScene();
             const LayoutNode& node = GetLayout();
-            const Rect<Unit> textRect = node.Style.Padding.Apply( node.Layout.FinalRect );
+            const Rect<Unit> textRect = ContentPadding( node ).Apply( node.Layout.FinalRect );
 
             // Suppress the fade percentage when not in Fade overflow mode so the
             // MSDF shader doesn't accidentally fade glyphs in Clip/Ellipsis mode.
@@ -120,11 +144,22 @@ namespace RatUI
             switch ( m_LayoutStyle.Overflow )
             {
                 case ETextOverflow::Clip:
+                {
+                    // Text that doesn't fit is cut at the node's edge so it can't draw over its neighbours.
+                    const Optional<Rect<Unit>> clip = TextClipRect( node.Layout.FinalRect, textRect,
+                        { m_ShapedText->MaxWidth, m_ShapedText->TotalHeight() }, m_ShapedText->LineHeight );
+
+                    if ( clip )
+                        a_Event.Drawer.PushClipRect( *clip );
+                    a_Event.Drawer.AddText( *m_ShapedText, effectiveStyle, textRect, VisibleGlyphs );
+                    if ( clip )
+                        a_Event.Drawer.PopClipRect();
+                    break;
+                }
                 case ETextOverflow::Fade:
                 {
-                    //a_Event.DrawList.PushClipRect( textRect );
+                    // The fade shader hides the overflow itself.
                     a_Event.Drawer.AddText( *m_ShapedText, effectiveStyle, textRect, VisibleGlyphs );
-                    //a_Event.DrawList.PopClipRect();
                     break;
                 }
                 default:
