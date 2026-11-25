@@ -5,6 +5,25 @@
 #include <format>
 
 /**
+ * @brief A panel filled with a warning tint, whatever the theme. As ThemeShowcase's root it clears the safe area, so its
+ * fill shows in the unsafe bands around the content when a safe area is set.
+ */
+class UnsafeAreaBackdrop : public PanelWidget
+{
+public:
+    using Super = PanelWidget;
+
+    bool IsFocusable() const override { return false; }
+
+    void OnPaint( const PaintEvent& a_Event ) override
+    {
+        a_Event.Drawer.AddBrushRect( GetLayout().Layout.FinalRect, SolidBrush{ FromColorF32( 1.f, 0.294f, 0.404f, 0.35f ) },
+                                     Colors::Transparent, 0_u, CornerRadius::None() );
+        PaintChildren( a_Event );
+    }
+};
+
+/**
  * @brief The showcase's own factories, composed with the standard ones (see ShowcaseSceneBuilder below).
  * This is how you add your own ui.Something() calls: a mixin templated on the final builder type B.
  */
@@ -22,9 +41,16 @@ struct ShowcaseFactories
     }
 
     /** @brief A button that grows up to a_MaxWidth and shrinks on narrow screens. */
-    WidgetBuilder<ButtonWidget> WideButton( String a_Label, Unit a_MaxWidth, ButtonWidget::OnClickCallback a_OnClick ) const
+    WidgetBuilder<ButtonWidget> WideButton( String a_Label, Unit a_MaxWidth, ButtonWidget::OnClickCallback a_OnClick,
+                                            TextWidget** a_OutLabel = nullptr ) const
     {
-        return Ui().Button( std::move( a_Label ), std::move( a_OnClick ) ).FlexWidth().FixedHeight( 38_u ).MaxWidth( a_MaxWidth );
+        TextWidget* label = nullptr;
+        WidgetBuilder<ButtonWidget> button = Ui().Button( std::move( a_OnClick ) ).FlexWidth().FixedHeight( 38_u ).MaxWidth( a_MaxWidth )(
+            Ui().Text( std::move( a_Label ) ).NoWrap().Visibility( EVisibility::HitTestInvisible ).Bind( label )
+        );
+        if ( a_OutLabel )
+            *a_OutLabel = label;
+        return button;
     }
 
     /** @brief Sizes a text field: fills the column, up to 280 wide. */
@@ -65,6 +91,7 @@ using ShowcaseSceneBuilder = BasicSceneBuilder<StandardFactories, ShowcaseFactor
 
 /**
  * @brief Buttons, sliders and text, restyled live by switching between four themes.
+ * The Safe Area button simulates a phone's notch, rounded corners and home bar.
  */
 class ThemeShowcase : public Example
 {
@@ -80,8 +107,10 @@ public:
         WidgetBuilder<PanelWidget> themeButtons = ui.Section().Horizontal().ContentHeight().FocusScope();
         for ( size i = 0; i < Size( m_Themes ); ++i )
             themeButtons( ui.WideButton( m_Themes[i].Name, 130_u, [this, i]( ButtonBaseWidget& ) { ApplyTheme( i ); } ) );
+        themeButtons( ui.WideButton( "", 170_u, [this]( ButtonBaseWidget& ) { SetSafeAreaEnabled( !m_SafeAreaEnabled ); }, &m_SafeAreaLabel ) );
 
-        ui.Root( ui.Panel().Vertical().Flex().Padding( 16_u ).Spacing( 12_u ).FocusScope()(
+        // The backdrop keeps the whole window, so its tint fills the unsafe bands; the content is laid out clear of them.
+        ui.Root( ui.MakeWidget<UnsafeAreaBackdrop>().Flex().SafeAreaEdges( ESafeAreaEdges::All )( ui.Panel().Vertical().Flex().Padding( 16_u ).Spacing( 12_u ).FocusScope()(
             ui.Label( "Theme Showcase", 30_u ),
             ui.Text( "" ).Size( 16_u ).FlexWidth().Bind( m_Status ),
             themeButtons,
@@ -116,9 +145,10 @@ public:
                     ui.Field( ui.TextArea() ).Text( "Multi-line field.\nEnter adds a line." )
                 )
             )
-        ) );
+        ) ) );
 
         ApplyTheme( 0 );
+        SetSafeAreaEnabled( false );
     }
 
     void Update( f32 a_DeltaSeconds ) override
@@ -141,6 +171,16 @@ private:
     TextWidget*       m_Status{ nullptr };
     TextWidget*       m_Typewriter{ nullptr };
     f32               m_Time{ 0.f };
+    TextWidget*       m_SafeAreaLabel{ nullptr };
+    bool              m_SafeAreaEnabled{ false };
+
+    /** @brief Toggles a phone-like safe area: a notch on top, a home bar at the bottom and rounded corners at the sides. */
+    void SetSafeAreaEnabled( bool a_Enabled )
+    {
+        m_SafeAreaEnabled = a_Enabled;
+        m_Scene.SetSafeArea( a_Enabled ? Edges{ .T = 44_u, .R = 24_u, .B = 34_u, .L = 24_u } : Edges{} );
+        m_SafeAreaLabel->SetText( Text{ a_Enabled ? "Safe Area: On" : "Safe Area: Off" } );
+    }
 
     void ApplyTheme( size a_Index )
     {

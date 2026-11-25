@@ -111,6 +111,7 @@ namespace RatUI
 
         Self PositionMode( EPositioning a_Mode ) const { Layout().PositionMode( a_Mode ); return This(); }
         Self Anchor( RatUI::Anchor a_Anchor ) const    { Layout().Anchor( a_Anchor ); return This(); }
+        Self SafeAreaEdges( ESafeAreaEdges a_Edges ) const { Layout().SafeAreaEdges( a_Edges ); return This(); }
 
         Self WidthMode( ESizing a_Mode ) const  { Layout().WidthMode( a_Mode ); return This(); }
         Self HeightMode( ESizing a_Mode ) const { Layout().HeightMode( a_Mode ); return This(); }

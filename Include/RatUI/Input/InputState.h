@@ -34,6 +34,7 @@ namespace RatUI
         f64        LastPressTime{ 0.0 };
         u32        PressCount{ 0 };
         NodeID     PressedWidget{ c_InvalidNodeID };
+        NodeID     CapturedWidget{ c_InvalidNodeID }; ///< Gets this pointer's events until it is released, wherever the pointer goes.
         bool       IsDown{ false };
         bool       IsDragging{ false };
         bool       LongPressFired{ false };
@@ -64,7 +65,6 @@ namespace RatUI
 
         NodeID FocusedWidget{ c_InvalidNodeID };
         NodeID HoveredWidget{ c_InvalidNodeID };
-        NodeID CapturedWidget{ c_InvalidNodeID };
 
         PointerEvent LastPointerEvent{};
         HashMap<EButtonID, KeyPressTarget> KeyPresses{}; ///< Held keyboard keys whose press a widget took, so focus changes can't split a key stroke.

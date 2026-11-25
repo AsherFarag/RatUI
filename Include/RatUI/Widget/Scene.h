@@ -56,6 +56,15 @@ namespace RatUI
          */
         void UpdateLayout( Vec2<Unit> a_AvailableSize );
 
+        /**
+         * @brief Sets the insets from the scene's edges that content should avoid, such as a phone's notch,
+         * rounded corners and home bar, or a TV's overscan. A node opts in per edge with LayoutStyle::SafeAreaEdges and
+         * is inset by what its ancestors haven't already cleared (SafeAreaInsets( node )). Applied by the next
+         * UpdateLayout, which re-measures only the nodes the change reaches.
+         */
+        void SetSafeArea( const Edges& a_SafeArea );
+        RATUI_NODISCARD const Edges& GetSafeArea() const { return m_SafeArea; }
+
         /** @brief Advances the input clock and resolves time-based gestures (currently: long-press). Call once per frame. */
         void Tick( f64 a_DeltaSeconds );
 
@@ -86,11 +95,25 @@ namespace RatUI
         /** @brief Clears the focus from the current focused widget. */
         void ClearFocus() { SetFocus( c_InvalidNodeID ); }
 
-        void CapturePointer( NodeID a_Node ) { Input.CapturedWidget = a_Node; }
+        // - Pointer Capture: each pointer (the mouse, each touch, each pen) is captured on its own, so several fingers can
+        //   hold different widgets at once.
 
-        void ReleasePointerCapture() { Input.CapturedWidget = c_InvalidNodeID; }
+        /** @brief Sends a_Pointer's events to a_Node until the capture is released, wherever the pointer goes. */
+        void CapturePointer( PointerID a_Pointer, NodeID a_Node ) { Input.PointerStates[a_Pointer].CapturedWidget = a_Node; }
 
-        RATUI_NODISCARD NodeID GetCapturedWidget() const { return Input.CapturedWidget; }
+        /** @brief Ends a_Pointer's capture, if it has one. */
+        void ReleasePointerCapture( PointerID a_Pointer )
+        {
+            if ( PointerGestureState* gesture = FindValue( Input.PointerStates, a_Pointer ) )
+                gesture->CapturedWidget = c_InvalidNodeID;
+        }
+
+        /** @brief The widget capturing a_Pointer, or c_InvalidNodeID. */
+        RATUI_NODISCARD NodeID GetCapturedWidget( PointerID a_Pointer ) const
+        {
+            const PointerGestureState* gesture = FindValue( Input.PointerStates, a_Pointer );
+            return gesture ? gesture->CapturedWidget : c_InvalidNodeID;
+        }
 
         /** @brief Whether input is currently pointer-driven or navigation-driven; useful for widgets deciding whether to show a focus ring. */
         RATUI_NODISCARD EInputMode GetInputMode() const { return Input.InputMode; }
@@ -157,10 +180,12 @@ namespace RatUI
         NodePool m_Layouts{};      ///< Pool of layout nodes representing the hierarchical structure and layout information of widgets in the scene.
         Array<NodeID>  m_ToDestroy;
 		f64            m_ClockSeconds{ 0.0 };
+        Edges          m_SafeArea{};
 
         // --- Internal Methods ---
 
-        void ApplyReply( const Reply& a_Reply );
+        /** @brief Applies a_Reply's requests; a capture request or release applies to a_Pointer. */
+        void ApplyReply( const Reply& a_Reply, PointerID a_Pointer = c_MousePointerID );
         NavReply QueryBoundaryReply( ENavAction a_Action, NodeID a_Focused );
 
         /**
@@ -192,6 +217,17 @@ namespace RatUI
             // A held key's release must not reach a later widget that reuses this NodeID.
             for ( auto it = Input.KeyPresses.begin(); it != Input.KeyPresses.end(); )
                 it = it->second.Widget == a_Node.ID ? Input.KeyPresses.erase( it ) : std::next( it );
+
+            // Nor must a pointer this widget held or hovered.
+            for ( auto& [pointerID, gesture] : Input.PointerStates )
+            {
+                if ( gesture.CapturedWidget == a_Node.ID )
+                    gesture.CapturedWidget = c_InvalidNodeID;
+                if ( gesture.PressedWidget == a_Node.ID )
+                    gesture.PressedWidget = c_InvalidNodeID;
+            }
+            if ( Input.HoveredWidget == a_Node.ID )
+                Input.HoveredWidget = c_InvalidNodeID;
 
             m_Layouts.Deallocate( a_Node.ID );
         }

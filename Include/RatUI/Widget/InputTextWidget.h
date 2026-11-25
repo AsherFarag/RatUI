@@ -211,7 +211,7 @@ namespace RatUI
 
             const LayoutNode& node     = GetLayout();
             const Rect<Unit>& rect     = node.Layout.FinalRect;
-            const Rect<Unit>  textRect = GetTextRect( node.Style.Padding.Apply( rect ) );
+            const Rect<Unit>  textRect = GetTextRect( ContentPadding( node ).Apply( rect ) );
             const bool        focused  = HasFocus();
 
             a_Event.Drawer.AddBrushRect( rect, FillBrush, BorderColor, BorderThickness, Radius );
@@ -220,7 +220,7 @@ namespace RatUI
 
             // Clip text at the padding horizontally (it scrolls past the edges) but only at the border
             // vertically, so ascenders and descenders that overhang a tight line box stay visible.
-            const Rect<Unit> padded = node.Style.Padding.Apply( rect );
+            const Rect<Unit> padded = ContentPadding( node ).Apply( rect );
             const Unit       inset  = std::min( BorderThickness, rect.Size[1] * 0.5f );
             a_Event.Drawer.PushClipRect( Rect<Unit>{ Vec2<Unit>{ padded.Origin[0], rect.Origin[1] + inset },
                                                      Vec2<Unit>{ padded.Size[0], rect.Size[1] - inset * 2.f } } );
