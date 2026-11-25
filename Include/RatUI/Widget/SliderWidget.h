@@ -12,6 +12,8 @@ namespace RatUI
     class SliderWidget : public IWidget
     {
     public:
+        using Super = IWidget;
+
         // --------------------------------------------------------------------
         // Render properties
         // --------------------------------------------------------------------

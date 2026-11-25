@@ -12,6 +12,9 @@ namespace RatUI
     class ButtonBaseWidget : public IWidget
     {
     public:
+        using Super = IWidget;
+        static constexpr bool c_HasChildren = true;
+
 		using OnClickCallback = Callback<ButtonBaseWidget&>;
         OnClickCallback OnClick; ///< Callback that is invoked when the button is clicked.
 
@@ -92,6 +95,8 @@ namespace RatUI
     class ButtonWidget : public ButtonBaseWidget
     {
     public:
+        using Super = ButtonBaseWidget;
+
         ButtonWidget( OnClickCallback a_OnClick = {} )
 			: ButtonBaseWidget( std::move( a_OnClick ) )
         {}

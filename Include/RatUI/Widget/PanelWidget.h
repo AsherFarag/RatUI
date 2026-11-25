@@ -12,6 +12,9 @@ namespace RatUI
     class PanelWidget : public IWidget
     {
     public:
+        using Super = IWidget;
+        static constexpr bool c_HasChildren = true;
+
         PanelWidget() = default;
 
         // --------------------------------------------------------------------

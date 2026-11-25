@@ -7,6 +7,23 @@ namespace RatUI
     // TODO: Make this a reusable utility?
     namespace 
     {
+        /** @brief Focusable widgets under a_Node, looking through bare layout nodes. */
+        void CollectNavTargets( LayoutNode& a_Node, Array<const LayoutNode*>& a_Out )
+        {
+            a_Node.ForEachChild( [&]( LayoutNode& child )
+            {
+                if ( child.Widget )
+                {
+                    if ( child.Widget->IsFocusable() )
+                        PushBack( a_Out, &child );
+                }
+                else
+                {
+                    CollectNavTargets( child, a_Out );
+                }
+            } );
+        }
+
         /** @brief The ButtonEvent a widget receives for ENavAction::ActivatePressed/ActivateReleased. */
         ButtonEvent MakeActivateEvent( bool a_Pressed )
         {
@@ -17,42 +34,6 @@ namespace RatUI
                 .Held     = a_Pressed,
             };
         }
-
-        struct LayoutChildIterator
-        {
-            using iterator_concept = std::forward_iterator_tag;
-            using iterator_category = std::forward_iterator_tag;
-            using value_type = LayoutNode*;
-            using difference_type = std::ptrdiff_t;
-
-            LayoutNode* Current{ nullptr };
-
-            value_type operator*() const { return Current; }
-
-            LayoutChildIterator& operator++()
-            {
-                Current = Current ? Current->NextSibling() : nullptr;
-                return *this;
-            }
-
-            LayoutChildIterator operator++( int )
-            {
-                LayoutChildIterator copy = *this;
-                ++( *this );
-                return copy;
-            }
-
-            bool operator==( std::default_sentinel_t ) const { return Current == nullptr; }
-        };
-
-        struct LayoutChildRange : std::ranges::view_interface<LayoutChildRange>
-        {
-            LayoutNode* First{ nullptr };
-
-            LayoutChildRange( LayoutNode* a_First ) : First( a_First ) {}
-            LayoutChildIterator begin() const { return LayoutChildIterator{ First }; }
-            std::default_sentinel_t end() const { return {}; }
-        };
 
     } // namespace
 
@@ -117,8 +98,7 @@ namespace RatUI
         CleanupDestroyedWidgets();
 
         if ( LayoutNode* rootNode = m_Layouts.Get( RootWidget ) )
-            if ( rootNode->Widget )
-                rootNode->Widget->Paint( PaintEvent{ a_DrawList, a_DeltaSeconds } );
+            IWidget::PaintNode( *rootNode, PaintEvent{ a_DrawList, a_DeltaSeconds } );
     }
 
     // ========================================================================
@@ -657,14 +637,10 @@ namespace RatUI
             LayoutNode* scopeNode = m_Layouts.Get( a_ScopeID );
             if ( !scopeNode ) return;
 
-            for ( LayoutNode* child = scopeNode->FirstChild(); child; child = child->NextSibling() )
-            {
-                if ( child->Widget && child->Widget->IsFocusable() )
-                {
-                    SetFocus( child->Widget->GetLayoutID() );
-                    return;
-                }
-            }
+            Array<const LayoutNode*> targets;
+            CollectNavTargets( *scopeNode, targets );
+            if ( !Empty( targets ) )
+                SetFocus( targets[0]->ID );
         };
 
         if ( a_Action == ENavAction::Cancel )
@@ -710,22 +686,14 @@ namespace RatUI
             return;
         }
 
-        // TODO: If I move navigation from LayoutNodes to Widgets, I should remove this.
-        // TODO: Though I do like not having explicit widget types for containers like VBox/HBox/Grid etc and still keep nav for them.
+        Array<const LayoutNode*> targets;
+        CollectNavTargets( *scopeNode, targets );
 
-        auto focusableNodes = LayoutChildRange{ scopeNode->FirstChild() }
-            | std::views::filter( [&]( LayoutNode* node ) -> bool
-        {
-            if ( !node ) return false;
-            // TODO: Probs dont need LayoutStyle::IsFocusScope anymore
-            return ( node->Widget && node->Widget->IsFocusable() ) || node->Style.IsFocusScope;
-        } );
-
-        const LayoutNode* nextNode = FindNavigatableNode( a_Action, focusedNode, focusableNodes );
+        const LayoutNode* nextNode = FindNavigatableNode( a_Action, focusedNode, targets );
 
         if ( nextNode )
         {
-            SetFocus( nextNode->Widget->GetLayoutID() );
+            SetFocus( nextNode->ID );
             return;
         }
 

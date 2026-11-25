@@ -1,12 +1,67 @@
 #pragma once
 #include "Example.h"
-#include <RatUI/Widget/ButtonWidget.h>
-#include <RatUI/Widget/InputTextWidget.h>
-#include <RatUI/Widget/PanelWidget.h>
-#include <RatUI/Widget/SliderWidget.h>
-#include <RatUI/Widget/TextWidget.h>
+#include <RatUI/Widget/WidgetBuilder.h>
 #include <cmath>
 #include <format>
+
+/**
+ * @brief The showcase's own factories, composed with the standard ones (see ShowcaseSceneBuilder below).
+ * This is how you add your own ui.Something() calls: a mixin templated on the final builder type B.
+ */
+template<typename B>
+struct ShowcaseFactories
+{
+    WidgetBuilder<PanelWidget> Section() const
+    {
+        return Ui().Panel().Flex().Padding( 12_u ).Spacing( 10_u );
+    }
+
+    WidgetBuilder<TextWidget> Label( String a_String, Unit a_Size ) const
+    {
+        return Ui().Text( std::move( a_String ) ).Size( a_Size ).NoWrap();
+    }
+
+    /** @brief A button that grows up to a_MaxWidth and shrinks on narrow screens. */
+    WidgetBuilder<ButtonWidget> WideButton( String a_Label, Unit a_MaxWidth, ButtonWidget::OnClickCallback a_OnClick ) const
+    {
+        return Ui().Button( std::move( a_Label ), std::move( a_OnClick ) ).FlexWidth().FixedHeight( 38_u ).MaxWidth( a_MaxWidth );
+    }
+
+    /** @brief Sizes a text field: fills the column, up to 280 wide. */
+    WidgetBuilder<InputTextWidget> Field( WidgetBuilder<InputTextWidget> a_Input ) const
+    {
+        return a_Input.FlexWidth().ContentHeight().Padding( 6_u ).MaxWidth( 280_u );
+    }
+
+    /** @brief A card with a slider and a label showing its value. */
+    WidgetBuilder<PanelWidget> LabeledSlider( String a_Label, f32 a_Value, EOrient a_Orientation = EOrient::Horizontal ) const
+    {
+        const bool vertical = a_Orientation == EOrient::Vertical;
+
+        WidgetBuilder<SliderWidget> slider = Ui().Slider( 0.f, 1.f, a_Value, a_Orientation );
+        if ( vertical )
+            slider.FixedSize( 36_u, 120_u );
+        else
+            slider.FlexWidth().FixedHeight( 28_u );
+
+        TextWidget* label = nullptr;
+        WidgetBuilder<PanelWidget> card = Section().Vertical().FixedHeight( vertical ? 180_u : 86_u ).Padding( 8_u ).Spacing( 6_u )(
+            Label( "", 14_u ).Bind( label ),
+            slider
+        );
+
+        slider.OnValueChanged( [label, a_Label]( const f32& a_Current )
+        {
+            label->SetText( Text{ std::format( "{}: {}%", a_Label, static_cast<int>( std::round( a_Current * 100.f ) ) ) } );
+        } );
+        return card;
+    }
+
+private:
+    const B& Ui() const { return static_cast<const B&>( *this ); }
+};
+
+using ShowcaseSceneBuilder = BasicSceneBuilder<StandardFactories, ShowcaseFactories>;
 
 /**
  * @brief Buttons, sliders and text, restyled live by switching between four themes.
@@ -20,66 +75,48 @@ public:
         // Every widget shares m_ActiveTheme, so copying another theme into it restyles the whole scene.
         m_Scene.DefaultTheme = m_ActiveTheme;
 
-        PanelWidget* root = m_Scene.CreateRootWidget<PanelWidget>();
-        root->GetLayout()
-            .LayoutType( ELayoutType::Vertical )
-            .WidthMode( ESizing::Flex )
-            .HeightMode( ESizing::Flex )
-            .Padding( Edges::All( 16_u ) )
-            .Spacing( 12_u )
-            .FocusScope( true );
+        ShowcaseSceneBuilder ui{ m_Scene };
 
-        AddText( root, "Theme Showcase", 30_u );
-        m_Status = AddText( root, "", 16_u, TextWrap::WrapWord() );
-        m_Status->GetLayout().WidthMode( ESizing::Flex );
-
-        PanelWidget* themeButtons = AddPanel( root, ELayoutType::Horizontal );
-        themeButtons->GetLayout().HeightMode( ESizing::Content ).FocusScope( true );
+        WidgetBuilder<PanelWidget> themeButtons = ui.Section().Horizontal().ContentHeight().FocusScope();
         for ( size i = 0; i < Size( m_Themes ); ++i )
-            AddButton( themeButtons, m_Themes[i].Name, 130_u, [this, i]( ButtonBaseWidget& ) { ApplyTheme( i ); } );
+            themeButtons( ui.WideButton( m_Themes[i].Name, 130_u, [this, i]( ButtonBaseWidget& ) { ApplyTheme( i ); } ) );
 
-        PanelWidget* columns = AddPanel( root, ELayoutType::Horizontal );
-        columns->GetLayout().FocusScope( true );
+        ui.Root( ui.Panel().Vertical().Flex().Padding( 16_u ).Spacing( 12_u ).FocusScope()(
+            ui.Label( "Theme Showcase", 30_u ),
+            ui.Text( "" ).Size( 16_u ).FlexWidth().Bind( m_Status ),
+            themeButtons,
+            ui.Section().Horizontal().FocusScope()(
+                // Left column: sliders.
+                ui.Section().Vertical().Grow( 1.f ).FocusScope()(
+                    ui.Label( "Controls", 20_u ),
+                    ui.LabeledSlider( "Master Volume",   0.65f ),
+                    ui.LabeledSlider( "Accent Strength", 0.30f ),
+                    ui.LabeledSlider( "Vertical Mix",    0.45f, EOrient::Vertical )
+                ),
+                // Right column: text wrapping, typewriter reveal, overflow fade and a button.
+                ui.Section().Vertical().Grow( 1.f ).FocusScope()(
+                    ui.Label( "Preview", 20_u ),
+                    ui.Text( "This panel uses the active theme for panel fills, text color, button states, and slider visuals." )
+                        .Size( 16_u ).FlexWidth(),
+                    ui.Text( "My game dialogue uses the visible glyphs system. This only affects the rendering of the text, not the layout "
+                             "or shaped text data, which is useful for text revealed over time, such as in a dialogue system." )
+                        .Size( 16_u ).FlexWidth().FlexHeight().MaxWidth( 280_u ).Bind( m_Typewriter ),
+                    ui.Text( "This is an example of a long text string that will exceed its box and fade out instead of being cut off." )
+                        .Size( 16_u ).Overflow( ETextOverflow::Fade ).FixedSize( 100_u, 100_u ),
+                    ui.WideButton( "Preview Button", 280_u, [this]( ButtonBaseWidget& )
+                    {
+                        m_Status->SetText( Text{ "Theme applied: " + m_Themes[m_ThemeIndex].Name + " (preview button clicked)" } );
+                    } ),
 
-        // Left column: sliders.
-        PanelWidget* controls = AddPanel( columns, ELayoutType::Vertical );
-        controls->GetLayout().FlexGrow( 1.f ).FocusScope( true );
-
-        AddText( controls, "Controls", 20_u );
-        AddSlider( controls, "Master Volume",   0.65f );
-        AddSlider( controls, "Accent Strength", 0.30f );
-        AddSlider( controls, "Vertical Mix",    0.45f, EOrient::Vertical );
-
-        // Right column: text wrapping, typewriter reveal, overflow fade and a button.
-        PanelWidget* preview = AddPanel( columns, ELayoutType::Vertical );
-        preview->GetLayout().FlexGrow( 1.f ).FocusScope( true );
-
-        AddText( preview, "Preview", 20_u );
-
-        AddText( preview, "This panel uses the active theme for panel fills, text color, button states, and slider visuals.",
-                 16_u, TextWrap::WrapWord() )->GetLayout().WidthMode( ESizing::Flex );
-
-        m_Typewriter = AddText( preview,
-            "My game dialogue uses the visible glyphs system. This only affects the rendering of the text, not the layout "
-            "or shaped text data, which is useful for text revealed over time, such as in a dialogue system.",
-            16_u, TextWrap::WrapWord() );
-        m_Typewriter->GetLayout().WidthMode( ESizing::Flex ).FlexHeight().SizeConstraints( Constraints::AtMost( { 280_u, Limits<Unit>::max() } ) );
-
-        AddText( preview, "This is an example of a long text string that will exceed its box and fade out instead of being cut off.",
-                 16_u, TextWrap::WrapWord(), ETextOverflow::Fade )->GetLayout().FixedWidth( 100_u ).FixedHeight( 100_u );
-
-        AddButton( preview, "Preview Button", 280_u, [this]( ButtonBaseWidget& )
-        {
-            m_Status->SetText( Text{ "Theme applied: " + m_Themes[m_ThemeIndex].Name + " (preview button clicked)" } );
-        } );
-
-        // Text input: Enter in the single-line field submits to the status line.
-        AddText( preview, "Text Input", 20_u );
-        InputTextWidget* name = AddInput( preview, MakeUnique<SingleLineTextEditPolicy>() );
-        name->SetPlaceholder( "Type here and press Enter" );
-        name->OnSubmit = [this]( const String& a_Text ) { m_Status->SetText( Text{ "Submitted: " + a_Text } ); };
-
-        AddInput( preview, MakeUnique<MultiLineTextEditPolicy>() )->SetText( "Multi-line field.\nEnter adds a line." );
+                    // Text input: Enter in the single-line field submits to the status line.
+                    ui.Label( "Text Input", 20_u ),
+                    ui.Field( ui.InputText() )
+                        .Placeholder( "Type here and press Enter" )
+                        .OnSubmit( [this]( const String& a_Text ) { m_Status->SetText( Text{ "Submitted: " + a_Text } ); } ),
+                    ui.Field( ui.TextArea() ).Text( "Multi-line field.\nEnter adds a line." )
+                )
+            )
+        ) );
 
         ApplyTheme( 0 );
     }
@@ -110,88 +147,6 @@ private:
         m_ThemeIndex   = a_Index;
         *m_ActiveTheme = *m_Themes[a_Index].Style;
         m_Status->SetText( Text{ "Theme applied: " + m_Themes[a_Index].Name + " (use the buttons below to switch styles)" } );
-    }
-
-    // -------------------------------------------------------------------------
-    // Widget helpers
-    // -------------------------------------------------------------------------
-
-    PanelWidget* AddPanel( IWidget* a_Parent, ELayoutType a_Type )
-    {
-        PanelWidget* panel = m_Scene.CreateWidget<PanelWidget>( a_Parent->GetLayoutID() );
-        panel->GetLayout()
-            .LayoutType( a_Type )
-            .WidthMode( ESizing::Flex )
-            .HeightMode( ESizing::Flex )
-            .Padding( Edges::All( 12_u ) )
-            .Spacing( 10_u );
-        return panel;
-    }
-
-    TextWidget* AddText( IWidget* a_Parent, String a_String, Unit a_Size,
-                         TextWrap a_Wrap = TextWrap::NoWrap(), ETextOverflow a_Overflow = ETextOverflow::Clip )
-    {
-        TextLayoutStyle style{};
-        style.Font     = Fonts::Roboto;
-        style.Size     = a_Size;
-        style.Wrap     = a_Wrap;
-        style.Overflow = a_Overflow;
-
-        TextWidget* text = m_Scene.CreateWidget<TextWidget>( a_Parent->GetLayoutID(), Text{ std::move( a_String ) }, style );
-        text->GetLayout().HeightMode( ESizing::Content );
-        return text;
-    }
-
-    InputTextWidget* AddInput( IWidget* a_Parent, Unique<ITextEditPolicy> a_Policy )
-    {
-        InputTextWidget* input = m_Scene.CreateWidget<InputTextWidget>( a_Parent->GetLayoutID(), std::move( a_Policy ) );
-        input->GetLayout()
-            .WidthMode( ESizing::Flex )
-            .HeightMode( ESizing::Content )
-            .Padding( Edges::All( 6_u ) )
-            .SizeConstraints( Constraints::AtMost( { 280_u, Limits<Unit>::max() } ) );
-        return input;
-    }
-
-    /** @brief A button that grows up to a_MaxWidth and shrinks on narrow screens. */
-    ButtonWidget* AddButton( IWidget* a_Parent, String a_Label, Unit a_MaxWidth, ButtonWidget::OnClickCallback a_OnClick )
-    {
-        ButtonWidget* button = m_Scene.CreateWidget<ButtonWidget>( a_Parent->GetLayoutID(), std::move( a_OnClick ) );
-        button->GetLayout()
-            .WidthMode( ESizing::Flex )
-            .FixedHeight( 38_u )
-            .SizeConstraints( Constraints::AtMost( { a_MaxWidth, Limits<Unit>::max() } ) )
-            .ChildAlign( EAlign::Center );
-
-        // The label must not steal clicks from the button.
-        AddText( button, std::move( a_Label ), 16_u )->GetLayout().Visibility( EVisibility::HitTestInvisible );
-        return button;
-    }
-
-    /** @brief A card with a slider and a label showing its value. */
-    void AddSlider( IWidget* a_Parent, String a_Label, f32 a_Value, EOrient a_Orientation = EOrient::Horizontal )
-    {
-        const bool vertical = a_Orientation == EOrient::Vertical;
-
-        PanelWidget* card = AddPanel( a_Parent, ELayoutType::Vertical );
-        card->GetLayout()
-            .FixedHeight( vertical ? 180_u : 86_u )
-            .Padding( Edges::All( 8_u ) )
-            .Spacing( 6_u );
-
-        TextWidget* label = AddText( card, "", 14_u );
-
-        SliderWidget* slider = m_Scene.CreateWidget<SliderWidget>( card->GetLayoutID(), 0.f, 1.f, a_Value );
-        slider->Orientation = a_Orientation;
-        if ( vertical )
-            slider->GetLayout().FixedWidth( 36_u ).FixedHeight( 120_u );
-        else
-            slider->GetLayout().WidthMode( ESizing::Flex ).FixedHeight( 28_u );
-
-        slider->Value.Subscribe( [label, a_Label]( const f32& a_Current )
-        {
-            label->SetText( Text{ std::format( "{}: {}%", a_Label, static_cast<int>( std::round( a_Current * 100.f ) ) ) } );
-        } );
     }
 
     // -------------------------------------------------------------------------

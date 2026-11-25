@@ -20,6 +20,8 @@ namespace RatUI
     class InputTextWidget : public IWidget
     {
     public:
+        using Super = IWidget;
+
         using TextBuffer = TextEditModel::TextBuffer;
 
         Unique<ITextEditPolicy> Policy;

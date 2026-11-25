@@ -80,18 +80,29 @@ namespace RatUI
         /** @brief Returns the layout identifier for this widget. */
         NodeID GetLayoutID() const { return m_LayoutID; }
 
+        /** @brief The nearest ancestor widget, skipping bare layout nodes. */
         IWidget* GetParentWidget() const
         {
-            const LayoutNode& node = GetLayout();
-            return node.Parent() ? node.Parent()->Widget.get() : nullptr;
+            for ( const LayoutNode* node = GetLayout().Parent(); node; node = node->Parent() )
+            {
+                if ( node->Widget )
+                    return node->Widget.get();
+            }
+            return nullptr;
         }
 
         template<std::derived_from<IWidget> WidgetType>
         WidgetType* GetParentWidgetAs() const { return dynamic_cast<WidgetType*>( GetParentWidget() ); }
 
+        /** @brief The node user children go into. Defaults to this widget's node. */
+        virtual NodeID GetChildSlotID() const { return m_LayoutID; }
+
+        /** @brief Opt-in: lets UI builders add children and set child layout. Only checked by the builders. */
+        static constexpr bool c_HasChildren = false;
+
         // - Lifecycle
 
-        /** @brief Called immediately after the widget is constructed and associated with a layout node. */
+        /** @brief Called after construction. The widget may not have a parent yet. */
         virtual void OnConstruct() {}
 
         /** @brief Called immediately before the widget is destroyed and disassociated from its layout node. */
@@ -199,11 +210,23 @@ namespace RatUI
 
         void PaintChildren( const PaintEvent& a_Event )
         {
-            GetLayout().ForEachChild( [&]( LayoutNode& childNode )
+            GetLayout().ForEachChild( [&]( LayoutNode& childNode ) { PaintNode( childNode, a_Event ); } );
+        }
+
+    public:
+        /** @brief Paints a node's widget, or a bare node's children. Use instead of Widget->Paint(). */
+        static void PaintNode( LayoutNode& a_Node, const PaintEvent& a_Event )
+        {
+            if ( a_Node.Widget )
             {
-                if ( childNode.Widget )
-                    childNode.Widget->Paint( a_Event );
-            } );
+                a_Node.Widget->Paint( a_Event );
+                return;
+            }
+
+            if ( !Visibility::IsRendered( a_Node.Layout.Visibility ) )
+                return;
+
+            a_Node.ForEachChild( [&]( LayoutNode& childNode ) { PaintNode( childNode, a_Event ); } );
         }
 
     protected:

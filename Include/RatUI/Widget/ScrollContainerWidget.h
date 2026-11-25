@@ -31,6 +31,9 @@ namespace RatUI
     class ScrollContainerWidget : public IWidget
     {
     public:
+        using Super = IWidget;
+        static constexpr bool c_HasChildren = true;
+
         static constexpr Unit c_ScrollbarSize = 16_u;
 
         Callback<ScrollContainerWidget&, Vec2<Unit>> OnScroll; ///< Callback invoked when the scroll offset changes, providing the new offset.
@@ -88,6 +91,8 @@ namespace RatUI
             EnsureScrollbars();
         }
 
+        NodeID GetChildSlotID() const override { return m_ContentNodeID; }
+
         bool IsFocusable() const override { return true; }
 
         void OnPaint( const PaintEvent& a_Event ) override
@@ -115,11 +120,7 @@ namespace RatUI
 
                 if ( LayoutNode* contentNode = scene.GetLayoutNode( m_ContentNodeID ) )
                 {
-                    contentNode->ForEachChild( [&]( LayoutNode& child )
-                    {
-                        if ( child.Widget )
-                            child.Widget->Paint( a_Event );
-                    } );
+                    contentNode->ForEachChild( [&]( LayoutNode& child ) { PaintNode( child, a_Event ); } );
                 }
 
                 if ( hasTranslation )

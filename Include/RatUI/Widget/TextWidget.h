@@ -10,6 +10,8 @@ namespace RatUI
     class TextWidget : public IWidget
     {
     public:
+        using Super = IWidget;
+
 
         // --------------------------------------------------------------------
         // Render Properties
@@ -38,6 +40,8 @@ namespace RatUI
             m_ResolvedText = NullOpt;
             InvalidatePrepared();
         }
+
+        const TextLayoutStyle& GetLayoutStyle() const { return m_LayoutStyle; }
 
         /**
          * @brief Replaces the layout style.
