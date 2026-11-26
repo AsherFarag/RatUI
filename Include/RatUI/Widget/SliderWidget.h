@@ -3,11 +3,15 @@
 #include "IWidget.h"
 
 #include "Theme.h"
+#include "FocusRing.h"
 
 namespace RatUI
 {
     /**
-     * @brief
+     * @brief A track with a draggable thumb.
+     *
+     * For keyboard and gamepad it is engaged to be adjusted (see IWidget::CanEngage): navigation stops on the slider,
+     * Activate (Enter, A) engages it, and the arrows along the track then move the value until it is disengaged.
      */
     class SliderWidget : public IWidget
     {
@@ -40,6 +44,7 @@ namespace RatUI
         Unit  ThumbBorderThickness   { 0_u };                                  ///< Border thickness of the thumb.
         Unit  ThumbBorderThicknessPressed{ 2_u };                              ///< Border thickness of the thumb while dragging.
         CornerRadius ThumbRadius     { CornerRadius::All( 0_u ) };             ///< Corner rounding of the thumb.
+        FocusRingStyle FocusRing{};                                            ///< Drawn while focused (theme: FocusOutline keys).
 
         // --------------------------------------------------------------------
         // Behaviour properties
@@ -47,14 +52,14 @@ namespace RatUI
 
         f32 Min       { 0.f };
         f32 Max       { 1.f };
-        f32 Step      { 0.f };   ///< If > 0, the value will snap to multiples of Step between Min and Max.
+        f32 Step      { 0.f };   ///< If > 0, the value snaps to Min plus multiples of Step, and arrow keys move one Step. If 0, arrow keys move 1% of the range.
         f32 ScrollStep{ 0.05f }; ///< Scroll wheel step.
 
         Observable<f32> Value{}; ///< Current value, clamped to [Min, Max].
 
-        SliderWidget() = default;
+        SliderWidget() : IWidget( ENavRole::Stop ) {}
         SliderWidget( f32 a_Min, f32 a_Max, f32 a_InitialValue = 0.f )
-            : Min( a_Min ), Max( a_Max )
+            : IWidget( ENavRole::Stop ), Min( a_Min ), Max( a_Max )
         {
             Value.Set( std::clamp( a_InitialValue, a_Min, a_Max ) );
         }
@@ -85,7 +90,7 @@ namespace RatUI
         // --------------------------------------------------------------------
 
         bool IsInteractable() const override { return true; }
-        bool IsFocusable()    const override { return true; }
+        bool CanEngage()      const override { return true; }
 
         void OnPaint( const PaintEvent& a_Event ) override
         {
@@ -95,6 +100,12 @@ namespace RatUI
 
             PaintTrack( a_Event.Drawer, rect );
             PaintThumb( a_Event.Drawer, rect );
+
+            // Around the thumb while engaged, around the whole slider while navigation is on it.
+            if ( IsEngaged() )
+                FocusRing.Draw( a_Event.Drawer, GetThumbRect( rect ), ThumbRadius );
+            else if ( GetScene().IsFocusVisible( GetLayoutID() ) )
+                FocusRing.Draw( a_Event.Drawer, rect, ThumbRadius );
         }
 
         // --------------------------------------------------------------------
@@ -116,6 +127,16 @@ namespace RatUI
                 GetScene().CapturePointer( m_DragPointer, GetLayoutID() );
                 UpdateFromPointer( GetLayout().Layout.FinalRect, m_LastPointerPos );
 
+                return Reply::Handled();
+            }
+
+            // While engaged, the arrows along the track move the value. Down and right increase it, as the thumb moves.
+            const bool      isHz = Orientation == EOrient::Horizontal;
+            const EButtonID less = isHz ? EButtonID::KeyLeft : EButtonID::KeyUp;
+            const EButtonID more = isHz ? EButtonID::KeyRight : EButtonID::KeyDown;
+            if ( IsEngaged() && ( a_Event.Button == less || a_Event.Button == more ) )
+            {
+                StepValue( a_Event.Button == more );
                 return Reply::Handled();
             }
 
@@ -166,15 +187,22 @@ namespace RatUI
 
         Reply OnPointerScroll( const PointerEvent& a_Event ) override
         {
-            const bool isHz = ( Orientation == EOrient::Horizontal );
-            const f32  delta = isHz
-                ? a_Event.ScrollDelta[0].ToFloat()
-				: a_Event.ScrollDelta[1].ToFloat() * -1.f; // Invert vertical scroll to match typical scrollbar behaviour.
+            // Only once focused (e.g. clicked), so the wheel over a slider in scrolling content scrolls the content.
+            if ( GetScene().GetFocusedNode() != GetLayoutID() )
+                return Reply::Unhandled();
 
+            // Horizontal: the sideways wheel if there is one, else the vertical wheel (up raises the value), so a plain
+            // mouse wheel works. Vertical: like a scrollbar, wheel down moves the thumb down.
+            const f32 dx    = a_Event.ScrollDelta[0].ToFloat();
+            const f32 dy    = a_Event.ScrollDelta[1].ToFloat();
+            const f32 delta = Orientation == EOrient::Horizontal ? ( dx != 0.f ? dx : dy ) : -dy;
+
+            const f32 before = Value.Get();
             if ( delta != 0.f )
                 Nudge( delta * ScrollStep );
 
-            return Reply::Unhandled();
+            // Unmoved at either end, the scroll passes on to the widgets around it.
+            return Value.Get() != before ? Reply::Handled() : Reply::Unhandled();
         }
 
     protected:
@@ -184,6 +212,24 @@ namespace RatUI
         bool m_IsThumbPressed { false };
         Vec2<Unit> m_LastPointerPos{ 0_u, 0_u };
         PointerID  m_DragPointer{ c_MousePointerID }; ///< The pointer dragging the slider, while m_IsDragging
+
+        /**
+         * @brief Moves to the next multiple of Step (from Min) up or down, so an off-step value lands back on the
+         * steps, or by 1% of the range when Step is 0.
+         */
+        void StepValue( bool a_Up )
+        {
+            if ( Step <= 0.f )
+            {
+                Nudge( ( Max - Min ) * ( a_Up ? 0.01f : -0.01f ) );
+                return;
+            }
+
+            constexpr f32 c_Epsilon = 1e-4f;
+            const f32     index     = ( Value.Get() - Min ) / Step;
+            const f32     next      = a_Up ? std::floor( index + 1.f + c_Epsilon ) : std::ceil( index - 1.f - c_Epsilon );
+            Value.Set( std::clamp( Min + next * Step, Min, Max ) );
+        }
 
         /** @brief Pulls the cached render properties from the theme if it changed. */
         void SyncTheme()
@@ -207,6 +253,7 @@ namespace RatUI
                     ThumbBorderThickness = Theme.GetMetric( ThemeKey::Metric::SliderThumbBorderThickness, ThumbBorderThickness );
                     ThumbBorderThicknessPressed = Theme.GetMetric( ThemeKey::Metric::SliderThumbBorderThicknessPressed, ThumbBorderThicknessPressed );
                     ThumbRadius = Theme.GetRadius( ThemeKey::Radii::SliderThumb, ThumbRadius );
+                    FocusRing.UpdateFromTheme( Theme );
                 }
             }
         }
@@ -307,11 +354,14 @@ namespace RatUI
         {
             SyncTheme(); // Input can arrive before the first paint or after a theme swap.
 
-			const auto stepValue = [=]( f32 a_Value ) -> f32
-			{
-				if ( Step <= 0.f ) return a_Value;
-				return std::round( a_Value / Step ) * Step;
-			};
+            // a_T is the thumb's [0, 1] position; Step applies to the value.
+            const auto setFromPosition = [this]( f32 a_T )
+            {
+                f32 value = Min + std::clamp( a_T, 0.f, 1.f ) * ( Max - Min );
+                if ( Step > 0.f )
+                    value = Min + std::round( ( value - Min ) / Step ) * Step;
+                Value.Set( std::clamp( value, Min, Max ) );
+            };
 
             const Vec2<Unit> thumbSize = GetEffectiveThumbSize( a_Rect );
 
@@ -322,7 +372,7 @@ namespace RatUI
 
                 const f32 t = ( a_Pos[0] - ( a_Rect.Left() + thumbSize[0] * 0.5f ) ).ToFloat()
                               / travel.ToFloat();
-                SetNormalized( stepValue( t ) );
+                setFromPosition( t );
             }
             else
             {
@@ -331,7 +381,7 @@ namespace RatUI
 
                 const f32 t = ( a_Pos[1] - ( a_Rect.Top() + thumbSize[1] * 0.5f ) ).ToFloat()
                               / travel.ToFloat();
-				SetNormalized( stepValue( t ) );
+				setFromPosition( t );
             }
         }
 

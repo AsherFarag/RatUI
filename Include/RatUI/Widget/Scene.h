@@ -95,6 +95,27 @@ namespace RatUI
         /** @brief Clears the focus from the current focused widget. */
         void ClearFocus() { SetFocus( c_InvalidNodeID ); }
 
+        /**
+         * @brief Scrolls every EOverflow::Scroll node a_Node is in so it is in view, as far as each can. Done for
+         * focus that keyboard or gamepad navigation moves.
+         */
+        void ScrollIntoView( NodeID a_Node );
+
+        /** @brief Has the next UpdateLayout call a_Node's IWidget::OnLayoutDone once it is done. */
+        void NotifyAfterLayout( NodeID a_Node );
+
+        /** @brief Focuses a_Node and engages it, if it can be engaged (see IWidget::CanEngage). */
+        void Engage( NodeID a_Node );
+
+        /** @brief Disengages the engaged widget, if any, keeping it focused. */
+        void Disengage();
+
+        /** @brief Whether a_Node is the engaged widget. */
+        RATUI_NODISCARD bool IsEngaged( NodeID a_Node ) const
+        {
+            return a_Node != c_InvalidNodeID && Input.EngagedWidget == a_Node;
+        }
+
         // - Pointer Capture: each pointer (the mouse, each touch, each pen) is captured on its own, so several fingers can
         //   hold different widgets at once.
 
@@ -179,6 +200,7 @@ namespace RatUI
 
         NodePool m_Layouts{};      ///< Pool of layout nodes representing the hierarchical structure and layout information of widgets in the scene.
         Array<NodeID>  m_ToDestroy;
+        Array<NodeID>  m_AfterLayout; ///< Widgets to call OnLayoutDone on at the end of UpdateLayout.
 		f64            m_ClockSeconds{ 0.0 };
         Edges          m_SafeArea{};
 
@@ -186,30 +208,54 @@ namespace RatUI
 
         /** @brief Applies a_Reply's requests; a capture request or release applies to a_Pointer. */
         void ApplyReply( const Reply& a_Reply, PointerID a_Pointer = c_MousePointerID );
-        NavReply QueryBoundaryReply( ENavAction a_Action, NodeID a_Focused );
+        /** @brief What to do when a move inside the current nav scope finds nothing: asks the group it is inside. */
+        NavReply QueryBoundaryReply( ENavAction a_Action );
 
         /**
          * @brief Makes the nav scope stack match the newly focused widget's position in the tree.
-         * Scopes that don't contain the widget are dropped, and its enclosing focus scopes are pushed,
+         * Scopes that don't contain the widget are dropped, and its enclosing groups (ENavRole::Group) are pushed,
          * so arrow keys move between its siblings after it was focused by a click or SetFocus().
          */
         void SyncNavScopes( NodeID a_Focused );
 
         bool ProcessPointerEvent( const PointerEvent& a_Event );
+
+        /**
+         * @brief Re-hit-tests the last pointer position after layout moved or removed widgets, so hover follows
+         * without a new pointer event. Sends only OnPointerExit/OnPointerEnter: the pointer itself didn't move.
+         */
+        void RefreshHover();
+
+        /**
+         * @brief Sends a wheel event to the widget its gesture is latched to (WheelLatch), or else bubbles it up from the
+         * deepest node under the pointer (or its captor) and latches the gesture to the widget that takes it.
+         */
+        bool DispatchWheel( const PointerEvent& a_Event, NodeID a_Captured );
+
+        /** @brief Moves hover to a_Target, sending OnPointerExit and OnPointerEnter if it changed. */
+        void SetHovered( NodeID a_Target, const PointerEvent& a_Event );
+
         bool ProcessButtonEvent( const ButtonEvent& a_Event );
         bool ProcessTextInputEvent( const TextInputEvent& a_Event );
         void UpdateGestureState( const ButtonEvent& a_Event );
         NodeID HitTest( NodeID a_ID, Vec2<Unit> a_LogicalPos );
+        /** @brief The deepest node under a_LogicalPos, interactable or not (e.g. the empty area of a scroll container). */
+        NodeID HitTestDeepest( NodeID a_ID, Vec2<Unit> a_LogicalPos );
 
-        /** @brief Recursively collects focusable widgets within a_Scope's subtree, not descending into nested navigation boundaries. */
-        void CollectFocusableCandidates( LayoutNode& a_Scope, Array<const LayoutNode*>& a_Out );
+        /**
+         * @brief The widgets arrow keys and Tab move between inside a_Scope, in layout order: focusable widgets
+         * anywhere below it, except inside groups (ENavRole::Group). A group is a target itself; its contents are
+         * reached by entering it with Activate.
+         */
+        void CollectNavTargets( LayoutNode& a_Scope, Array<const LayoutNode*>& a_Out );
 
         void DestroyWidgetImmediately( LayoutNode& a_Node )
         {
             a_Node.DetachFromParent();
-            a_Node.ForEachChild( [&]( LayoutNode& child ) {
-                DestroyWidgetImmediately( child );
-            } );
+
+            // Each child detaches itself, so take the first until none are left.
+            while ( LayoutNode* child = a_Node.FirstChild() )
+                DestroyWidgetImmediately( *child );
 
             if (a_Node.Widget)
                 a_Node.Widget->OnDestroy();
@@ -228,6 +274,10 @@ namespace RatUI
             }
             if ( Input.HoveredWidget == a_Node.ID )
                 Input.HoveredWidget = c_InvalidNodeID;
+            if ( Input.EngagedWidget == a_Node.ID )
+                Input.EngagedWidget = c_InvalidNodeID;
+            if ( Input.Wheel.Widget == a_Node.ID )
+                Input.Wheel = {};
 
             m_Layouts.Deallocate( a_Node.ID );
         }

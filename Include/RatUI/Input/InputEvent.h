@@ -385,6 +385,21 @@ namespace RatUI
             return *this;
         }
 
+        /** @brief Focus the specified widget and engage it (see IWidget::CanEngage). */
+        constexpr Reply& Engage( NodeID a_Widget )
+        {
+            m_FocusWidget = a_Widget;
+            m_Engage      = true;
+            return *this;
+        }
+
+        /** @brief Disengage the engaged widget, keeping it focused. */
+        constexpr Reply& Disengage()
+        {
+            m_Disengage = true;
+            return *this;
+        }
+
         /** @brief Prevent the default behavior associated with this event (e.g., text input, button clicks). */
         constexpr Reply& PreventDefault()
         {
@@ -397,6 +412,8 @@ namespace RatUI
         constexpr bool ShouldReleasePointer() const { return m_ReleasePointer; }
         constexpr bool ShouldSetFocus()     const { return m_FocusWidget != c_InvalidNodeID; }
         constexpr bool ShouldClearFocus()   const { return m_ClearFocus; }
+        constexpr bool ShouldEngage()       const { return m_Engage; }
+        constexpr bool ShouldDisengage()    const { return m_Disengage; }
         constexpr bool IsDefaultPrevented() const { return m_PreventDefault; }
 
         /** @brief The widget a capture request sends the replied-to pointer's events to. */
@@ -414,6 +431,8 @@ namespace RatUI
         bool   m_RequestCapture : 1 { false };
         bool   m_ReleasePointer : 1 { false };
         bool   m_ClearFocus     : 1 { false };
+        bool   m_Engage         : 1 { false };
+        bool   m_Disengage      : 1 { false };
         bool   m_PreventDefault : 1 { false };
     };
 

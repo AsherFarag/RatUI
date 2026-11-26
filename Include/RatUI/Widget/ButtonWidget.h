@@ -15,15 +15,14 @@ namespace RatUI
 		using OnClickCallback = Callback<ButtonBaseWidget&>;
         OnClickCallback OnClick; ///< Callback that is invoked when the button is clicked.
 
-        ButtonBaseWidget() = default;
+        ButtonBaseWidget() : IWidget( ENavRole::Stop ) {}
         ButtonBaseWidget( OnClickCallback a_OnClick )
-            : OnClick( std::move( a_OnClick ) )
+            : IWidget( ENavRole::Stop ), OnClick( std::move( a_OnClick ) )
         {}
 
         virtual ~ButtonBaseWidget() = default;
 
         bool IsInteractable() const override { return true; }
-        bool IsFocusable()    const override { return true; }
 
         Reply OnButtonPressed( const ButtonEvent& a_Event ) override
         {

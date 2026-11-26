@@ -96,6 +96,11 @@ namespace RatUI
         DrawList& PushClipRect( Rect<Unit> a_Rect )
         {
             RATUI_ASSERT( m_ClipStackSize < Size(m_ClipStack), "Exceeded maximum clip stack depth." );
+
+            // Clips are stored in screen space, so one pushed under a transform (e.g. scrolled content) moves with it.
+            if ( m_TransformStackSize > 0 )
+                a_Rect = TransformBounds( GetCurrentTransform(), a_Rect );
+
             if ( Optional<Rect<Unit>> currentClip = GetCurrentClip() )
                 a_Rect = a_Rect.Intersection( *currentClip );
 
@@ -370,6 +375,26 @@ namespace RatUI
                 ToPixel( a_Radius.BL, m_DPIScale ),
                 ToPixel( a_Radius.BR, m_DPIScale )
             };
+        }
+
+        /** @brief The axis-aligned bounds of @p a_Rect after @p a_Transform. */
+        static Rect<Unit> TransformBounds( const Mat3<Unit>& a_Transform, const Rect<Unit>& a_Rect )
+        {
+            f32 minX = std::numeric_limits<f32>::max(), minY = minX;
+            f32 maxX = std::numeric_limits<f32>::lowest(), maxY = maxX;
+
+            for ( const f32 x : { a_Rect.Left().ToFloat(), a_Rect.Right().ToFloat() } )
+            {
+                for ( const f32 y : { a_Rect.Top().ToFloat(), a_Rect.Bottom().ToFloat() } )
+                {
+                    const f32 tx = a_Transform[0][0].ToFloat() * x + a_Transform[1][0].ToFloat() * y + a_Transform[2][0].ToFloat();
+                    const f32 ty = a_Transform[0][1].ToFloat() * x + a_Transform[1][1].ToFloat() * y + a_Transform[2][1].ToFloat();
+                    minX = std::min( minX, tx ); maxX = std::max( maxX, tx );
+                    minY = std::min( minY, ty ); maxY = std::max( maxY, ty );
+                }
+            }
+
+            return { { Unit( minX ), Unit( minY ) }, { Unit( maxX - minX ), Unit( maxY - minY ) } };
         }
 
         // TODO: We call these alot, should cache them

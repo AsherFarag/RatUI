@@ -10,12 +10,12 @@
 namespace RatUI
 {
     /**
-     * @brief An editable text field. Click it (or navigate to it) to focus, then type.
-     * Editing behaviour (single-line, multi-line, numeric) comes from the ITextEditPolicy.
+     * @brief An editable text field. Editing behaviour (single-line, multi-line, numeric) comes from the ITextEditPolicy.
      *
-     * Typed characters arrive as TextInputEvents; editing keys (Backspace, arrows, Ctrl+Z...)
-     * arrive as ButtonEvents. While focused, the widget receives keys before navigation and
-     * only lets through keys its policy leaves unhandled (e.g. Up/Down in a single-line field).
+     * It is edited while engaged (see IWidget::CanEngage): navigation stops on the field without editing it, and
+     * Activate (Enter, A) or a click starts editing. While editing, typed characters arrive as TextInputEvents and
+     * editing keys (Backspace, arrows, Ctrl+Z...) as ButtonEvents, before navigation. Cancel (Escape) stops editing, as
+     * does a commit (Enter in a single-line field) after OnSubmit; Tab stops and moves on.
      */
     class InputTextWidget : public IWidget
     {
@@ -43,7 +43,7 @@ namespace RatUI
         FocusRingStyle FocusRing{};                                  ///< Drawn while the field has focus (theme: FocusOutline keys).
 
         explicit InputTextWidget( Unique<ITextEditPolicy> a_Policy = MakeUnique<SingleLineTextEditPolicy>() )
-            : Policy( std::move( a_Policy ) )
+            : IWidget( ENavRole::Stop ), Policy( std::move( a_Policy ) )
         {
             // Preserve spaces and newlines so the caret and the rendered text agree.
             // Shaping uses unlimited width, so there are no soft wraps.
@@ -95,30 +95,28 @@ namespace RatUI
                 GetLayout().MarkDirty(); // A content-sized field fits its placeholder.
         }
 
-        bool HasFocus() const { return GetScene().GetFocusedNode() == GetLayoutID(); }
+        /** @brief Whether the field is being edited: it is engaged, so it takes typed text. */
+        bool IsEditing() const { return IsEngaged(); }
 
         // --------------------------------------------------------------------
         // IWidget overrides
         // --------------------------------------------------------------------
 
         bool IsInteractable() const override { return true; }
-        bool IsFocusable()    const override { return true; }
-        bool WantsTextInput() const override { return HasFocus(); }
+        bool CanEngage()      const override { return true; }
+        bool WantsTextInput() const override { return IsEditing(); }
 
         Reply OnButtonPressed( const ButtonEvent& a_Event ) override
         {
-            if ( IsPointerButton( a_Event.Button ) )
+            if ( a_Event.Button == EButtonID::MouseLeft )
             {
-                if ( a_Event.Button != EButtonID::MouseLeft )
-                    return Reply::Unhandled();
-
                 // TODO: Place the caret under the pointer instead of at the end.
-                if ( !HasFocus() )
+                if ( !IsEditing() )
                     m_Model.SetCaret( static_cast<u32>( m_Model.GetTextBuffer().size() ) );
-                return Reply::Handled().SetFocus( GetLayoutID() );
+                return Reply::Handled().Engage( GetLayoutID() );
             }
 
-            if ( !Policy )
+            if ( !IsEditing() || !Policy )
                 return Reply::Unhandled();
 
             const TextEditOutcome outcome = Policy->HandleKey( m_Model, a_Event );
@@ -128,26 +126,30 @@ namespace RatUI
             if ( outcome.Changed )
                 OnTextChanged();
 
+            Reply reply = Reply::Handled();
+
             // Holding Enter shouldn't submit again with every key repeat.
             if ( outcome.Commited && !a_Event.Repeat )
+            {
                 if ( OnSubmit ) OnSubmit( m_Utf8 );
+                if ( IsEditing() ) // OnSubmit may have moved focus on.
+                    reply.Disengage();
+            }
 
             if ( outcome.Canceled )
-                return Reply::Handled().ClearFocus();
+                reply.Disengage();
 
-            return Reply::Handled();
+            return reply;
         }
 
         Reply OnButtonReleased( const ButtonEvent& a_Event ) override
         {
-            // Releases of keys this field took on press are routed back here by the Scene;
-            // there is nothing to do on release.
             return a_Event.Button == EButtonID::MouseLeft ? Reply::Handled() : Reply::Unhandled();
         }
 
         Reply OnTextInput( const TextInputEvent& a_Event ) override
         {
-            if ( !Policy )
+            if ( !IsEditing() || !Policy )
                 return Reply::Unhandled();
 
             // No modifier filtering here: platforms don't send text for shortcuts like Ctrl+A,
@@ -201,10 +203,11 @@ namespace RatUI
             const LayoutNode& node     = GetLayout();
             const Rect<Unit>& rect     = node.Layout.FinalRect;
             const Rect<Unit>  textRect = GetTextRect( ContentPadding( node ).Apply( rect ) );
-            const bool        focused  = HasFocus();
+            const bool        focused  = IsEditing();
 
+            // The ring shows while editing, and while navigation is on the field.
             a_Event.Drawer.AddBrushRect( rect, FillBrush, BorderColor, BorderThickness, Radius );
-            if ( focused )
+            if ( focused || GetScene().IsFocusVisible( GetLayoutID() ) )
                 FocusRing.Draw( a_Event.Drawer, rect, Radius );
 
             // Clip text at the padding horizontally (it scrolls past the edges) but only at the border

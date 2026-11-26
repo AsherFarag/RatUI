@@ -25,6 +25,20 @@ namespace RatUI
         Unit MultiPressDistance{ 6_u };
         Unit DragThreshold{ 4_u };
         f64  LongPressSeconds{ 0.5 };
+        f64  WheelLatchSeconds{ 0.5 };  ///< A pause this long between wheel notches ends a wheel gesture (see WheelLatch).
+        Unit WheelLatchDistance{ 4_u }; ///< Moving the pointer this far ends a wheel gesture.
+    };
+
+    /**
+     * @brief The widget a wheel gesture is latched to. The notches of one gesture all go to the widget that took the
+     * first, so content scrolling under a still pointer doesn't hand the wheel to whatever slides beneath it.
+     */
+    struct WheelLatch
+    {
+        NodeID     Widget{ c_InvalidNodeID };
+        PointerID  Pointer{};
+        Vec2<Unit> Position{}; ///< Where the gesture started.
+        f64        LastTime{ 0.0 };
     };
 
     struct PointerGestureState
@@ -64,12 +78,14 @@ namespace RatUI
         EModifier     ModifierState{ EModifier::None };
 
         NodeID FocusedWidget{ c_InvalidNodeID };
+        NodeID EngagedWidget{ c_InvalidNodeID }; ///< The focused widget, while it is engaged (see IWidget::CanEngage).
         NodeID HoveredWidget{ c_InvalidNodeID };
 
         PointerEvent LastPointerEvent{};
         HashMap<EButtonID, KeyPressTarget> KeyPresses{}; ///< Held keyboard keys whose press a widget took, so focus changes can't split a key stroke.
         bool DropNextTextInput{ false }; ///< The last key press was used by navigation, so the text it produces (e.g. Space's " ") is not typed.
         HashMap<PointerID, PointerGestureState> PointerStates{};
+        WheelLatch Wheel{};
         Array<NavScope> NavStack{};
 
         // --------------------------------------------------------------------

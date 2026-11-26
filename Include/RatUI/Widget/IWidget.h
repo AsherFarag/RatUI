@@ -63,6 +63,7 @@ namespace RatUI
     {
     public:
         IWidget() = default;
+        explicit IWidget( ENavRole a_NavRole ) : m_NavRole( a_NavRole ) {}
         IWidget( const IWidget& ) = delete;
         IWidget& operator=( const IWidget& ) = delete;
         IWidget( IWidget&& ) = default;
@@ -103,6 +104,18 @@ namespace RatUI
         /** */
         virtual bool HasWidthDependentContent() const { return false; }
 
+        /**
+         * @brief Called once layout has arranged this widget and everything below it, e.g. to react to how far its
+         * content scrolls. Return true if it changed something layout depends on, to have layout run again.
+         */
+        virtual bool OnArranged() { return false; }
+
+        /**
+         * @brief Called after an UpdateLayout this widget asked for with Scene::NotifyAfterLayout, once every pass is
+         * done: unlike OnArranged, the scene can be changed here, e.g. by user callbacks.
+         */
+        virtual void OnLayoutDone() {}
+
         void Paint( const PaintEvent& a_Event )
         {
             LayoutNode& node = GetLayout();
@@ -122,11 +135,27 @@ namespace RatUI
         /** @brief Returns whether this widget can receive pointer events. */
         virtual bool IsInteractable() const { return false; }
 
-        /** @brief Returns whether this widget can hold keyboard/gamepad focus. */
-        virtual bool IsFocusable() const { return false; }
+        /** @brief How keyboard and gamepad navigation treats this widget. Each widget type sets its default. */
+        ENavRole GetNavRole() const { return m_NavRole; }
 
-        /** @brief Whether this widget defines a navigation boundary. */
-        virtual bool IsNavigationBoundary() const { return false; }
+        /** @brief Changes how navigation treats this widget. Made unfocusable while focused, it loses focus. */
+        void SetNavRole( ENavRole a_NavRole );
+
+        /** @brief Whether this widget can hold keyboard/gamepad focus: its nav role isn't ENavRole::None. */
+        bool IsFocusable() const { return m_NavRole != ENavRole::None; }
+
+        /**
+         * @brief Whether this widget can be engaged: put in an edit mode where it takes the keys navigation would
+         * otherwise use (e.g. a slider taking the arrows, a text field taking typed text).
+         *
+         * Navigation stops on the widget without engaging it. Activate (Enter, A) engages it; Activate again, Cancel
+         * (Escape, B) or Tab disengage it, as does focus moving away. While engaged, arrow keys the widget leaves
+         * unhandled don't move focus. A widget can also engage itself, e.g. on a click, with Reply::Engage.
+         */
+        virtual bool CanEngage() const { return false; }
+
+        /** @brief Whether this widget is engaged (see CanEngage). */
+        bool IsEngaged() const;
 
         // - Pointer Events: Only called for widgets that return true from IsInteractable()
 
@@ -177,17 +206,24 @@ namespace RatUI
         /** @brief Called with typed text (UTF-8) while this widget is focused. */
         virtual Reply OnTextInput( const TextInputEvent& a_Event ) { return Reply::Unhandled(); }
 
+        /** @brief Called when the widget becomes engaged (see CanEngage). */
+        virtual void OnEngage() {}
+
+        /** @brief Called when the widget stops being engaged, before OnFocusLost if focus is moving. */
+        virtual void OnDisengage() {}
+
         /**
-         * @brief Whether this widget currently wants keyboard input before navigation does (e.g. a focused text field).
-         * When true and the widget is focused, key presses reach OnButtonPressed before navigation, and only
-         * fall through to navigation if the widget leaves them unhandled. The release of a key whose press a
-         * widget handled is always sent to that widget, even if focus has moved since.
+         * @brief Whether the platform should be asked for text input (e.g. to show an on-screen keyboard or an IME)
+         * while this widget is focused, as for an engaged text field.
          */
         virtual bool WantsTextInput() const { return false; }
 
-		// - Navigation: Only called for widgets that return true from IsNavigationBoundary()
+		// - Navigation
 
-		/** @brief */
+		/**
+		 * @brief Called on the widget whose nav scope navigation is in (an entered ENavRole::Group, or a widget pushed
+		 * with Scene::PushNavScope) when a move finds nothing further that way. By default navigation leaves the scope.
+		 */
 		virtual NavReply OnNavigationBoundary( const NavEvent& a_Event ) { return NavReply::Escape(); }
 
     protected:
@@ -210,6 +246,7 @@ namespace RatUI
         friend Scene;
 		Scene*   m_Scene{ nullptr };
         NodeID   m_LayoutID{};
+        ENavRole m_NavRole{ ENavRole::None };
     };
 
 } // namespace RatUI

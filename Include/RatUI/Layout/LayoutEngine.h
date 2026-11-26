@@ -69,6 +69,13 @@ namespace RatUI
     {
 		BumpAllocator& Allocator;
 		Edges          RemainingSafeArea{}; ///< The safe area (Scene::SetSafeArea) not yet cleared by an ancestor of the node being measured.
+
+        /**
+         * @brief Scroll nodes whose request arrange clamped. The caller settles their requests (LayoutNode::ScrollOffset)
+         * once every layout pass is done, so content a later pass grows (e.g. by reflowing text) still counts. Without a
+         * list, arrange settles them itself.
+         */
+        Array<LayoutNode*>* ClampedScrolls{ nullptr };
     };
 
     /**
@@ -116,4 +123,11 @@ namespace RatUI
      *         Callers should re-run Measure + Arrange once when this returns true.
      */
     bool       ArrangeLayoutNode( LayoutNode& a_Node, Rect<Unit> a_AllocatedRect, LayoutContext& a_Ctx );
+
+    /**
+     * @brief Scrolls an EOverflow::Scroll node now: sets its requested ScrollOffset and moves its arranged descendants,
+     * clamped to the content as of the last arrange. The next arrange clamps the request again, so content added since
+     * counts too.
+     */
+    void       ScrollLayoutNode( LayoutNode& a_Node, Vec2<Unit> a_Offset );
 } // namespace RatUI

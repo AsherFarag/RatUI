@@ -342,6 +342,14 @@ namespace RatUI
         }
     };
 
+    /** @brief What a node does with children that extend past it. */
+    enum class EOverflow : u8
+    {
+        Visible, ///< Children are placed where layout puts them, past the node's edges if they extend that far.
+        Scroll,  ///< Children are moved by the node's LayoutNode::ScrollOffset, which is clamped to how far they extend past it.
+                 ///< Layout only moves them: the widget painting them clips them.
+    };
+
     /**
      * @brief Represents the input parameters for the layout process of a UI element.
      * If any of these values change, the computed layout is invalid and must be recalculated.
@@ -353,8 +361,8 @@ namespace RatUI
         ELayoutType LayoutType{ ELayoutType::Overlay }; ///< The layout type to use for arranging child elements (if this element is a container).
         EAlign      ChildAlign{ EAlign::TopLeft };      ///< Default alignment for child elements within this container.
 		EVisibility Visibility{ EVisibility::Visible }; ///< The visibility state of the element, which can affect both rendering and layout.
-		bool        IsFocusScope{ false };              ///< Whether this element should be considered a focus scope for navigation.
 		ESafeAreaEdges SafeAreaEdges{ ESafeAreaEdges::None }; ///< Edges whose remaining safe area is added to Padding for this node's content.
+		EOverflow   Overflow{ EOverflow::Visible };     ///< Whether this node scrolls its children.
 
         /**
          * @note For grid layouts, at least one of GridColumns or GridRows must be set to a non-zero value. 
@@ -417,6 +425,8 @@ namespace RatUI
         Vec2<Unit> DesiredSize{};        ///< The desired size of the element based on its content and constraints. Filled by the Measure step.
 		Vec2<Unit> LastAvailableSize{};  ///< The last available size passed to the Measure step. Used to determine if a re-measure is necessary.
 		Edges      LastSafeArea{};       ///< The safe area that reached this node in the last Measure step. Used to determine if a re-measure is necessary.
+		Vec2<Unit> ScrollOffset{};       ///< How far an EOverflow::Scroll node's children are moved: the requested LayoutNode::ScrollOffset, clamped.
+		Vec2<Unit> MaxScrollOffset{};    ///< How far an EOverflow::Scroll node's children extend past it, so how far it can scroll.
 
 		LinearAggregate CachedLinear{};  ///< Cached aggregate values for linear layouts, used to optimize layout calculations.
 
@@ -441,12 +451,11 @@ namespace RatUI
         LayoutResult Layout{};        ///< The cached layout result for this widget computed during the layout process.
         Unique<class IWidget> Widget;
 
-        // TODO: Im not a big fan of this, but it's the only solution I can think of for now. 
-        // The problem is that some widgets (like ScrollContainer) have children that are 
-        // visually offset from their layout rect (e.g. scrolled content). 
-        // If we don't account for this, the hit test will fail for those children. 
-        // So we need to apply the ChildHitTestOffset to the logical position before recursing into children.
-        Vec2<Unit> ChildHitTestOffset{ 0_u, 0_u }; ///< The offset to apply to child hit-testing, allowing for custom hit-test regions that differ from the layout bounds.
+        /**
+         * @brief The scroll offset requested for an EOverflow::Scroll node. Arrange clamps it to the content and moves the
+         * children by it, so their FinalRects are where they are drawn. Set it with ScrollLayoutNode to move them at once.
+         */
+        Vec2<Unit> ScrollOffset{ 0_u, 0_u };
 
         LayoutNode( NodeID a_ID = {}, LayoutStyle a_Style = {} ); // Defined in Layout.cpp, IWidget is incomplete here.
         ~LayoutNode();
@@ -461,8 +470,8 @@ namespace RatUI
         LayoutNode& LayoutType( ELayoutType a_LayoutType ) { Style.LayoutType = a_LayoutType; MarkDirty(); return *this; }
         LayoutNode& ChildAlign( EAlign a_ChildAlign )      { Style.ChildAlign = a_ChildAlign; MarkDirty(); return *this; }
         LayoutNode& Visibility( EVisibility a_Visibility ) { Style.Visibility = a_Visibility; MarkDirty(); return *this; }
-        LayoutNode& FocusScope( bool a_IsFocusScope )      { Style.IsFocusScope = a_IsFocusScope; MarkDirty(); return *this; }
         LayoutNode& SafeAreaEdges( ESafeAreaEdges a_Edges ) { Style.SafeAreaEdges = a_Edges; MarkDirty(); return *this; }
+        LayoutNode& Overflow( EOverflow a_Overflow )        { Style.Overflow = a_Overflow; MarkDirty(); return *this; }
 
         LayoutNode& GridColumns( u16 a_GridColumns )  { Style.GridColumns = a_GridColumns; MarkDirty(); return *this; }
         LayoutNode& GridRows( u16 a_GridRows )        { Style.GridRows = a_GridRows; MarkDirty(); return *this; }

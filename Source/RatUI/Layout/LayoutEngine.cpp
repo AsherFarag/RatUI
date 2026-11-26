@@ -727,6 +727,68 @@ namespace
 		return reflowed;
     }
 
+    static Vec2<Unit> ClampScrollOffset( Vec2<Unit> a_Offset, Vec2<Unit> a_Max )
+    {
+        return { std::clamp( a_Offset[0], 0_u, a_Max[0] ), std::clamp( a_Offset[1], 0_u, a_Max[1] ) };
+    }
+
+    static void TranslateDescendants( LayoutNode& a_Node, Vec2<Unit> a_Delta )
+    {
+        a_Node.ForEachChild( [&]( LayoutNode& a_Child )
+        {
+            a_Child.Layout.FinalRect.Origin = a_Child.Layout.FinalRect.Origin + a_Delta;
+            TranslateDescendants( a_Child, a_Delta );
+        } );
+    }
+
+    /** @brief Grows a_End to the bottom-right of everything laid out below a_Node, except what nested scroll nodes clip. */
+    static void AccumulateContentEnd( const LayoutNode& a_Node, Vec2<Unit>& a_End )
+    {
+        a_Node.ForEachChild( [&]( const LayoutNode& a_Child )
+        {
+            if ( !Visibility::AffectsLayout( a_Child.Layout.Visibility ) )
+                return;
+
+            const Rect<Unit>& rect = a_Child.Layout.FinalRect;
+            a_End = { std::max( a_End[0], rect.Right() ), std::max( a_End[1], rect.Bottom() ) };
+
+            if ( a_Child.Style.Overflow != EOverflow::Scroll )
+                AccumulateContentEnd( a_Child, a_End );
+        } );
+    }
+
+    /**
+     * @brief Measures how far a scroll node's children, arranged at a_Arranged, extend past it, then clamps its
+     * requested offset to that and moves the children to it.
+     */
+    static void ResolveScroll( LayoutNode& a_Node, Vec2<Unit> a_Arranged, LayoutContext& a_Ctx )
+    {
+        const Rect<Unit>& rect    = a_Node.Layout.FinalRect;
+        const Edges       padding = ContentPadding( a_Node );
+
+        Vec2<Unit> end = rect.Origin - a_Arranged; // Where the content starts, as arranged.
+        AccumulateContentEnd( a_Node, end );
+
+        // In unscrolled positions, keeping the padding after the content.
+        const Vec2<Unit> max{ std::max( 0_u, end[0] + a_Arranged[0] + padding.R - rect.Right() ),
+                              std::max( 0_u, end[1] + a_Arranged[1] + padding.B - rect.Bottom() ) };
+
+        const Vec2<Unit> offset = ClampScrollOffset( a_Node.ScrollOffset, max );
+        if ( offset[0] != a_Arranged[0] || offset[1] != a_Arranged[1] )
+            TranslateDescendants( a_Node, a_Arranged - offset );
+
+        a_Node.Layout.MaxScrollOffset = max;
+        a_Node.Layout.ScrollOffset    = offset;
+
+        if ( offset[0] != a_Node.ScrollOffset[0] || offset[1] != a_Node.ScrollOffset[1] )
+        {
+            if ( a_Ctx.ClampedScrolls )
+                PushBack( *a_Ctx.ClampedScrolls, &a_Node );
+            else
+                a_Node.ScrollOffset = offset;
+        }
+    }
+
 } // namespace
 
     bool ArrangeLayoutNode( LayoutNode& a_Node, Rect<Unit> a_AllocatedRect, LayoutContext& a_Ctx )
@@ -756,10 +818,15 @@ namespace
             }
         }
     
+        // Children are arranged at the offset scrolled to so far, then moved if the content changed how far it can go.
+        const bool       scrolls  = a_Node.Style.Overflow == EOverflow::Scroll;
+        const Vec2<Unit> arranged = scrolls ? ClampScrollOffset( a_Node.ScrollOffset, a_Node.Layout.MaxScrollOffset ) : Vec2<Unit>{ 0_u, 0_u };
+
         if ( a_Node.FirstChild() )
         {
-            const Rect<Unit> inner = ContentPadding( a_Node ).Apply( a_AllocatedRect );
-    
+            Rect<Unit> inner = ContentPadding( a_Node ).Apply( a_AllocatedRect );
+            inner.Origin     = inner.Origin - arranged;
+
             switch ( a_Node.Style.LayoutType )
             {
                 case ELayoutType::Horizontal:
@@ -776,8 +843,31 @@ namespace
                     break;
             }
         }
-    
+
+        if ( scrolls )
+            ResolveScroll( a_Node, arranged, a_Ctx );
+        else
+            a_Node.Layout.ScrollOffset = a_Node.Layout.MaxScrollOffset = Vec2<Unit>{ 0_u, 0_u };
+
+        if ( a_Node.Widget )
+            reflowed |= a_Node.Widget->OnArranged();
+
         return reflowed;
+    }
+
+    void ScrollLayoutNode( LayoutNode& a_Node, Vec2<Unit> a_Offset )
+    {
+        a_Node.ScrollOffset = Vec2<Unit>{ std::max( a_Offset[0], 0_u ), std::max( a_Offset[1], 0_u ) };
+        if ( a_Node.Style.Overflow != EOverflow::Scroll )
+            return;
+
+        const Vec2<Unit> before = a_Node.Layout.ScrollOffset;
+        const Vec2<Unit> after  = ClampScrollOffset( a_Node.ScrollOffset, a_Node.Layout.MaxScrollOffset );
+        if ( after[0] == before[0] && after[1] == before[1] )
+            return;
+
+        a_Node.Layout.ScrollOffset = after;
+        TranslateDescendants( a_Node, before - after );
     }
 
 } // namespace RatUI
