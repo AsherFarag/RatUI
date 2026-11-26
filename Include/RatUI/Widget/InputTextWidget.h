@@ -164,27 +164,18 @@ namespace RatUI
             HandleThemeUpdate();
             EnsureShaped();
 
-            // Measure each line including trailing spaces (ShapedText::MaxWidth drops them),
+            // Lines are measured with their trailing spaces (ShapedText::MaxWidth leaves them out),
             // so the caret after trailing spaces stays inside the field.
-            // Line widths are cached by content, so an edit only reshapes the line it changed.
-            const TextBuffer& text  = m_Model.GetTextBuffer();
-            Unit              width = 0_u;
-            u32               lines = 1;
-            LineWidthMap      current;
-            for ( u32 lineStart = 0;; )
+            Unit width = 0_u;
+            u32  lines = 1;
+            for ( const codepoint c : m_Model.GetTextBuffer() )
+                lines += c == U'\n' ? 1u : 0u;
+
+            if ( m_ShapedText )
             {
-                u32 lineEnd = lineStart;
-                while ( lineEnd < text.size() && text[lineEnd] != U'\n' )
-                    ++lineEnd;
-
-                width = std::max( width, MeasureLine( lineStart, lineEnd, current ) );
-                if ( lineEnd >= text.size() )
-                    break;
-
-                lineStart = lineEnd + 1;
-                ++lines;
+                for ( u32 i = 0; i < m_ShapedText->LineCount(); ++i )
+                    width = std::max( width, m_ShapedText->CaretOffset( i, m_ShapedText->Lines[i].TextEnd ) );
             }
-            m_LineWidths = std::move( current ); // Drop lines that no longer exist.
 
             // A content-sized field fits its placeholder, whether or not it is showing, so the
             // field doesn't change size when the first character is typed.
@@ -241,9 +232,9 @@ namespace RatUI
                     {
                         const u32  from = std::max( start, lineStart );
                         const u32  to   = std::min( end, lineEnd );
-                        const Unit x0   = MeasureRange( lineStart, from );
+                        const Unit x0   = CaretX( lineStart, from );
                         // Show a sliver for selected newlines so empty selected lines are visible.
-                        const Unit x1   = MeasureRange( lineStart, to ) + ( end > lineEnd ? Unit{ 4.f } : 0_u );
+                        const Unit x1   = CaretX( lineStart, to ) + ( end > lineEnd ? Unit{ 4.f } : 0_u );
 
                         a_Event.Drawer.AddRect(
                             Rect<Unit>{ Vec2<Unit>{ textRect.Origin[0] + x0, textRect.Origin[1] + ( m_LineHeight + m_LineSpacing ) * static_cast<f32>( lineIndex ) },
@@ -285,7 +276,7 @@ namespace RatUI
                     }
                 }
 
-                const Unit x = MeasureRange( lineStart, caret );
+                const Unit x = CaretX( lineStart, caret );
                 a_Event.Drawer.AddRect(
                     Rect<Unit>{ Vec2<Unit>{ textRect.Origin[0] + x, textRect.Origin[1] + ( m_LineHeight + m_LineSpacing ) * static_cast<f32>( lineIndex ) },
                                 Vec2<Unit>{ CaretWidth, m_LineHeight } },
@@ -371,12 +362,11 @@ namespace RatUI
             if ( OnChanged ) OnChanged( m_Utf8 );
         }
 
-        /** @brief The text changed: reshape it. Per-line widths are kept (they are keyed by content). */
+        /** @brief The text changed: reshape it. */
         void InvalidateShaped()
         {
             m_ShapedText = NullOpt;
             m_Shaped     = false;
-            ::RatUI::Clear( m_PrefixWidths );
             if ( m_Scene )
                 GetLayout().MarkDirty();
         }
@@ -387,8 +377,6 @@ namespace RatUI
             m_ShapedPlaceholder = NullOpt;
             m_PlaceholderShaped = false;
             m_LineHeightValid   = false;
-            m_SentinelWidth   = Unit{ -1.f };
-            ::RatUI::Clear( m_LineWidths );
             InvalidateShaped();
         }
 
@@ -437,7 +425,7 @@ namespace RatUI
             if ( !m_LineHeightValid )
             {
                 // Not marked valid on failure (e.g. the font isn't loaded yet), so it is retried.
-                if ( Optional<ShapedText> probe = Shape( c_Sentinel ) ) // A visible glyph: whitespace alone may not shape.
+                if ( Optional<ShapedText> probe = Shape( c_Probe ) ) // A visible glyph: whitespace alone may not shape.
                 {
                     // The renderer centres each line's glyphs in its LineHeight box (ShapedText::FirstBaseline),
                     // so the caret and selection boxes line up with the text without any offset.
@@ -462,77 +450,44 @@ namespace RatUI
             if ( !metrics )
                 return NullOpt;
 
-            Optional<PreparedText> prepared = metrics->Prepare( a_Text, m_LayoutStyle );
+            // The caret maps buffer bytes to glyph clusters, so the shaped text must be the buffer's bytes:
+            // no transform (e.g. uppercase 'ß' is "SS"), and whitespace kept as typed.
+            TextLayoutStyle style = m_LayoutStyle;
+            style.Transform       = ETextTransform::None;
+            style.Wrap            = TextWrap::PreWrap();
+
+            Optional<PreparedText> prepared = metrics->Prepare( a_Text, style );
             if ( !prepared )
                 return NullOpt;
 
-            return metrics->Shape( *prepared, m_LayoutStyle );
+            return metrics->Shape( *prepared, style );
         }
 
-        /** @brief Width of the codepoints [a_Begin, a_End) of one line, cached until the text changes. */
-        Unit MeasureRange( u32 a_Begin, u32 a_End )
+        static constexpr const char* c_Probe = "|";
+
+        /** @brief UTF-8 byte offset of codepoint a_Index: the prepared text's offsets, as the field keeps only '\n' breaks. */
+        u32 ByteOffset( u32 a_Index ) const
         {
-            if ( a_End <= a_Begin )
+            const TextBuffer& text  = m_Model.GetTextBuffer();
+            u32               bytes = 0;
+            for ( u32 i = 0; i < a_Index && i < text.size(); ++i )
+                bytes += text[i] < 0x80 ? 1u : text[i] < 0x800 ? 2u : text[i] < 0x10000 ? 3u : 4u;
+            return bytes;
+        }
+
+        /** @brief Distance from the start of the line beginning at codepoint a_LineStart to a caret before codepoint a_Index. */
+        Unit CaretX( u32 a_LineStart, u32 a_Index ) const
+        {
+            if ( !m_ShapedText || a_Index <= a_LineStart )
                 return 0_u;
 
-            const u64 key = ( static_cast<u64>( a_Begin ) << 32 ) | a_End;
-            if ( const Unit* cached = FindValue( m_PrefixWidths, key ) )
-                return *cached;
-
-            const Optional<Unit> width = MeasureCodepoints( a_Begin, a_End );
-            if ( width )
-                Emplace( m_PrefixWidths, key, *width ); // Not cached without text metrics, so it is measured once they exist.
-            return width.value_or( 0_u );
-        }
-
-        using LineWidthMap = HashMap<TextBuffer, Unit>;
-
-        /** @brief Width of the line [a_Begin, a_End), looked up by its content; records it in a_Current. */
-        Unit MeasureLine( u32 a_Begin, u32 a_End, LineWidthMap& a_Current )
-        {
-            TextBuffer line( m_Model.GetTextBuffer().data() + a_Begin, a_End - a_Begin );
-            if ( const Unit* cached = FindValue( a_Current, line ) )
-                return *cached;
-
-            Optional<Unit> width;
-            if ( const Unit* known = FindValue( m_LineWidths, line ) )
-                width = *known;
-            else
-                width = MeasureCodepoints( a_Begin, a_End );
-
-            if ( width )
-                Emplace( a_Current, std::move( line ), *width );
-            return width.value_or( 0_u );
-        }
-
-        /** @brief Shapes the codepoints [a_Begin, a_End), or NullOpt without text metrics. */
-        Optional<Unit> MeasureCodepoints( u32 a_Begin, u32 a_End )
-        {
-            if ( a_End <= a_Begin )
-                return 0_u;
-
-            // Shaped line widths leave out trailing whitespace, so measure with a sentinel glyph
-            // appended and subtract the sentinel's own width.
-            const String utf8 = Unicode::EncodeUTF8( m_Model.GetTextBuffer().data() + a_Begin, a_End - a_Begin ) + c_Sentinel;
-            Optional<ShapedText> shaped = Shape( utf8 );
-            if ( !shaped )
-                return NullOpt;
-
-            return std::max( 0_u, shaped->MaxWidth - SentinelWidth() );
-        }
-
-        static constexpr const char* c_Sentinel = "|";
-
-        Unit SentinelWidth()
-        {
-            if ( m_SentinelWidth < 0_u )
+            const u32 lineByte = ByteOffset( a_LineStart );
+            for ( u32 i = 0; i < m_ShapedText->LineCount(); ++i )
             {
-                Optional<ShapedText> shaped = Shape( c_Sentinel );
-                if ( !shaped )
-                    return 0_u; // No text metrics yet; measure again later.
-                m_SentinelWidth = shaped->MaxWidth;
+                if ( m_ShapedText->Lines[i].TextStart == lineByte )
+                    return m_ShapedText->CaretOffset( i, ByteOffset( a_Index ) );
             }
-            return m_SentinelWidth;
+            return 0_u;
         }
 
     protected:
@@ -547,9 +502,6 @@ namespace RatUI
         String                 m_Placeholder;
         Optional<ShapedText>   m_ShapedPlaceholder;
         bool                   m_PlaceholderShaped{ false };
-        Unit                   m_SentinelWidth{ -1.f };
-        HashMap<u64, Unit>             m_PrefixWidths; ///< (begin << 32 | end) -> width; cleared on every edit.
-        LineWidthMap           m_LineWidths;     ///< Line content -> width; kept across edits, cleared on font change.
     };
 
 } // namespace RatUI

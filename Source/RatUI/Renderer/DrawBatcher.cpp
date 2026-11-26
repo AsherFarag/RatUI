@@ -466,7 +466,10 @@ namespace RatUI
                     break;
             }
     
+            // Hanging trailing spaces aren't in line.Width. In right-to-left text they are drawn first, so start before them.
             Pixel penX = lineX;
+            for ( u32 g = line.Start; g < line.End && line.VisibleEnd < line.TextEnd && a_Text.Glyphs[g].Cluster >= line.VisibleEnd; ++g )
+                penX -= ToPixel( a_Text.Glyphs[g].XAdvance, fontSize, a_DpiScale );
     
             u32 vertexBase = ( static_cast<u32>( Size( m_Vertices ) ) - Back( m_Batches ).VertexByteOffset ) / sizeof( TextVertex );
     
