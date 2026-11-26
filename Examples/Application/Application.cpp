@@ -339,11 +339,17 @@ void Application::ProcessEvents()
                 break;
 
             case SDL_MOUSEWHEEL:
+            {
+                // The wheel scrolls what is under the mouse, so the event carries where it is.
+                int mouseX = 0, mouseY = 0;
+                SDL_GetMouseState( &mouseX, &mouseY );
                 scene.DispatchInputEvent( { .Device = EDeviceID::Mouse,
-                                            .Payload = PointerEvent{ .Type        = EPointerType::Mouse,
+                                            .Payload = PointerEvent{ .Position    = toUnits( mouseX, mouseY ),
+                                                                     .Type        = EPointerType::Mouse,
                                                                      .Modifiers   = modifiers,
                                                                      .ScrollDelta = Vec2<Unit>{ Unit{ (f32)event.wheel.x }, Unit{ (f32)event.wheel.y } } } } );
                 break;
+            }
 
             default:
                 break;
