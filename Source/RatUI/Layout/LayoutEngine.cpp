@@ -835,6 +835,7 @@ namespace
             a_Node.Layout.SceneRect = a_Node.Layout.ParentRect;
 
         ComposeChildren( a_Node );
+        a_Node.MarkHitTestDirty();
     }
 
     bool SetContentOffset( LayoutNode& a_Node, Vec2<Unit> a_Offset )
@@ -844,6 +845,7 @@ namespace
 
         a_Node.ContentOffset = a_Offset;
         ComposeChildren( a_Node );
+        a_Node.MarkHitTestDirty();
         return true;
     }
 

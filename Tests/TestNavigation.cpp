@@ -660,3 +660,209 @@ TEST_CASE( "Navigation: Shift+Tab while editing stops editing and moves back", "
     REQUIRE( fixture.Scene.GetFocusedNode() == fixture.Top->GetLayoutID() );
     REQUIRE_FALSE( fixture.Field->IsEditing() );
 }
+
+TEST_CASE( "InputTextWidget: the gamepad starts and stops editing", "[Scene][Navigation][Text]" )
+{
+    TextFieldNavFixture fixture;
+    fixture.Scene.Input.NavMap.BindDefaultGamepad();
+    fixture.Scene.SetFocus( fixture.Field->GetLayoutID() );
+
+    fixture.Tap( EButtonID::GamepadA );
+    REQUIRE( fixture.Field->IsEditing() );
+
+    fixture.Tap( EButtonID::GamepadB );
+    REQUIRE_FALSE( fixture.Field->IsEditing() );
+    REQUIRE( fixture.Scene.GetFocusedNode() == fixture.Field->GetLayoutID() );
+}
+
+TEST_CASE( "SliderWidget: the D-pad moves an engaged slider", "[Scene][Navigation]" )
+{
+    NavFixture f;
+    f.Scene.Input.NavMap.BindDefaultGamepad();
+    SliderWidget* slider = f.Scene.CreateWidget<SliderWidget>( f.Root->GetLayoutID(), 0.f, 1.f, 0.5f );
+    slider->GetLayout().FixedWidth( 100_u ).FixedHeight( 16_u );
+    f.Layout();
+    f.Scene.SetFocus( slider->GetLayoutID() );
+
+    f.Tap( EButtonID::GamepadA );
+    REQUIRE( slider->IsEngaged() );
+
+    f.Tap( EButtonID::GamepadDPadRight );
+    REQUIRE( slider->Value.Get() > 0.5f );
+
+    f.Tap( EButtonID::GamepadB );
+    REQUIRE_FALSE( slider->IsEngaged() );
+}
+
+TEST_CASE( "Navigation: a pushed scope stays when focus goes outside it", "[Navigation]" )
+{
+    NavFixture    f;
+    ButtonWidget* behind = f.AddButton( f.Root->GetLayoutID() );
+    ButtonWidget* other  = f.AddButton( f.Root->GetLayoutID() );
+    PanelWidget*  modal  = f.Scene.CreateWidget<PanelWidget>( f.Root->GetLayoutID() );
+    f.AddButton( modal->GetLayoutID() );
+    f.Layout();
+
+    f.Scene.SetFocus( behind->GetLayoutID() );
+    f.Scene.PushNavScope( modal->GetLayoutID() );
+
+    f.Scene.SetFocus( other->GetLayoutID() );
+    REQUIRE( f.Scene.GetCurrentNavScope() == modal->GetLayoutID() );
+
+    // Popping it restores the focus it remembered.
+    REQUIRE( f.Scene.PopNavScope() );
+    REQUIRE( f.Scene.GetFocusedNode() == behind->GetLayoutID() );
+}
+
+TEST_CASE( "Scene: ReleaseAllKeys lets go of a button held by a key, without clicking it", "[Scene][Navigation]" )
+{
+    struct PressProbe : ButtonWidget
+    {
+        using ButtonWidget::ButtonWidget;
+        bool IsPressed() const { return m_IsPressed; }
+    };
+
+    NavFixture  f;
+    int         clicks = 0;
+    PressProbe* button = f.Scene.CreateWidget<PressProbe>( f.Root->GetLayoutID(), [&]( ButtonBaseWidget& ) { ++clicks; } );
+    f.Layout();
+    f.Scene.SetFocus( button->GetLayoutID() );
+
+    f.Key( EButtonID::KeyEnter, true );
+    REQUIRE( button->IsPressed() );
+
+    f.Scene.ReleaseAllKeys();
+    REQUIRE_FALSE( button->IsPressed() );
+    REQUIRE( clicks == 0 );
+}
+
+TEST_CASE( "IWidget: a panel that stops being a group is passed through again", "[Scene][Navigation]" )
+{
+    PanelNavFixture fixture{ true };
+    fixture.Group->SetNavGroup( false );
+    REQUIRE_FALSE( fixture.Group->IsFocusable() );
+
+    fixture.Scene.SetFocus( fixture.Top->GetLayoutID() );
+    fixture.Tap( EButtonID::KeyDown );
+    REQUIRE( fixture.Scene.GetFocusedNode() == fixture.Inner[0]->GetLayoutID() );
+}
+
+TEST_CASE( "Navigation: with nothing focused, the first Activate only picks the start", "[Navigation]" )
+{
+    NavFixture    f;
+    int           clicks = 0;
+    ButtonWidget* button = f.AddButton( f.Root->GetLayoutID(), &clicks );
+    f.Layout();
+
+    REQUIRE( f.Tap( EButtonID::KeyEnter ) );
+    REQUIRE( f.Scene.GetFocusedNode() == button->GetLayoutID() );
+    REQUIRE( clicks == 0 );
+
+    REQUIRE( f.Tap( EButtonID::KeyEnter ) );
+    REQUIRE( clicks == 1 );
+}
+
+TEST_CASE( "Scene: an engaged widget is offered a navigation action before navigation uses it", "[Scene][Navigation]" )
+{
+    struct ActionCatcher : SliderWidget
+    {
+        int Cancels{ 0 };
+        Reply OnNavigate( const NavEvent& a_Event ) override
+        {
+            if ( a_Event.Action != ENavAction::Cancel )
+                return SliderWidget::OnNavigate( a_Event );
+            ++Cancels;
+            return Reply::Handled();
+        }
+    };
+
+    NavFixture     f;
+    ActionCatcher* catcher = f.Scene.CreateWidget<ActionCatcher>( f.Root->GetLayoutID() );
+    catcher->GetLayout().FixedWidth( 100_u ).FixedHeight( 16_u );
+    f.Layout();
+    f.Scene.Engage( catcher->GetLayoutID() );
+
+    // It took Cancel, so it stays engaged.
+    f.Tap( EButtonID::KeyEscape );
+    REQUIRE( catcher->Cancels == 1 );
+    REQUIRE( catcher->IsEngaged() );
+
+    // Activate it left alone disengages as usual.
+    f.Tap( EButtonID::KeyEnter );
+    REQUIRE_FALSE( catcher->IsEngaged() );
+}
+
+TEST_CASE( "Scene: a cancelled pointer lets go of what it held, without a click", "[Scene]" )
+{
+    NavFixture    f;
+    int           clicks = 0;
+    ButtonWidget* button = f.AddButton( f.Root->GetLayoutID(), &clicks );
+    SliderWidget* slider = f.Scene.CreateWidget<SliderWidget>( f.Root->GetLayoutID(), 0.f, 1.f, 0.f );
+    slider->GetLayout().FixedWidth( 100_u ).FixedHeight( 16_u );
+    f.Layout();
+
+    const auto Touch = [&]( PointerID a_ID, Vec2<Unit> a_Position, bool a_Pressed )
+    {
+        f.Scene.DispatchInputEvent( { .Device  = EDeviceID::Mouse,
+                                      .Payload = ButtonEvent{ .Button = EButtonID::MouseLeft, .Pressed = a_Pressed, .Released = !a_Pressed,
+                                                              .Pointer = a_ID, .PointerPosition = a_Position } } );
+    };
+    const Vec2<Unit> onButton = button->GetLayout().Layout.SceneRect.Center();
+    const Vec2<Unit> onSlider = slider->GetLayout().Layout.SceneRect.Center();
+
+    Touch( 5, onButton, true );
+    f.Scene.CancelPointer( 5 );
+    REQUIRE( f.Scene.GetCapturedWidget( 5 ) == c_InvalidNodeID );
+    Touch( 5, onButton, false );
+    REQUIRE( clicks == 0 );
+
+    // A slider whose drag was cancelled can be dragged again by another touch.
+    Touch( 6, onSlider, true );
+    f.Scene.ReleaseAllPointers();
+    slider->Value.Set( 0.f );
+    Touch( 7, onSlider, true );
+    REQUIRE( slider->Value.Get() > 0.f );
+}
+
+TEST_CASE( "Navigation: the widget of a pushed scope is asked before Cancel pops it", "[Navigation]" )
+{
+    struct Dialog : PanelWidget
+    {
+        bool StayOpen{ true };
+        int  Closes{ 0 };
+
+        Reply OnNavigate( const NavEvent& a_Event ) override
+        {
+            if ( a_Event.Action != ENavAction::Cancel )
+                return Reply::Unhandled();
+            if ( !StayOpen )
+            {
+                ++Closes;
+                GetScene().PopNavScope();
+            }
+            return Reply::Handled();
+        }
+    };
+
+    NavFixture    f;
+    ButtonWidget* behind = f.AddButton( f.Root->GetLayoutID() );
+    Dialog*       dialog = f.Scene.CreateWidget<Dialog>( f.Root->GetLayoutID() );
+    ButtonWidget* inside = f.AddButton( dialog->GetLayoutID() );
+    f.Layout();
+
+    f.Scene.SetFocus( behind->GetLayoutID() );
+    f.Scene.PushNavScope( dialog->GetLayoutID() );
+    f.Scene.SetFocus( inside->GetLayoutID() );
+
+    // It stays open: the scope is kept.
+    REQUIRE( f.Tap( EButtonID::KeyEscape ) );
+    REQUIRE( f.Scene.GetCurrentNavScope() == dialog->GetLayoutID() );
+    REQUIRE( f.Scene.GetFocusedNode() == inside->GetLayoutID() );
+
+    // It closes itself: popped once, by the dialog.
+    dialog->StayOpen = false;
+    REQUIRE( f.Tap( EButtonID::KeyEscape ) );
+    REQUIRE( dialog->Closes == 1 );
+    REQUIRE( f.Scene.GetCurrentNavScope() == f.Root->GetLayoutID() );
+    REQUIRE( f.Scene.GetFocusedNode() == behind->GetLayoutID() );
+}

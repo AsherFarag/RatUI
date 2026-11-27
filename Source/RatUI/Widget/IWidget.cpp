@@ -1,6 +1,8 @@
 #include <RatUI/Widget/IWidget.h>
 #include <RatUI/Widget/Scene.h>
 
+#include <utility>
+
 namespace RatUI
 {
     LayoutNode& IWidget::GetLayout()
@@ -27,9 +29,11 @@ namespace RatUI
 
     void IWidget::SetNavGroup( bool a_NavGroup )
     {
+        if ( a_NavGroup && !m_Traits.NavGroup )
+            m_FocusBeforeGroup = std::exchange( m_Traits.Focus, EFocusPolicy::All );
+        else if ( !a_NavGroup && m_Traits.NavGroup )
+            m_Traits.Focus = m_FocusBeforeGroup;
         m_Traits.NavGroup = a_NavGroup;
-        if ( a_NavGroup )
-            m_Traits.Focus = EFocusPolicy::All;
         if ( m_Scene )
             m_Scene->OnFocusTraitsChanged( *this );
     }

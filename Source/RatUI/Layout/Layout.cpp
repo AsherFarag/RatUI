@@ -19,6 +19,14 @@ namespace RatUI
             ResolveVisibilityBelow( *child );
     }
 
+    void LayoutNode::MarkHitTestDirty()
+    {
+        LayoutNode* root = this;
+        while ( root->m_Parent )
+            root = root->m_Parent;
+        root->Layout.IsHitTestDirty = true;
+    }
+
     LayoutNode& LayoutNode::Visibility( EVisibility a_Visibility )
     {
         const bool takesSpaceChanged = Visibility::AffectsLayout( Style.Visibility ) != Visibility::AffectsLayout( a_Visibility );
@@ -26,6 +34,7 @@ namespace RatUI
 
         // Resolved at once, as layout skips what is below a Collapsed node.
         ResolveVisibilityBelow( *this );
+        MarkHitTestDirty();
         if ( takesSpaceChanged )
             MarkDirty();
         return *this;
@@ -35,6 +44,7 @@ namespace RatUI
     {
         Style.HitTestable = a_HitTestable;
         ResolveVisibilityBelow( *this );
+        MarkHitTestDirty();
         return *this;
     }
 

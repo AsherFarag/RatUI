@@ -129,17 +129,20 @@ namespace RatUI
                 return Reply::Handled();
             }
 
-            // While engaged, the arrows along the track move the value. Down and right increase it, as the thumb moves.
-            const bool      isHz = Orientation == EOrient::Horizontal;
-            const EButtonID less = isHz ? EButtonID::KeyLeft : EButtonID::KeyUp;
-            const EButtonID more = isHz ? EButtonID::KeyRight : EButtonID::KeyDown;
-            if ( IsEngaged() && ( a_Event.Button == less || a_Event.Button == more ) )
-            {
-                StepValue( a_Event.Button == more );
-                return Reply::Handled();
-            }
-
             return Reply::Unhandled();
+        }
+
+        /** @brief While engaged, moves along the track step the value. Down and right increase it, as the thumb moves. */
+        Reply OnNavigate( const NavEvent& a_Event ) override
+        {
+            const bool isHz = Orientation == EOrient::Horizontal;
+            const bool less = a_Event.Action == ( isHz ? ENavAction::MoveLeft : ENavAction::MoveUp );
+            const bool more = a_Event.Action == ( isHz ? ENavAction::MoveRight : ENavAction::MoveDown );
+            if ( !less && !more )
+                return Reply::Unhandled();
+
+            StepValue( more );
+            return Reply::Handled();
         }
 
         Reply OnButtonReleased( const ButtonEvent& a_Event ) override
@@ -152,6 +155,12 @@ namespace RatUI
             }
             
             return Reply::Unhandled();
+        }
+
+        void OnPressCancelled( const PressCancelEvent& a_Event ) override
+        {
+            if ( a_Event.Pointer == m_DragPointer )
+                m_IsDragging = false;
         }
 
         Reply OnPointerEnter( const PointerEvent& a_Event ) override

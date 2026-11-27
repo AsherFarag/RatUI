@@ -366,6 +366,7 @@ namespace RatUI
         bool        HitTestable{ true };        ///< Whether the pointer can hit this node: it and its ancestors are hit-testable and it is drawn.
         bool        IsDirty{ true };            ///< Whether the layout needs to be recalculated. Set to true when properties affecting layout are changed.
 		bool        IsDescendantDirty{ true };  ///< Whether any descendant elements are dirty and require layout recalculation.
+		bool        IsHitTestDirty{ false };    ///< On a root: where its nodes are, or which can be hit, changed (LayoutNode::MarkHitTestDirty). Whoever tracks what is under the pointer clears it.
     };
 
     /**
@@ -392,7 +393,7 @@ namespace RatUI
         Vec2<Unit> ContentOffset{ 0_u, 0_u };
 
         bool NotifyGeometry{ false };       ///< A change to this node's size or ContentSize is reported to the nearest widget (IWidget::OnGeometryChanged). Set by the widget that wants it.
-        bool ClipsContent{ false };         ///< What overflows this node is cut off (by the widget painting it), so it doesn't count towards its parent's ContentSize.
+        bool ClipsContent{ false };        ///< What overflows this node is cut off (by the widget painting it), so it doesn't count towards its parent's ContentSize.
 
         LayoutNode( NodeID a_ID = {}, LayoutStyle a_Style = {} ); // Defined in Layout.cpp, IWidget is incomplete here.
         ~LayoutNode();
@@ -446,6 +447,9 @@ namespace RatUI
 
         /** @brief Marks this node as dirty, indicating that its layout needs to be recalculated. Also marks all ancestor nodes as having a dirty descendant. */
         void MarkDirty();
+
+        /** @brief Marks this node's root as hit-test dirty: nodes moved, or which of them the pointer can hit changed. */
+        void MarkHitTestDirty();
 
         /** @brief Marks this node and all its descendants as dirty, indicating that their layout needs to be recalculated. */
         void MarkDescendantDirty();

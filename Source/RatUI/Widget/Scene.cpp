@@ -75,7 +75,6 @@ namespace RatUI
             }
 
             ComposeLayout( *rootNode );
-            m_HoverStale = true;
 
             // Layout that ran out of passes carries on at the next call.
             m_LaidOutSize     = settled ? a_AvailableSize : Vec2<Unit>{ Unit{ -1.f }, Unit{ -1.f } };
@@ -115,10 +114,10 @@ namespace RatUI
             BringIntoView( target );
         }
 
-        // Layout or a content offset moved widgets under a pointer that didn't move.
-        if ( m_HoverStale )
+        // Layout or a content offset moved widgets under a pointer that didn't move, or one was shown or hidden.
+        if ( rootNode->Layout.IsHitTestDirty )
         {
-            m_HoverStale = false;
+            rootNode->Layout.IsHitTestDirty = false;
             RefreshHover();
         }
     }
@@ -374,9 +373,11 @@ namespace RatUI
             return std::any_of( path.begin(), path.end(), [&]( const LayoutNode* a_Node ) { return a_Node->ID == a_ID; } );
         };
 
-        // Keep the scopes that still contain the widget (this also keeps scopes pushed by hand,
-        // e.g. a dialog with a custom restore target); drop the rest.
-        size keep = 0;
+        // A scope pushed by hand (e.g. a dialog) stays until it is popped, wherever focus goes, and so does what is
+        // under it. Above the innermost one, keep the scopes that still contain the widget; drop the rest.
+        size keep = Size( Input.NavStack );
+        while ( keep > 0 && !Input.NavStack[keep - 1].Modal )
+            --keep;
         while ( keep < Size( Input.NavStack ) && IsOnPath( Input.NavStack[keep].Scope ) )
             ++keep;
         while ( Size( Input.NavStack ) > keep )
@@ -462,9 +463,46 @@ namespace RatUI
 
     void Scene::ReleaseAllKeys()
     {
+        // Taken first: a handler may change what is held.
+        const HashMap<EButtonID, KeyPressTarget> presses = std::move( Input.KeyPresses );
         Input.KeyPresses.clear();
         Input.ModifierState     = EModifier::None;
         Input.DropNextTextInput = false;
+
+        for ( const auto& [button, press] : presses )
+        {
+            if ( IWidget* target = GetWidget( press.Widget ) )
+                target->OnPressCancelled( {} );
+        }
+    }
+
+    void Scene::CancelPointer( PointerID a_Pointer )
+    {
+        PointerGestureState* gesture = FindValue( Input.PointerStates, a_Pointer );
+        if ( !gesture || ( !gesture->IsDown && gesture->CapturedWidget == c_InvalidNodeID ) )
+            return;
+
+        const NodeID held = gesture->CapturedWidget != c_InvalidNodeID ? gesture->CapturedWidget : gesture->PressedWidget;
+        gesture->IsDown         = false;
+        gesture->IsDragging     = false;
+        gesture->PressCount     = 0;
+        gesture->CapturedWidget = c_InvalidNodeID;
+        gesture->PressedWidget  = c_InvalidNodeID;
+
+        if ( IWidget* widget = GetWidget( held ) )
+            widget->OnPressCancelled( { .Pointer = a_Pointer } );
+
+        // The capture is gone, so hover goes back to what is under the pointer.
+        RefreshHover();
+    }
+
+    void Scene::ReleaseAllPointers()
+    {
+        Array<PointerID> pointers;
+        for ( const auto& [pointerID, gesture] : Input.PointerStates )
+            PushBack( pointers, pointerID );
+        for ( const PointerID pointerID : pointers )
+            CancelPointer( pointerID );
     }
 
     bool Scene::ProcessTextInputEvent( const TextInputEvent& a_Event )
@@ -657,9 +695,17 @@ namespace RatUI
 
     bool Scene::ProcessNavPress( ENavAction a_Action, const ButtonEvent& a_Event )
     {
-        // An engaged widget left this key unhandled: arrows stay with it, the rest disengage it.
+        // An engaged widget left this key unhandled: it is offered the action, then arrows stay with it and the rest disengage it.
         if ( IsEngaged( Input.FocusedWidget ) )
         {
+            if ( IWidget* engaged = GetWidget( Input.FocusedWidget ) )
+            {
+                const Reply reply = engaged->OnNavigate( NavEvent{ .Action = a_Action } );
+                ApplyReply( reply );
+                if ( reply.IsHandled() )
+                    return true;
+            }
+
             if ( a_Action == ENavAction::Next || a_Action == ENavAction::Previous )
             {
                 Disengage();
@@ -683,7 +729,12 @@ namespace RatUI
                 if ( a_Event.Repeat )
                     return Input.FocusedWidget != c_InvalidNodeID;
 
-                EnsureInitialFocus();
+                // With nothing focused, the first press only picks the starting widget, as a move does.
+                if ( Input.FocusedWidget == c_InvalidNodeID )
+                {
+                    EnsureInitialFocus();
+                    return Input.FocusedWidget != c_InvalidNodeID;
+                }
 
                 const NodeID   target       = Input.FocusedWidget;
                 const IWidget* widget       = GetWidget( target );
@@ -878,9 +929,8 @@ namespace RatUI
 
     void Scene::SetContentOffset( NodeID a_Node, Vec2<Unit> a_Offset )
     {
-        LayoutNode* node = m_Layouts.Get( a_Node );
-        if ( node && RatUI::SetContentOffset( *node, a_Offset ) )
-            m_HoverStale = true;
+        if ( LayoutNode* node = m_Layouts.Get( a_Node ) )
+            RatUI::SetContentOffset( *node, a_Offset );
     }
 
     bool Scene::Navigate( ENavAction a_Action )
@@ -901,7 +951,18 @@ namespace RatUI
             return false;
 
         if ( a_Action == ENavAction::Cancel )
+        {
+            // A scope pushed by hand belongs to its widget (e.g. a dialog), which may close itself or stay open instead.
+            IWidget* owner = !Empty( Input.NavStack ) && Back( Input.NavStack ).Modal ? GetWidget( Back( Input.NavStack ).Scope ) : nullptr;
+            if ( owner )
+            {
+                const Reply reply = owner->OnNavigate( NavEvent{ .Action = a_Action } );
+                ApplyReply( reply );
+                if ( reply.IsHandled() )
+                    return true;
+            }
             return PopNavScope();
+        }
 
         if ( a_Action == ENavAction::ActivatePressed || a_Action == ENavAction::ActivateReleased )
         {
@@ -1076,7 +1137,6 @@ namespace RatUI
         RootWidget = c_InvalidNodeID;
         Input.Reset();
         Clear( m_ToDestroy );
-        m_HoverStale = false;
         m_LaidOutSize = { Unit{ -1.f }, Unit{ -1.f } };
         m_PendingBringIntoView = c_InvalidNodeID;
     }

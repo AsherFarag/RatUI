@@ -176,8 +176,18 @@ namespace RatUI
         /**
          * @brief Forgets held keys and modifiers without sending releases. Call when the window loses
          * keyboard focus, since the releases of keys held at that moment go to another window.
+         * Each widget holding a key is told (IWidget::OnPressCancelled), so nothing stays pressed or gets activated.
          */
         void ReleaseAllKeys();
+
+        /**
+         * @brief Ends a_Pointer's press and capture without a release, e.g. when the platform cancels a touch.
+         * The widget holding it is told (IWidget::OnPressCancelled); no click or drag end is sent.
+         */
+        void CancelPointer( PointerID a_Pointer );
+
+        /** @brief CancelPointer for every pointer, e.g. when the window loses the mouse while a button is down. */
+        void ReleaseAllPointers();
 
         // - Navigation
 
@@ -186,7 +196,8 @@ namespace RatUI
 
         /**
          * @brief Confines navigation to a_ScopeID's widgets (e.g. a dialog) until it is popped, remembering the
-         * focused widget so it can be restored then.
+         * focused widget so it can be restored then. Cancel pops it, unless its widget handles the Cancel in
+         * IWidget::OnNavigate.
          */
         void PushNavScope( NodeID a_ScopeID );
 
@@ -248,7 +259,6 @@ namespace RatUI
         NodePool           m_Layouts{};      ///< Pool of layout nodes representing the hierarchical structure and layout information of widgets in the scene.
         Array<NodeID>      m_ToDestroy;
         u64                m_LayoutCount{ 0 };   ///< Layouts run so far.
-        bool               m_HoverStale{ false }; ///< Widgets moved since hover was last worked out.
         Array<byte>        m_LayoutScratch;  ///< Scratch memory for one UpdateLayout.
         u32                m_LayoutScratchSize{ 1024 * 1024 };
 		f64                m_ClockSeconds{ 0.0 };

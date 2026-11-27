@@ -137,4 +137,44 @@ TEST_CASE( "InputTextBaseWidget: caret and selection rects follow the shaped tex
     REQUIRE( field->SelectionRects == 2 ); // One per line.
 }
 
+TEST_CASE( "InputTextBaseWidget: text wider than the field scrolls to keep the caret in it", "[Scene][Text][FreeType]" )
+{
+    const std::filesystem::path font = std::filesystem::path( RATUI_SOURCE_DIR ) / "Examples/Resources/Fonts/Roboto-Medium.ttf";
+    FreeType::FontCache cache;
+    REQUIRE( cache.RegisterFontHandle( FontHandle{ 1 }, font.string() ) );
+    FreeType::TextMetrics metrics{ cache };
+
+    FieldFixture f;
+    f.Scene.TextMetrics = &metrics;
+
+    UnderlineField* field = f.Scene.CreateWidget<UnderlineField>( f.Root->GetLayoutID() );
+    field->GetLayout().FixedWidth( 60_u ).FixedHeight( 30_u );
+    TextLayoutStyle style{};
+    style.Font = FontHandle{ 1 };
+    style.Size = 16_u;
+    field->SetLayoutStyle( style );
+    field->SetText( "a long line that does not fit" );
+
+    f.Scene.SetFocus( field->GetLayoutID() );
+    f.Scene.Engage( field->GetLayoutID() );
+    f.Frame();
+
+    // The caret is at the end, at the field's right edge, and the text starts left of the field.
+    const Rect<Unit>& rect = field->GetLayout().Layout.SceneRect;
+    REQUIRE( field->Caret.Right().ToFloat() == Catch::Approx( rect.Right().ToFloat() ).margin( 0.01f ) );
+    REQUIRE( field->GetTextRect().Origin[0] < rect.Origin[0] );
+
+    // Home brings the start back.
+    f.Tap( EButtonID::KeyHome );
+    f.Frame();
+    REQUIRE( field->Caret.Origin[0] == rect.Origin[0] );
+
+    // Not editing, it shows its start.
+    f.Tap( EButtonID::KeyEnd );
+    f.Frame();
+    f.Tap( EButtonID::KeyEscape );
+    f.Frame();
+    REQUIRE( field->GetTextRect().Origin[0] == rect.Origin[0] );
+}
+
 #endif

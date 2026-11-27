@@ -318,9 +318,12 @@ void Application::ProcessEvents()
             }
 
             case SDL_WINDOWEVENT:
-                // Keys held when the window loses focus are released in another window.
+                // Keys and buttons held when the window loses focus are released in another window.
                 if ( event.window.event == SDL_WINDOWEVENT_FOCUS_LOST )
+                {
                     scene.ReleaseAllKeys();
+                    scene.ReleaseAllPointers();
+                }
                 break;
 
             case SDL_TEXTINPUT:

@@ -60,6 +60,12 @@ namespace RatUI
         bool Pressed{ true };
     };
 
+    /** @brief A press a widget took that ended without its release. */
+    struct PressCancelEvent
+    {
+        Optional<PointerID> Pointer{}; ///< The pointer whose press was cancelled; empty for a key.
+    };
+
     /** @brief Which input can give a widget focus. */
     enum class EFocusPolicy : u8
     {
@@ -120,10 +126,15 @@ namespace RatUI
          */
         NodeID GetContentNodeID() const { return m_ContentID == c_InvalidNodeID ? m_LayoutID : m_ContentID; }
 
+        /** @brief The nearest widget this one is inside, past any bare layout nodes (e.g. a scroll container's content node). */
         IWidget* GetParentWidget() const
         {
-            const LayoutNode& node = GetLayout();
-            return node.Parent() ? node.Parent()->Widget.get() : nullptr;
+            for ( const LayoutNode* node = GetLayout().Parent(); node; node = node->Parent() )
+            {
+                if ( node->Widget )
+                    return node->Widget.get();
+            }
+            return nullptr;
         }
 
         template<std::derived_from<IWidget> WidgetType>
@@ -191,7 +202,10 @@ namespace RatUI
         /** @brief Whether this widget is a navigation group (see WidgetTraits::NavGroup). */
         bool IsNavGroup() const { return m_Traits.NavGroup && IsNavStop(); }
 
-        /** @brief Makes this widget a navigation group, or an ordinary widget again. A group is a navigation stop (EFocusPolicy::All). */
+        /**
+         * @brief Makes this widget a navigation group, or an ordinary widget again. A group is a navigation stop
+         * (EFocusPolicy::All); when it stops being one it gets back the focus policy it had before.
+         */
         void SetNavGroup( bool a_NavGroup );
 
         /**
@@ -262,6 +276,12 @@ namespace RatUI
          */
         virtual Reply OnActivate( const ActivateEvent& a_Event ) { return Reply::Unhandled(); }
 
+        /**
+         * @brief Called when a press this widget took (a key, an activation or a pointer it holds) ended without its
+         * release: Scene::ReleaseAllKeys, Scene::CancelPointer. Drop the pressed or dragging state and act on nothing.
+         */
+        virtual void OnPressCancelled( const PressCancelEvent& a_Event ) {}
+
         /** @brief Called when the widget becomes engaged (see CanEngage). */
         virtual void OnEngage() {}
 
@@ -275,6 +295,16 @@ namespace RatUI
         virtual Optional<Rect<Unit>> GetTextInputRect() const { return NullOpt; }
 
 		// - Navigation
+
+		/**
+		 * @brief Called on the engaged widget (see CanEngage) with a navigation action whose button it left unhandled,
+		 * before navigation acts on it. Handle a move to use it, e.g. a slider stepping its value; handling Activate
+		 * or Cancel keeps the widget engaged.
+		 *
+		 * Also called with Cancel on the widget of a scope pushed with Scene::PushNavScope, before Cancel pops it.
+		 * Handle it to close the dialog yourself (and pop the scope), or to stay open; unhandled, the scope is popped.
+		 */
+		virtual Reply OnNavigate( const NavEvent& a_Event ) { return Reply::Unhandled(); }
 
 		/**
 		 * @brief Called on the widget whose nav scope navigation is in (an entered group, or a widget pushed
@@ -304,6 +334,7 @@ namespace RatUI
         NodeID       m_LayoutID{};
         NodeID       m_ContentID{}; ///< Set by a widget that keeps its children in an inner node (see GetContentNodeID).
         WidgetTraits m_Traits{};
+        EFocusPolicy m_FocusBeforeGroup{ EFocusPolicy::None }; ///< The policy SetNavGroup( false ) restores.
     };
 
 } // namespace RatUI

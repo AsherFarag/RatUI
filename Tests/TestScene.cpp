@@ -420,6 +420,28 @@ TEST_CASE( "Scene: hover follows layout moving widgets under a still mouse, with
     REQUIRE( scene.GetInputMode() == EInputMode::Navigation );
 }
 
+TEST_CASE( "Scene: hover leaves a widget hidden under a still mouse, though no layout runs", "[Scene]" )
+{
+    RatUI::Scene scene;
+    PanelWidget* root = scene.CreateRootWidget<PanelWidget>();
+    MoveCountingButton* button = scene.CreateWidget<MoveCountingButton>( root->GetLayoutID() );
+    button->GetLayout().FixedWidth( 100_u ).FixedHeight( 40_u );
+    scene.UpdateLayout( { 400_u, 300_u } );
+
+    scene.DispatchInputEvent( { .Device = EDeviceID::Mouse, .Payload = PointerEvent{ .Position = { 50_u, 20_u }, .Type = EPointerType::Mouse } } );
+    REQUIRE( button->IsHovered() );
+
+    const u64 layouts = scene.GetLayoutCount();
+    button->GetLayout().Visibility( EVisibility::Hidden );
+    scene.UpdateLayout( { 400_u, 300_u } );
+    REQUIRE( !button->IsHovered() );
+    REQUIRE( scene.GetLayoutCount() == layouts );
+
+    button->GetLayout().Visibility( EVisibility::Visible );
+    scene.UpdateLayout( { 400_u, 300_u } );
+    REQUIRE( button->IsHovered() );
+}
+
 TEST_CASE( "IWidget: the focus policy decides focus, and making a focused widget unfocusable clears focus", "[Scene][Navigation]" )
 {
     ButtonSceneFixture fixture;

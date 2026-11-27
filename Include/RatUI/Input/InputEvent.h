@@ -193,6 +193,11 @@ namespace RatUI
         return a_Button >= EButtonID::Mouse0 && a_Button <= EButtonID::Mouse7;
     }
 
+    inline constexpr bool IsKeyboardButton( EButtonID a_Button )
+    {
+        return a_Button >= EButtonID::KeyA && a_Button < EButtonID::GamepadA;
+    }
+
     /** @brief Maps a raw button to the modifier it represents, or EModifier::None if it isn't one. */
     inline constexpr EModifier ModifierFor( EButtonID a_Button )
     {

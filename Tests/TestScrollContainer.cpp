@@ -765,7 +765,7 @@ TEST_CASE( "ScrollContainerWidget: a widget created with the container as its pa
 
     REQUIRE( scroll->GetContentNodeID() != scroll->GetLayoutID() );
     REQUIRE( button->GetLayout().Parent() == scroll->GetContentNode() );
-    REQUIRE( button->GetParentWidget() == nullptr ); // The content node has no widget of its own.
+    REQUIRE( button->GetParentWidget() == scroll ); // Past the content node, which has no widget of its own.
 }
 
 TEST_CASE( "Scene: a layout node created under a scroll container goes in its content, like a widget", "[Scene][Scroll]" )

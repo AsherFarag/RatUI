@@ -96,11 +96,13 @@ namespace RatUI
         /**
          * @brief The area the lines are laid out in: the padded rect, with a single-line field's line
          * centred vertically when the field is taller than its text. Multi-line text stays at the top.
+         * While editing text wider than the field, it starts left of the field: the text is scrolled to the caret.
          */
         Rect<Unit> GetTextRect() const
         {
             const LayoutNode& node   = GetLayout();
             Rect<Unit>        padded = ContentPadding( node ).Apply( node.Layout.SceneRect );
+            padded.Origin[0] -= m_ScrollX;
             if ( Policy && !Policy->MultiLine() )
             {
                 const Unit spare = padded.Size[1] - m_LineHeight;
@@ -319,18 +321,24 @@ namespace RatUI
             if ( m_Shaped && !wasShaped )
                 GetLayout().MarkDirty();
 
+            ScrollToCaret();
             OnPaintField( a_Event );
         }
 
-        /** @brief Keys the widget lets fall through to navigation when its policy doesn't use them; it keeps all others. */
+        /**
+         * @brief Buttons the widget lets fall through to navigation when its policy doesn't use them: a few keys, and
+         * everything that isn't a keyboard key (e.g. gamepad B to stop editing). It keeps all other keys.
+         */
         static constexpr bool PassesThrough( EButtonID a_Button )
         {
+            if ( !IsKeyboardButton( a_Button ) )
+                return true;
+
             switch ( a_Button )
             {
                 case EButtonID::KeyUp:
                 case EButtonID::KeyDown:
                 case EButtonID::KeyTab:
-                case EButtonID::Unknown:
                     return true;
                 default:
                     return false;
@@ -431,6 +439,21 @@ namespace RatUI
             return metrics->Shape( *prepared, style );
         }
 
+        /** @brief Scrolls the text sideways just enough to keep the caret in the field while editing; back to the start otherwise. */
+        void ScrollToCaret()
+        {
+            if ( !IsEditing() )
+            {
+                m_ScrollX = 0_u;
+                return;
+            }
+
+            const Rect<Unit> textRect = GetTextRect();
+            const Unit       caretX   = GetCaretRect().Origin[0] - textRect.Origin[0];
+            const Unit       visible  = std::max( 0_u, textRect.Size[0] - CaretWidth );
+            m_ScrollX = std::clamp( m_ScrollX, std::max( 0_u, caretX - visible ), caretX );
+        }
+
         static constexpr const char* c_Probe = "|";
 
         Unit LineTop( const Rect<Unit>& a_TextRect, u32 a_Line ) const
@@ -471,6 +494,7 @@ namespace RatUI
         String               m_Placeholder;
         Optional<ShapedText> m_ShapedPlaceholder;
         bool                 m_PlaceholderShaped{ false };
+        Unit                 m_ScrollX{ 0_u }; ///< How far the text is scrolled left to keep the caret in the field.
     };
 
     /**

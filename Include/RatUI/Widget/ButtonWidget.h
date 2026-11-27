@@ -51,6 +51,14 @@ namespace RatUI
             return Reply::Unhandled();
         }
 
+        void OnPressCancelled( const PressCancelEvent& a_Event ) override
+        {
+            if ( a_Event.Pointer != m_PressPointer )
+                return;
+            m_IsPressed    = false;
+            m_PressPointer = NullOpt;
+        }
+
         Reply OnActivate( const ActivateEvent& a_Event ) override
         {
             if ( !a_Event.Pressed )
