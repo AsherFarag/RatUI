@@ -10,6 +10,8 @@ jobs:
   # The core library on its own: no backends, no third party dependencies besides Catch2.
   core:
     name: Core (${{ matrix.name }})
+    # A pull request from main or dev here is already tested by the push.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository || ( github.head_ref != 'main' && github.head_ref != 'dev' )
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -27,17 +29,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configure
-        if: runner.os != 'Windows'
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DRATUI_BUILD_TESTS=ON -DRATUI_INSTALL=OFF
-
-      # TEMPORARY: the default Release flags plus a PDB, for the crash stack trace below.
-      - name: Configure (Windows, with symbols)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: >
-          cmake -B build -DRATUI_BUILD_TESTS=ON -DRATUI_INSTALL=OFF
-          "-DCMAKE_CXX_FLAGS_RELEASE=/O2 /Ob2 /DNDEBUG /Zi"
-          "-DCMAKE_EXE_LINKER_FLAGS_RELEASE=/DEBUG /INCREMENTAL:NO /OPT:REF /OPT:ICF"
 
       - name: Build
         run: cmake --build build --config Release --parallel
@@ -45,40 +37,11 @@ jobs:
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
 
-      # TEMPORARY: the stack of a crashing test, and a dump to open in Visual Studio.
-      - name: Crash stack trace (Windows)
-        if: failure() && runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $exe  = "build/Tests/Release/RatUI_Tests.exe"
-          $test = "ScrollContainerWidget: clicks reach the row under the pointer once scrolled"
-
-          $cdb = "${env:ProgramFiles(x86)}\Windows Kits\10\Debuggers\x64\cdb.exe"
-          if ( Test-Path $cdb ) {
-            # Stops at the first access violation, prints the registers and stack, and quits.
-            Set-Content cdb.txt -Encoding ascii -Value 'sxe -c ".lastevent; r; kn 50; q" av', 'g'
-            & $cdb -lines -G -y "build/Tests/Release" -cf cdb.txt $exe $test
-          } else {
-            Write-Host "cdb not found: see the dump artifact."
-          }
-
-          Invoke-WebRequest https://download.sysinternals.com/files/Procdump.zip -OutFile procdump.zip
-          Expand-Archive procdump.zip procdump
-          New-Item -ItemType Directory dumps | Out-Null
-          ./procdump/procdump64.exe -accepteula -ma -e 1 -f C0000005 -x dumps $exe $test
-          Copy-Item build/Tests/Release/RatUI_Tests.exe, build/Tests/Release/RatUI_Tests.pdb dumps
-
-      - name: Upload crash dump (Windows)
-        if: failure() && runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
-        with:
-          name: crash-dump-windows
-          path: dumps
-          if-no-files-found: warn
-
   # Every backend plus the examples app, with dependencies fetched where they are not installed.
   backends:
     name: Backends + Examples (${{ matrix.name }})
+    # A pull request from main or dev here is already tested by the push.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository || ( github.head_ref != 'main' && github.head_ref != 'dev' )
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -106,6 +69,8 @@ jobs:
   # Installs the core library and builds a separate project against it with find_package().
   package:
     name: Install + find_package
+    # A pull request from main or dev here is already tested by the push.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository || ( github.head_ref != 'main' && github.head_ref != 'dev' )
     runs-on: ubuntu-latest
 
     steps:
