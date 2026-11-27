@@ -64,3 +64,60 @@ TEST_CASE( "NodePool: ForEach visits only live nodes", "[nodepool]" )
     pool.ForEach( [&]( const LayoutNode& a_Node ) { REQUIRE( a_Node.ID == b ); ++count; } );
     REQUIRE( count == 1 );
 }
+
+static_assert( std::is_const_v<decltype( LayoutNode::ID )> );
+static_assert( NodeID{} == c_InvalidNodeID );
+
+TEST_CASE( "NodePool: the invalid ID never refers to a node", "[nodepool]" )
+{
+    NodePool pool;
+    REQUIRE( pool.Get( c_InvalidNodeID ) == nullptr );
+    REQUIRE_FALSE( pool.IsValid( c_InvalidNodeID ) );
+
+    (void)pool.Allocate();
+    REQUIRE( pool.Get( c_InvalidNodeID ) == nullptr );
+    pool.Deallocate( c_InvalidNodeID ); // Ignored.
+}
+
+TEST_CASE( "NodePool: deallocating a stale ID frees nothing", "[nodepool]" )
+{
+    NodePool pool;
+    const NodeID first = pool.Allocate();
+    pool.Deallocate( first );
+    pool.Deallocate( first );
+
+    // The slot went back on the free list once, so two allocations get two slots.
+    const NodeID a = pool.Allocate();
+    const NodeID b = pool.Allocate();
+    REQUIRE( Traits::Index( a ) != Traits::Index( b ) );
+    REQUIRE( pool.IsValid( a ) );
+    REQUIRE( pool.IsValid( b ) );
+}
+
+TEST_CASE( "NodePool: growing past a bucket keeps every node where it was", "[nodepool]" )
+{
+    NodePool           pool;
+    const NodeID       first = pool.Allocate();
+    const LayoutNode*  where = pool.Get( first );
+
+    NodeID last{};
+    for ( int i = 0; i < 4096; ++i )
+        last = pool.Allocate();
+
+    REQUIRE( Traits::Index( last ) == 4096 );
+    REQUIRE( pool.Get( first ) == where );
+    REQUIRE( pool.Get( last ) != nullptr );
+
+    u32 live = 0;
+    pool.ForEach( [&]( const LayoutNode& ) { ++live; } );
+    REQUIRE( live == 4097 );
+}
+
+TEST_CASE( "NodePool: Allocate passes its arguments to the node", "[nodepool]" )
+{
+    NodePool     pool;
+    const NodeID id = pool.Allocate( LayoutStyle{ .Spacing = 7_u, .LayoutType = ELayoutType::Grid } );
+
+    REQUIRE( pool.Get( id )->Style.Spacing == 7_u );
+    REQUIRE( pool.Get( id )->Style.LayoutType == ELayoutType::Grid );
+}

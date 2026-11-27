@@ -12,7 +12,7 @@ int main()
     child->GetLayout().FixedWidth( 100_u ).FixedHeight( 50_u );
     scene.UpdateLayout( { 800_u, 600_u } );
 
-    const Vec2<Unit> size = child->GetLayout().Layout.FinalRect.Size;
+    const Vec2<Unit> size = child->GetLayout().Layout.SceneRect.Size;
     std::printf( "RatUI %s: child is %.0fx%.0f\n", RATUI_VERSION_STRING, size[0].ToFloat(), size[1].ToFloat() );
     return size[0].ToFloat() == 100.f && size[1].ToFloat() == 50.f ? 0 : 1;
 }
