@@ -19,7 +19,7 @@ class UnsafeAreaBackdrop : public PanelWidget
 public:
     void OnPaint( const PaintEvent& a_Event ) override
     {
-        a_Event.Drawer.AddBrushRect( GetLayout().Layout.FinalRect, SolidBrush{ FromColorF32( 1.f, 0.294f, 0.404f, 0.35f ) },
+        a_Event.Drawer.AddBrushRect( GetLayout().Layout.SceneRect, SolidBrush{ FromColorF32( 1.f, 0.294f, 0.404f, 0.35f ) },
                                      Colors::Transparent, 0_u, CornerRadius::None() );
         PaintChildren( a_Event );
     }
@@ -199,9 +199,13 @@ private:
         well->GetLayout().HeightMode( ESizing::Flex );
 
         ScrollContainerWidget* scroll = m_Scene.CreateWidget<ScrollContainerWidget>( well->GetLayoutID() );
-        scroll->OnScroll = [this]( ScrollContainerWidget&, Vec2<Unit> a_Offset )
+        scroll->OnScroll = [this]( ScrollContainerWidget&, const ScrollEvent& a_Event )
         {
-            SetStatus( std::format( "Scrolled to {}, {}", static_cast<int>( a_Offset[0].ToFloat() ), static_cast<int>( a_Offset[1].ToFloat() ) ) );
+            // Also called when only the range changes (e.g. the list is resized); the status is about where it scrolled to.
+            if ( a_Event.OffsetDelta[0] == 0_u && a_Event.OffsetDelta[1] == 0_u )
+                return;
+
+            SetStatus( std::format( "Scrolled to {}, {}", static_cast<int>( a_Event.Offset[0].ToFloat() ), static_cast<int>( a_Event.Offset[1].ToFloat() ) ) );
         };
 
         // Room around the rows for their focus rings, which the list clips; more on the right to clear the scrollbar.
@@ -374,7 +378,7 @@ private:
 
         // The label must not steal clicks from the button.
         TextWidget* label = AddText( button, std::move( a_Label ), 15_u );
-        label->GetLayout().Visibility( EVisibility::HitTestInvisible );
+        label->GetLayout().HitTestable( false );
         if ( a_OutLabel )
             *a_OutLabel = label;
         return button;
@@ -404,8 +408,8 @@ private:
             .ChildAlign( EAlign::CenterLeft );
 
         TextWidget* name = AddText( row, std::move( a_Name ), 15_u );
-        name->GetLayout().WidthMode( ESizing::Flex ).Visibility( EVisibility::HitTestInvisible );
-        AddText( row, std::move( a_Detail ), 13_u, true )->GetLayout().Visibility( EVisibility::HitTestInvisible );
+        name->GetLayout().WidthMode( ESizing::Flex ).HitTestable( false );
+        AddText( row, std::move( a_Detail ), 13_u, true )->GetLayout().HitTestable( false );
         return row;
     }
 

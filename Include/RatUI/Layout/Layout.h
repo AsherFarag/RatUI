@@ -147,88 +147,28 @@ namespace RatUI
     };
 
     /**
-	 * @brief Represents the visibility state of a UI element, defining how it is rendered, 
-     * whether it participates in layout calculations, and whether it can be hit-tested for interactions.
+	 * @brief Whether a UI element is drawn and whether it takes space in layout.
+     * Whether the pointer can hit it is separate (LayoutStyle::HitTestable), so showing an element never changes how it takes input.
      */
 	enum class EVisibility : u8
     {
-        None            = 0,
-        Render          = 1 << 0, ///< The element is rendered and visible.
-        Layout          = 1 << 1, ///< The element participates in layout calculations and occupies space.
-        SelfHitTest     = 1 << 2, ///< The element can be hit-tested (e.g., for mouse interactions) based on its own geometry.
-        ChildrenHitTest = 1 << 3, ///< The element's children can be hit-tested, even if the element itself is not
-                                  ///< (e.g., for invisible containers that still allow interaction with their children).
-
-        /** @brief Visible and hit-testable. Participates in layout and rendering. */
-        Visible = Render | Layout | SelfHitTest | ChildrenHitTest,
-
-        /** @brief  Not visible or hit-testable, but still occupies space in the layout. */
-        Hidden = Layout,
-
-        /** @brief Not visible, not hit-testable, and does not occupy any space in the layout. */
-        Collapsed = None,
-
-        /** @brief Visible but not hit-testable (including children). */
-        HitTestInvisible = Render | Layout,
-
-        /** @brief Visible and hit-testable, but the element itself is not hit-testable (children can still be hit-tested). */
-        SelfHitTestInvisible = Render | Layout | ChildrenHitTest
+        Visible,   ///< Drawn, and takes its space in layout.
+        Hidden,    ///< Not drawn or hit-tested, but still takes its space.
+        Collapsed, ///< Not drawn or hit-tested, and takes no space.
     };
-    RATUI_ENUM_ENABLE_BITMASK_OPERATORS( EVisibility, u8 );
 
-    /**
-	 * @brief Utility functions for working with EVisibility flags.
-     */
-    namespace Visibility         
+    namespace Visibility
     {
-        /** @brief Returns true if the element should be considered in layout calculations (i.e., it is not Collapsed). */
-        inline constexpr bool AffectsLayout( EVisibility a_Visibility )
-        {
-            return ( a_Visibility & EVisibility::Layout ) != EVisibility::None;
-        }
+        /** @brief Whether the element takes space in layout (it isn't Collapsed). */
+        constexpr bool AffectsLayout( EVisibility a_Visibility ) { return a_Visibility != EVisibility::Collapsed; }
 
-        /** @brief Returns true if the element should be rendered (i.e., it is Visible). */
-        constexpr bool IsRendered( EVisibility a_Visibility )
-        {
-            return ( a_Visibility & EVisibility::Render ) != EVisibility::None;
-        }
+        /** @brief Whether the element is drawn. */
+        constexpr bool IsRendered( EVisibility a_Visibility ) { return a_Visibility == EVisibility::Visible; }
 
-        /** @brief Returns true if the element should be hit-testable (i.e., it is Visible). */
-        constexpr bool IsHitTestable(EVisibility a_Visibility)
+        /** @brief The visibility a child ends up with under its parent: the more hidden of the two. */
+        RATUI_NODISCARD constexpr EVisibility Apply( EVisibility a_Parent, EVisibility a_Child )
         {
-            return ( a_Visibility & EVisibility::SelfHitTest ) != EVisibility::None;
-        }
-
-        /** @brief Returns true if the element's children should be hit-testable, even if the element itself is not. */
-        constexpr bool AreChildrenHitTestable(EVisibility a_Visibility)
-        {
-            return ( a_Visibility & EVisibility::ChildrenHitTest ) != EVisibility::None;
-        }
-
-        /**
-         * @brief Combines the visibility of a parent and child element to determine the effective visibility of the child.
-         * @param a_Parent The visibility of the parent element.
-         * @param a_Child The visibility of the child element.
-         * @return The effective visibility of the child element after applying the parent's visibility rules.
-         */
-        RATUI_NODISCARD static constexpr EVisibility Apply( EVisibility a_Parent, EVisibility a_Child )
-        {
-            // Layout: If both parent and child have Layout, then child has Layout. Otherwise, child does not have Layout.
-            // Render: If both parent and child have Render, then child has Render. Otherwise, child does not have Render.
-            // SelfHitTest: If parent has ChildrenHitTest, then child can have SelfHitTest. Otherwise, child cannot have SelfHitTest.
-            // ChildrenHitTest: If parent has ChildrenHitTest, then child can have ChildrenHitTest. Otherwise, child cannot have ChildrenHitTest.
-
-            EVisibility result =
-                (a_Parent & a_Child) &
-                (EVisibility::Render | EVisibility::Layout);
-        
-            if ((a_Parent & EVisibility::ChildrenHitTest) != EVisibility::None)
-            {
-                result |= a_Child &
-                    (EVisibility::SelfHitTest | EVisibility::ChildrenHitTest);
-            }
-        
-            return result;
+            return a_Parent > a_Child ? a_Parent : a_Child;
         }
     }
 
@@ -342,14 +282,6 @@ namespace RatUI
         }
     };
 
-    /** @brief What a node does with children that extend past it. */
-    enum class EOverflow : u8
-    {
-        Visible, ///< Children are placed where layout puts them, past the node's edges if they extend that far.
-        Scroll,  ///< Children are moved by the node's LayoutNode::ScrollOffset, which is clamped to how far they extend past it.
-                 ///< Layout only moves them: the widget painting them clips them.
-    };
-
     /**
      * @brief Represents the input parameters for the layout process of a UI element.
      * If any of these values change, the computed layout is invalid and must be recalculated.
@@ -360,9 +292,9 @@ namespace RatUI
         Unit        Spacing{ 0_u };                     ///< The spacing to apply between child elements in a container.
         ELayoutType LayoutType{ ELayoutType::Overlay }; ///< The layout type to use for arranging child elements (if this element is a container).
         EAlign      ChildAlign{ EAlign::TopLeft };      ///< Default alignment for child elements within this container.
-		EVisibility Visibility{ EVisibility::Visible }; ///< The visibility state of the element, which can affect both rendering and layout.
+		EVisibility Visibility{ EVisibility::Visible }; ///< Whether the element is drawn and whether it takes space.
+		bool        HitTestable{ true };                ///< False: this node and everything below it ignore the pointer. Independent of Visibility.
 		ESafeAreaEdges SafeAreaEdges{ ESafeAreaEdges::None }; ///< Edges whose remaining safe area is added to Padding for this node's content.
-		EOverflow   Overflow{ EOverflow::Visible };     ///< Whether this node scrolls its children.
 
         /**
          * @note For grid layouts, at least one of GridColumns or GridRows must be set to a non-zero value. 
@@ -421,16 +353,17 @@ namespace RatUI
      */
     struct LayoutResult
     {
-        Rect<Unit> FinalRect{};          ///< The final position and size of the element after layout, in absolute coordinates. Filled by the Arrange step.
+        Rect<Unit> ParentRect{};         ///< Position and size in the parent's space, before any ContentOffset. Filled by the Arrange step.
+        Rect<Unit> SceneRect{};          ///< Where the element is drawn and hit, in the scene's space. Filled by ComposeLayout, after Arrange.
+        Vec2<Unit> ContentSize{};        ///< How far the element's content extends from its top-left: its children, what overflows them (unless they clip, LayoutNode::ClipsContent), and its end padding. Filled by the Arrange step.
         Vec2<Unit> DesiredSize{};        ///< The desired size of the element based on its content and constraints. Filled by the Measure step.
 		Vec2<Unit> LastAvailableSize{};  ///< The last available size passed to the Measure step. Used to determine if a re-measure is necessary.
 		Edges      LastSafeArea{};       ///< The safe area that reached this node in the last Measure step. Used to determine if a re-measure is necessary.
-		Vec2<Unit> ScrollOffset{};       ///< How far an EOverflow::Scroll node's children are moved: the requested LayoutNode::ScrollOffset, clamped.
-		Vec2<Unit> MaxScrollOffset{};    ///< How far an EOverflow::Scroll node's children extend past it, so how far it can scroll.
 
 		LinearAggregate CachedLinear{};  ///< Cached aggregate values for linear layouts, used to optimize layout calculations.
 
-        EVisibility Visibility{ EVisibility::Visible };       ///< The visibility state of the element, which can affect both rendering and layout.
+        EVisibility Visibility{ EVisibility::Visible };       ///< Style.Visibility combined with the ancestors'.
+        bool        HitTestable{ true };        ///< Whether the pointer can hit this node: it and its ancestors are hit-testable and it is drawn.
         bool        IsDirty{ true };            ///< Whether the layout needs to be recalculated. Set to true when properties affecting layout are changed.
 		bool        IsDescendantDirty{ true };  ///< Whether any descendant elements are dirty and require layout recalculation.
     };
@@ -452,10 +385,14 @@ namespace RatUI
         Unique<class IWidget> Widget;
 
         /**
-         * @brief The scroll offset requested for an EOverflow::Scroll node. Arrange clamps it to the content and moves the
-         * children by it, so their FinalRects are where they are drawn. Set it with ScrollLayoutNode to move them at once.
+         * @brief Moves this node's children by this much from where layout put them, e.g. to scroll or slide them.
+         * It only changes where they are drawn and hit (their SceneRects), so layout isn't run. Set it with
+         * SetContentOffset, which updates them at once.
          */
-        Vec2<Unit> ScrollOffset{ 0_u, 0_u };
+        Vec2<Unit> ContentOffset{ 0_u, 0_u };
+
+        bool NotifyGeometry{ false };       ///< A change to this node's size or ContentSize is reported to the nearest widget (IWidget::OnGeometryChanged). Set by the widget that wants it.
+        bool ClipsContent{ false };         ///< What overflows this node is cut off (by the widget painting it), so it doesn't count towards its parent's ContentSize.
 
         LayoutNode( NodeID a_ID = {}, LayoutStyle a_Style = {} ); // Defined in Layout.cpp, IWidget is incomplete here.
         ~LayoutNode();
@@ -469,9 +406,11 @@ namespace RatUI
         LayoutNode& Spacing( Unit a_Spacing )              { Style.Spacing = a_Spacing; MarkDirty(); return *this; }
         LayoutNode& LayoutType( ELayoutType a_LayoutType ) { Style.LayoutType = a_LayoutType; MarkDirty(); return *this; }
         LayoutNode& ChildAlign( EAlign a_ChildAlign )      { Style.ChildAlign = a_ChildAlign; MarkDirty(); return *this; }
-        LayoutNode& Visibility( EVisibility a_Visibility ) { Style.Visibility = a_Visibility; MarkDirty(); return *this; }
+        /** @brief Only entering or leaving Collapsed runs layout again; Visible and Hidden take the same space. */
+        LayoutNode& Visibility( EVisibility a_Visibility );
+        /** @brief Sets whether the pointer can hit this node and everything below it. Never runs layout. */
+        LayoutNode& HitTestable( bool a_HitTestable );
         LayoutNode& SafeAreaEdges( ESafeAreaEdges a_Edges ) { Style.SafeAreaEdges = a_Edges; MarkDirty(); return *this; }
-        LayoutNode& Overflow( EOverflow a_Overflow )        { Style.Overflow = a_Overflow; MarkDirty(); return *this; }
 
         LayoutNode& GridColumns( u16 a_GridColumns )  { Style.GridColumns = a_GridColumns; MarkDirty(); return *this; }
         LayoutNode& GridRows( u16 a_GridRows )        { Style.GridRows = a_GridRows; MarkDirty(); return *this; }
@@ -501,6 +440,9 @@ namespace RatUI
         LayoutNode* LastChild()   const { return m_LastChild; }
         LayoutNode* PrevSibling() const { return m_PrevSibling; }
         LayoutNode* NextSibling() const { return m_NextSibling; }
+
+        /** @brief Sets Layout.Visibility and Layout.HitTestable from this node's style and its parent's resolved values. */
+        void ResolveVisibility();
 
         /** @brief Marks this node as dirty, indicating that its layout needs to be recalculated. Also marks all ancestor nodes as having a dirty descendant. */
         void MarkDirty();

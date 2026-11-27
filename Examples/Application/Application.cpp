@@ -248,6 +248,17 @@ void Application::Frame()
     scene.UpdateLayout( { Unit{ width / pixelsPerUnit }, Unit{ height / pixelsPerUnit } } );
     scene.Tick( deltaSeconds );
 
+    // Tell the platform where text is being typed, so it can place the IME's candidate window (in window coordinates).
+    if ( const Optional<Rect<Unit>> caret = scene.GetTextInputRect() )
+    {
+        int windowWidth, windowHeight;
+        SDL_GetWindowSize( m_Window, &windowWidth, &windowHeight );
+        const f32      scale = pixelsPerUnit * static_cast<f32>( windowWidth ) / static_cast<f32>( std::max( width, 1 ) );
+        const SDL_Rect rect{ static_cast<int>( caret->Origin[0].ToFloat() * scale ), static_cast<int>( caret->Origin[1].ToFloat() * scale ),
+                             static_cast<int>( caret->Size[0].ToFloat() * scale ),   static_cast<int>( caret->Size[1].ToFloat() * scale ) };
+        SDL_SetTextInputRect( &rect );
+    }
+
     // ...then draw in pixels.
     glViewport( 0, 0, width, height );
     m_Renderer->SetViewport( width, height );

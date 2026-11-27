@@ -7,9 +7,6 @@
 #include "../Text/ITextMetrics.h"
 #include "IWidget.h"
 
-#include <iterator>
-#include <ranges>
-
 namespace RatUI
 {
 
@@ -47,14 +44,32 @@ namespace RatUI
 
         // - Scene Management
 
+        /**
+         * @brief Sends an input event to the widgets. Returns whether the UI used it; an event it returns false for
+         * (e.g. Escape with nothing to cancel) is the host's to act on.
+         */
         bool DispatchInputEvent( const InputEvent& a_Event );
 
         /**
          * @brief Updates the layout of all widgets in the scene based on the given available size.
-         * This involves measuring and arranging each widget according to its layout properties and the layout algorithm.
+         * Does nothing when no node was marked dirty and the size and safe area are unchanged since the last call.
+         * Layout results (ParentRect, SceneRect, ContentSize) are up to date when it returns.
          * @param a_AvailableSize The total available size for the scene, which is typically the size of the window or rendering area.
          */
         void UpdateLayout( Vec2<Unit> a_AvailableSize );
+
+        /** @brief How many times layout has run. Lets a widget tell whether a layout has gone by since it noted the count. */
+        RATUI_NODISCARD u64 GetLayoutCount() const { return m_LayoutCount; }
+
+        /** @brief Whether a node changed since the last layout, so the next UpdateLayout will lay the scene out again. */
+        RATUI_NODISCARD bool IsLayoutPending() const
+        {
+            const LayoutNode* root = m_Layouts.Get( RootWidget );
+            return root && ( root->Layout.IsDirty || root->Layout.IsDescendantDirty );
+        }
+
+        /** @brief Sets how much scratch memory layout may use per UpdateLayout (default 1 MiB). Raise it for very large scenes. */
+        void SetLayoutScratchSize( u32 a_Bytes ) { m_LayoutScratchSize = a_Bytes; }
 
         /**
          * @brief Sets the insets from the scene's edges that content should avoid, such as a phone's notch,
@@ -62,7 +77,7 @@ namespace RatUI
          * is inset by what its ancestors haven't already cleared (SafeAreaInsets( node )). Applied by the next
          * UpdateLayout, which re-measures only the nodes the change reaches.
          */
-        void SetSafeArea( const Edges& a_SafeArea );
+        void SetSafeArea( const Edges& a_SafeArea ) { m_SafeArea = a_SafeArea; }
         RATUI_NODISCARD const Edges& GetSafeArea() const { return m_SafeArea; }
 
         /** @brief Advances the input clock and resolves time-based gestures (currently: long-press). Call once per frame. */
@@ -96,13 +111,17 @@ namespace RatUI
         void ClearFocus() { SetFocus( c_InvalidNodeID ); }
 
         /**
-         * @brief Scrolls every EOverflow::Scroll node a_Node is in so it is in view, as far as each can. Done for
-         * focus that keyboard or gamepad navigation moves.
+         * @brief Asks every widget a_Node is inside, innermost first, to bring it into view (IWidget::OnBringIntoView),
+         * e.g. a scroll container scrolling to it. Done for focus that keyboard or gamepad navigation moves.
+         * While a layout is pending, where the node is isn't known yet: it is done at the end of the next UpdateLayout.
          */
-        void ScrollIntoView( NodeID a_Node );
+        void BringIntoView( NodeID a_Node );
 
-        /** @brief Has the next UpdateLayout call a_Node's IWidget::OnLayoutDone once it is done. */
-        void NotifyAfterLayout( NodeID a_Node );
+        /**
+         * @brief Moves a_Node's children by a_Offset from where layout put them (LayoutNode::ContentOffset), e.g. to
+         * scroll them. Layout isn't run: only where they are drawn and hit changes.
+         */
+        void SetContentOffset( NodeID a_Node, Vec2<Unit> a_Offset );
 
         /** @brief Focuses a_Node and engages it, if it can be engaged (see IWidget::CanEngage). */
         void Engage( NodeID a_Node );
@@ -139,8 +158,14 @@ namespace RatUI
         /** @brief Whether input is currently pointer-driven or navigation-driven; useful for widgets deciding whether to show a focus ring. */
         RATUI_NODISCARD EInputMode GetInputMode() const { return Input.InputMode; }
 
-        /** @brief Whether the focused widget wants keyboard/text input (e.g. a text field). Platform layers can use this to skip their own key shortcuts. */
-        RATUI_NODISCARD bool WantsTextInput() const;
+        /**
+         * @brief Where the focused widget is taking typed text (see IWidget::GetTextInputRect), or empty if it isn't.
+         * Platform layers use it to show an on-screen keyboard and place the IME.
+         */
+        RATUI_NODISCARD Optional<Rect<Unit>> GetTextInputRect() const;
+
+        /** @brief Whether the focused widget is taking typed text. Platform layers can use this to skip their own key shortcuts. */
+        RATUI_NODISCARD bool WantsTextInput() const { return HasValue( GetTextInputRect() ); }
 
         /**
          * @brief Forgets held keys and modifiers without sending releases. Call when the window loses
@@ -150,11 +175,17 @@ namespace RatUI
 
         // - Navigation
 
-        void Navigate( ENavAction a_Action );
+        /** @brief Performs a navigation action. Returns whether it did anything (moved focus, entered or left a scope, activated a widget). */
+        bool Navigate( ENavAction a_Action );
 
-        /** @brief Pushes a navigation scope, remembering the currently focused widget so it can be restored on pop. */
+        /**
+         * @brief Confines navigation to a_ScopeID's widgets (e.g. a dialog) until it is popped, remembering the
+         * focused widget so it can be restored then.
+         */
         void PushNavScope( NodeID a_ScopeID );
-        void PopNavScope();
+
+        /** @brief Leaves the current nav scope, restoring the focus it remembered. Returns false if there was none. */
+        bool PopNavScope();
         RATUI_NODISCARD NodeID GetCurrentNavScope() const { return Input.GetCurrentNavScope( RootWidget ); }
 
         /** @brief If no widget is currently focused, focuses the first focusable widget in the scene. Called automatically the first time navigation input arrives. */
@@ -162,19 +193,27 @@ namespace RatUI
 
         // - Widget Management
 
+        /**
+         * @brief Creates a layout node as the last child of a_ParentID. If the parent is a widget that keeps its
+         * children in an inner node (IWidget::GetContentNodeID, e.g. a scroll container), the node goes there.
+         */
         LayoutNode& CreateLayoutNode( LayoutStyle a_Style = {}, NodeID a_ParentID = c_InvalidNodeID );
 
         RATUI_NODISCARD       LayoutNode* GetLayoutNode( NodeID a_ID )       { return m_Layouts.Get( a_ID ); }
         RATUI_NODISCARD const LayoutNode* GetLayoutNode( NodeID a_ID ) const { return m_Layouts.Get( a_ID ); }
 
+        /**
+         * @brief Creates a widget as the last child of a_ParentID. If the parent is a widget that keeps its children in
+         * an inner node (IWidget::GetContentNodeID, e.g. a scroll container), the widget goes there.
+         */
         template<std::derived_from<IWidget> WidgetType, typename... Args>
         WidgetType* CreateWidget( NodeID a_ParentID, Args&&... a_Args );
 
         template<std::derived_from<IWidget> WidgetType, typename... Args>
         WidgetType* CreateRootWidget( Args&&... a_Args );
 
-        /** @brief Destroys the widget with the specified ID, including its children. */
-        bool DestroyWidget( NodeID a_WidgetID ) { PushBack( m_ToDestroy, a_WidgetID ); return true; }
+        /** @brief Destroys the widget with the specified ID, including its children, at the start of the next UpdateLayout or Render. */
+        void DestroyWidget( NodeID a_WidgetID ) { PushBack( m_ToDestroy, a_WidgetID ); }
 
         RATUI_NODISCARD IWidget* GetWidget( NodeID a_ID );
 
@@ -196,25 +235,38 @@ namespace RatUI
         void Reset();
 
     protected:
+        friend class IWidget;
+
         // --- Internal State ---
 
-        NodePool m_Layouts{};      ///< Pool of layout nodes representing the hierarchical structure and layout information of widgets in the scene.
-        Array<NodeID>  m_ToDestroy;
-        Array<NodeID>  m_AfterLayout; ///< Widgets to call OnLayoutDone on at the end of UpdateLayout.
-		f64            m_ClockSeconds{ 0.0 };
-        Edges          m_SafeArea{};
+        NodePool           m_Layouts{};      ///< Pool of layout nodes representing the hierarchical structure and layout information of widgets in the scene.
+        Array<NodeID>      m_ToDestroy;
+        u64                m_LayoutCount{ 0 };   ///< Layouts run so far.
+        bool               m_HoverStale{ false }; ///< Widgets moved since hover was last worked out.
+        Array<byte>        m_LayoutScratch;  ///< Scratch memory for one UpdateLayout.
+        u32                m_LayoutScratchSize{ 1024 * 1024 };
+		f64                m_ClockSeconds{ 0.0 };
+        Edges              m_SafeArea{};
+        Vec2<Unit>         m_LaidOutSize{ Unit{ -1.f }, Unit{ -1.f } }; ///< What the last layout ran with, to skip one that would change nothing. Negative: none yet.
+        Edges              m_LaidOutSafeArea{};
+        NodeID             m_LaidOutRoot{};
+        NodeID             m_PendingBringIntoView{}; ///< Asked for while a layout was pending.
 
         // --- Internal Methods ---
 
         /** @brief Applies a_Reply's requests; a capture request or release applies to a_Pointer. */
         void ApplyReply( const Reply& a_Reply, PointerID a_Pointer = c_MousePointerID );
+
+        /** @brief A widget's focus policy or group flag changed: drops the focus and group scope it can no longer hold. */
+        void OnFocusTraitsChanged( IWidget& a_Widget );
+
         /** @brief What to do when a move inside the current nav scope finds nothing: asks the group it is inside. */
         NavReply QueryBoundaryReply( ENavAction a_Action );
 
         /**
          * @brief Makes the nav scope stack match the newly focused widget's position in the tree.
-         * Scopes that don't contain the widget are dropped, and its enclosing groups (ENavRole::Group) are pushed,
-         * so arrow keys move between its siblings after it was focused by a click or SetFocus().
+         * Scopes that don't contain the widget are dropped, and its enclosing groups are pushed,
+         * so arrow keys move between its siblings after it was focused by a click, Tab or SetFocus().
          */
         void SyncNavScopes( NodeID a_Focused );
 
@@ -237,61 +289,28 @@ namespace RatUI
 
         bool ProcessButtonEvent( const ButtonEvent& a_Event );
         bool ProcessTextInputEvent( const TextInputEvent& a_Event );
-        void UpdateGestureState( const ButtonEvent& a_Event );
-        NodeID HitTest( NodeID a_ID, Vec2<Unit> a_LogicalPos );
-        /** @brief The deepest node under a_LogicalPos, interactable or not (e.g. the empty area of a scroll container). */
-        NodeID HitTestDeepest( NodeID a_ID, Vec2<Unit> a_LogicalPos );
+
+        /** @brief Handles a press of a button mapped to a_Action. Returns whether navigation used it. */
+        bool ProcessNavPress( ENavAction a_Action, const ButtonEvent& a_Event );
+
+        /** @brief Tracks a pointer button's gesture (press, drag, multi-press). a_Hit is the widget under a press. */
+        void UpdateGestureState( const ButtonEvent& a_Event, NodeID a_Hit );
 
         /**
-         * @brief The widgets arrow keys and Tab move between inside a_Scope, in layout order: focusable widgets
-         * anywhere below it, except inside groups (ENavRole::Group). A group is a target itself; its contents are
-         * reached by entering it with Activate.
+         * @brief The topmost node under a_Position: the topmost interactable widget, or with a_InteractableOnly false
+         * any node (e.g. the empty area of a scroll container).
          */
-        void CollectNavTargets( LayoutNode& a_Scope, Array<const LayoutNode*>& a_Out );
+        NodeID HitTest( Vec2<Unit> a_Position, bool a_InteractableOnly = true ) const;
 
-        void DestroyWidgetImmediately( LayoutNode& a_Node )
-        {
-            a_Node.DetachFromParent();
+        /**
+         * @brief The navigation stops inside a_Scope, in layout order. Arrow keys move between stops outside groups:
+         * a group is a stop itself and its contents are reached by entering it. With a_IntoGroups (Tab) the stops
+         * inside groups are collected instead of the groups, except a_Keep, the group focus is on.
+         */
+        void CollectNavTargets( const LayoutNode& a_Scope, Array<const LayoutNode*>& a_Out, bool a_IntoGroups = false, NodeID a_Keep = c_InvalidNodeID ) const;
 
-            // Each child detaches itself, so take the first until none are left.
-            while ( LayoutNode* child = a_Node.FirstChild() )
-                DestroyWidgetImmediately( *child );
-
-            if (a_Node.Widget)
-                a_Node.Widget->OnDestroy();
-
-            // A held key's release must not reach a later widget that reuses this NodeID.
-            for ( auto it = Input.KeyPresses.begin(); it != Input.KeyPresses.end(); )
-                it = it->second.Widget == a_Node.ID ? Input.KeyPresses.erase( it ) : std::next( it );
-
-            // Nor must a pointer this widget held or hovered.
-            for ( auto& [pointerID, gesture] : Input.PointerStates )
-            {
-                if ( gesture.CapturedWidget == a_Node.ID )
-                    gesture.CapturedWidget = c_InvalidNodeID;
-                if ( gesture.PressedWidget == a_Node.ID )
-                    gesture.PressedWidget = c_InvalidNodeID;
-            }
-            if ( Input.HoveredWidget == a_Node.ID )
-                Input.HoveredWidget = c_InvalidNodeID;
-            if ( Input.EngagedWidget == a_Node.ID )
-                Input.EngagedWidget = c_InvalidNodeID;
-            if ( Input.Wheel.Widget == a_Node.ID )
-                Input.Wheel = {};
-
-            m_Layouts.Deallocate( a_Node.ID );
-        }
-
-        void CleanupDestroyedWidgets()
-        {
-            for (NodeID nodeID : m_ToDestroy)
-            {
-                if (LayoutNode* node = m_Layouts.Get(nodeID))
-                    DestroyWidgetImmediately( *node );
-            }
-
-            Clear( m_ToDestroy );
-        }
+        void DestroyWidgetImmediately( LayoutNode& a_Node );
+        void CleanupDestroyedWidgets();
     };
 
     // === Inline Implementations ===

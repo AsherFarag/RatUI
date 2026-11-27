@@ -98,11 +98,7 @@ namespace
 
     static EVisibility ResolveNodeVisibility( LayoutNode& a_Node )
     {
-        if ( const LayoutNode* parent = a_Node.Parent() )
-            a_Node.Layout.Visibility = Visibility::Apply( parent->Layout.Visibility, a_Node.Style.Visibility );
-        else
-            a_Node.Layout.Visibility = a_Node.Style.Visibility;
-
+        a_Node.ResolveVisibility();
         return a_Node.Layout.Visibility;
     }
 
@@ -727,89 +723,30 @@ namespace
 		return reflowed;
     }
 
-    static Vec2<Unit> ClampScrollOffset( Vec2<Unit> a_Offset, Vec2<Unit> a_Max )
-    {
-        return { std::clamp( a_Offset[0], 0_u, a_Max[0] ), std::clamp( a_Offset[1], 0_u, a_Max[1] ) };
-    }
-
-    static void TranslateDescendants( LayoutNode& a_Node, Vec2<Unit> a_Delta )
-    {
-        a_Node.ForEachChild( [&]( LayoutNode& a_Child )
-        {
-            a_Child.Layout.FinalRect.Origin = a_Child.Layout.FinalRect.Origin + a_Delta;
-            TranslateDescendants( a_Child, a_Delta );
-        } );
-    }
-
-    /** @brief Grows a_End to the bottom-right of everything laid out below a_Node, except what nested scroll nodes clip. */
-    static void AccumulateContentEnd( const LayoutNode& a_Node, Vec2<Unit>& a_End )
-    {
-        a_Node.ForEachChild( [&]( const LayoutNode& a_Child )
-        {
-            if ( !Visibility::AffectsLayout( a_Child.Layout.Visibility ) )
-                return;
-
-            const Rect<Unit>& rect = a_Child.Layout.FinalRect;
-            a_End = { std::max( a_End[0], rect.Right() ), std::max( a_End[1], rect.Bottom() ) };
-
-            if ( a_Child.Style.Overflow != EOverflow::Scroll )
-                AccumulateContentEnd( a_Child, a_End );
-        } );
-    }
-
-    /**
-     * @brief Measures how far a scroll node's children, arranged at a_Arranged, extend past it, then clamps its
-     * requested offset to that and moves the children to it.
-     */
-    static void ResolveScroll( LayoutNode& a_Node, Vec2<Unit> a_Arranged, LayoutContext& a_Ctx )
-    {
-        const Rect<Unit>& rect    = a_Node.Layout.FinalRect;
-        const Edges       padding = ContentPadding( a_Node );
-
-        Vec2<Unit> end = rect.Origin - a_Arranged; // Where the content starts, as arranged.
-        AccumulateContentEnd( a_Node, end );
-
-        // In unscrolled positions, keeping the padding after the content.
-        const Vec2<Unit> max{ std::max( 0_u, end[0] + a_Arranged[0] + padding.R - rect.Right() ),
-                              std::max( 0_u, end[1] + a_Arranged[1] + padding.B - rect.Bottom() ) };
-
-        const Vec2<Unit> offset = ClampScrollOffset( a_Node.ScrollOffset, max );
-        if ( offset[0] != a_Arranged[0] || offset[1] != a_Arranged[1] )
-            TranslateDescendants( a_Node, a_Arranged - offset );
-
-        a_Node.Layout.MaxScrollOffset = max;
-        a_Node.Layout.ScrollOffset    = offset;
-
-        if ( offset[0] != a_Node.ScrollOffset[0] || offset[1] != a_Node.ScrollOffset[1] )
-        {
-            if ( a_Ctx.ClampedScrolls )
-                PushBack( *a_Ctx.ClampedScrolls, &a_Node );
-            else
-                a_Node.ScrollOffset = offset;
-        }
-    }
-
 } // namespace
 
     bool ArrangeLayoutNode( LayoutNode& a_Node, Rect<Unit> a_AllocatedRect, LayoutContext& a_Ctx )
     {
         ResolveNodeVisibility( a_Node );
-        a_Node.Layout.FinalRect = a_AllocatedRect;
-    
-        bool reflowed = false;
 
-        if ( a_Node.Widget && a_Node.Widget->HasWidthDependentContent() )
+        const Vec2<Unit> previousSize        = a_Node.Layout.ParentRect.Size;
+        const Vec2<Unit> previousContentSize = a_Node.Layout.ContentSize;
+        a_Node.Layout.ParentRect = a_AllocatedRect;
+
+        bool        reflowed       = false;
+        const Edges contentPadding = ContentPadding( a_Node );
+
+        if ( a_Node.Widget && a_Node.Widget->GetTraits().WidthDependentContent )
         {
-            const LayoutStyle& s = a_Node.Style;
-            const Edges        contentPadding = ContentPadding( a_Node );
-            const Vec2<Unit>   contentSize = contentPadding.Apply( a_AllocatedRect ).Size;
+            const LayoutStyle& s            = a_Node.Style;
+            const Vec2<Unit>   contentSize  = contentPadding.Apply( a_AllocatedRect ).Size;
             const Vec2<Unit>   newIntrinsic = a_Node.Widget->OnMeasureContent( a_Node, contentSize, a_Ctx );
-    
+
             if ( s.HeightMode == ESizing::Content || s.HeightMode == ESizing::Flex )
             {
                 const Unit newHeight = std::clamp( newIntrinsic[1] + contentPadding.Vertical(),
                                                    s.SizeConstraints.Min[1], s.SizeConstraints.Max[1] );
-    
+
                 if ( !IsApproxEqual( newHeight.ToFloat(), a_Node.Layout.DesiredSize[1].ToFloat() ) )
                 {
                     a_Node.Layout.DesiredSize[1] = newHeight;
@@ -817,15 +754,12 @@ namespace
                 }
             }
         }
-    
-        // Children are arranged at the offset scrolled to so far, then moved if the content changed how far it can go.
-        const bool       scrolls  = a_Node.Style.Overflow == EOverflow::Scroll;
-        const Vec2<Unit> arranged = scrolls ? ClampScrollOffset( a_Node.ScrollOffset, a_Node.Layout.MaxScrollOffset ) : Vec2<Unit>{ 0_u, 0_u };
 
+        // Children are laid out in this node's own space: its top-left is the origin.
+        Vec2<Unit> contentEnd{ 0_u, 0_u };
         if ( a_Node.FirstChild() )
         {
-            Rect<Unit> inner = ContentPadding( a_Node ).Apply( a_AllocatedRect );
-            inner.Origin     = inner.Origin - arranged;
+            const Rect<Unit> inner = contentPadding.Apply( Rect<Unit>{ Vec2<Unit>{ 0_u, 0_u }, a_AllocatedRect.Size } );
 
             switch ( a_Node.Style.LayoutType )
             {
@@ -833,41 +767,69 @@ namespace
                 case ELayoutType::Vertical:
                     reflowed |= ArrangeLinear( a_Node, inner, a_Ctx );
                     break;
-    
+
                 case ELayoutType::Overlay:
                     reflowed |= ArrangeOverlay( a_Node, inner, a_Ctx );
                     break;
-    
+
                 case ELayoutType::Grid:
                     reflowed |= ArrangeGrid( a_Node, inner, a_Ctx );
                     break;
             }
+
+            for ( const LayoutNode* child = a_Node.FirstChild(); child; child = child->NextSibling() )
+            {
+                if ( !Visibility::AffectsLayout( child->Layout.Visibility ) )
+                    continue;
+
+                // What overflows a child counts too, unless the child clips it.
+                const Rect<Unit>& rect = child->Layout.ParentRect;
+                Vec2<Unit>        end{ rect.Right(), rect.Bottom() };
+                if ( !child->ClipsContent )
+                {
+                    end = { std::max( end[0], rect.Origin[0] + child->Layout.ContentSize[0] ),
+                            std::max( end[1], rect.Origin[1] + child->Layout.ContentSize[1] ) };
+                }
+                contentEnd = { std::max( contentEnd[0], end[0] ), std::max( contentEnd[1], end[1] ) };
+            }
         }
+        a_Node.Layout.ContentSize = { contentEnd[0] + contentPadding.R, contentEnd[1] + contentPadding.B };
 
-        if ( scrolls )
-            ResolveScroll( a_Node, arranged, a_Ctx );
-        else
-            a_Node.Layout.ScrollOffset = a_Node.Layout.MaxScrollOffset = Vec2<Unit>{ 0_u, 0_u };
-
-        if ( a_Node.Widget )
-            reflowed |= a_Node.Widget->OnArranged();
+        if ( a_Node.NotifyGeometry && a_Ctx.GeometryChanges &&
+             !( previousSize == a_AllocatedRect.Size && previousContentSize == a_Node.Layout.ContentSize ) )
+        {
+            PushBack( *a_Ctx.GeometryChanges, GeometryChange{ &a_Node, previousSize, previousContentSize } );
+        }
 
         return reflowed;
     }
 
-    void ScrollLayoutNode( LayoutNode& a_Node, Vec2<Unit> a_Offset )
+    static void ComposeChildren( LayoutNode& a_Node )
     {
-        a_Node.ScrollOffset = Vec2<Unit>{ std::max( a_Offset[0], 0_u ), std::max( a_Offset[1], 0_u ) };
-        if ( a_Node.Style.Overflow != EOverflow::Scroll )
-            return;
+        const Vec2<Unit> origin = a_Node.Layout.SceneRect.Origin + a_Node.ContentOffset;
+        for ( LayoutNode* child = a_Node.FirstChild(); child; child = child->NextSibling() )
+        {
+            child->Layout.SceneRect = { origin + child->Layout.ParentRect.Origin, child->Layout.ParentRect.Size };
+            ComposeChildren( *child );
+        }
+    }
 
-        const Vec2<Unit> before = a_Node.Layout.ScrollOffset;
-        const Vec2<Unit> after  = ClampScrollOffset( a_Node.ScrollOffset, a_Node.Layout.MaxScrollOffset );
-        if ( after[0] == before[0] && after[1] == before[1] )
-            return;
+    void ComposeLayout( LayoutNode& a_Node )
+    {
+        if ( !a_Node.Parent() )
+            a_Node.Layout.SceneRect = a_Node.Layout.ParentRect;
 
-        a_Node.Layout.ScrollOffset = after;
-        TranslateDescendants( a_Node, before - after );
+        ComposeChildren( a_Node );
+    }
+
+    bool SetContentOffset( LayoutNode& a_Node, Vec2<Unit> a_Offset )
+    {
+        if ( a_Node.ContentOffset == a_Offset )
+            return false;
+
+        a_Node.ContentOffset = a_Offset;
+        ComposeChildren( a_Node );
+        return true;
     }
 
 } // namespace RatUI

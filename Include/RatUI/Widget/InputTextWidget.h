@@ -43,7 +43,7 @@ namespace RatUI
         FocusRingStyle FocusRing{};                                  ///< Drawn while the field has focus (theme: FocusOutline keys).
 
         explicit InputTextWidget( Unique<ITextEditPolicy> a_Policy = MakeUnique<SingleLineTextEditPolicy>() )
-            : IWidget( ENavRole::Stop ), Policy( std::move( a_Policy ) )
+            : IWidget( { .Focus = EFocusPolicy::All, .Interactable = true, .Engageable = true } ), Policy( std::move( a_Policy ) )
         {
             // Preserve spaces and newlines so the caret and the rendered text agree.
             // Shaping uses unlimited width, so there are no soft wraps.
@@ -102,9 +102,10 @@ namespace RatUI
         // IWidget overrides
         // --------------------------------------------------------------------
 
-        bool IsInteractable() const override { return true; }
-        bool CanEngage()      const override { return true; }
-        bool WantsTextInput() const override { return IsEditing(); }
+        Optional<Rect<Unit>> GetTextInputRect() const override
+        {
+            return IsEditing() ? Optional<Rect<Unit>>{ GetCaretRect() } : NullOpt;
+        }
 
         Reply OnButtonPressed( const ButtonEvent& a_Event ) override
         {
@@ -198,10 +199,15 @@ namespace RatUI
         void OnPaint( const PaintEvent& a_Event ) override
         {
             HandleThemeUpdate();
+
+            // Text that couldn't be shaped when it was measured (e.g. no font yet) needs measuring again once it can.
+            const bool wasShaped = m_Shaped;
             EnsureShaped();
+            if ( m_Shaped && !wasShaped )
+                GetLayout().MarkDirty();
 
             const LayoutNode& node     = GetLayout();
-            const Rect<Unit>& rect     = node.Layout.FinalRect;
+            const Rect<Unit>& rect     = node.Layout.SceneRect;
             const Rect<Unit>  textRect = GetTextRect( ContentPadding( node ).Apply( rect ) );
             const bool        focused  = IsEditing();
 
@@ -265,28 +271,32 @@ namespace RatUI
             }
 
             if ( focused )
-            {
-                const TextBuffer& text  = m_Model.GetTextBuffer();
-                const u32         caret = m_Model.Caret();
-
-                u32 lineStart = 0, lineIndex = 0;
-                for ( u32 i = 0; i < caret; ++i )
-                {
-                    if ( text[i] == U'\n' )
-                    {
-                        lineStart = i + 1;
-                        ++lineIndex;
-                    }
-                }
-
-                const Unit x = CaretX( lineStart, caret );
-                a_Event.Drawer.AddRect(
-                    Rect<Unit>{ Vec2<Unit>{ textRect.Origin[0] + x, textRect.Origin[1] + ( m_LineHeight + m_LineSpacing ) * static_cast<f32>( lineIndex ) },
-                                Vec2<Unit>{ CaretWidth, m_LineHeight } },
-                    { .FillColor = CaretColor.value_or( RenderStyle.FillColor ) } );
-            }
+                a_Event.Drawer.AddRect( GetCaretRect(), { .FillColor = CaretColor.value_or( RenderStyle.FillColor ) } );
 
             a_Event.Drawer.PopClipRect();
+        }
+
+        /** @brief Where the caret is drawn. */
+        Rect<Unit> GetCaretRect() const
+        {
+            const LayoutNode& node     = GetLayout();
+            const Rect<Unit>  textRect = GetTextRect( ContentPadding( node ).Apply( node.Layout.SceneRect ) );
+            const TextBuffer& text     = m_Model.GetTextBuffer();
+            const u32         caret    = m_Model.Caret();
+
+            u32 lineStart = 0, lineIndex = 0;
+            for ( u32 i = 0; i < caret; ++i )
+            {
+                if ( text[i] == U'\n' )
+                {
+                    lineStart = i + 1;
+                    ++lineIndex;
+                }
+            }
+
+            return Rect<Unit>{ Vec2<Unit>{ textRect.Origin[0] + CaretX( lineStart, caret ),
+                                           textRect.Origin[1] + ( m_LineHeight + m_LineSpacing ) * static_cast<f32>( lineIndex ) },
+                               Vec2<Unit>{ CaretWidth, m_LineHeight } };
         }
 
         /**

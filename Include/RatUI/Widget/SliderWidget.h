@@ -57,9 +57,11 @@ namespace RatUI
 
         Observable<f32> Value{}; ///< Current value, clamped to [Min, Max].
 
-        SliderWidget() : IWidget( ENavRole::Stop ) {}
+        static constexpr WidgetTraits c_Traits{ .Focus = EFocusPolicy::All, .Interactable = true, .Engageable = true };
+
+        SliderWidget() : IWidget( c_Traits ) {}
         SliderWidget( f32 a_Min, f32 a_Max, f32 a_InitialValue = 0.f )
-            : IWidget( ENavRole::Stop ), Min( a_Min ), Max( a_Max )
+            : IWidget( c_Traits ), Min( a_Min ), Max( a_Max )
         {
             Value.Set( std::clamp( a_InitialValue, a_Min, a_Max ) );
         }
@@ -89,12 +91,9 @@ namespace RatUI
         // IWidget Overrides
         // --------------------------------------------------------------------
 
-        bool IsInteractable() const override { return true; }
-        bool CanEngage()      const override { return true; }
-
         void OnPaint( const PaintEvent& a_Event ) override
         {
-            const Rect<Unit>& rect = GetLayout().Layout.FinalRect;
+            const Rect<Unit>& rect = GetLayout().Layout.SceneRect;
 
             SyncTheme();
 
@@ -125,7 +124,7 @@ namespace RatUI
                 if ( a_Event.PointerPosition )
                     m_LastPointerPos = *a_Event.PointerPosition;
                 GetScene().CapturePointer( m_DragPointer, GetLayoutID() );
-                UpdateFromPointer( GetLayout().Layout.FinalRect, m_LastPointerPos );
+                UpdateFromPointer( GetLayout().Layout.SceneRect, m_LastPointerPos );
 
                 return Reply::Handled();
             }
@@ -180,7 +179,7 @@ namespace RatUI
             if ( !m_IsDragging )
                 return Reply::Unhandled();
 
-            UpdateFromPointer( GetLayout().Layout.FinalRect, a_Event.Position );
+            UpdateFromPointer( GetLayout().Layout.SceneRect, a_Event.Position );
 
             return Reply::Unhandled();
         }

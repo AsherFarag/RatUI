@@ -15,44 +15,37 @@ namespace RatUI
 		using OnClickCallback = Callback<ButtonBaseWidget&>;
         OnClickCallback OnClick; ///< Callback that is invoked when the button is clicked.
 
-        ButtonBaseWidget() : IWidget( ENavRole::Stop ) {}
-        ButtonBaseWidget( OnClickCallback a_OnClick )
-            : IWidget( ENavRole::Stop ), OnClick( std::move( a_OnClick ) )
+        ButtonBaseWidget( OnClickCallback a_OnClick = {} )
+            : IWidget( { .Focus = EFocusPolicy::All, .Interactable = true } ), OnClick( std::move( a_OnClick ) )
         {}
 
         virtual ~ButtonBaseWidget() = default;
 
-        bool IsInteractable() const override { return true; }
-
         Reply OnButtonPressed( const ButtonEvent& a_Event ) override
         {
-            if ( !a_Event.Pressed )
+            if ( !a_Event.Pressed || a_Event.Button != EButtonID::MouseLeft )
                 return Reply::Unhandled();
 
-            if ( IsActivationButton( a_Event.Button ) )
-            {
-                m_IsPressed = true;
-                m_PressPointer = a_Event.Pointer;
-                return Reply::Handled();
-            }
-
-            return Reply::Unhandled();
+            m_IsPressed    = true;
+            m_PressPointer = a_Event.Pointer;
+            return Reply::Handled();
         }
 
         Reply OnButtonReleased( const ButtonEvent& a_Event ) override
         {
-            if ( !a_Event.Released )
+            if ( !a_Event.Released || a_Event.Button != EButtonID::MouseLeft )
                 return Reply::Unhandled();
 
-            if ( !IsActivationButton( a_Event.Button ) )
-                return Reply::Unhandled();
+            return Release();
+        }
 
-            const bool wasPressed = m_IsPressed;
-            m_IsPressed = false;
+        Reply OnActivate( const ActivateEvent& a_Event ) override
+        {
+            if ( !a_Event.Pressed )
+                return Release();
 
-            if ( wasPressed )
-                Invoke( OnClick, *this );
-
+            m_IsPressed    = true;
+            m_PressPointer = NullOpt;
             return Reply::Handled();
         }
 
@@ -76,10 +69,16 @@ namespace RatUI
 
     protected:
 
-        // TODO: This shouldn't be handled here, what if users wanted to change the activation buttons or have multiple buttons with different activation buttons?
-        static constexpr bool IsActivationButton( EButtonID a_Button )
+        /** @brief Ends a press, clicking if it wasn't cancelled (e.g. by the pointer leaving). */
+        Reply Release()
         {
-            return a_Button == EButtonID::MouseLeft || a_Button == EButtonID::KeyEnter;
+            const bool wasPressed = m_IsPressed;
+            m_IsPressed = false;
+
+            if ( wasPressed )
+                Invoke( OnClick, *this );
+
+            return Reply::Handled();
         }
 
         bool m_IsHovered{ false };
@@ -119,7 +118,7 @@ namespace RatUI
         {
             Scene& scene = GetScene();
             const LayoutNode& node = GetLayout();
-            const Rect<Unit>& rect = node.Layout.FinalRect;
+            const Rect<Unit>& rect = node.Layout.SceneRect;
 
             if constexpr ( HasMixin<ThemeMixin> )
             {

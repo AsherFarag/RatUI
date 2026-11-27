@@ -3,34 +3,56 @@
 #include "IWidget.h"
 #include "SliderWidget.h"
 
-namespace RatUI 
+namespace RatUI
 {
-    /**
-	 * @brief Enumeration for scrollbar visibility modes in the ScrollContainerWidget.
-	 * These modes determine when the vertical and horizontal scrollbars are displayed based on the content size relative to the container's bounds.
-     */
+    /** @brief When a scrollbar is shown. */
     enum class EScrollbarMode : u8
     {
-        Auto,  ///< The scrollbar is visible only when the content exceeds the container's bounds in the corresponding direction.
-        Never, ///< The scrollbar is never visible, and the wheel doesn't scroll that axis. SetScrollOffset still does.
-        Always ///< The scrollbar is always visible, regardless of the content size relative to the container's bounds.
+        Auto,  ///< Shown only while the content overflows on its axis.
+        Never, ///< Never shown, and the wheel doesn't scroll that axis. SetScrollOffset still does.
+        Always ///< Always shown.
+    };
+
+    /** @brief Whether the scrollbars take space from the content. */
+    enum class EScrollbarPlacement : u8
+    {
+        Gutter, ///< Each bar has a strip of its own beside the content, kept whether or not the bar is showing, so content never shifts.
+        Overlay ///< Bars draw over the edge of the content and take no space.
+    };
+
+    /** @brief What moved a scroll container. */
+    enum class EScrollCause : u8
+    {
+        User,         ///< The wheel or a scrollbar drag.
+        Programmatic, ///< SetScrollOffset, ScrollToEnd, or a widget brought into view (e.g. keyboard focus).
+        Layout,       ///< Layout changed the content or the viewport: the offset was clamped, or only the range changed.
+    };
+
+    /** @brief A change to a scroll container's offset or to how far it can scroll. */
+    struct ScrollEvent
+    {
+        Vec2<Unit>   Offset{};
+        Vec2<Unit>   OffsetDelta{};
+        Vec2<Unit>   MaxOffset{};      ///< How far the content extends past the viewport.
+        Vec2<Unit>   MaxOffsetDelta{}; ///< Non-zero when the content or the viewport changed size.
+        EScrollCause Cause{ EScrollCause::Programmatic };
     };
 
     /**
-     * @brief A container widget that provides a clipping region for its children, allowing for scrollable content.
-     * This widget supports vertical, horizontal, or bidirectional scrolling based on the layout and content size.
+     * @brief A viewport onto content larger than itself, with scrollbars.
      *
-     * The content node is an EOverflow::Scroll layout node: layout moves the children by the scroll offset and clamps
-     * it, so hit-testing, navigation and painting use the children's FinalRects as they are. Focus moved by keyboard
-     * or gamepad is scrolled into view by the scene (Scene::ScrollIntoView).
+     * Scrolling moves the content node's children (LayoutNode::ContentOffset) without running layout, so hit-testing,
+     * navigation and painting use the children's SceneRects as they are. A descendant brought into view
+     * (Scene::BringIntoView, e.g. by keyboard or gamepad focus) is scrolled to.
      *
      * Layout structure:
      *
-     *   ScrollContainerWidget  [Vertical]
-     *   +-- m_ContentRowID     [Horizontal, Flex height]
-     *   |   +-- m_ContentNodeID  [Flex width, Flex height]  <- user children go here
-     *   |   +-- VScrollbar       [Fixed width=16, Flex height]
-     *   +-- HScrollbar           [Flex width, Fixed height=16]
+     *   ScrollContainerWidget  [Overlay]
+     *   +-- content node       [Flex width, Flex height]  <- children go here (GetContentNodeID)
+     *   +-- VScrollbar         [right edge, Flex height]
+     *   +-- HScrollbar         [bottom edge, Flex width]
+     *
+     * It scrolls vertically by default; SetHScrollbarMode turns on the horizontal axis.
      */
     class ScrollContainerWidget : public IWidget
     {
@@ -38,44 +60,68 @@ namespace RatUI
         static constexpr Unit c_ScrollbarSize = 16_u;
         static constexpr Unit c_WheelStep     = 40_u; ///< Distance scrolled per mouse wheel notch.
 
-        /**
-         * @brief Called with the new offset when the scroll offset changes. Changes made by layout (the content
-         * shrinking, focus scrolled into view) are reported after the next layout.
-         */
-        Callback<ScrollContainerWidget&, Vec2<Unit>> OnScroll;
+        /** @brief Called whenever the offset or the scrollable range changes, whatever the cause. Never during layout. */
+        Callback<ScrollContainerWidget&, const ScrollEvent&> OnScroll;
 
         /**
-         * @brief Retrieves the internal content node ID where user-added child widgets are parented.
-         * This is where children should be added to ensure they are properly clipped and scrolled within the container.
+         * @brief Keeps the view at the end of an axis while content is added, as long as it was at the end (e.g. a chat
+         * or combat log). Scrolling away from the end releases it; scrolling back catches it again.
          */
-        RATUI_NODISCARD NodeID      GetContentNodeID() const { return m_ContentNodeID; }
+        bool StickToEndX{ false };
+        bool StickToEndY{ false };
+
+        /** @brief The node the children are parented to (IWidget::GetContentNodeID). Scene::CreateWidget puts them there. */
         RATUI_NODISCARD LayoutNode* GetContentNode() { return GetScene().GetLayoutNode( m_ContentNodeID ); }
         RATUI_NODISCARD const LayoutNode* GetContentNode() const { return GetScene().GetLayoutNode( m_ContentNodeID ); }
 
         RATUI_NODISCARD EScrollbarMode GetVScrollbarMode() const { return m_VScrollbarMode; }
-
-		void SetVScrollbarMode( EScrollbarMode a_Mode ) 
-        {
-            if ( m_VScrollbarMode == a_Mode ) return;
-			m_VScrollbarMode = a_Mode;
-
-			if ( a_Mode != EScrollbarMode::Auto )
-			{
-				ShowScrollbar( m_VScrollbarID, a_Mode == EScrollbarMode::Never );
-			}
-        }
-
         RATUI_NODISCARD EScrollbarMode GetHScrollbarMode() const { return m_HScrollbarMode; }
+        RATUI_NODISCARD EScrollbarPlacement GetScrollbarPlacement() const { return m_Placement; }
+
+        void SetVScrollbarMode( EScrollbarMode a_Mode )
+        {
+            m_VScrollbarMode = a_Mode;
+            UpdateBarLayout();
+        }
 
         void SetHScrollbarMode( EScrollbarMode a_Mode )
         {
-            if ( m_HScrollbarMode == a_Mode ) return;
             m_HScrollbarMode = a_Mode;
+            UpdateBarLayout();
+        }
 
-            if ( a_Mode != EScrollbarMode::Auto )
-            {
-				ShowScrollbar( m_HScrollbarID, a_Mode == EScrollbarMode::Never );
-            }
+        void SetScrollbarPlacement( EScrollbarPlacement a_Placement )
+        {
+            m_Placement = a_Placement;
+            UpdateBarLayout();
+        }
+
+        // =====================================================================
+        // Scrolling
+        // =====================================================================
+
+        /** @brief The offset the content is scrolled by. */
+        RATUI_NODISCARD Vec2<Unit> GetScrollOffset() const { return m_Offset; }
+
+        /** @brief How far the content extends past the viewport, as of the last layout. */
+        RATUI_NODISCARD Vec2<Unit> GetMaxScrollOffset() const
+        {
+            const LayoutNode* content = GetContentNode();
+            return content ? MaxOffset( content->Layout.ContentSize, content->Layout.ParentRect.Size ) : Vec2<Unit>{ 0_u, 0_u };
+        }
+
+        /**
+         * @brief Scrolls to @p a_Offset, clamped to the content's extent. Content added since the last layout counts
+         * too: the offset asked for is kept until the next layout is done, then clamped again.
+         */
+        void SetScrollOffset( Vec2<Unit> a_Offset ) { ScrollTo( a_Offset, EScrollCause::Programmatic ); }
+
+        /** @brief Scrolls to the end of an axis, including content added since the last layout. */
+        void ScrollToEnd( EOrient a_Axis = EOrient::Vertical )
+        {
+            Vec2<Unit> offset = m_Offset;
+            offset[a_Axis == EOrient::Horizontal ? 0 : 1] = Limits<Unit>::max();
+            SetScrollOffset( offset );
         }
 
         // =====================================================================
@@ -85,58 +131,89 @@ namespace RatUI
         void OnConstruct() override
         {
             Scene& scene = GetScene();
-            // Root node: vertical layout so the h-scrollbar row sits below the content row.
-            {
-                GetLayout()
-                    .LayoutType( ELayoutType::Vertical )
-                    .WidthMode( ESizing::Flex )
-                    .HeightMode( ESizing::Flex );
-            }
+            GetLayout()
+                .LayoutType( ELayoutType::Overlay )
+                .WidthMode( ESizing::Flex )
+                .HeightMode( ESizing::Flex );
 
-            EnsureContentRow();
-            EnsureScrollbars();
+            LayoutNode& content = scene.CreateLayoutNode( {}, GetLayoutID() );
+            m_ContentNodeID        = content.ID;
+            content.NotifyGeometry = true;
+            content.ClipsContent   = true;
+            content
+                .WidthMode( ESizing::Flex )
+                .HeightMode( ESizing::Flex )
+                .LayoutType( ELayoutType::Vertical );
+
+            // After the content, so the bars are drawn and hit above it.
+            m_VScrollbarID = CreateScrollbar( EOrient::Vertical );
+            m_HScrollbarID = CreateScrollbar( EOrient::Horizontal );
+            UpdateBarLayout();
+
+            // Last, so the container's own parts above aren't parented to the content.
+            m_ContentID = m_ContentNodeID;
         }
-
 
         Reply OnPointerScroll( const PointerEvent& a_Event ) override
         {
-            const Vec2<Unit> before = GetScrollOffset();
+            const Vec2<Unit> before = m_Offset;
             const f32 dx = m_HScrollbarMode == EScrollbarMode::Never ? 0.f : a_Event.ScrollDelta[0].ToFloat();
             const f32 dy = m_VScrollbarMode == EScrollbarMode::Never ? 0.f : a_Event.ScrollDelta[1].ToFloat();
-            SetScrollOffset( { before[0] + c_WheelStep * dx, before[1] - c_WheelStep * dy } );
+            ScrollTo( { before[0] + c_WheelStep * dx, before[1] - c_WheelStep * dy }, EScrollCause::User );
 
             // Unmoved at either end, the scroll passes on to an enclosing scroll container.
-            const Vec2<Unit> after = GetScrollOffset();
-            const bool moved = after[0] != before[0] || after[1] != before[1];
+            const bool moved = m_Offset[0] != before[0] || m_Offset[1] != before[1];
             return moved ? Reply::Handled() : Reply::Unhandled();
         }
 
-        bool OnArranged() override
+        void OnGeometryChanged( const LayoutNode& a_Node, const GeometryEvent& a_Event ) override
         {
-            const Vec2<Unit> max = GetMaxScrollOffset();
-            bool relayout = UpdateAutoScrollbar( m_HScrollbarID, m_HScrollbarMode, max[0] );
-            relayout     |= UpdateAutoScrollbar( m_VScrollbarID, m_VScrollbarMode, max[1] );
+            if ( a_Node.ID != m_ContentNodeID )
+                return;
 
-            SyncScrollbars();
+            const Vec2<Unit> max         = MaxOffset( a_Event.ContentSize, a_Event.Size );
+            const Vec2<Unit> previousMax = MaxOffset( a_Event.PreviousContentSize, a_Event.PreviousSize );
 
-            // OnScroll is user code, which may change the scene: not in the middle of layout.
-            const Vec2<Unit> offset = GetScrollOffset();
-            if ( offset[0] != m_NotifiedOffset[0] || offset[1] != m_NotifiedOffset[1] )
-                GetScene().NotifyAfterLayout( GetLayoutID() );
-            return relayout;
+            // Only the layout an offset was asked ahead of clamps it again; any other leaves the view where it is.
+            Vec2<Unit> target = GetScene().GetLayoutCount() == m_RequestLayout ? m_Request : m_Offset;
+            if ( StickToEndX && m_Offset[0] >= previousMax[0] ) target[0] = max[0];
+            if ( StickToEndY && m_Offset[1] >= previousMax[1] ) target[1] = max[1];
+
+            Apply( target, max, previousMax, EScrollCause::Layout );
+            SyncScrollbars( max ); // The thumb's size follows the viewport, also when the range is unchanged.
+            UpdateBarVisibility( max );
         }
 
-        void OnLayoutDone() override { NotifyScroll(); }
+        void OnBringIntoView( const LayoutNode& a_Target ) override
+        {
+            const LayoutNode* content = GetContentNode();
+            if ( !content )
+                return;
+
+            // The least movement that shows it; when it is larger than the viewport, its start.
+            const Rect<Unit>& viewport = content->Layout.SceneRect;
+            const Rect<Unit>& rect     = a_Target.Layout.SceneRect;
+            Vec2<Unit>        offset   = m_Offset;
+            for ( u32 axis = 0; axis < 2; ++axis )
+            {
+                const Unit before = rect.Origin[axis] - viewport.Origin[axis];
+                const Unit after  = before + rect.Size[axis] - viewport.Size[axis];
+                if ( before < 0_u )
+                    offset[axis] = offset[axis] + before;
+                else if ( after > 0_u )
+                    offset[axis] = offset[axis] + std::min( after, before );
+            }
+            ScrollTo( offset, EScrollCause::Programmatic );
+        }
 
         void OnPaint( const PaintEvent& a_Event ) override
         {
             Scene& scene = GetScene();
 
-            // Layout already placed the content where it scrolled to; it only needs clipping to the viewport.
-            if ( LayoutNode* contentNode = GetContentNode() )
+            if ( LayoutNode* content = GetContentNode() )
             {
-                a_Event.Drawer.PushClipRect( contentNode->Layout.FinalRect );
-                contentNode->ForEachChild( [&]( LayoutNode& child )
+                a_Event.Drawer.PushClipRect( content->Layout.SceneRect );
+                content->ForEachChild( [&]( LayoutNode& child )
                 {
                     if ( child.Widget )
                         child.Widget->Paint( a_Event );
@@ -144,236 +221,159 @@ namespace RatUI
                 a_Event.Drawer.PopClipRect();
             }
 
-            // Draw scrollbars if needed
             if ( IWidget* vScrollbar = scene.GetWidget( m_VScrollbarID ) )
-            {
                 vScrollbar->Paint( a_Event );
-            }
 
             if ( IWidget* hScrollbar = scene.GetWidget( m_HScrollbarID ) )
-            {
                 hScrollbar->Paint( a_Event );
-            }
-        }
-
-        // =====================================================================
-        // Scroll offset access
-        // =====================================================================
-
-        RATUI_NODISCARD Vec2<Unit> GetScrollOffset() const
-        {
-            const LayoutNode* contentNode = GetContentNode();
-            return contentNode ? contentNode->Layout.ScrollOffset : Vec2<Unit>{ 0_u, 0_u };
-        }
-
-        /** @brief How far the content extends past the viewport, as of the last layout. */
-        RATUI_NODISCARD Vec2<Unit> GetMaxScrollOffset() const
-        {
-            const LayoutNode* contentNode = GetContentNode();
-            return contentNode ? contentNode->Layout.MaxScrollOffset : Vec2<Unit>{ 0_u, 0_u };
-        }
-
-        /**
-         * @brief Scrolls to @p a_Offset, clamped to the content's extent.
-         * Content added since the last layout counts too: the next layout clamps the request again.
-         */
-        void SetScrollOffset( Vec2<Unit> a_Offset )
-        {
-            if ( LayoutNode* contentNode = GetContentNode() )
-                ScrollLayoutNode( *contentNode, a_Offset );
-
-            SyncScrollbars();
-            NotifyScroll();
         }
 
     protected:
-        EScrollbarMode m_VScrollbarMode{ EScrollbarMode::Auto };
-        EScrollbarMode m_HScrollbarMode{ EScrollbarMode::Auto };
-        Vec2<Unit>     m_NotifiedOffset{ 0_u, 0_u }; ///< The offset OnScroll last reported.
-        bool           m_SyncingScrollbars{ false };
+        EScrollbarMode      m_VScrollbarMode{ EScrollbarMode::Auto };
+        EScrollbarMode      m_HScrollbarMode{ EScrollbarMode::Never }; // Most content scrolls one way: no strip is kept for a bar it never needs.
+        EScrollbarPlacement m_Placement{ EScrollbarPlacement::Gutter };
 
-        void NotifyScroll()
-        {
-            const Vec2<Unit> offset = GetScrollOffset();
-            if ( offset[0] == m_NotifiedOffset[0] && offset[1] == m_NotifiedOffset[1] )
-                return;
+        Vec2<Unit> m_Request{ 0_u, 0_u }; ///< The offset last asked for, which may be past the content's end.
+        Vec2<Unit> m_Offset{ 0_u, 0_u };  ///< The offset applied.
+        u64        m_RequestLayout{ 0 };  ///< The one layout (Scene::GetLayoutCount) that clamps m_Request again.
+        bool       m_SyncingScrollbars{ false };
 
-            m_NotifiedOffset = offset;
-            if ( OnScroll ) OnScroll( *this, offset );
-        }
-
-        // Internal layout node IDs
-        NodeID   m_ContentRowID{ c_InvalidNodeID };  ///< Horizontal row containing content + v-scrollbar.
-        NodeID   m_ContentNodeID{ c_InvalidNodeID }; ///< Flex node that user children are parented to.
-
-        // Scrollbar widget IDs
+        NodeID m_ContentNodeID{ c_InvalidNodeID };
         NodeID m_VScrollbarID{ c_InvalidNodeID };
         NodeID m_HScrollbarID{ c_InvalidNodeID };
 
-		void ShowScrollbar( NodeID a_ScrollbarID, bool a_Hidden = false )
-		{
-			if ( IWidget* scrollbar = GetScene().GetWidget( a_ScrollbarID ) )
-			{
-				if ( LayoutNode* scrollbarNode = GetScene().GetLayoutNode( scrollbar->GetLayoutID() ) )
-				{
-					scrollbarNode->Style.Visibility = a_Hidden ? EVisibility::Collapsed : EVisibility::Visible;
-					scrollbarNode->MarkDirty();
-				}
-			}
-		}
-
-        // =====================================================================
-        // Setup helpers
-        // =====================================================================
-
-        /**
-         * @brief Creates the horizontal content row node and the content node inside it.
-         *
-         * Content row:  Horizontal layout, Flex in both axes (fills root minus h-scrollbar).
-         * Content node: Flex in both axes (fills row minus v-scrollbar).
-         */
-        void EnsureContentRow()
+        static Vec2<Unit> MaxOffset( Vec2<Unit> a_ContentSize, Vec2<Unit> a_ViewportSize )
         {
-            if ( m_ContentRowID != c_InvalidNodeID )
-                return;
-
-            Scene& scene = GetScene();
-            LayoutNode& selfNode = GetLayout();
-
-            // --- Content row ---
-            LayoutNode& rowNode = scene.CreateLayoutNode( {}, GetLayoutID() );
-            m_ContentRowID = rowNode.ID;
-            rowNode
-                .LayoutType( ELayoutType::Horizontal )
-                .WidthMode( ESizing::Flex )
-                .HeightMode( ESizing::Flex );   
-
-            // --- Content node (user children go here) ---
-            LayoutNode& contentNode = scene.CreateLayoutNode( {}, rowNode.ID );
-            m_ContentNodeID = contentNode.ID;
-            contentNode
-                .WidthMode( ESizing::Flex )
-                .HeightMode( ESizing::Flex )
-                .LayoutType( ELayoutType::Vertical )
-                .Overflow( EOverflow::Scroll );
+            const Vec2<Unit> overflow = a_ContentSize - a_ViewportSize;
+            return { std::max( 0_u, overflow[0] ), std::max( 0_u, overflow[1] ) };
         }
 
-        /**
-         * @brief Creates both scrollbar widgets and inserts them at the correct positions.
-         *
-         * V-scrollbar: appended to the content row
-         * H-scrollbar: appended to the root node  
-         */
-        void EnsureScrollbars()
+        void ScrollTo( Vec2<Unit> a_Offset, EScrollCause a_Cause )
         {
-            Scene& scene = GetScene();
-            LayoutNode& selfNode = GetLayout();
-            LayoutNode& rowNode = *scene.GetLayoutNode( m_ContentRowID );
+            const Scene& scene = GetScene();
+            m_Request = { std::max( a_Offset[0], 0_u ), std::max( a_Offset[1], 0_u ) };
 
-            const auto setUpScrollbarStyle = [&]( SliderWidget& a_Slider, EOrient a_Orientation )
+            // Content added since the last layout is laid out by the pending one, which clamps the offset again.
+            m_RequestLayout = scene.GetLayoutCount() + ( scene.IsLayoutPending() ? 1 : 0 );
+
+            const Vec2<Unit> max = GetMaxScrollOffset();
+            Apply( m_Request, max, max, a_Cause );
+        }
+
+        /** @brief Moves the content and the bars to a_Target, clamped to a_Max, and reports what changed. */
+        void Apply( Vec2<Unit> a_Target, Vec2<Unit> a_Max, Vec2<Unit> a_PreviousMax, EScrollCause a_Cause )
+        {
+            const Vec2<Unit>   offset{ std::clamp( a_Target[0], 0_u, a_Max[0] ), std::clamp( a_Target[1], 0_u, a_Max[1] ) };
+            const ScrollEvent  event{ .Offset = offset, .OffsetDelta = offset - m_Offset, .MaxOffset = a_Max, .MaxOffsetDelta = a_Max - a_PreviousMax, .Cause = a_Cause };
+            const Vec2<Unit>   none{ 0_u, 0_u };
+            if ( event.OffsetDelta == none && event.MaxOffsetDelta == none )
+                return;
+
+            m_Offset = offset;
+            GetScene().SetContentOffset( m_ContentNodeID, { -offset[0], -offset[1] } );
+            SyncScrollbars( a_Max );
+
+            if ( OnScroll )
+                OnScroll( *this, event );
+        }
+
+        NodeID CreateScrollbar( EOrient a_Orientation )
+        {
+            SliderWidget* bar = GetScene().CreateWidget<SliderWidget>( GetLayoutID() );
+            bar->Orientation = a_Orientation;
+            bar->SetFocusPolicy( EFocusPolicy::None ); // Dragging a bar leaves focus where it is, and navigation moves through the content.
+            bar->ShowTrackFill         = false;
+            bar->ScaleThumbOnTrackAxis = true;
+
+            if ( a_Orientation == EOrient::Vertical )
+                bar->GetLayout().FixedWidth( c_ScrollbarSize ).HeightMode( ESizing::Flex ).SelfAlign( EAlign::TopRight );
+            else
+                bar->GetLayout().WidthMode( ESizing::Flex ).FixedHeight( c_ScrollbarSize ).SelfAlign( EAlign::BottomLeft );
+
+            const u32 axis = a_Orientation == EOrient::Horizontal ? 0 : 1;
+            bar->Value.Subscribe( [this, axis]( const f32& a_Value )
             {
-				a_Slider.Orientation = a_Orientation;
-                a_Slider.SetNavRole( ENavRole::None ); // For the pointer: navigation moves through the content instead.
-                a_Slider.Min = 0.f;
-                a_Slider.Max = 1.f;
-                
-				// Slider track should be the same size as the scrollbar, so set the thickness to fill the entire scrollbar in the non-scrolling axis.
-                a_Slider.ShowTrackFill = false;
-                a_Slider.ScaleThumbOnTrackAxis = true;
+                // Matching the bar to the offset isn't a drag.
+                if ( m_SyncingScrollbars )
+                    return;
 
-                // Values are in content units, so the wheel over a bar scrolls as far as over the content.
-                a_Slider.ScrollStep = c_WheelStep.ToFloat();
+                Vec2<Unit> offset = m_Offset;
+                offset[axis]      = Unit( a_Value );
+                ScrollTo( offset, EScrollCause::User );
+            }, false );
 
-                const u32 axis = a_Orientation == EOrient::Horizontal ? 0 : 1;
-                a_Slider.Value.Subscribe( [this, axis]( const f32& a_Value )
-                {
-                    // Matching the bar to the offset must not replace a pending, not yet clamped, request.
-                    if ( m_SyncingScrollbars )
-                        return;
+            return bar->GetLayoutID();
+        }
 
-                    Vec2<Unit> offset = GetScrollOffset();
-                    offset[axis] = Unit( a_Value );
-                    SetScrollOffset( offset );
-                }, false );
+        /** @brief Applies the modes and the placement: which bars take part in layout, and the gutters the content leaves for them. */
+        void UpdateBarLayout()
+        {
+            Scene&      scene   = GetScene();
+            LayoutNode* content = GetContentNode();
+            LayoutNode* vBar    = scene.GetLayoutNode( m_VScrollbarID );
+            LayoutNode* hBar    = scene.GetLayoutNode( m_HScrollbarID );
+            if ( !content || !vBar || !hBar )
+                return;
+
+            const bool vertical   = m_VScrollbarMode != EScrollbarMode::Never;
+            const bool horizontal = m_HScrollbarMode != EScrollbarMode::Never;
+            const bool gutter     = m_Placement == EScrollbarPlacement::Gutter;
+
+            // The gutters depend on the settings alone, never on whether the content overflows, so layout can't feed back into them.
+            content->Margin( Edges{ .R = vertical && gutter ? c_ScrollbarSize : 0_u, .B = horizontal && gutter ? c_ScrollbarSize : 0_u } );
+
+            // The horizontal bar stops short of the vertical bar's strip.
+            hBar->Margin( Edges{ .R = vertical ? c_ScrollbarSize : 0_u } );
+
+            UpdateBarVisibility( GetMaxScrollOffset() );
+        }
+
+        void UpdateBarVisibility( Vec2<Unit> a_Max )
+        {
+            const auto apply = [this]( NodeID a_BarID, EScrollbarMode a_Mode, Unit a_Max )
+            {
+                LayoutNode* bar = GetScene().GetLayoutNode( a_BarID );
+                if ( !bar )
+                    return;
+
+                // Auto only switches between Visible and Hidden, which take the same space: no layout.
+                const EVisibility visibility = a_Mode == EScrollbarMode::Never ? EVisibility::Collapsed
+                                             : a_Mode == EScrollbarMode::Always || a_Max > 0_u ? EVisibility::Visible
+                                             : EVisibility::Hidden;
+                if ( bar->Style.Visibility != visibility )
+                    bar->Visibility( visibility );
             };
 
-            // --- Vertical scrollbar ---
-            {
-                SliderWidget* vScroll = scene.CreateWidget<SliderWidget>( m_ContentRowID );
-				m_VScrollbarID        = vScroll->GetLayoutID();
-                LayoutNode& vNode     = vScroll->GetLayout();
-
-                vNode
-                    .FixedWidth( c_ScrollbarSize )
-                    .HeightMode( ESizing::Flex );
-
-				setUpScrollbarStyle( *vScroll, EOrient::Vertical );
-            }
-
-            // --- Horizontal scrollbar ---
-            {
-                SliderWidget* hScroll = scene.CreateWidget<SliderWidget>( GetLayoutID() );
-                m_HScrollbarID		  = hScroll->GetLayoutID();
-                LayoutNode& hNode     = hScroll->GetLayout();
-
-                hNode
-                    .WidthMode( ESizing::Flex )
-                    .FixedHeight( c_ScrollbarSize );
-
-				setUpScrollbarStyle( *hScroll, EOrient::Horizontal );
-            }
+            apply( m_HScrollbarID, m_HScrollbarMode, a_Max[0] );
+            apply( m_VScrollbarID, m_VScrollbarMode, a_Max[1] );
         }
 
         /** @brief Matches the scrollbars' range, thumb and value to the content and scroll offset. */
-        void SyncScrollbars()
+        void SyncScrollbars( Vec2<Unit> a_Max )
         {
-            Scene& scene = GetScene();
-            const LayoutNode* contentNode = GetContentNode();
-            if ( !contentNode )
+            const LayoutNode* content = GetContentNode();
+            if ( !content )
                 return;
-
-            const Rect<Unit>& viewport  = contentNode->Layout.FinalRect;
-            const Vec2<Unit>  offset    = contentNode->Layout.ScrollOffset;
-            const Vec2<Unit>  maxOffset = contentNode->Layout.MaxScrollOffset;
 
             m_SyncingScrollbars = true;
             const auto sync = [&]( NodeID a_ScrollbarID, u32 a_Axis )
             {
-                SliderWidget* bar = scene.GetWidget<SliderWidget>( a_ScrollbarID );
+                // The container made the bars itself, so their type is known.
+                SliderWidget* bar = static_cast<SliderWidget*>( GetScene().GetWidget( a_ScrollbarID ) );
                 if ( !bar )
                     return;
 
-                const f32 viewportSize = viewport.Size[a_Axis].ToFloat();
-                const f32 contentSize  = viewportSize + maxOffset[a_Axis].ToFloat();
+                const f32 viewportSize = content->Layout.ParentRect.Size[a_Axis].ToFloat();
+                const f32 contentSize  = viewportSize + a_Max[a_Axis].ToFloat();
                 bar->Min = 0.f;
-                bar->Max = maxOffset[a_Axis].ToFloat();
+                bar->Max = a_Max[a_Axis].ToFloat();
                 bar->ThumbScale = contentSize <= 0.f ? 1.f : std::clamp( viewportSize / contentSize, 0.f, 1.f );
-                bar->Value.Set( offset[a_Axis].ToFloat() );
+                bar->Value.Set( m_Offset[a_Axis].ToFloat() );
             };
 
             sync( m_HScrollbarID, 0 );
             sync( m_VScrollbarID, 1 );
             m_SyncingScrollbars = false;
-        }
-
-        /** @brief Shows an Auto scrollbar only while the content overflows on its axis. Returns whether it changed. */
-        bool UpdateAutoScrollbar( NodeID a_ScrollbarID, EScrollbarMode a_Mode, Unit a_MaxOffset )
-        {
-            if ( a_Mode != EScrollbarMode::Auto )
-                return false;
-
-            // Showing a bar only shrinks the viewport and hiding one only grows it, so this settles without flicker.
-            const LayoutNode* bar = GetScene().GetLayoutNode( a_ScrollbarID );
-            if ( !bar )
-                return false;
-
-            const bool hidden    = bar->Style.Visibility == EVisibility::Collapsed;
-            const bool overflows = a_MaxOffset > 0_u;
-            if ( hidden != overflows )
-                return false;
-
-            ShowScrollbar( a_ScrollbarID, !overflows );
-            return true;
         }
     };
 

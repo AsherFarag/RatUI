@@ -18,23 +18,20 @@ namespace RatUI
         return GetScene().IsEngaged( m_LayoutID );
     }
 
-    void IWidget::SetNavRole( ENavRole a_NavRole )
+    void IWidget::SetFocusPolicy( EFocusPolicy a_Policy )
     {
-        const ENavRole previous = m_NavRole;
-        m_NavRole = a_NavRole;
-        if ( !m_Scene )
-            return;
+        m_Traits.Focus = a_Policy;
+        if ( m_Scene )
+            m_Scene->OnFocusTraitsChanged( *this );
+    }
 
-        // Navigation was inside it as a group, so it leaves.
-        if ( previous == ENavRole::Group && a_NavRole != ENavRole::Group )
-        {
-            Array<NavScope>& stack = m_Scene->Input.NavStack;
-            stack.erase( std::remove_if( stack.begin(), stack.end(), [this]( const NavScope& a_Scope ) { return a_Scope.Scope == m_LayoutID; } ),
-                         stack.end() );
-        }
-
-        if ( a_NavRole == ENavRole::None && m_Scene->GetFocusedNode() == m_LayoutID )
-            m_Scene->ClearFocus();
+    void IWidget::SetNavGroup( bool a_NavGroup )
+    {
+        m_Traits.NavGroup = a_NavGroup;
+        if ( a_NavGroup )
+            m_Traits.Focus = EFocusPolicy::All;
+        if ( m_Scene )
+            m_Scene->OnFocusTraitsChanged( *this );
     }
 
     const LayoutNode& IWidget::GetLayout() const

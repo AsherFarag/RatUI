@@ -6,6 +6,39 @@ namespace RatUI
     LayoutNode::LayoutNode( NodeID a_ID, LayoutStyle a_Style ) : ID( a_ID ), Style( a_Style ) {}
     LayoutNode::~LayoutNode() = default;
 
+    void LayoutNode::ResolveVisibility()
+    {
+        Layout.Visibility  = m_Parent ? Visibility::Apply( m_Parent->Layout.Visibility, Style.Visibility ) : Style.Visibility;
+        Layout.HitTestable = Style.HitTestable && Visibility::IsRendered( Layout.Visibility ) && ( !m_Parent || m_Parent->Layout.HitTestable );
+    }
+
+    static void ResolveVisibilityBelow( LayoutNode& a_Node )
+    {
+        a_Node.ResolveVisibility();
+        for ( LayoutNode* child = a_Node.FirstChild(); child; child = child->NextSibling() )
+            ResolveVisibilityBelow( *child );
+    }
+
+    LayoutNode& LayoutNode::Visibility( EVisibility a_Visibility )
+    {
+        const bool takesSpaceChanged = Visibility::AffectsLayout( Style.Visibility ) != Visibility::AffectsLayout( a_Visibility );
+        Style.Visibility = a_Visibility;
+
+        // Layout resolves it on the way down; without a layout, it is resolved here.
+        if ( takesSpaceChanged )
+            MarkDirty();
+        else
+            ResolveVisibilityBelow( *this );
+        return *this;
+    }
+
+    LayoutNode& LayoutNode::HitTestable( bool a_HitTestable )
+    {
+        Style.HitTestable = a_HitTestable;
+        ResolveVisibilityBelow( *this );
+        return *this;
+    }
+
     void LayoutNode::MarkDirty()
     {
         Layout.IsDirty = true;
@@ -50,6 +83,7 @@ namespace RatUI
             m_Parent->m_LastChild = m_PrevSibling;
 
         m_Parent->m_ChildCount--;
+        m_Parent->MarkDirty();
         m_Parent = nullptr;
         m_PrevSibling = nullptr;
         m_NextSibling = nullptr;
@@ -75,6 +109,7 @@ namespace RatUI
 
         m_LastChild = &a_Child;
         ++m_ChildCount;
+        MarkDirty();
     }
 
     void LayoutNode::PushFrontChild( LayoutNode& a_Child )
@@ -97,6 +132,7 @@ namespace RatUI
 
         m_FirstChild = &a_Child;
         ++m_ChildCount;
+        MarkDirty();
     }
 
     void LayoutNode::InsertChildAfter( LayoutNode& a_Child, LayoutNode& a_Sibling )
@@ -120,6 +156,7 @@ namespace RatUI
 
         a_Sibling.m_NextSibling = &a_Child;
         ++m_ChildCount;
+        MarkDirty();
     }
 
     void LayoutNode::InsertChildBefore( LayoutNode& a_Child, LayoutNode& a_Sibling )
@@ -143,6 +180,7 @@ namespace RatUI
 
         a_Sibling.m_PrevSibling = &a_Child;
         ++m_ChildCount;
+        MarkDirty();
     }
 
 } // namespace RatUI

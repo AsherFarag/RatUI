@@ -388,8 +388,7 @@ namespace RatUI
         /** @brief Focus the specified widget and engage it (see IWidget::CanEngage). */
         constexpr Reply& Engage( NodeID a_Widget )
         {
-            m_FocusWidget = a_Widget;
-            m_Engage      = true;
+            m_EngageWidget = a_Widget;
             return *this;
         }
 
@@ -400,40 +399,34 @@ namespace RatUI
             return *this;
         }
 
-        /** @brief Prevent the default behavior associated with this event (e.g., text input, button clicks). */
-        constexpr Reply& PreventDefault()
-        {
-            m_PreventDefault = true;
-            return *this;
-        }
-
         constexpr bool IsHandled()          const { return m_Handled; }
         constexpr bool ShouldCapturePointer() const { return m_RequestCapture; }
         constexpr bool ShouldReleasePointer() const { return m_ReleasePointer; }
         constexpr bool ShouldSetFocus()     const { return m_FocusWidget != c_InvalidNodeID; }
         constexpr bool ShouldClearFocus()   const { return m_ClearFocus; }
-        constexpr bool ShouldEngage()       const { return m_Engage; }
+        constexpr bool ShouldEngage()       const { return m_EngageWidget != c_InvalidNodeID; }
         constexpr bool ShouldDisengage()    const { return m_Disengage; }
-        constexpr bool IsDefaultPrevented() const { return m_PreventDefault; }
 
         /** @brief The widget a capture request sends the replied-to pointer's events to. */
         constexpr NodeID GetPointerCaptureTarget() const { return m_PointerCapture; }
         
-        /** @brief Get the widget that currently has keyboard focus. */
+        /** @brief The widget a focus request focuses. */
         constexpr NodeID GetFocusTarget()        const { return m_FocusWidget; }
+
+        /** @brief The widget an engage request focuses and engages. */
+        constexpr NodeID GetEngageTarget()       const { return m_EngageWidget; }
 
     private:
         constexpr explicit Reply( bool a_Handled ) : m_Handled( a_Handled ) {}
 
         NodeID m_PointerCapture     { c_InvalidNodeID };
         NodeID m_FocusWidget        { c_InvalidNodeID };
+        NodeID m_EngageWidget       { c_InvalidNodeID };
         bool   m_Handled        : 1 { false };
         bool   m_RequestCapture : 1 { false };
         bool   m_ReleasePointer : 1 { false };
         bool   m_ClearFocus     : 1 { false };
-        bool   m_Engage         : 1 { false };
         bool   m_Disengage      : 1 { false };
-        bool   m_PreventDefault : 1 { false };
     };
 
 } // namespace RatUI

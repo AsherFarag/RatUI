@@ -20,6 +20,7 @@ namespace RatUI
         Builder& WithLayout( const LayoutStyle& a_Layout )
         {
             Widget.GetLayout().Style = a_Layout;
+            Widget.GetLayout().MarkDirty();
             return *this;
         }
 

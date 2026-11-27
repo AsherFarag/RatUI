@@ -28,15 +28,6 @@ namespace RatUI
         Cancel,           ///< Cancel or go back, e.g., XBOX B button, Escape key, etc.
     };
 
-    /** @brief How keyboard and gamepad navigation treats a widget (IWidget::SetNavRole). */
-    enum class ENavRole : u8
-    {
-        None,  ///< Not focusable: navigation passes through it to the focusable widgets inside.
-        Stop,  ///< Focusable: navigation stops on it.
-        Group, ///< Focusable group: navigation stops on it, Activate enters it and Cancel leaves it. The widgets inside are
-               ///< only reached once it is entered, and its OnNavigationBoundary decides what happens at its edges.
-    };
-
     /**
      * @brief Finds the most suitable navigatable LayoutNode in the specified direction from the starting node, based on their layout positions.
      * @tparam Range A range of LayoutNode references to consider as navigation targets. Must be a range of const LayoutNode*.
@@ -50,7 +41,7 @@ namespace RatUI
     requires std::convertible_to<std::ranges::range_value_t<Range>, const LayoutNode*>
     const LayoutNode* FindNavigatableNode(
         ENavAction a_Action,
-        LayoutNode* a_Start,
+        const LayoutNode* a_Start,
         Range&& a_Nodes,
         f32 a_LateralPenaltyWeight = 2.f )
     {
@@ -68,7 +59,7 @@ namespace RatUI
     		default:                    return nullptr; // Unsupported action
         }
 
-        const Vec2<Unit> startCenter = a_Start->Layout.FinalRect.Center();
+        const Vec2<Unit> startCenter = a_Start->Layout.SceneRect.Center();
 
     	const LayoutNode* best = nullptr;
         f32 bestScore = Limits<f32>::max();
@@ -77,7 +68,7 @@ namespace RatUI
         {
             if ( candidate == a_Start ) continue;
         
-    		const Vec2<Unit> candidateCenter = candidate->Layout.FinalRect.Center();
+    		const Vec2<Unit> candidateCenter = candidate->Layout.SceneRect.Center();
             const Vec2<Unit> delta = candidateCenter - startCenter;
         
     		// Reject candidates not in the movement direction
@@ -107,54 +98,29 @@ namespace RatUI
     public:
         enum class EBoundaryRule : u8
         {
-            Escape,   ///< Focus can leave this boundary normally. Default.
-            Stop,     ///< Trap focus - wrap around within this boundary.
-            Explicit, ///< Redirect focus to a specific widget.
-            Custom,   ///< Invoke a callback to decide at runtime.
+            Escape,   ///< Navigation leaves the scope. Default.
+            Wrap,     ///< Focus stays in the scope, wrapping round to its other end.
+            Explicit, ///< Focus goes to a specific widget.
         };
-    
-        static NavReply Escape()
-        {
-            return NavReply{ EBoundaryRule::Escape };
-        }
-    
-        static NavReply Stop()
-        {
-            return NavReply{ EBoundaryRule::Stop };
-        }
-    
+
+        static NavReply Escape() { return NavReply{ EBoundaryRule::Escape }; }
+        static NavReply Wrap()   { return NavReply{ EBoundaryRule::Wrap }; }
+
         static NavReply Explicit( NodeID a_Target )
         {
             NavReply r{ EBoundaryRule::Explicit };
             r.m_ExplicitTarget = a_Target;
             return r;
         }
-    
-        static NavReply Custom( Callback<ENavAction, NodeID /*current*/> a_Handler )
-        {
-            NavReply r{ EBoundaryRule::Custom };
-            r.m_CustomHandler = std::move( a_Handler );
-            return r;
-        }
-    
-        EBoundaryRule GetRule()           const { return m_Rule; }
-        NodeID      GetExplicitTarget() const { return m_ExplicitTarget; }
-    
-        NodeID ResolveCustom( ENavAction a_Action, NodeID a_Current ) const
-        {
-            // TODO: I was stupid and thought Callback<> wouldnt need a return type. Upgrade Callback to support returns.
-            if ( m_CustomHandler )
-                /*return*/ m_CustomHandler( a_Action, a_Current );
 
-            return c_InvalidNodeID;
-        }
-    
+        EBoundaryRule GetRule()           const { return m_Rule; }
+        NodeID        GetExplicitTarget() const { return m_ExplicitTarget; }
+
     private:
         explicit NavReply( EBoundaryRule a_Rule ) : m_Rule( a_Rule ) {}
-    
-        Callback<ENavAction, NodeID> m_CustomHandler;
-        NodeID                       m_ExplicitTarget{ c_InvalidNodeID };
-        EBoundaryRule                m_Rule{ EBoundaryRule::Escape };
+
+        NodeID        m_ExplicitTarget{ c_InvalidNodeID };
+        EBoundaryRule m_Rule{ EBoundaryRule::Escape };
     };
 
     /**
@@ -211,8 +177,8 @@ namespace RatUI
          */
         InputNavMap& BindDefaultGamepad()
         {
-            MapNav( EButtonID::GamepadLeftStick,  ENavAction::MoveLeft );
-            MapNav( EButtonID::GamepadRightStick, ENavAction::MoveRight );
+            MapNav( EButtonID::GamepadDPadLeft,   ENavAction::MoveLeft );
+            MapNav( EButtonID::GamepadDPadRight,  ENavAction::MoveRight );
             MapNav( EButtonID::GamepadDPadUp,     ENavAction::MoveUp );
             MapNav( EButtonID::GamepadDPadDown,   ENavAction::MoveDown );
 
