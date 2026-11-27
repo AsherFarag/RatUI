@@ -10,14 +10,16 @@
 namespace RatUI
 {
     /**
-     * @brief An editable text field. Editing behaviour (single-line, multi-line, numeric) comes from the ITextEditPolicy.
+     * @brief The logic of an editable text field, without any look: editing, shaping, measuring and where the caret
+     * and selection are. Derive from it and implement OnPaintField to draw a field; InputTextWidget is the default look.
+     * Editing behaviour (single-line, multi-line, numeric) comes from the ITextEditPolicy.
      *
      * It is edited while engaged (see IWidget::CanEngage): navigation stops on the field without editing it, and
      * Activate (Enter, A) or a click starts editing. While editing, typed characters arrive as TextInputEvents and
      * editing keys (Backspace, arrows, Ctrl+Z...) as ButtonEvents, before navigation. Cancel (Escape) stops editing, as
      * does a commit (Enter in a single-line field) after OnSubmit; Tab stops and moves on.
      */
-    class InputTextWidget : public IWidget
+    class InputTextBaseWidget : public IWidget
     {
     public:
         using TextBuffer = TextEditModel::TextBuffer;
@@ -26,29 +28,18 @@ namespace RatUI
         Callback<const String&> OnChanged; ///< Called with the new text (UTF-8) whenever it changes.
         Callback<const String&> OnSubmit;  ///< Called with the text (UTF-8) when the policy commits (Enter in single-line mode).
 
-        // --------------------------------------------------------------------
-        // Render Properties
-        // --------------------------------------------------------------------
+        Unit CaretWidth{ 1.5_u }; ///< Also reserved after the text when measuring, so the caret fits.
+        Unit MinWidth{ 120_u };
 
-        TextRenderStyle RenderStyle{};
-        Brush        FillBrush{ SolidBrush{ Colors::Surface800 } };
-        Color        BorderColor{ Colors::Surface500 };
-        Unit         BorderThickness{ 1_u };
-        CornerRadius Radius{ CornerRadius::None() };
-        Optional<Color> CaretColor{};                                   ///< Unset: use the text colour.
-        Optional<Color> PlaceholderColor{};                             ///< Unset: the text colour at 60% opacity. Themed by ThemeKey::Color::TextPlaceholder.
-        Color        SelectionColor{ Color{ 61, 130, 255, 96 } }; ///< AccentBlue, translucent. Themed by ThemeKey::Color::TextSelection.
-        Unit         CaretWidth{ 1.5_u };
-        Unit         MinWidth{ 120_u };
-        FocusRingStyle FocusRing{};                                  ///< Drawn while the field has focus (theme: FocusOutline keys).
-
-        explicit InputTextWidget( Unique<ITextEditPolicy> a_Policy = MakeUnique<SingleLineTextEditPolicy>() )
+        explicit InputTextBaseWidget( Unique<ITextEditPolicy> a_Policy = MakeUnique<SingleLineTextEditPolicy>() )
             : IWidget( { .Focus = EFocusPolicy::All, .Interactable = true, .Engageable = true } ), Policy( std::move( a_Policy ) )
         {
             // Preserve spaces and newlines so the caret and the rendered text agree.
             // Shaping uses unlimited width, so there are no soft wraps.
             m_LayoutStyle.Wrap = TextWrap::PreWrap();
         }
+
+        virtual ~InputTextBaseWidget() = default;
 
         // --------------------------------------------------------------------
         // Text
@@ -80,7 +71,7 @@ namespace RatUI
             InvalidateFont();
         }
 
-        /** @brief Hint text (UTF-8) shown greyed out while the field is empty, e.g. "Leave empty for a random seed". */
+        /** @brief Hint text (UTF-8) shown while the field is empty, e.g. "Leave empty for a random seed". */
         const String& GetPlaceholder() const noexcept { return m_Placeholder; }
 
         void SetPlaceholder( StringView a_Text )
@@ -97,6 +88,109 @@ namespace RatUI
 
         /** @brief Whether the field is being edited: it is engaged, so it takes typed text. */
         bool IsEditing() const { return IsEngaged(); }
+
+        // --------------------------------------------------------------------
+        // Geometry, for painting. In scene space, valid after layout.
+        // --------------------------------------------------------------------
+
+        /**
+         * @brief The area the lines are laid out in: the padded rect, with a single-line field's line
+         * centred vertically when the field is taller than its text. Multi-line text stays at the top.
+         */
+        Rect<Unit> GetTextRect() const
+        {
+            const LayoutNode& node   = GetLayout();
+            Rect<Unit>        padded = ContentPadding( node ).Apply( node.Layout.SceneRect );
+            if ( Policy && !Policy->MultiLine() )
+            {
+                const Unit spare = padded.Size[1] - m_LineHeight;
+                if ( spare > 0_u )
+                    padded.Origin[1] += spare * 0.5f;
+            }
+            return padded;
+        }
+
+        /** @brief Where the caret is: CaretWidth wide and one line tall. */
+        Rect<Unit> GetCaretRect() const
+        {
+            const Rect<Unit>  textRect = GetTextRect();
+            const TextBuffer& text     = m_Model.GetTextBuffer();
+            const u32         caret    = m_Model.Caret();
+
+            u32 lineStart = 0, lineIndex = 0;
+            for ( u32 i = 0; i < caret; ++i )
+            {
+                if ( text[i] == U'\n' )
+                {
+                    lineStart = i + 1;
+                    ++lineIndex;
+                }
+            }
+
+            return Rect<Unit>{ Vec2<Unit>{ textRect.Origin[0] + CaretX( lineStart, caret ), LineTop( textRect, lineIndex ) },
+                               Vec2<Unit>{ CaretWidth, m_LineHeight } };
+        }
+
+        /**
+         * @brief Calls a_Func with one rect per line the selection touches. A selected line break adds a sliver
+         * at the end of its line, so selected empty lines are visible. Nothing is called without a selection.
+         */
+        template<std::invocable<const Rect<Unit>&> Func>
+        void ForEachSelectionRect( Func&& a_Func ) const
+        {
+            if ( !m_Model.HasSelection() )
+                return;
+
+            const Rect<Unit>  textRect = GetTextRect();
+            const TextBuffer& text     = m_Model.GetTextBuffer();
+            const u32         start    = m_Model.SelectionStart();
+            const u32         end      = m_Model.SelectionEnd();
+
+            u32 lineStart = 0, lineIndex = 0;
+            while ( lineStart <= text.size() )
+            {
+                u32 lineEnd = lineStart;
+                while ( lineEnd < text.size() && text[lineEnd] != U'\n' )
+                    ++lineEnd;
+
+                if ( lineEnd >= start && lineStart <= end )
+                {
+                    const Unit x0 = CaretX( lineStart, std::max( start, lineStart ) );
+                    const Unit x1 = CaretX( lineStart, std::min( end, lineEnd ) ) + ( end > lineEnd ? Unit{ 4.f } : 0_u );
+                    a_Func( Rect<Unit>{ Vec2<Unit>{ textRect.Origin[0] + x0, LineTop( textRect, lineIndex ) },
+                                        Vec2<Unit>{ x1 - x0, m_LineHeight } } );
+                }
+
+                if ( lineEnd >= end || lineEnd >= text.size() )
+                    break;
+
+                lineStart = lineEnd + 1;
+                ++lineIndex;
+            }
+        }
+
+        /** @brief The shaped text, or null while the field is empty or can't be shaped yet. Its lines start at GetTextRect. */
+        const ShapedText* GetShapedText() const { return m_ShapedText ? &*m_ShapedText : nullptr; }
+
+        /** @brief The shaped placeholder, or null if there is none (or no text metrics yet). */
+        const ShapedText* GetShapedPlaceholder()
+        {
+            if ( Empty( m_Placeholder ) )
+                return nullptr;
+
+            if ( !m_PlaceholderShaped )
+            {
+                m_ShapedPlaceholder = Shape( m_Placeholder );
+                m_PlaceholderShaped = HasValue( m_ShapedPlaceholder ); // Retried until text metrics exist.
+            }
+            return m_ShapedPlaceholder ? &*m_ShapedPlaceholder : nullptr;
+        }
+
+        /** @brief Whether the placeholder should show: the field is empty and has one. */
+        bool ShowsPlaceholder() const { return m_Model.GetTextBuffer().empty() && !Empty( m_Placeholder ); }
+
+        /** @brief The height of one line box, which the caret and selection rects use. */
+        Unit GetLineHeight() const { return m_LineHeight; }
 
         // --------------------------------------------------------------------
         // IWidget overrides
@@ -196,7 +290,26 @@ namespace RatUI
 
     protected:
 
-        void OnPaint( const PaintEvent& a_Event ) override
+        /** @brief Draws the field. The theme is applied and the text shaped before it is called. */
+        virtual void OnPaintField( const PaintEvent& a_Event ) {}
+
+        /**
+         * @brief Reads the theme, once each time it changes. This one reads the font (ThemeKey::Font::Default);
+         * overrides call it, then read their own look.
+         */
+        virtual void ApplyTheme( const ThemeHandle& a_Theme )
+        {
+            if ( const FontHandle* font = a_Theme.TryGetFont( ThemeKey::Font::Default ) )
+            {
+                if ( m_LayoutStyle.Font != *font )
+                {
+                    m_LayoutStyle.Font = *font;
+                    InvalidateFont();
+                }
+            }
+        }
+
+        void OnPaint( const PaintEvent& a_Event ) final
         {
             HandleThemeUpdate();
 
@@ -206,151 +319,7 @@ namespace RatUI
             if ( m_Shaped && !wasShaped )
                 GetLayout().MarkDirty();
 
-            const LayoutNode& node     = GetLayout();
-            const Rect<Unit>& rect     = node.Layout.SceneRect;
-            const Rect<Unit>  textRect = GetTextRect( ContentPadding( node ).Apply( rect ) );
-            const bool        focused  = IsEditing();
-
-            // The ring shows while editing, and while navigation is on the field.
-            a_Event.Drawer.AddBrushRect( rect, FillBrush, BorderColor, BorderThickness, Radius );
-            if ( focused || GetScene().IsFocusVisible( GetLayoutID() ) )
-                FocusRing.Draw( a_Event.Drawer, rect, Radius );
-
-            // Clip text at the padding horizontally (it scrolls past the edges) but only at the border
-            // vertically, so ascenders and descenders that overhang a tight line box stay visible.
-            const Rect<Unit> padded = ContentPadding( node ).Apply( rect );
-            const Unit       inset  = std::min( BorderThickness, rect.Size[1] * 0.5f );
-            a_Event.Drawer.PushClipRect( Rect<Unit>{ Vec2<Unit>{ padded.Origin[0], rect.Origin[1] + inset },
-                                                     Vec2<Unit>{ padded.Size[0], rect.Size[1] - inset * 2.f } } );
-
-            // Selection highlight, one rect per line touched.
-            if ( focused && m_Model.HasSelection() )
-            {
-                const TextBuffer& text  = m_Model.GetTextBuffer();
-                const u32         start = m_Model.SelectionStart();
-                const u32         end   = m_Model.SelectionEnd();
-
-                u32 lineStart = 0, lineIndex = 0;
-                while ( lineStart <= text.size() )
-                {
-                    u32 lineEnd = lineStart;
-                    while ( lineEnd < text.size() && text[lineEnd] != U'\n' )
-                        ++lineEnd;
-
-                    if ( lineEnd >= start && lineStart <= end )
-                    {
-                        const u32  from = std::max( start, lineStart );
-                        const u32  to   = std::min( end, lineEnd );
-                        const Unit x0   = CaretX( lineStart, from );
-                        // Show a sliver for selected newlines so empty selected lines are visible.
-                        const Unit x1   = CaretX( lineStart, to ) + ( end > lineEnd ? Unit{ 4.f } : 0_u );
-
-                        a_Event.Drawer.AddRect(
-                            Rect<Unit>{ Vec2<Unit>{ textRect.Origin[0] + x0, textRect.Origin[1] + ( m_LineHeight + m_LineSpacing ) * static_cast<f32>( lineIndex ) },
-                                        Vec2<Unit>{ x1 - x0, m_LineHeight } },
-                            { .FillColor = SelectionColor } );
-                    }
-
-                    if ( lineEnd >= end || lineEnd >= text.size() )
-                        break;
-
-                    lineStart = lineEnd + 1;
-                    ++lineIndex;
-                }
-            }
-
-            // Line boxes start at textRect; the renderer centres the glyphs in each of them.
-            if ( m_ShapedText )
-            {
-                a_Event.Drawer.AddText( *m_ShapedText, GetDrawStyle( RenderStyle.FillColor ), textRect );
-            }
-            else if ( m_Model.GetTextBuffer().empty() )
-            {
-                if ( const ShapedText* placeholder = GetShapedPlaceholder() )
-                    a_Event.Drawer.AddText( *placeholder, GetDrawStyle( GetPlaceholderColor() ), textRect );
-            }
-
-            if ( focused )
-                a_Event.Drawer.AddRect( GetCaretRect(), { .FillColor = CaretColor.value_or( RenderStyle.FillColor ) } );
-
-            a_Event.Drawer.PopClipRect();
-        }
-
-        /** @brief Where the caret is drawn. */
-        Rect<Unit> GetCaretRect() const
-        {
-            const LayoutNode& node     = GetLayout();
-            const Rect<Unit>  textRect = GetTextRect( ContentPadding( node ).Apply( node.Layout.SceneRect ) );
-            const TextBuffer& text     = m_Model.GetTextBuffer();
-            const u32         caret    = m_Model.Caret();
-
-            u32 lineStart = 0, lineIndex = 0;
-            for ( u32 i = 0; i < caret; ++i )
-            {
-                if ( text[i] == U'\n' )
-                {
-                    lineStart = i + 1;
-                    ++lineIndex;
-                }
-            }
-
-            return Rect<Unit>{ Vec2<Unit>{ textRect.Origin[0] + CaretX( lineStart, caret ),
-                                           textRect.Origin[1] + ( m_LineHeight + m_LineSpacing ) * static_cast<f32>( lineIndex ) },
-                               Vec2<Unit>{ CaretWidth, m_LineHeight } };
-        }
-
-        /**
-         * @brief The area the lines are laid out in: the padded rect, with a single-line field's line
-         * centred vertically when the field is taller than its text. Multi-line text stays at the top.
-         */
-        Rect<Unit> GetTextRect( Rect<Unit> a_Padded ) const
-        {
-            if ( Policy && !Policy->MultiLine() )
-            {
-                const Unit spare = a_Padded.Size[1] - m_LineHeight;
-                if ( spare > 0_u )
-                    a_Padded.Origin[1] += spare * 0.5f;
-            }
-            return a_Padded;
-        }
-
-        /**
-         * @brief RenderStyle as the field draws it: left/top aligned, because the caret and selection are
-         * measured from the left edge and the top of each line, and without the overflow fade, since
-         * text past the edge is clipped (a fade would dim the characters next to the caret).
-         */
-        TextRenderStyle GetDrawStyle( Color a_Fill ) const
-        {
-            TextRenderStyle style = RenderStyle;
-            style.FillColor       = a_Fill;
-            style.Align           = ETextAlign::Left;
-            style.Baseline        = ETextBaseline::Top;
-            style.FadePercentage  = 0.f;
-            return style;
-        }
-
-        Color GetPlaceholderColor() const
-        {
-            if ( PlaceholderColor )
-                return *PlaceholderColor;
-
-            Color color = RenderStyle.FillColor;
-            color[3]    = static_cast<u8>( color[3] * 0.6f );
-            return color;
-        }
-
-        /** @brief The shaped placeholder, or null if there is none (or no text metrics yet). */
-        const ShapedText* GetShapedPlaceholder()
-        {
-            if ( Empty( m_Placeholder ) )
-                return nullptr;
-
-            if ( !m_PlaceholderShaped )
-            {
-                m_ShapedPlaceholder = Shape( m_Placeholder );
-                m_PlaceholderShaped = HasValue( m_ShapedPlaceholder ); // Retried until text metrics exist.
-            }
-            return m_ShapedPlaceholder ? &*m_ShapedPlaceholder : nullptr;
+            OnPaintField( a_Event );
         }
 
         /** @brief Keys the widget lets fall through to navigation when its policy doesn't use them; it keeps all others. */
@@ -393,31 +362,17 @@ namespace RatUI
             InvalidateShaped();
         }
 
+        TextEditModel   m_Model;
+        String          m_Utf8;           ///< UTF-8 copy of the model's buffer, for shaping and callbacks.
+        TextLayoutStyle m_LayoutStyle{};
+
+    private:
         void HandleThemeUpdate()
         {
             if constexpr ( HasMixin<ThemeMixin> )
             {
-                if ( !Theme.Update() )
-                    return;
-
-                RenderStyle     = Theme.GetTextStyle( ThemeKey::TextStyle::Default, RenderStyle );
-                FillBrush       = Theme.GetBrush( ThemeKey::Brush::ButtonNormal, FillBrush );
-                BorderColor     = Theme.GetColor( ThemeKey::Color::ButtonBorder, BorderColor );
-                BorderThickness = std::max( 1_u, Theme.GetMetric( ThemeKey::Metric::ButtonBorderThickness, BorderThickness ) );
-                Radius          = Theme.GetRadius( ThemeKey::Radii::Button, Radius );
-                FocusRing.UpdateFromTheme( Theme );
-                SelectionColor  = Theme.GetColor( ThemeKey::Color::TextSelection, SelectionColor );
-                if ( const Color* placeholder = Theme.TryGetColor( ThemeKey::Color::TextPlaceholder ) )
-                    PlaceholderColor = *placeholder;
-
-                if ( const FontHandle* font = Theme.TryGetFont( ThemeKey::Font::Default ) )
-                {
-                    if ( m_LayoutStyle.Font != *font )
-                    {
-                        m_LayoutStyle.Font = *font;
-                        InvalidateFont();
-                    }
-                }
+                if ( Theme.Update() )
+                    ApplyTheme( Theme );
             }
         }
 
@@ -478,6 +433,11 @@ namespace RatUI
 
         static constexpr const char* c_Probe = "|";
 
+        Unit LineTop( const Rect<Unit>& a_TextRect, u32 a_Line ) const
+        {
+            return a_TextRect.Origin[1] + ( m_LineHeight + m_LineSpacing ) * static_cast<f32>( a_Line );
+        }
+
         /** @brief UTF-8 byte offset of codepoint a_Index: the prepared text's offsets, as the field keeps only '\n' breaks. */
         u32 ByteOffset( u32 a_Index ) const
         {
@@ -503,18 +463,116 @@ namespace RatUI
             return 0_u;
         }
 
+        Optional<ShapedText> m_ShapedText;
+        bool                 m_Shaped{ false };
+        Unit                 m_LineHeight{ 20_u };
+        Unit                 m_LineSpacing{ 0_u }; ///< Extra space between lines (ShapedText::LineSpacing).
+        bool                 m_LineHeightValid{ false };
+        String               m_Placeholder;
+        Optional<ShapedText> m_ShapedPlaceholder;
+        bool                 m_PlaceholderShaped{ false };
+    };
+
+    /**
+     * @brief The default text field: a filled, bordered box with a focus ring, selection highlight and caret.
+     * Its look can be changed through its public properties or the theme.
+     */
+    class InputTextWidget : public InputTextBaseWidget
+    {
+    public:
+        using InputTextBaseWidget::InputTextBaseWidget;
+
+        // --------------------------------------------------------------------
+        // Render Properties
+        // --------------------------------------------------------------------
+
+        TextRenderStyle RenderStyle{};
+        Brush           FillBrush{ SolidBrush{ Colors::Surface800 } };
+        Color           BorderColor{ Colors::Surface500 };
+        Unit            BorderThickness{ 1_u };
+        CornerRadius    Radius{ CornerRadius::None() };
+        Optional<Color> CaretColor{};                                ///< Unset: use the text colour.
+        Optional<Color> PlaceholderColor{};                          ///< Unset: the text colour at 60% opacity. Themed by ThemeKey::Color::TextPlaceholder.
+        Color           SelectionColor{ Color{ 61, 130, 255, 96 } }; ///< AccentBlue, translucent. Themed by ThemeKey::Color::TextSelection.
+        FocusRingStyle  FocusRing{};                                 ///< Drawn while the field has focus (theme: FocusOutline keys).
+
     protected:
-        TextEditModel          m_Model;
-        String                 m_Utf8;           ///< UTF-8 copy of the model's buffer, for shaping and callbacks.
-        TextLayoutStyle        m_LayoutStyle{};
-        Optional<ShapedText>   m_ShapedText;
-        bool                   m_Shaped{ false };
-        Unit                   m_LineHeight{ 20_u };
-        Unit                   m_LineSpacing{ 0_u }; ///< Extra space between lines (ShapedText::LineSpacing).
-        bool                   m_LineHeightValid{ false };
-        String                 m_Placeholder;
-        Optional<ShapedText>   m_ShapedPlaceholder;
-        bool                   m_PlaceholderShaped{ false };
+        void ApplyTheme( const ThemeHandle& a_Theme ) override
+        {
+            InputTextBaseWidget::ApplyTheme( a_Theme );
+
+            RenderStyle     = a_Theme.GetTextStyle( ThemeKey::TextStyle::Default, RenderStyle );
+            FillBrush       = a_Theme.GetBrush( ThemeKey::Brush::ButtonNormal, FillBrush );
+            BorderColor     = a_Theme.GetColor( ThemeKey::Color::ButtonBorder, BorderColor );
+            BorderThickness = std::max( 1_u, a_Theme.GetMetric( ThemeKey::Metric::ButtonBorderThickness, BorderThickness ) );
+            Radius          = a_Theme.GetRadius( ThemeKey::Radii::Button, Radius );
+            FocusRing.UpdateFromTheme( a_Theme );
+            SelectionColor  = a_Theme.GetColor( ThemeKey::Color::TextSelection, SelectionColor );
+            if ( const Color* placeholder = a_Theme.TryGetColor( ThemeKey::Color::TextPlaceholder ) )
+                PlaceholderColor = *placeholder;
+        }
+
+        void OnPaintField( const PaintEvent& a_Event ) override
+        {
+            const LayoutNode& node     = GetLayout();
+            const Rect<Unit>& rect     = node.Layout.SceneRect;
+            const Rect<Unit>  textRect = GetTextRect();
+            const bool        editing  = IsEditing();
+
+            // The ring shows while editing, and while navigation is on the field.
+            a_Event.Drawer.AddBrushRect( rect, FillBrush, BorderColor, BorderThickness, Radius );
+            if ( editing || GetScene().IsFocusVisible( GetLayoutID() ) )
+                FocusRing.Draw( a_Event.Drawer, rect, Radius );
+
+            // Clip text at the padding horizontally (it scrolls past the edges) but only at the border
+            // vertically, so ascenders and descenders that overhang a tight line box stay visible.
+            const Rect<Unit> padded = ContentPadding( node ).Apply( rect );
+            const Unit       inset  = std::min( BorderThickness, rect.Size[1] * 0.5f );
+            a_Event.Drawer.PushClipRect( Rect<Unit>{ Vec2<Unit>{ padded.Origin[0], rect.Origin[1] + inset },
+                                                     Vec2<Unit>{ padded.Size[0], rect.Size[1] - inset * 2.f } } );
+
+            if ( editing )
+                ForEachSelectionRect( [&]( const Rect<Unit>& a_Rect ) { a_Event.Drawer.AddRect( a_Rect, { .FillColor = SelectionColor } ); } );
+
+            // Line boxes start at textRect; the renderer centres the glyphs in each of them.
+            if ( const ShapedText* text = GetShapedText() )
+                a_Event.Drawer.AddText( *text, GetDrawStyle( RenderStyle.FillColor ), textRect );
+            else if ( ShowsPlaceholder() )
+            {
+                if ( const ShapedText* placeholder = GetShapedPlaceholder() )
+                    a_Event.Drawer.AddText( *placeholder, GetDrawStyle( GetPlaceholderColor() ), textRect );
+            }
+
+            if ( editing )
+                a_Event.Drawer.AddRect( GetCaretRect(), { .FillColor = CaretColor.value_or( RenderStyle.FillColor ) } );
+
+            a_Event.Drawer.PopClipRect();
+        }
+
+        /**
+         * @brief RenderStyle as the field draws it: left/top aligned, because the caret and selection are
+         * measured from the left edge and the top of each line, and without the overflow fade, since
+         * text past the edge is clipped (a fade would dim the characters next to the caret).
+         */
+        TextRenderStyle GetDrawStyle( Color a_Fill ) const
+        {
+            TextRenderStyle style = RenderStyle;
+            style.FillColor       = a_Fill;
+            style.Align           = ETextAlign::Left;
+            style.Baseline        = ETextBaseline::Top;
+            style.FadePercentage  = 0.f;
+            return style;
+        }
+
+        Color GetPlaceholderColor() const
+        {
+            if ( PlaceholderColor )
+                return *PlaceholderColor;
+
+            Color color = RenderStyle.FillColor;
+            color[3]    = static_cast<u8>( color[3] * 0.6f );
+            return color;
+        }
     };
 
 } // namespace RatUI
