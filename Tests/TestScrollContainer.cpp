@@ -927,3 +927,21 @@ TEST_CASE( "ScrollContainerWidget: the sideways wheel scrolls an axis whose scro
     fixture.Scroll->ScrollToEnd( EOrient::Horizontal );
     REQUIRE( fixture.Scroll->GetScrollOffset()[0].ToFloat() > ScrollContainerWidget::c_WheelStep.ToFloat() );
 }
+
+TEST_CASE( "ScrollContainerWidget: a row under a bare layout node is painted", "[Scene][Scroll]" )
+{
+    struct PaintProbe : IWidget
+    {
+        int& Paints;
+        explicit PaintProbe( int& a_Paints ) : Paints( a_Paints ) {}
+        void OnPaint( const PaintEvent& ) override { ++Paints; }
+    };
+
+    ScrollSceneFixture fixture;
+    LayoutNode&        group  = fixture.Scene.CreateLayoutNode( {}, fixture.Scroll->GetLayoutID() );
+    int                paints = 0;
+    fixture.Scene.CreateWidget<PaintProbe>( group.ID, paints );
+
+    fixture.Frame();
+    REQUIRE( paints == 1 );
+}

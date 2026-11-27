@@ -121,3 +121,18 @@ TEST_CASE( "NodePool: Allocate passes its arguments to the node", "[nodepool]" )
     REQUIRE( pool.Get( id )->Style.Spacing == 7_u );
     REQUIRE( pool.Get( id )->Style.LayoutType == ELayoutType::Grid );
 }
+
+TEST_CASE( "NodePool: an ID stays stale however often its slot is reused", "[nodepool]" )
+{
+    NodePool     pool;
+    const NodeID first = pool.Allocate();
+    pool.Deallocate( first );
+
+    for ( int i = 0; i < 1000; ++i )
+    {
+        const NodeID reused = pool.Allocate();
+        REQUIRE( Traits::Index( reused ) == Traits::Index( first ) );
+        REQUIRE_FALSE( pool.IsValid( first ) );
+        pool.Deallocate( reused );
+    }
+}

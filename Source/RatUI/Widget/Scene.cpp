@@ -1146,15 +1146,16 @@ namespace RatUI
         if ( const IWidget* parent = GetWidget( a_ParentID ) )
             a_ParentID = parent->GetContentNodeID();
 
+        // A node made under a parent that is gone would never be drawn or destroyed.
+        LayoutNode* parentNode = m_Layouts.Get( a_ParentID );
+        RATUI_USER_ASSERT( parentNode || a_ParentID == c_InvalidNodeID, "Creating a widget or layout node under a parent that no longer exists." );
+
         NodeID nodeID = m_Layouts.Allocate( a_Style );
         LayoutNode* node = m_Layouts.Get( nodeID );
         RATUI_ASSERT( node, "Failed to allocate layout node." );
 
-        if ( a_ParentID != c_InvalidNodeID )
-        {
-            if ( LayoutNode* parentNode = m_Layouts.Get( a_ParentID ) )
-                parentNode->PushBackChild( *node );
-        }
+        if ( parentNode )
+            parentNode->PushBackChild( *node );
 
         return *node;
     }

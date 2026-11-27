@@ -15,6 +15,17 @@ namespace RatUI
         return *node;
     }
 
+    void IWidget::PaintChildren( const PaintEvent& a_Event, LayoutNode& a_Node )
+    {
+        for ( LayoutNode* child = a_Node.FirstChild(); child; child = child->NextSibling() )
+        {
+            if ( child->Widget )
+                child->Widget->Paint( a_Event );
+            else if ( Visibility::IsRendered( child->Layout.Visibility ) )
+                PaintChildren( a_Event, *child );
+        }
+    }
+
     bool IWidget::IsEngaged() const
     {
         return GetScene().IsEngaged( m_LayoutID );

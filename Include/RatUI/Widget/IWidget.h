@@ -319,14 +319,11 @@ namespace RatUI
             PaintChildren( a_Event );
         }
 
-        void PaintChildren( const PaintEvent& a_Event )
-        {
-            GetLayout().ForEachChild( [&]( LayoutNode& childNode )
-            {
-                if ( childNode.Widget )
-                    childNode.Widget->Paint( a_Event );
-            } );
-        }
+        /** @brief Paints the widgets inside this one. */
+        void PaintChildren( const PaintEvent& a_Event ) { PaintChildren( a_Event, GetLayout() ); }
+
+        /** @brief Paints the nearest widgets below a_Node, through any bare layout nodes in between. */
+        void PaintChildren( const PaintEvent& a_Event, LayoutNode& a_Node );
 
     protected:
         friend Scene;

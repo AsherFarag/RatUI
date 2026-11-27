@@ -45,7 +45,7 @@ namespace RatUI
 
         Builder& WithDebugName( String a_DebugName ) requires ( WidgetType::template HasMixin<DebugMixin> )
         {
-            Widget.GetLayout().DebugName = std::move( a_DebugName );
+            Widget.DebugName = std::move( a_DebugName );
             return *this;
         }
     };

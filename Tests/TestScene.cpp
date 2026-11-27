@@ -2,6 +2,8 @@
 #include <RatUI/Widget/ButtonWidget.h>
 #include <RatUI/Widget/PanelWidget.h>
 #include <RatUI/Widget/SliderWidget.h>
+#include <RatUI/Widget/WidgetBuilder.h>
+#include <type_traits>
 
 /**
  * @brief A vertical root panel with two fixed-size buttons that count their clicks.
@@ -1051,3 +1053,52 @@ TEST_CASE( "Scene: releasing over a clipped part of a button doesn't click it", 
     Mouse( { 50_u, 20_u }, false );
     REQUIRE( clicks == 1 );
 }
+
+// Widgets point back at their scene, so it stays where it is.
+static_assert( !std::is_move_constructible_v<RatUI::Scene> );
+static_assert( !std::is_move_assignable_v<RatUI::Scene> );
+
+/** @brief Counts how often it is painted. */
+struct PaintProbe : IWidget
+{
+    int& Paints;
+
+    explicit PaintProbe( int& a_Paints ) : Paints( a_Paints ) {}
+
+    void OnPaint( const PaintEvent& ) override { ++Paints; }
+};
+
+TEST_CASE( "Scene: a widget under a bare layout node is painted", "[Scene]" )
+{
+    Null::NullRenderer    renderer;
+    Null::NullTextMetrics textMetrics;
+    GlyphAtlas            atlas{ renderer, textMetrics };
+    DrawList              drawer{ atlas };
+
+    RatUI::Scene scene;
+    PanelWidget* root  = scene.CreateRootWidget<PanelWidget>();
+    LayoutNode&  outer = scene.CreateLayoutNode( {}, root->GetLayoutID() );
+    LayoutNode&  inner = scene.CreateLayoutNode( {}, outer.ID );
+    int          paints = 0;
+    scene.CreateWidget<PaintProbe>( inner.ID, paints );
+    scene.UpdateLayout( { 400_u, 300_u } );
+
+    scene.Render( drawer, 0.f );
+    REQUIRE( paints == 1 );
+
+    outer.Visibility( EVisibility::Hidden );
+    scene.Render( drawer, 0.f );
+    REQUIRE( paints == 1 );
+}
+
+#if RATUI_DEBUG
+TEST_CASE( "Builder: WithDebugName names the widget", "[Scene]" )
+{
+    RatUI::Scene scene;
+    PanelWidget* root = scene.CreateRootWidget<PanelWidget>();
+
+    Builder<PanelWidget> builder( scene, root->GetLayoutID() );
+    builder.WithDebugName( "Inventory" );
+    REQUIRE( builder.Widget.DebugName == "Inventory" );
+}
+#endif

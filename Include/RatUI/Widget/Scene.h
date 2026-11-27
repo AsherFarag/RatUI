@@ -18,8 +18,8 @@ namespace RatUI
      * Scene scene;
      * scene.Input.NavMap.BindDefaultDesktop();
      *
-     * NodeID root = scene.CreateRootWidget<ContainerWidget>();
-     * NodeID child1 = scene.CreateWidget<ButtonWidget>( root );
+     * PanelWidget*  root   = scene.CreateRootWidget<PanelWidget>();
+     * ButtonWidget* button = scene.CreateWidget<ButtonWidget>( root->GetLayoutID() );
      *
      * // In your main loop:
      * scene.Tick( deltaSeconds );
@@ -34,8 +34,8 @@ namespace RatUI
         ~Scene() = default;
         Scene( const Scene& ) = delete;
         Scene& operator=( const Scene& ) = delete;
-        Scene( Scene&& ) = default;
-        Scene& operator=( Scene&& ) = default;
+        Scene( Scene&& ) = delete; // Widgets point back at their scene.
+        Scene& operator=( Scene&& ) = delete;
 
         NodeID         RootWidget{};   ///< The NodeID of the root widget in the scene, which serves as the entry point for layout and rendering.
         ITextMetrics*  TextMetrics{};  ///< Pointer to a text metrics provider used for measuring text during layout, set by the user.
@@ -222,6 +222,7 @@ namespace RatUI
         /**
          * @brief Creates a widget as the last child of a_ParentID. If the parent is a widget that keeps its children in
          * an inner node (IWidget::GetContentNodeID, e.g. a scroll container), the widget goes there.
+         * a_ParentID must be a live node, or c_InvalidNodeID for a widget with no parent.
          */
         template<std::derived_from<IWidget> WidgetType, typename... Args>
         WidgetType* CreateWidget( NodeID a_ParentID, Args&&... a_Args );
