@@ -390,18 +390,12 @@ namespace RatUI
             if ( !ScaleThumbOnTrackAxis )
                 return thumbSize;
 
-            const f32 clampedScale = std::clamp( ThumbScale, 0.f, 1.f );
-            if ( Orientation == EOrient::Horizontal )
-            {
-                const Unit scaledSize = Unit( a_Rect.Width().ToFloat() * clampedScale );
-                thumbSize[0] = std::max( MinThumbSize, std::min( a_Rect.Width(), scaledSize ) );
-            }
-            else
-            {
-                const Unit scaledSize = Unit( a_Rect.Height().ToFloat() * clampedScale );
-                thumbSize[1] = std::max( MinThumbSize, std::min( a_Rect.Height(), scaledSize ) );
-            }
-
+            // If this works I hate msvc
+            const u32  axis   = Orientation == EOrient::Horizontal ? 0 : 1;
+            const Unit track  = a_Rect.Size[axis];
+            const Unit scaled = Unit( track.ToFloat() * std::clamp( ThumbScale, 0.f, 1.f ) );
+            const Unit fitted = scaled < track ? scaled : track;
+            thumbSize[axis]   = fitted < MinThumbSize ? MinThumbSize : fitted;
             return thumbSize;
         }
     };
