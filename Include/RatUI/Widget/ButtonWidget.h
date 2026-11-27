@@ -36,7 +36,22 @@ namespace RatUI
             if ( !a_Event.Released || a_Event.Button != EButtonID::MouseLeft )
                 return Reply::Unhandled();
 
+            // The pressing pointer keeps the button while held, so it may be released somewhere else.
+            if ( a_Event.PointerPosition && !IsOver( *a_Event.PointerPosition ) )
+                m_IsPressed = false;
+
             return Release();
+        }
+
+        Reply OnPointerMove( const PointerEvent& a_Event ) override
+        {
+            // Hover isn't updated for a captured pointer, so the button follows the one that pressed it.
+            if ( m_PressPointer && *m_PressPointer == a_Event.ID && !IsOver( a_Event.Position ) )
+            {
+                m_IsPressed = false;
+                m_IsHovered = false;
+            }
+            return Reply::Unhandled();
         }
 
         Reply OnActivate( const ActivateEvent& a_Event ) override
@@ -73,13 +88,16 @@ namespace RatUI
         Reply Release()
         {
             const bool wasPressed = m_IsPressed;
-            m_IsPressed = false;
+            m_IsPressed    = false;
+            m_PressPointer = NullOpt;
 
             if ( wasPressed )
                 Invoke( OnClick, *this );
 
             return Reply::Handled();
         }
+
+        bool IsOver( Vec2<Unit> a_Position ) const { return GetLayout().Layout.SceneRect.Contains( a_Position ); }
 
         bool m_IsHovered{ false };
         bool m_IsPressed{ false };

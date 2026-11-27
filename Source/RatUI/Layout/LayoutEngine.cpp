@@ -125,7 +125,13 @@ namespace
 
         if ( !Visibility::AffectsLayout( a_Node.Layout.Visibility ) )
         {
-            a_Node.Layout.DesiredSize = { 0_u, 0_u };
+            // Settled until it is shown again (which marks it dirty). Its subtree keeps its own dirty flags for then,
+            // but takes its visibility now, so nothing below reads as drawn or hit-testable.
+            a_Node.ForEachDescendant( []( LayoutNode& a_Child ) { a_Child.ResolveVisibility(); } );
+            a_Node.Layout.DesiredSize       = { 0_u, 0_u };
+            a_Node.Layout.LastAvailableSize = a_AvailableSize;
+            a_Node.Layout.IsDirty           = false;
+            a_Node.Layout.IsDescendantDirty = false;
             return { 0_u, 0_u };
         }
 
@@ -571,20 +577,20 @@ namespace
             if (!isHz && (HasFlag( align, EAlign::HStretch ) || child.Style.WidthMode == ESizing::Flex))
                 childSize[0] = std::clamp( std::max( 0_u, a_Inner.Size[0] - child.Style.Margin.Horizontal() ), crossConstraints.Min[0], crossConstraints.Max[0] );
 
-            Rect<Unit> childRect;
+            // The child's slot is its size plus its margin; the margin then insets the slot, leaving the child its size.
+            const Vec2<Unit> slotSize = childSize + child.Style.Margin.Total();
+            Rect<Unit>       childRect{ .Size = slotSize };
 
             if ( isHz )
             {
                 childRect.Origin[0] = cursor;
-                childRect.Origin[1] = AlignCrossAxis( childSize[1], a_Inner.Origin[1], a_Inner.Size[1], align, isHz );
+                childRect.Origin[1] = AlignCrossAxis( slotSize[1], a_Inner.Origin[1], a_Inner.Size[1], align, isHz );
             }
             else
             {
-                childRect.Origin[0] = AlignCrossAxis( childSize[0], a_Inner.Origin[0], a_Inner.Size[0], align, isHz );
+                childRect.Origin[0] = AlignCrossAxis( slotSize[0], a_Inner.Origin[0], a_Inner.Size[0], align, isHz );
                 childRect.Origin[1] = cursor;
             }
-
-            childRect.Size = childSize;
 
             childRect = child.Style.Margin.Apply( childRect );
 
@@ -709,13 +715,12 @@ namespace
             Vec2<Unit>   childSize = childSizes[i];
             const EAlign align     = ResolveAlign( child, a_Node );
 
-            if ( HasFlag( align, EAlign::HStretch ) || child.Style.WidthMode  == ESizing::Flex ) childSize[0] = cellRect.Size[0];
-            if ( HasFlag( align, EAlign::VStretch ) || child.Style.HeightMode == ESizing::Flex ) childSize[1] = cellRect.Size[1];
+            // As in linear layouts, the margin sits around the child: stretching fills the cell less the margin.
+            const Edges& margin = child.Style.Margin;
+            if ( HasFlag( align, EAlign::HStretch ) || child.Style.WidthMode  == ESizing::Flex ) childSize[0] = std::max( 0_u, cellRect.Size[0] - margin.Horizontal() );
+            if ( HasFlag( align, EAlign::VStretch ) || child.Style.HeightMode == ESizing::Flex ) childSize[1] = std::max( 0_u, cellRect.Size[1] - margin.Vertical() );
 
-            Rect<Unit> childRect = AlignRect( childSize, cellRect, align );
-			childRect            = child.Style.Margin.Apply( childRect );
-            childRect.Size[0]    = std::max( 0_u, childRect.Size[0] );
-            childRect.Size[1]    = std::max( 0_u, childRect.Size[1] );
+            const Rect<Unit> childRect = margin.Apply( AlignRect( childSize + margin.Total(), cellRect, align ) );
 
             reflowed |= ArrangeLayoutNode( child, childRect, a_Ctx );
         }
@@ -751,12 +756,17 @@ namespace
                 {
                     a_Node.Layout.DesiredSize[1] = newHeight;
                     reflowed = true;
+
+                    // The ancestors measured the old height: the next pass measures them again. The node itself
+                    // isn't dirtied, so it keeps the height its final width gave it.
+                    if ( LayoutNode* parent = a_Node.Parent() )
+                        parent->MarkDescendantDirty();
                 }
             }
         }
 
-        // Children are laid out in this node's own space: its top-left is the origin.
-        Vec2<Unit> contentEnd{ 0_u, 0_u };
+        // Children are laid out in this node's own space: its top-left is the origin. Content starts after the start padding.
+        Vec2<Unit> contentEnd{ contentPadding.L, contentPadding.T };
         if ( a_Node.FirstChild() )
         {
             const Rect<Unit> inner = contentPadding.Apply( Rect<Unit>{ Vec2<Unit>{ 0_u, 0_u }, a_AllocatedRect.Size } );
@@ -783,8 +793,9 @@ namespace
                     continue;
 
                 // What overflows a child counts too, unless the child clips it.
+                // A child's trailing margin counts, so the space after the last child scrolls into view too.
                 const Rect<Unit>& rect = child->Layout.ParentRect;
-                Vec2<Unit>        end{ rect.Right(), rect.Bottom() };
+                Vec2<Unit>        end{ rect.Right() + child->Style.Margin.R, rect.Bottom() + child->Style.Margin.B };
                 if ( !child->ClipsContent )
                 {
                     end = { std::max( end[0], rect.Origin[0] + child->Layout.ContentSize[0] ),

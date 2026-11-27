@@ -208,7 +208,7 @@ namespace RatUI
          * @param a_Text  The typed text, UTF-8 encoded (e.g. TextInputEvent::Text).
          * @return Change() if any text was inserted, otherwise Unhandle().
          */
-        [[nodiscard]] TextEditOutcome HandleText( TextEditModel& a_Model, StringView a_Text ) const;
+        [[nodiscard]] virtual TextEditOutcome HandleText( TextEditModel& a_Model, StringView a_Text ) const;
     };
 
     /**
@@ -280,11 +280,10 @@ namespace RatUI
 
     /**
      * @brief A text edit policy that allows for numeric input only,
-     * where only digits, a minus sign, and (for floating-point types) a decimal point are accepted.
+     * where only digits, a leading minus sign (signed and floating-point types) and one decimal point (floating-point
+     * types) are accepted. Typing that would put a sign or point anywhere else is ignored.
      * Pressing Enter commits the edit, and pressing Escape cancels it.
-     * This policy does not allow for multi-line input, and ignores Up/Down arrow keys to prevent navigation in multi-line text.
-     * It is templated on the numeric type (integral or floating-point) to determine which characters are accepted.
-     * For example, NumericTextEdit
+     * Up/Down are left unhandled, for the owning widget to step the value.
      */
     template<typename ValueType>
         requires ( std::floating_point<ValueType> || std::integral<ValueType> )
@@ -297,19 +296,45 @@ namespace RatUI
         {
             if ( a_Char >= U'0' && a_Char <= U'9' ) 
                 return true;
-
-            // Allow minus sign for negative numbers
-            if constexpr ( std::signed_integral<ValueType> )
-            {
-                return a_Char == U'-';
-            }
-            // Allow decimal point for floating-point numbers
-            else if constexpr ( std::floating_point<ValueType> )
-            {
-                return a_Char == U'.';
-            }
-
+            if ( a_Char == U'-' )
+                return c_Signed;
+            if ( a_Char == U'.' )
+                return c_Fractional;
             return false;
+        }
+
+        [[nodiscard]] TextEditOutcome HandleText( TextEditModel& a_Model, StringView a_Text ) const override
+        {
+            TextEditModel::TextBuffer accepted;
+            for ( const codepoint cp : DecodeEditText( a_Text ) )
+            {
+                if ( AcceptChar( cp ) )
+                    accepted.push_back( cp );
+            }
+
+            // The sign and point depend on where they land, so check the text the edit would leave.
+            const TextEditModel::TextBuffer& text   = a_Model.GetTextBuffer();
+            TextEditModel::TextBuffer        result = text.substr( 0, a_Model.SelectionStart() ) + accepted + text.substr( a_Model.SelectionEnd() );
+            if ( accepted.empty() || !IsPartialNumber( result ) )
+                return TextEditOutcome::Unhandle();
+
+            return TextEditOutcome::Change( a_Model.ReplaceSelection( accepted ) );
+        }
+
+        /** @brief Whether a_Text is a number being typed: an optional leading '-', digits, and at most one '.'. */
+        [[nodiscard]] static bool IsPartialNumber( TextEditModel::TextView a_Text )
+        {
+            size i      = c_Signed && !a_Text.empty() && a_Text[0] == U'-' ? 1 : 0;
+            bool points = false;
+            for ( ; i < a_Text.size(); ++i )
+            {
+                if ( a_Text[i] >= U'0' && a_Text[i] <= U'9' )
+                    continue;
+                if ( a_Text[i] != U'.' || !c_Fractional || points )
+                    return false;
+                points = true;
+            }
+            return true;
         }
 
         [[nodiscard]] TextEditOutcome HandleKey( TextEditModel& a_Model, const ButtonEvent& a_Event ) const override
@@ -326,6 +351,10 @@ namespace RatUI
                     return ITextEditPolicy::HandleKey( a_Model, a_Event );
             }
         }
+
+    private:
+        static constexpr bool c_Signed     = std::signed_integral<ValueType> || std::floating_point<ValueType>;
+        static constexpr bool c_Fractional = std::floating_point<ValueType>;
     };
 
 } // namespace RatUI

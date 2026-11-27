@@ -24,11 +24,10 @@ namespace RatUI
         const bool takesSpaceChanged = Visibility::AffectsLayout( Style.Visibility ) != Visibility::AffectsLayout( a_Visibility );
         Style.Visibility = a_Visibility;
 
-        // Layout resolves it on the way down; without a layout, it is resolved here.
+        // Resolved at once, as layout skips what is below a Collapsed node.
+        ResolveVisibilityBelow( *this );
         if ( takesSpaceChanged )
             MarkDirty();
-        else
-            ResolveVisibilityBelow( *this );
         return *this;
     }
 
