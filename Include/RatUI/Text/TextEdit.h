@@ -2,6 +2,8 @@
 #include "../Core/Types.h"
 #include "../Input/InputEvent.h"
 
+#include <utility>
+
 namespace RatUI
 {
 
@@ -281,7 +283,7 @@ namespace RatUI
     /**
      * @brief A text edit policy that allows for numeric input only,
      * where only digits, a leading minus sign (signed and floating-point types) and one decimal point (floating-point
-     * types) are accepted. Typing that would put a sign or point anywhere else is ignored.
+     * types) are accepted. A sign or point that would land anywhere else is dropped, even from text input carrying several characters.
      * Pressing Enter commits the edit, and pressing Escape cancels it.
      * Up/Down are left unhandled, for the owning widget to step the value.
      */
@@ -305,36 +307,31 @@ namespace RatUI
 
         [[nodiscard]] TextEditOutcome HandleText( TextEditModel& a_Model, StringView a_Text ) const override
         {
+            const TextEditModel::TextView text   = a_Model.GetTextBuffer();
+            const TextEditModel::TextView before = text.substr( 0, a_Model.SelectionStart() );
+            const TextEditModel::TextView after  = text.substr( a_Model.SelectionEnd() );
+
+            // Nothing goes in front of a sign, a sign only goes first, and there is one point.
+            // Only what is inserted is checked, so text set some other way can still be typed into.
+            if ( before.empty() && !after.empty() && after[0] == U'-' )
+                return TextEditOutcome::Unhandle();
+
+            bool                      hasPoint = before.find( U'.' ) != before.npos || after.find( U'.' ) != after.npos;
             TextEditModel::TextBuffer accepted;
             for ( const codepoint cp : DecodeEditText( a_Text ) )
             {
-                if ( AcceptChar( cp ) )
-                    accepted.push_back( cp );
-            }
-
-            // The sign and point depend on where they land, so check the text the edit would leave.
-            const TextEditModel::TextBuffer& text   = a_Model.GetTextBuffer();
-            TextEditModel::TextBuffer        result = text.substr( 0, a_Model.SelectionStart() ) + accepted + text.substr( a_Model.SelectionEnd() );
-            if ( accepted.empty() || !IsPartialNumber( result ) )
-                return TextEditOutcome::Unhandle();
-
-            return TextEditOutcome::Change( a_Model.ReplaceSelection( accepted ) );
-        }
-
-        /** @brief Whether a_Text is a number being typed: an optional leading '-', digits, and at most one '.'. */
-        [[nodiscard]] static bool IsPartialNumber( TextEditModel::TextView a_Text )
-        {
-            size i      = c_Signed && !a_Text.empty() && a_Text[0] == U'-' ? 1 : 0;
-            bool points = false;
-            for ( ; i < a_Text.size(); ++i )
-            {
-                if ( a_Text[i] >= U'0' && a_Text[i] <= U'9' )
+                if ( !AcceptChar( cp ) )
                     continue;
-                if ( a_Text[i] != U'.' || !c_Fractional || points )
-                    return false;
-                points = true;
+                if ( cp == U'-' && ( !before.empty() || !accepted.empty() ) )
+                    continue;
+                if ( cp == U'.' && std::exchange( hasPoint, true ) )
+                    continue;
+                accepted.push_back( cp );
             }
-            return true;
+
+            if ( accepted.empty() )
+                return TextEditOutcome::Unhandle();
+            return TextEditOutcome::Change( a_Model.ReplaceSelection( accepted ) );
         }
 
         [[nodiscard]] TextEditOutcome HandleKey( TextEditModel& a_Model, const ButtonEvent& a_Event ) const override

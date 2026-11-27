@@ -965,3 +965,67 @@ TEST_CASE( "Scene: destroying a widget destroys every descendant, widgets and ba
         REQUIRE( f.Scene.GetLayoutNode( id ) == nullptr );
     REQUIRE( f.Root->GetLayout().ChildCount() == 0 );
 }
+
+TEST_CASE( "Scene: a pressed button is hovered again when the pointer comes back, and hover follows the pointer after release", "[Scene]" )
+{
+    ButtonSceneFixture fixture;
+    const Vec2<Unit>   on{ 50_u, 25_u };
+    const Vec2<Unit>   second{ 50_u, 75_u };
+    const auto         Mouse = [&]( Vec2<Unit> a_Position, bool a_Pressed )
+    {
+        fixture.Scene.DispatchInputEvent( { .Device = EDeviceID::Mouse, .Payload = ButtonEvent{ .Button = EButtonID::MouseLeft, .Pressed = a_Pressed, .Released = !a_Pressed, .Pointer = c_MousePointerID, .PointerPosition = a_Position } } );
+    };
+
+    fixture.MouseMove( on );
+    Mouse( on, true );
+
+    // While held, nothing else is hovered.
+    fixture.MouseMove( second );
+    REQUIRE_FALSE( fixture.First->IsHovered() );
+    REQUIRE_FALSE( fixture.Second->IsHovered() );
+
+    fixture.MouseMove( on );
+    REQUIRE( fixture.First->IsHovered() );
+    REQUIRE_FALSE( fixture.First->IsPressed() );
+
+    fixture.MouseMove( second );
+    Mouse( second, false );
+    REQUIRE( fixture.FirstClicks == 0 );
+    REQUIRE( fixture.Second->IsHovered() );
+}
+
+TEST_CASE( "Scene: a mouse press without a pointer ID is cancelled by leaving the button", "[Scene]" )
+{
+    ButtonSceneFixture fixture;
+    fixture.MouseMove( { 50_u, 25_u } );
+    fixture.Scene.DispatchInputEvent( { .Device = EDeviceID::Mouse, .Payload = ButtonEvent{ .Button = EButtonID::MouseLeft, .Pressed = true, .PointerPosition = Vec2<Unit>{ 50_u, 25_u } } } );
+    REQUIRE( fixture.First->IsPressed() );
+
+    fixture.MouseMove( { 300_u, 250_u } );
+    REQUIRE_FALSE( fixture.First->IsPressed() );
+}
+
+TEST_CASE( "Scene: releasing over a clipped part of a button doesn't click it", "[Scene]" )
+{
+    RatUI::Scene scene;
+    PanelWidget* root = scene.CreateRootWidget<PanelWidget>();
+    PanelWidget* clip = scene.CreateWidget<PanelWidget>( root->GetLayoutID() );
+    clip->GetLayout().FixedWidth( 100_u ).FixedHeight( 30_u );
+    int           clicks = 0;
+    ButtonWidget* button = scene.CreateWidget<ButtonWidget>( clip->GetLayoutID(), [&]( ButtonBaseWidget& ) { ++clicks; } );
+    button->GetLayout().FixedWidth( 100_u ).FixedHeight( 60_u );
+    scene.UpdateLayout( { 400_u, 300_u } );
+
+    const auto Mouse = [&]( Vec2<Unit> a_Position, bool a_Pressed )
+    {
+        scene.DispatchInputEvent( { .Device = EDeviceID::Mouse, .Payload = ButtonEvent{ .Button = EButtonID::MouseLeft, .Pressed = a_Pressed, .Released = !a_Pressed, .Pointer = c_MousePointerID, .PointerPosition = a_Position } } );
+    };
+
+    Mouse( { 50_u, 10_u }, true );
+    Mouse( { 50_u, 45_u }, false );
+    REQUIRE( clicks == 0 );
+
+    Mouse( { 50_u, 10_u }, true );
+    Mouse( { 50_u, 20_u }, false );
+    REQUIRE( clicks == 1 );
+}

@@ -541,14 +541,14 @@ namespace
         {
             ResolveNodeVisibility( child );
 
+            if ( !Visibility::AffectsLayout( child.Layout.Visibility ) )
+                return;
+
             if ( child.Style.PositionMode == EPositioning::Anchored )
             {
                 reflowed |= ArrangeAnchored( child, a_Inner, a_Ctx );
                 return;
             }
-
-            if ( !Visibility::AffectsLayout( child.Layout.Visibility ) )
-                return;
 
             Vec2<Unit> childSize = ResolveChildArrangeSize( child, a_Inner.Size );
 
@@ -621,14 +621,14 @@ namespace
         {
             ResolveNodeVisibility( child );
 
+            if ( !Visibility::AffectsLayout( child.Layout.Visibility ) )
+                return;
+
             if ( child.Style.PositionMode == EPositioning::Anchored )
             {
                 reflowed |= ArrangeAnchored( child, a_Inner, a_Ctx );
                 return;
             }
-
-            if ( !Visibility::AffectsLayout( child.Layout.Visibility ) )
-                return;
 
             flowChildren[flowCount++] = &child;
         });
@@ -733,6 +733,10 @@ namespace
     bool ArrangeLayoutNode( LayoutNode& a_Node, Rect<Unit> a_AllocatedRect, LayoutContext& a_Ctx )
     {
         ResolveNodeVisibility( a_Node );
+
+        // Measure skipped it, so its sizes are stale.
+        if ( !Visibility::AffectsLayout( a_Node.Layout.Visibility ) )
+            return false;
 
         const Vec2<Unit> previousSize        = a_Node.Layout.ParentRect.Size;
         const Vec2<Unit> previousContentSize = a_Node.Layout.ContentSize;

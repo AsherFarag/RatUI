@@ -155,6 +155,12 @@ namespace RatUI
             return gesture ? gesture->CapturedWidget : c_InvalidNodeID;
         }
 
+        /**
+         * @brief Whether a_Position would hit a_Node or something inside it: inside its parents' clips and not under
+         * another interactable widget. A captured widget is hovered only while this holds.
+         */
+        RATUI_NODISCARD bool IsOver( NodeID a_Node, Vec2<Unit> a_Position ) const;
+
         /** @brief Whether input is currently pointer-driven or navigation-driven; useful for widgets deciding whether to show a focus ring. */
         RATUI_NODISCARD EInputMode GetInputMode() const { return Input.InputMode; }
 
@@ -301,6 +307,14 @@ namespace RatUI
          * any node (e.g. the empty area of a scroll container).
          */
         NodeID HitTest( Vec2<Unit> a_Position, bool a_InteractableOnly = true ) const;
+
+        /** @brief What a pointer at a_Position hovers: the widget under it, or while a_Captured holds it, a_Captured or nothing. */
+        NodeID HoverTarget( Vec2<Unit> a_Position, NodeID a_Captured ) const
+        {
+            if ( a_Captured == c_InvalidNodeID )
+                return HitTest( a_Position );
+            return IsOver( a_Captured, a_Position ) ? a_Captured : c_InvalidNodeID;
+        }
 
         /**
          * @brief The navigation stops inside a_Scope, in layout order. Arrow keys move between stops outside groups:

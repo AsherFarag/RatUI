@@ -27,7 +27,7 @@ namespace RatUI
                 return Reply::Unhandled();
 
             m_IsPressed    = true;
-            m_PressPointer = a_Event.Pointer;
+            m_PressPointer = a_Event.Pointer.value_or( c_MousePointerID );
             return Reply::Handled();
         }
 
@@ -45,12 +45,9 @@ namespace RatUI
 
         Reply OnPointerMove( const PointerEvent& a_Event ) override
         {
-            // Hover isn't updated for a captured pointer, so the button follows the one that pressed it.
+            // Touches have no hover, so leaving is seen here.
             if ( m_PressPointer && *m_PressPointer == a_Event.ID && !IsOver( a_Event.Position ) )
-            {
                 m_IsPressed = false;
-                m_IsHovered = false;
-            }
             return Reply::Unhandled();
         }
 
@@ -97,7 +94,7 @@ namespace RatUI
             return Reply::Handled();
         }
 
-        bool IsOver( Vec2<Unit> a_Position ) const { return GetLayout().Layout.SceneRect.Contains( a_Position ); }
+        bool IsOver( Vec2<Unit> a_Position ) const { return GetScene().IsOver( GetLayoutID(), a_Position ); }
 
         bool m_IsHovered{ false };
         bool m_IsPressed{ false };

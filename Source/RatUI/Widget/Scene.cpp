@@ -134,15 +134,11 @@ namespace RatUI
         if ( !last.IsMouse() && !gesture )
             return;
 
-        // A captured pointer stays with the widget that captured it.
-        if ( gesture && gesture->CapturedWidget != c_InvalidNodeID )
-            return;
-
         // The pointer is where it was: only what is under it changed.
         PointerEvent still = last;
         still.Delta        = { 0_u, 0_u };
         still.ScrollDelta  = { 0_u, 0_u };
-        SetHovered( HitTest( still.Position ), still );
+        SetHovered( HoverTarget( still.Position, gesture ? gesture->CapturedWidget : c_InvalidNodeID ), still );
     }
 
     bool Scene::DispatchWheel( const PointerEvent& a_Event, NodeID a_Captured )
@@ -430,6 +426,16 @@ namespace RatUI
         return root ? HitTestNode( *root, a_Position, a_InteractableOnly ) : c_InvalidNodeID;
     }
 
+    bool Scene::IsOver( NodeID a_Node, Vec2<Unit> a_Position ) const
+    {
+        for ( const LayoutNode* node = m_Layouts.Get( HitTest( a_Position ) ); node; node = node->Parent() )
+        {
+            if ( node->ID == a_Node )
+                return true;
+        }
+        return false;
+    }
+
     // ========================================================================
     // Input Dispatch
     // ========================================================================
@@ -493,8 +499,8 @@ namespace RatUI
 
         // --- Hover transitions ---
         // Touches have no hover: a finger only points while it presses, and hover is shared by every pointer.
-        if ( a_Event.Type != EPointerType::Touch && captured == c_InvalidNodeID )
-            SetHovered( target, a_Event );
+        if ( a_Event.Type != EPointerType::Touch )
+            SetHovered( HoverTarget( a_Event.Position, captured ), a_Event );
 
         bool handled = false;
 
@@ -615,7 +621,8 @@ namespace RatUI
         // --- Pointer buttons go to the captured widget or the one under the pointer; other releases to the focused widget ---
         NodeID targetWidget = Input.FocusedWidget;
 
-        const PointerID pointer = a_Event.Pointer.value_or( c_MousePointerID );
+        const PointerID pointer        = a_Event.Pointer.value_or( c_MousePointerID );
+        const NodeID    capturedBefore = GetCapturedWidget( pointer );
         if ( a_Event.PointerPosition && IsPointerButton( a_Event.Button ) )
         {
             const NodeID captured = GetCapturedWidget( pointer );
@@ -637,6 +644,11 @@ namespace RatUI
                 reply = widget->OnButtonReleased( a_Event );
 
             ApplyReply( reply, pointer );
+
+            // The release ended a capture, so hover goes back to what is under the pointer.
+            if ( a_Event.Released && capturedBefore != c_InvalidNodeID && GetCapturedWidget( pointer ) == c_InvalidNodeID )
+                RefreshHover();
+
             return reply.IsHandled();
         }
 

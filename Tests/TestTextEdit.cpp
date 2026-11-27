@@ -275,7 +275,7 @@ TEST_CASE( "SingleLineTextEditPolicy: Enter commits, Escape cancels, Up and Down
     REQUIRE( Same( policy.HandleKey( model, KeyPress( EButtonID::KeyDown ) ), TextEditOutcome::Unhandle() ) );
     REQUIRE( model.GetTextBuffer().empty() );
 
-    // Pasted line breaks are dropped.
+    // Line breaks in text input are dropped.
     REQUIRE( Same( policy.HandleText( model, "a\r\nb" ), TextEditOutcome::Change() ) );
     REQUIRE( model.GetTextBuffer() == U"ab" );
     REQUIRE( Same( policy.HandleText( model, "\n" ), TextEditOutcome::Unhandle() ) );
@@ -300,7 +300,7 @@ TEST_CASE( "MultiLineTextEditPolicy: Enter inserts a line break and Up and Down 
 
     REQUIRE( Same( policy.HandleKey( model, KeyPress( EButtonID::KeyEscape ) ), TextEditOutcome::Cancel() ) );
 
-    // Pasted line breaks are kept, as '\n'.
+    // Line breaks in text input are kept, as '\n'.
     model.SetTextBuffer( TextBuffer{} );
     (void)policy.HandleText( model, "x\r\ny" );
     REQUIRE( model.GetTextBuffer() == U"x\ny" );
@@ -332,4 +332,38 @@ TEST_CASE( "NumericTextEditPolicy: digits, and a sign or decimal point by value 
 
     REQUIRE( Same( real.HandleKey( model, KeyPress( EButtonID::KeyEnter ) ), TextEditOutcome::Commit() ) );
     REQUIRE( Same( real.HandleKey( model, KeyPress( EButtonID::KeyUp ) ), TextEditOutcome::Unhandle() ) );
+}
+
+TEST_CASE( "NumericTextEditPolicy: a sign only goes first and a number has one point, in any text input", "[Text][TextEdit]" )
+{
+    const NumericTextEditPolicy<float>    real;
+    const NumericTextEditPolicy<unsigned> natural;
+    TextEditModel                         model;
+
+    REQUIRE( Same( real.HandleText( model, "-" ), TextEditOutcome::Change() ) );
+    REQUIRE( Same( real.HandleText( model, "-" ), TextEditOutcome::Unhandle() ) );
+    REQUIRE( Same( real.HandleText( model, "1.5" ), TextEditOutcome::Change() ) );
+    REQUIRE( Same( real.HandleText( model, "." ), TextEditOutcome::Unhandle() ) );
+    REQUIRE( model.GetTextBuffer() == U"-1.5" );
+
+    // Nothing goes in front of the sign.
+    model.SetCaret( 0 );
+    REQUIRE( Same( real.HandleText( model, "7" ), TextEditOutcome::Unhandle() ) );
+
+    // Text input of several characters keeps what fits.
+    model.SetTextBuffer( U"" );
+    REQUIRE( Same( real.HandleText( model, "12-3.4.5" ), TextEditOutcome::Change() ) );
+    REQUIRE( model.GetTextBuffer() == U"123.45" );
+
+    // Replacing the selection frees its point.
+    model.SetCaret( 3 );
+    model.SetCaret( 6, true );
+    REQUIRE( Same( real.HandleText( model, ".9" ), TextEditOutcome::Change() ) );
+    REQUIRE( model.GetTextBuffer() == U"123.9" );
+
+    // Text set some other way can still be typed into.
+    model.SetTextBuffer( U"1e5" );
+    model.SetCaret( 3 );
+    REQUIRE( Same( natural.HandleText( model, "7" ), TextEditOutcome::Change() ) );
+    REQUIRE( model.GetTextBuffer() == U"1e57" );
 }

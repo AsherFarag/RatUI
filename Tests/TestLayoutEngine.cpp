@@ -1123,3 +1123,20 @@ TEST_CASE( "Reflow honours a fixed height and the size constraints", "[layout-en
         REQUIRE_UNIT( wrapping.Layout.DesiredSize[1], 18.f );
     }
 }
+
+TEST_CASE( "A Collapsed anchored subtree is not arranged, so its content doesn't reflow", "[layout-engine][anchor][visibility][reflow]" )
+{
+    LayoutFixture fx;
+    LayoutNode    root, panel, wrapping;
+    root.LayoutType( ELayoutType::Vertical ).FixedWidth( 200_u ).FixedHeight( 200_u );
+    root.PushBackChild( panel );
+    panel.PushBackChild( wrapping );
+    panel.PositionMode( EPositioning::Anchored ).FixedWidth( 40_u ).Visibility( EVisibility::Collapsed );
+    wrapping.Widget = MakeUnique<WrappingProbe>();
+    wrapping.FlexWidth();
+
+    MeasureLayoutNode( root, Vec2<Unit>{ 200_u, 200_u }, fx.Ctx );
+    REQUIRE_FALSE( ArrangeLayoutNode( root, Rect<Unit>{ { 0_u, 0_u }, { 200_u, 200_u } }, fx.Ctx ) );
+    REQUIRE_FALSE( root.Layout.IsDescendantDirty );
+    REQUIRE_VEC2( wrapping.Layout.ParentRect.Size, 0.f, 0.f );
+}
