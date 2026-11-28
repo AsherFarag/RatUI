@@ -184,7 +184,7 @@ TEST_CASE( "Scene: a lifted touch is forgotten once it can't continue a multi-pr
     REQUIRE( FindValue( fixture.Scene.Input.PointerStates, c_MousePointerID ) != nullptr );
 }
 
-TEST_CASE( "Scene: destroying a widget frees the pointers it captured", "[Scene]" )
+TEST_CASE( "Scene: a destroyed widget's capture lasts until the pointer is released", "[Scene]" )
 {
     ButtonSceneFixture fixture;
     const NodeID first = fixture.First->GetLayoutID();
@@ -192,9 +192,15 @@ TEST_CASE( "Scene: destroying a widget frees the pointers it captured", "[Scene]
     fixture.Touch( 1, { 50_u, 25_u }, true );
     REQUIRE( fixture.Scene.GetCapturedWidget( 1 ) == first );
 
+    // Still held, so the rest of the press goes nowhere rather than to the game.
     fixture.Scene.DestroyWidget( first );
     fixture.Scene.UpdateLayout( { 400_u, 300_u } );
+    REQUIRE( fixture.Scene.GetCapturedWidget( 1 ) == first );
+    REQUIRE( fixture.Scene.GetWidget( first ) == nullptr );
+
+    fixture.Touch( 1, { 50_u, 25_u }, false );
     REQUIRE( fixture.Scene.GetCapturedWidget( 1 ) == c_InvalidNodeID );
+    REQUIRE( fixture.SecondClicks == 0 );
 }
 
 TEST_CASE( "SliderWidget: a drag starts where the pointer presses and follows only that pointer", "[Scene]" )
@@ -1102,3 +1108,275 @@ TEST_CASE( "Builder: WithDebugName names the widget", "[Scene]" )
     REQUIRE( builder.Widget.DebugName == "Inventory" );
 }
 #endif
+
+/** @brief ButtonSceneFixture with mouse helpers that return what DispatchInputEvent does. */
+struct PointerOwnerFixture : ButtonSceneFixture
+{
+    static constexpr Vec2<Unit> c_OnButton{ 50_u, 30_u };
+    static constexpr Vec2<Unit> c_OnPanel{ 115_u, 5_u }; // The root panel fills the scene; this is its padding.
+    static constexpr Vec2<Unit> c_Outside{ 300_u, 250_u };
+
+    bool Move( Vec2<Unit> a_Position )
+    {
+        return Scene.DispatchInputEvent( { .Device = EDeviceID::Mouse, .Payload = PointerEvent{ .Position = a_Position, .Type = EPointerType::Mouse } } );
+    }
+
+    bool Button( Vec2<Unit> a_Position, bool a_Pressed, EButtonID a_Button = EButtonID::MouseLeft )
+    {
+        return Scene.DispatchInputEvent( { .Device  = EDeviceID::Mouse,
+                                           .Payload = ButtonEvent{ .Button = a_Button, .Pressed = a_Pressed, .Released = !a_Pressed,
+                                                                   .Pointer = c_MousePointerID, .PointerPosition = a_Position } } );
+    }
+};
+
+TEST_CASE( "Scene: the pointer is the UI's over an interactable widget, whatever the widget does with it", "[Scene]" )
+{
+    PointerOwnerFixture f;
+    IWidget*            root = f.Scene.GetWidget( f.Scene.RootWidget );
+
+    // A panel passes the pointer through to the game by default.
+    REQUIRE_FALSE( f.Move( f.c_OnPanel ) );
+    REQUIRE_FALSE( f.Scene.IsPointerOverUI() );
+    REQUIRE_FALSE( f.Button( f.c_OnPanel, true ) );
+    REQUIRE_FALSE( f.Button( f.c_OnPanel, false ) );
+
+    // Interactable, it keeps the pointer though it handles nothing.
+    root->SetInteractable( true );
+    REQUIRE( f.Move( f.c_OnPanel ) );
+    REQUIRE( f.Scene.IsPointerOverUI() );
+    REQUIRE( f.Button( f.c_OnPanel, true ) );
+    REQUIRE( f.Button( f.c_OnPanel, false ) );
+
+    root->SetInteractable( false );
+    REQUIRE_FALSE( f.Move( f.c_OnPanel ) );
+    REQUIRE_FALSE( f.Scene.IsPointerOverUI() );
+}
+
+TEST_CASE( "Scene: a press that began outside the UI stays the game's until it is released", "[Scene]" )
+{
+    PointerOwnerFixture f;
+
+    REQUIRE_FALSE( f.Button( f.c_Outside, true ) );
+    REQUIRE_FALSE( f.Move( f.c_OnButton ) );
+    REQUIRE_FALSE( f.Scene.IsPointerOverUI() );
+    REQUIRE_FALSE( f.Button( f.c_OnButton, false ) );
+    REQUIRE( f.FirstClicks == 0 );
+
+    REQUIRE( f.Move( f.c_OnButton ) );
+    REQUIRE( f.Scene.IsPointerOverUI() );
+}
+
+TEST_CASE( "Scene: a press that began on a widget stays the UI's until it is released", "[Scene]" )
+{
+    PointerOwnerFixture f;
+
+    REQUIRE( f.Move( f.c_OnButton ) );
+    REQUIRE( f.Button( f.c_OnButton, true ) );
+    REQUIRE( f.Move( f.c_Outside ) );
+    REQUIRE( f.Scene.IsPointerOverUI() );
+    REQUIRE( f.Button( f.c_Outside, false ) );
+    REQUIRE( f.FirstClicks == 0 );
+
+    REQUIRE_FALSE( f.Move( f.c_Outside ) );
+    REQUIRE_FALSE( f.Scene.IsPointerOverUI() );
+}
+
+TEST_CASE( "Scene: another button of a held pointer goes where the pointer already goes", "[Scene]" )
+{
+    PointerOwnerFixture f;
+
+    SECTION( "down in the game" )
+    {
+        REQUIRE_FALSE( f.Button( f.c_Outside, true, EButtonID::MouseRight ) );
+        REQUIRE_FALSE( f.Move( f.c_OnButton ) );
+        REQUIRE_FALSE( f.Button( f.c_OnButton, true ) );
+        REQUIRE_FALSE( f.Scene.IsPointerOverUI() );
+
+        // Released, the pointer is back with what is under it.
+        REQUIRE_FALSE( f.Button( f.c_OnButton, false, EButtonID::MouseRight ) );
+        REQUIRE( f.Scene.IsPointerOverUI() );
+        REQUIRE( f.Button( f.c_OnButton, false ) );
+        REQUIRE( f.FirstClicks == 0 );
+    }
+    SECTION( "captured by a widget" )
+    {
+        REQUIRE( f.Button( f.c_OnButton, true ) );
+        REQUIRE( f.Button( f.c_Outside, true, EButtonID::MouseRight ) );
+        REQUIRE( f.Button( f.c_Outside, false ) );
+
+        REQUIRE_FALSE( f.Move( f.c_Outside ) );
+        REQUIRE_FALSE( f.Button( f.c_Outside, false, EButtonID::MouseRight ) );
+    }
+}
+
+TEST_CASE( "Scene: a press stays the UI's when its widget is destroyed", "[Scene]" )
+{
+    PointerOwnerFixture f;
+    REQUIRE( f.Button( f.c_OnButton, true ) );
+
+    f.Scene.DestroyWidget( f.First->GetLayoutID() );
+    f.Scene.UpdateLayout( { 400_u, 300_u } );
+
+    REQUIRE( f.Move( f.c_Outside ) );
+    REQUIRE( f.Scene.IsPointerOverUI() );
+    REQUIRE( f.Button( f.c_Outside, false ) );
+    REQUIRE_FALSE( f.Scene.IsPointerOverUI() );
+    REQUIRE_FALSE( f.Move( f.c_Outside ) );
+}
+
+TEST_CASE( "Scene: a widget that releases its capture mid-press leaves the pointer to what is under it", "[Scene]" )
+{
+    PointerOwnerFixture f;
+    REQUIRE( f.Button( f.c_OnButton, true ) );
+    f.Scene.ReleasePointerCapture( c_MousePointerID );
+
+    // Another widget can hover and take the release, e.g. a slot an item is dragged to.
+    const Vec2<Unit> onSecond{ 50_u, 80_u };
+    REQUIRE( f.Move( onSecond ) );
+    REQUIRE( f.Scene.Input.HoveredWidget == f.Second->GetLayoutID() );
+    REQUIRE( f.Scene.IsPointerOverUI() );
+
+    REQUIRE_FALSE( f.Move( f.c_Outside ) );
+    REQUIRE_FALSE( f.Scene.IsPointerOverUI() );
+    REQUIRE_FALSE( f.Button( f.c_Outside, false ) );
+}
+
+TEST_CASE( "Scene: IsPointerOverUI follows the pointer that hovers, not a touch that moved since", "[Scene]" )
+{
+    PointerOwnerFixture f;
+
+    REQUIRE_FALSE( f.Button( f.c_Outside, true ) );
+    REQUIRE_FALSE( f.Move( f.c_OnButton ) );
+    f.TouchMove( 7, f.c_Outside );
+    REQUIRE_FALSE( f.Scene.IsPointerOverUI() );
+}
+
+/** @brief Counts the pointer events it is sent. */
+struct PointerProbe : IWidget
+{
+    int Enters{ 0 };
+    int Moves{ 0 };
+    int Releases{ 0 };
+
+    PointerProbe() : IWidget( WidgetTraits{ .Interactable = true } ) {}
+
+    Reply OnPointerEnter( const PointerEvent& ) override { ++Enters; return Reply::Unhandled(); }
+    Reply OnPointerMove( const PointerEvent& ) override { ++Moves; return Reply::Unhandled(); }
+    Reply OnButtonReleased( const ButtonEvent& ) override { ++Releases; return Reply::Unhandled(); }
+};
+
+TEST_CASE( "Scene: widgets don't hear a pointer whose press began outside the UI", "[Scene]" )
+{
+    PointerOwnerFixture f;
+    PointerProbe*       probe = f.Scene.CreateWidget<PointerProbe>( f.Scene.RootWidget );
+    probe->GetLayout().FixedWidth( 100_u ).FixedHeight( 40_u );
+    f.Scene.UpdateLayout( { 400_u, 300_u } );
+    const Vec2<Unit> onProbe{ 50_u, 130_u };
+
+    f.Button( f.c_Outside, true );
+    f.Move( onProbe );
+    f.Scene.UpdateLayout( { 400_u, 300_u } );
+    REQUIRE( probe->Enters == 0 );
+    REQUIRE( probe->Moves == 0 );
+
+    // Released, the widget under the pointer is hovered, but isn't sent the release.
+    f.Button( onProbe, false );
+    REQUIRE( probe->Releases == 0 );
+    REQUIRE( probe->Enters == 1 );
+    REQUIRE( f.Scene.IsPointerOverUI() );
+}
+
+TEST_CASE( "Scene: ClearHover leaves nothing hovered until the pointer moves", "[Scene]" )
+{
+    PointerOwnerFixture f;
+
+    REQUIRE( f.Move( f.c_OnButton ) );
+    f.Scene.ClearHover();
+    REQUIRE_FALSE( f.Scene.IsPointerOverUI() );
+    REQUIRE( f.Scene.Input.HoveredWidget == c_InvalidNodeID );
+
+    // Layout doesn't bring the hover back.
+    f.First->GetLayout().FixedHeight( 44_u );
+    f.Scene.UpdateLayout( { 400_u, 300_u } );
+    REQUIRE_FALSE( f.Scene.IsPointerOverUI() );
+
+    REQUIRE( f.Move( f.c_OnButton ) );
+    REQUIRE( f.Scene.IsPointerOverUI() );
+}
+
+/** @brief Takes the wheel and counts it. */
+struct WheelProbe : IWidget
+{
+    int Scrolls{ 0 };
+
+    WheelProbe() : IWidget( WidgetTraits{ .Interactable = true } ) {}
+
+    Reply OnPointerScroll( const PointerEvent& ) override { ++Scrolls; return Reply::Handled(); }
+};
+
+TEST_CASE( "Scene: the wheel is the game's during a press that began outside the UI", "[Scene]" )
+{
+    PointerOwnerFixture f;
+    WheelProbe*         probe = f.Scene.CreateWidget<WheelProbe>( f.Scene.RootWidget );
+    probe->GetLayout().FixedWidth( 100_u ).FixedHeight( 40_u );
+    f.Scene.UpdateLayout( { 400_u, 300_u } );
+
+    const auto wheel = [&]
+    {
+        return f.Scene.DispatchInputEvent( { .Device  = EDeviceID::Mouse,
+                                             .Payload = PointerEvent{ .Position = { 50_u, 130_u }, .Type = EPointerType::Mouse, .ScrollDelta = { 0_u, 1_u } } } );
+    };
+
+    REQUIRE( wheel() );
+    REQUIRE( probe->Scrolls == 1 );
+
+    f.Button( f.c_Outside, true );
+    REQUIRE_FALSE( wheel() );
+    REQUIRE( probe->Scrolls == 1 );
+}
+
+TEST_CASE( "Scene: ClearHover leaves a captured pointer with its widget", "[Scene]" )
+{
+    PointerOwnerFixture f;
+
+    f.Move( f.c_OnButton );
+    f.Button( f.c_OnButton, true );
+    f.Scene.ClearHover();
+    REQUIRE( f.Scene.Input.HoveredWidget == c_InvalidNodeID );
+    REQUIRE( f.Scene.IsPointerOverUI() );
+
+    REQUIRE( f.Button( f.c_OnButton, false ) );
+    REQUIRE_FALSE( f.Scene.IsPointerOverUI() );
+}
+
+TEST_CASE( "Scene: a press after a lost release starts over from what is under it", "[Scene]" )
+{
+    PointerOwnerFixture f;
+    const Vec2<Unit>    onSecond{ 50_u, 80_u };
+
+    SECTION( "lost in the game" )
+    {
+        REQUIRE_FALSE( f.Button( f.c_Outside, true ) );
+    }
+    SECTION( "lost on a widget" )
+    {
+        REQUIRE( f.Button( f.c_OnButton, true ) );
+    }
+
+    REQUIRE( f.Button( onSecond, true ) );
+    REQUIRE( f.Scene.GetCapturedWidget( c_MousePointerID ) == f.Second->GetLayoutID() );
+    REQUIRE( f.Button( onSecond, false ) );
+    REQUIRE( f.FirstClicks == 0 );
+    REQUIRE( f.SecondClicks == 1 );
+}
+
+TEST_CASE( "Scene: a button event moves hover to where it happened", "[Scene]" )
+{
+    PointerOwnerFixture f;
+
+    f.Move( f.c_OnButton );
+    REQUIRE( f.Scene.Input.HoveredWidget == f.First->GetLayoutID() );
+
+    f.Button( { 50_u, 80_u }, true );
+    REQUIRE( f.Scene.Input.HoveredWidget == f.Second->GetLayoutID() );
+}

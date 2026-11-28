@@ -33,6 +33,12 @@ namespace RatUI
                    a_Action == ENavAction::MoveUp   || a_Action == ENavAction::MoveDown;
         }
 
+        /** @brief Whether a pointer is down in a press that landed on no widget: the game's until it is released. */
+        bool IsGamePress( const PointerGestureState& a_Gesture )
+        {
+            return a_Gesture.IsDown && a_Gesture.PressedWidget == c_InvalidNodeID;
+        }
+
     } // namespace
 
     // ========================================================================
@@ -124,20 +130,29 @@ namespace RatUI
 
     void Scene::RefreshHover()
     {
-        // Touches have no hover, and a pen that Tick has forgotten no longer points anywhere.
-        const PointerEvent& last = Input.LastPointerEvent;
-        if ( last.Type == EPointerType::Unknown || last.IsTouch() )
+        if ( !Input.Hover )
             return;
 
-        const PointerGestureState* gesture = FindValue( Input.PointerStates, last.ID );
-        if ( !last.IsMouse() && !gesture )
+        // A pen that Tick has forgotten no longer points anywhere.
+        const PointerGestureState* gesture = FindValue( Input.PointerStates, Input.Hover->ID );
+        if ( !Input.Hover->IsMouse() && !gesture )
             return;
 
         // The pointer is where it was: only what is under it changed.
-        PointerEvent still = last;
+        PointerEvent still = *Input.Hover;
         still.Delta        = { 0_u, 0_u };
         still.ScrollDelta  = { 0_u, 0_u };
-        SetHovered( HoverTarget( still.Position, gesture ? gesture->CapturedWidget : c_InvalidNodeID ), still );
+        SetHovered( HoverTarget( gesture, still.Position ), still );
+    }
+
+    void Scene::ClearHover()
+    {
+        if ( !Input.Hover )
+            return;
+
+        const PointerEvent last = *Input.Hover;
+        Input.Hover.reset();
+        SetHovered( c_InvalidNodeID, last );
     }
 
     bool Scene::DispatchWheel( const PointerEvent& a_Event, NodeID a_Captured )
@@ -437,6 +452,34 @@ namespace RatUI
         return false;
     }
 
+    NodeID Scene::PointerTarget( const PointerGestureState* a_Gesture, Vec2<Unit> a_Position ) const
+    {
+        if ( a_Gesture && a_Gesture->CapturedWidget != c_InvalidNodeID )
+            return a_Gesture->CapturedWidget;
+        if ( a_Gesture && IsGamePress( *a_Gesture ) )
+            return c_InvalidNodeID;
+        return HitTest( a_Position );
+    }
+
+    NodeID Scene::HoverTarget( const PointerGestureState* a_Gesture, Vec2<Unit> a_Position ) const
+    {
+        const NodeID target   = PointerTarget( a_Gesture, a_Position );
+        const bool   captured = a_Gesture && a_Gesture->CapturedWidget != c_InvalidNodeID;
+        return captured && !IsOver( target, a_Position ) ? c_InvalidNodeID : target;
+    }
+
+    bool Scene::IsPointerOverUI() const
+    {
+        for ( const auto& [pointerID, gesture] : Input.PointerStates )
+        {
+            if ( gesture.CapturedWidget != c_InvalidNodeID )
+                return true;
+        }
+
+        // Nothing is hovered while the pointer that hovers is down in the game.
+        return Input.HoveredWidget != c_InvalidNodeID;
+    }
+
     // ========================================================================
     // Input Dispatch
     // ========================================================================
@@ -526,19 +569,20 @@ namespace RatUI
 
     bool Scene::ProcessPointerEvent( const PointerEvent& a_Event )
     {
-        Input.LastPointerEvent = a_Event;
-
         if ( a_Event.IsMouse() || Math::LengthSq( a_Event.Delta ) > 0_u )
             Input.InputMode = EInputMode::Pointer;
 
         PointerGestureState& gesture = Input.PointerStates[a_Event.ID];
         const NodeID captured = gesture.CapturedWidget;
-        const NodeID target = captured != c_InvalidNodeID ? captured : HitTest( a_Event.Position );
+        const NodeID target   = PointerTarget( &gesture, a_Event.Position );
 
         // --- Hover transitions ---
         // Touches have no hover: a finger only points while it presses, and hover is shared by every pointer.
         if ( a_Event.Type != EPointerType::Touch )
-            SetHovered( HoverTarget( a_Event.Position, captured ), a_Event );
+        {
+            Input.Hover = a_Event;
+            SetHovered( HoverTarget( &gesture, a_Event.Position ), a_Event );
+        }
 
         bool handled = false;
 
@@ -580,7 +624,8 @@ namespace RatUI
         }
 
         // --- Raw pointer dispatch (move / scroll) ---
-        if ( a_Event.ScrollDelta[0] != 0_u || a_Event.ScrollDelta[1] != 0_u )
+        const bool scrolls = a_Event.ScrollDelta[0] != 0_u || a_Event.ScrollDelta[1] != 0_u;
+        if ( scrolls && ( captured != c_InvalidNodeID || !IsGamePress( gesture ) ) )
             handled = DispatchWheel( a_Event, captured );
 
         if ( IWidget* widget = GetWidget( target ) )
@@ -590,7 +635,8 @@ namespace RatUI
             handled = handled || moveReply.IsHandled();
         }
 
-        return handled;
+        // A pointer is the UI's by who it went to, whether or not the widget does anything with it.
+        return handled || target != c_InvalidNodeID;
     }
 
     bool Scene::ProcessButtonEvent( const ButtonEvent& a_Event )
@@ -659,38 +705,45 @@ namespace RatUI
         // --- Pointer buttons go to the captured widget or the one under the pointer; other releases to the focused widget ---
         NodeID targetWidget = Input.FocusedWidget;
 
-        const PointerID pointer        = a_Event.Pointer.value_or( c_MousePointerID );
-        const NodeID    capturedBefore = GetCapturedWidget( pointer );
-        if ( a_Event.PointerPosition && IsPointerButton( a_Event.Button ) )
+        const PointerID pointer   = a_Event.Pointer.value_or( c_MousePointerID );
+        const bool      isPointer = a_Event.PointerPosition && IsPointerButton( a_Event.Button );
+        if ( isPointer )
         {
-            const NodeID captured = GetCapturedWidget( pointer );
-            const NodeID hit      = a_Event.Pressed || captured == c_InvalidNodeID ? HitTest( *a_Event.PointerPosition ) : c_InvalidNodeID;
             Input.InputMode = EInputMode::Pointer;
 
-            UpdateGestureState( a_Event, hit );
+            // A press of the button that is already down means its release was lost: the old press is cancelled.
+            const PointerGestureState* stale = FindValue( Input.PointerStates, pointer );
+            if ( a_Event.Pressed && !a_Event.Repeat && stale && stale->IsDown && stale->Button == a_Event.Button )
+                CancelPointer( pointer );
 
-            // The captured widget (if any) gets the event, so a release stays with the press target.
-            targetWidget = captured != c_InvalidNodeID ? captured : hit;
+            // Found before the gesture changes, so the release that ends a press still goes with it.
+            targetWidget = PointerTarget( FindValue( Input.PointerStates, pointer ), *a_Event.PointerPosition );
+            UpdateGestureState( a_Event, targetWidget );
         }
 
+        Reply reply = Reply::Unhandled();
         if ( IWidget* widget = GetWidget( targetWidget ) )
         {
-            Reply reply = Reply::Unhandled();
             if ( a_Event.Pressed )
                 reply = widget->OnButtonPressed( a_Event );
             else if ( a_Event.Released )
                 reply = widget->OnButtonReleased( a_Event );
 
             ApplyReply( reply, pointer );
-
-            // The release ended a capture, so hover goes back to what is under the pointer.
-            if ( a_Event.Released && capturedBefore != c_InvalidNodeID && GetCapturedWidget( pointer ) == c_InvalidNodeID )
-                RefreshHover();
-
-            return reply.IsHandled();
         }
 
-        return false;
+        if ( !isPointer )
+            return reply.IsHandled();
+
+        // The press or release may have changed who holds the pointer, and so what it hovers. Touches don't hover.
+        if ( Input.Hover && Input.Hover->ID == pointer )
+        {
+            Input.Hover->Position = *a_Event.PointerPosition;
+            RefreshHover();
+        }
+
+        // A pointer button is the UI's by who it went to, whether or not the widget does anything with it.
+        return targetWidget != c_InvalidNodeID;
     }
 
     bool Scene::ProcessNavPress( ENavAction a_Action, const ButtonEvent& a_Event )
@@ -1106,6 +1159,10 @@ namespace RatUI
 
         for ( auto& [pointerID, gesture] : Input.PointerStates )
         {
+            // A widget destroyed mid-press keeps the pointer until the release, so the rest of the press doesn't go to the game.
+            if ( gesture.IsDown )
+                continue;
+
             if ( gesture.CapturedWidget == id )
                 gesture.CapturedWidget = c_InvalidNodeID;
             if ( gesture.PressedWidget == id )

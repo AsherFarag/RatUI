@@ -46,7 +46,10 @@ namespace RatUI
 
         /**
          * @brief Sends an input event to the widgets. Returns whether the UI used it; an event it returns false for
-         * (e.g. Escape with nothing to cancel) is the host's to act on.
+         * (e.g. Escape with nothing to cancel) is the host's to act on. A pointer event is the UI's while the pointer
+         * is over an interactable widget or held by one (see IsPointerOverUI), whatever the widget does with it.
+         * A press is tracked by its first button, so with several buttons held a release can be returned true for
+         * a button whose press was the game's: act on releases whatever this returns.
          */
         bool DispatchInputEvent( const InputEvent& a_Event );
 
@@ -148,7 +151,7 @@ namespace RatUI
                 gesture->CapturedWidget = c_InvalidNodeID;
         }
 
-        /** @brief The widget capturing a_Pointer, or c_InvalidNodeID. */
+        /** @brief The widget capturing a_Pointer, or c_InvalidNodeID. A widget destroyed mid-press stays here until the release. */
         RATUI_NODISCARD NodeID GetCapturedWidget( PointerID a_Pointer ) const
         {
             const PointerGestureState* gesture = FindValue( Input.PointerStates, a_Pointer );
@@ -160,6 +163,22 @@ namespace RatUI
          * another interactable widget. A captured widget is hovered only while this holds.
          */
         RATUI_NODISCARD bool IsOver( NodeID a_Node, Vec2<Unit> a_Position ) const;
+
+        /**
+         * @brief Whether the pointer is the UI's, so the game should leave it alone: it is over an interactable
+         * widget (WidgetTraits::Interactable), or a widget has captured it. A press that landed on no widget is the
+         * game's until it is released, so a drag begun in the game stays the game's when it crosses the UI. A widget
+         * that releases its capture mid-press leaves the pointer to whatever is under it.
+         * With several pointers it is true while any is captured; DispatchInputEvent answers for the pointer of
+         * its event. Touches don't hover, so a touch host should use what DispatchInputEvent returns.
+         */
+        RATUI_NODISCARD bool IsPointerOverUI() const;
+
+        /**
+         * @brief Tells the scene the mouse or pen is no longer over it, e.g. it left the window or the game took it
+         * for mouse look. Nothing is hovered until it moves again.
+         */
+        void ClearHover();
 
         /** @brief Whether input is currently pointer-driven or navigation-driven; useful for widgets deciding whether to show a focus ring. */
         RATUI_NODISCARD EInputMode GetInputMode() const { return Input.InputMode; }
@@ -186,7 +205,11 @@ namespace RatUI
          */
         void CancelPointer( PointerID a_Pointer );
 
-        /** @brief CancelPointer for every pointer, e.g. when the window loses the mouse while a button is down. */
+        /**
+         * @brief CancelPointer for every pointer, e.g. when the window loses the mouse while a button is down.
+         * A press whose release never arrives keeps its pointer (no widget hovers during one that began outside
+         * the UI) until this, CancelPointer, or the next press of the same button.
+         */
         void ReleaseAllPointers();
 
         // - Navigation
@@ -319,13 +342,14 @@ namespace RatUI
          */
         NodeID HitTest( Vec2<Unit> a_Position, bool a_InteractableOnly = true ) const;
 
-        /** @brief What a pointer at a_Position hovers: the widget under it, or while a_Captured holds it, a_Captured or nothing. */
-        NodeID HoverTarget( Vec2<Unit> a_Position, NodeID a_Captured ) const
-        {
-            if ( a_Captured == c_InvalidNodeID )
-                return HitTest( a_Position );
-            return IsOver( a_Captured, a_Position ) ? a_Captured : c_InvalidNodeID;
-        }
+        /**
+         * @brief The widget a pointer's events go to: the one capturing it, none while it is down in a press that
+         * landed on no widget (the game's), else the one under a_Position. a_Gesture may be null.
+         */
+        NodeID PointerTarget( const PointerGestureState* a_Gesture, Vec2<Unit> a_Position ) const;
+
+        /** @brief What a pointer at a_Position hovers: its PointerTarget, but a capturing widget only while the pointer is over it. */
+        NodeID HoverTarget( const PointerGestureState* a_Gesture, Vec2<Unit> a_Position ) const;
 
         /**
          * @brief The navigation stops inside a_Scope, in layout order. Arrow keys move between stops outside groups:

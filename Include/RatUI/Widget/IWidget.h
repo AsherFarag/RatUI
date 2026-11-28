@@ -87,7 +87,7 @@ namespace RatUI
     struct WidgetTraits
     {
         EFocusPolicy Focus{ EFocusPolicy::None };
-        bool Interactable{ false };          ///< Receives pointer events.
+        bool Interactable{ false };          ///< Receives pointer events, and keeps them from what is behind it and from the game (Scene::IsPointerOverUI).
         bool NavGroup{ false };              ///< A navigation stop that Activate enters and Cancel leaves. Arrows reach what is inside only once entered; Tab walks straight in.
         bool Engageable{ false };            ///< Can be engaged (see IWidget::CanEngage).
         bool WidthDependentContent{ false }; ///< OnMeasureContent's height depends on the width given (e.g. wrapped text), so it is measured again at the final width.

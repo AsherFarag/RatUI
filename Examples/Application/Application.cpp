@@ -324,6 +324,10 @@ void Application::ProcessEvents()
                     scene.ReleaseAllKeys();
                     scene.ReleaseAllPointers();
                 }
+                else if ( event.window.event == SDL_WINDOWEVENT_LEAVE )
+                {
+                    scene.ClearHover();
+                }
                 break;
 
             case SDL_TEXTINPUT:

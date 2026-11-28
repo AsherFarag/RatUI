@@ -82,8 +82,7 @@ namespace RatUI
         NodeID FocusedWidget{ c_InvalidNodeID };
         NodeID EngagedWidget{ c_InvalidNodeID }; ///< The focused widget, while it is engaged (see IWidget::CanEngage).
         NodeID HoveredWidget{ c_InvalidNodeID };
-
-        PointerEvent LastPointerEvent{};
+        Optional<PointerEvent> Hover{}; ///< The last move of the mouse or pen that hovers. Empty once it has left (Scene::ClearHover); touches don't hover.
         HashMap<EButtonID, KeyPressTarget> KeyPresses{}; ///< Held keyboard keys whose press a widget took, so focus changes can't split a key stroke.
         bool DropNextTextInput{ false }; ///< The last key press was used by navigation, so the text it produces (e.g. Space's " ") is not typed.
         HashMap<PointerID, PointerGestureState> PointerStates{};
