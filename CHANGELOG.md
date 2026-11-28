@@ -30,7 +30,7 @@ releases may contain breaking API changes.
 - `Scene::BringIntoView` and `IWidget::OnBringIntoView`. Focus moved by keyboard or gamepad is scrolled into view.
 - `ScrollContainerWidget`: `OnScroll` takes a `ScrollEvent` (offset, range, their changes and an `EScrollCause`).
   `ScrollToEnd()`, `StickToEndX` / `StickToEndY`, `GetMaxScrollOffset()`, and `EScrollbarPlacement` (`Gutter` or
-  `Overlay`).
+  `Overlay`). `ScrollPadding` keeps a widget brought into view off the viewport's edges, e.g. for its focus ring.
 - Wheel latching: one wheel gesture stays with the widget that took its first notch
   (`GestureConfig::WheelLatchSeconds`, `WheelLatchDistance`).
 - `LayoutResult::ParentRect`, `SceneRect` (replaces `FinalRect`) and `ContentSize`.

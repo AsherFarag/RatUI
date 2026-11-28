@@ -24,7 +24,7 @@ namespace RatUI
      * // In your main loop:
      * scene.Tick( deltaSeconds );
      * scene.DispatchInputEvent( event );
-     * scene.UpdateLayout( Vec2f{ 800.0f, 600.0f } );
+     * scene.UpdateLayout( { 800_u, 600_u } );
      * scene.Render( drawList, deltaSeconds );
      */
     class Scene

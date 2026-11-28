@@ -973,3 +973,17 @@ TEST_CASE( "ScrollContainerWidget: rows scrolled out of view aren't painted", "[
     fixture.Frame();
     REQUIRE( paints == 1 );
 }
+
+TEST_CASE( "ScrollContainerWidget: ScrollPadding keeps a widget brought into view off the viewport's edges", "[Scene][Scroll]" )
+{
+    ScrollSceneFixture fixture;
+    fixture.Scroll->ScrollPadding = Edges::All( 5_u );
+
+    // Row 5 is at 150..180 of the content; the viewport is 100 tall.
+    fixture.Scene.BringIntoView( fixture.Rows[5]->GetLayoutID() );
+    REQUIRE( fixture.Scroll->GetScrollOffset()[1].ToFloat() == Catch::Approx( 85.f ) );
+
+    // Row 1, at 30..60, is now above it.
+    fixture.Scene.BringIntoView( fixture.Rows[1]->GetLayoutID() );
+    REQUIRE( fixture.Scroll->GetScrollOffset()[1].ToFloat() == Catch::Approx( 25.f ) );
+}

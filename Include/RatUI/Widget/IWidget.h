@@ -148,7 +148,10 @@ namespace RatUI
         /** @brief Called immediately before the widget is destroyed and disassociated from its layout node. */
         virtual void OnDestroy() {}
 
-        /** */
+        /**
+         * @brief Returns the size this widget's own content (e.g. its text) wants within a_AvailableSize. Called on every
+         * measure, and again at the final width with WidthDependentContent; a content-sized node takes its size from it.
+         */
         virtual Vec2<Unit> OnMeasureContent( const LayoutNode& a_Node, Vec2<Unit> a_AvailableSize, const LayoutContext& a_Ctx ) { return Vec2<Unit>{ 0_u, 0_u }; }
 
         /**
@@ -226,7 +229,7 @@ namespace RatUI
         /** @brief Called when a pointer (e.g., mouse cursor) enters the widget's bounds. */
         virtual Reply OnPointerEnter( const PointerEvent& ) { return Reply::Unhandled(); }
 
-        /** @brief Called each frame while a pointer is inside (or captured by) this widget. */
+        /** @brief Called for every pointer event this widget is the target of (over it, or captured by it): moves, and wheel notches too. */
         virtual Reply OnPointerMove( const PointerEvent& ) { return Reply::Unhandled(); }
 
         /** @brief Called when the pointer scrolls over this widget. */

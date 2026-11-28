@@ -1407,3 +1407,66 @@ TEST_CASE( "SliderWidget: a thumb grabbed off its centre doesn't jump", "[Scene]
     button( { 18_u, 20_u }, true );
     REQUIRE( slider->Value.Get() == Catch::Approx( 0.f ) );
 }
+
+TEST_CASE( "Scene: a wheel gesture stays with the widget that took its first notch", "[Scene]" )
+{
+    PointerOwnerFixture f;
+    WheelProbe*         upper = f.Scene.CreateWidget<WheelProbe>( f.Scene.RootWidget );
+    WheelProbe*         lower = f.Scene.CreateWidget<WheelProbe>( f.Scene.RootWidget );
+    upper->GetLayout().FixedWidth( 100_u ).FixedHeight( 40_u );
+    lower->GetLayout().FixedWidth( 100_u ).FixedHeight( 40_u );
+    f.Scene.UpdateLayout( { 400_u, 300_u } );
+
+    const auto wheel = [&]
+    {
+        f.Scene.DispatchInputEvent( { .Device  = EDeviceID::Mouse,
+                                      .Payload = PointerEvent{ .Position = { 50_u, 130_u }, .Type = EPointerType::Mouse, .ScrollDelta = { 0_u, 1_u } } } );
+    };
+
+    wheel();
+    REQUIRE( upper->Scrolls == 1 );
+
+    // The lower probe slides under the still pointer, and the gesture carries on where it began.
+    upper->GetLayout().Visibility( EVisibility::Collapsed );
+    f.Scene.UpdateLayout( { 400_u, 300_u } );
+    wheel();
+    REQUIRE( upper->Scrolls == 2 );
+    REQUIRE( lower->Scrolls == 0 );
+
+    // A pause ends it.
+    f.Scene.Tick( f.Scene.Input.Config.WheelLatchSeconds + 0.1 );
+    wheel();
+    REQUIRE( upper->Scrolls == 2 );
+    REQUIRE( lower->Scrolls == 1 );
+}
+
+TEST_CASE( "Scene: IsOver is true for the widget under a position and the widgets it is inside", "[Scene]" )
+{
+    PointerOwnerFixture f;
+
+    REQUIRE( f.Scene.IsOver( f.First->GetLayoutID(), f.c_OnButton ) );
+    REQUIRE( f.Scene.IsOver( f.Scene.RootWidget, f.c_OnButton ) );
+    REQUIRE_FALSE( f.Scene.IsOver( f.Second->GetLayoutID(), f.c_OnButton ) );
+    REQUIRE_FALSE( f.Scene.IsOver( f.First->GetLayoutID(), f.c_Outside ) );
+}
+
+TEST_CASE( "Scene: layout runs in the scratch size it is given", "[Scene]" )
+{
+    RatUI::Scene scene;
+    scene.SetLayoutScratchSize( 64 * 1024 );
+    PanelWidget* root  = scene.CreateRootWidget<PanelWidget>();
+    PanelWidget* child = scene.CreateWidget<PanelWidget>( root->GetLayoutID() );
+    child->GetLayout().FixedWidth( 100_u ).FixedHeight( 50_u );
+    scene.UpdateLayout( { 400_u, 300_u } );
+
+    REQUIRE( child->GetLayout().Layout.SceneRect.Size[0].ToFloat() == 100.f );
+    REQUIRE( child->GetLayout().Layout.SceneRect.Size[1].ToFloat() == 50.f );
+}
+
+TEST_CASE( "Input: IsKeyboardButton is true for keys only", "[Scene]" )
+{
+    REQUIRE( IsKeyboardButton( EButtonID::KeyA ) );
+    REQUIRE( IsKeyboardButton( EButtonID::KeyEscape ) );
+    REQUIRE_FALSE( IsKeyboardButton( EButtonID::MouseLeft ) );
+    REQUIRE_FALSE( IsKeyboardButton( EButtonID::GamepadA ) );
+}

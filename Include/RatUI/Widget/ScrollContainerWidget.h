@@ -70,6 +70,13 @@ namespace RatUI
         bool StickToEndX{ false };
         bool StickToEndY{ false };
 
+        /**
+         * @brief Room kept between a widget brought into view (e.g. by keyboard or gamepad focus) and the viewport's
+         * edges, so what it draws around itself, such as a focus ring, isn't cut off there. It can't be kept at the
+         * ends of the content, where there is nothing more to scroll to: give the content its own padding for those.
+         */
+        Edges ScrollPadding{};
+
         /** @brief The node the children are parented to (IWidget::GetContentNodeID). Scene::CreateWidget puts them there. */
         RATUI_NODISCARD LayoutNode* GetContentNode() { return GetScene().GetLayoutNode( m_ContentNodeID ); }
         RATUI_NODISCARD const LayoutNode* GetContentNode() const { return GetScene().GetLayoutNode( m_ContentNodeID ); }
@@ -191,7 +198,7 @@ namespace RatUI
                 return;
 
             // The least movement that shows it; when it is larger than the viewport, its start.
-            const Rect<Unit>& viewport = content->Layout.SceneRect;
+            const Rect<Unit>  viewport = ScrollPadding.Apply( content->Layout.SceneRect );
             const Rect<Unit>& rect     = a_Target.Layout.SceneRect;
             Vec2<Unit>        offset   = m_Offset;
             for ( u32 axis = 0; axis < 2; ++axis )

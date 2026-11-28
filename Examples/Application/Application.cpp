@@ -18,6 +18,8 @@ namespace
     constexpr const char* c_WindowTitle  = "RatUI Examples";
     constexpr int         c_WindowWidth  = 1280;
     constexpr int         c_WindowHeight = 720;
+    constexpr int         c_MinWindowWidth  = 640; // Smaller than this, the examples have no room to lay out.
+    constexpr int         c_MinWindowHeight = 480;
 
     // Smallest space (in Units) the examples are laid out in. Smaller screens, such as phones,
     // scale the whole UI down to fit instead of cutting it off.
@@ -177,6 +179,7 @@ bool Application::Initialize()
     m_Window = SDL_CreateWindow( c_WindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, c_WindowWidth, c_WindowHeight, windowFlags );
     if ( !m_Window )
         return false;
+    SDL_SetWindowMinimumSize( m_Window, c_MinWindowWidth, c_MinWindowHeight );
 
     m_GLContext = SDL_GL_CreateContext( m_Window );
     if ( !m_GLContext )
