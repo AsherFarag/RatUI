@@ -446,10 +446,11 @@ namespace RatUI::TextLayout
             if ( pendingBreakSeg != static_cast<u32>( -1 ) )
             {
                 // Break at the last recorded opportunity (word-space or CJK boundary).
-                if ( !emitLine( pendingBreakSeg, pendingBreakPaintW ) )
+                const u32 breakSeg = pendingBreakSeg;
+                if ( !emitLine( breakSeg, pendingBreakPaintW ) )
                     return lineCount;
-                lineStartSeg = pendingBreakSeg;
-                // Do NOT advance i; re-process the current segment on the new line.
+                // The new line starts at the break: segments that fit after it (kept with what follows them) go with it.
+                i = breakSeg;
                 continue;
             }
 

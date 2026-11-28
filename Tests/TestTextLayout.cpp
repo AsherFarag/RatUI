@@ -102,3 +102,13 @@ TEST_CASE( "TextLayout: an empty line between two line breaks is kept", "[Text]"
     CHECK( lines[1].Start == lines[1].End );
     CHECK( lines[1].Width.ToFloat() == 0.f );
 }
+
+TEST_CASE( "TextLayout: a word kept with the punctuation after it wraps with it", "[Text]" )
+{
+    // The full stop (30 wide) can't start a line, so "world" moves down with it instead of being dropped.
+    const Array<Line> lines = LayOut( "hello world\xE3\x80\x82", TextWrap::WrapWord(), 110_u );
+    REQUIRE( Size( lines ) == 2 );
+    CHECK( lines[0].Width.ToFloat() == 50.f );
+    CHECK( lines[1].Start == lines[0].End );
+    CHECK( lines[1].Width.ToFloat() == 80.f );
+}
