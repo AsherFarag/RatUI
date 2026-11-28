@@ -50,6 +50,13 @@ namespace RatUI
         return ( a_Value & a_Flag ) == a_Flag;
     }
 
+    /** @brief True if any bit of a_Flags is set in a_Value (e.g. either Shift key for EModifier::Shift). */
+    template<typename T>
+    inline constexpr bool HasAnyFlag( T a_Value, T a_Flags )
+    {
+        return ( a_Value & a_Flags ) != static_cast<T>( 0 );
+    }
+
     template<typename T>
     inline constexpr auto ToUnderlying( T a_Enum ) -> std::underlying_type_t<T>
     {

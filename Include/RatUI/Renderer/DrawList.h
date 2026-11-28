@@ -1,5 +1,6 @@
 #pragma once
 #include "../Core.h"
+#include "Brush.h"
 #include "DrawBatcher.h"
 #include "RenderTransform.h"
 #include "IRenderer.h"
@@ -95,6 +96,11 @@ namespace RatUI
         DrawList& PushClipRect( Rect<Unit> a_Rect )
         {
             RATUI_ASSERT( m_ClipStackSize < Size(m_ClipStack), "Exceeded maximum clip stack depth." );
+
+            // Clips are stored in screen space, so one pushed under a transform (e.g. scrolled content) moves with it.
+            if ( m_TransformStackSize > 0 )
+                a_Rect = TransformBounds( GetCurrentTransform(), a_Rect );
+
             if ( Optional<Rect<Unit>> currentClip = GetCurrentClip() )
                 a_Rect = a_Rect.Intersection( *currentClip );
 
@@ -163,17 +169,67 @@ namespace RatUI
 
             const Rect<f32> uvRect = ComputeUVRect( a_Style.Texture.Region, texInfo->Size );
 
+            // Slice scale is in units per texel, so the art grows with the DPI scale like everything else
+            NineSlice pixelSlice = a_Style.Slice;
+            pixelSlice.Scale = { pixelSlice.Scale[0] * m_DPIScale, pixelSlice.Scale[1] * m_DPIScale };
+
             DrawBatcher& batcher = GetCurrentBatcher();
             batcher.EnsureSDFBatch( GetPixelClipRect(), GetPixelTransform(), a_Style.Texture );
             batcher.EmitSlicedRect( ToPixelRect( a_Rect ),
-                a_Style.Slice,
+                pixelSlice,
 				sliceSize,
                 a_Style.Tint,
                 uvRect );
 
 			return *this;
 		}
-        
+
+        /**
+         * @brief Adds a rectangle filled with @p a_Brush.
+         * @note Nine-slice brushes ignore the border and radius.
+         */
+        DrawList& AddBrushRect( Rect<Unit> a_Rect, const Brush& a_Brush,
+                                Color a_BorderColor = Colors::Transparent, Unit a_BorderThickness = 0_u,
+                                CornerRadius a_Radius = CornerRadius::None() )
+        {
+            if ( Holds<SolidBrush>( a_Brush ) )
+            {
+                return AddRect( a_Rect,
+                {
+                    .FillColor       = Get<SolidBrush>( a_Brush ).Fill,
+                    .BorderColor     = a_BorderColor,
+                    .BorderThickness = a_BorderThickness,
+                    .Radius          = a_Radius
+                } );
+            }
+
+            if ( Holds<TextureBrush>( a_Brush ) )
+            {
+                const TextureBrush& texture = Get<TextureBrush>( a_Brush );
+                return AddRect( a_Rect,
+                {
+                    .FillColor       = texture.Tint,
+                    .BorderColor     = a_BorderColor,
+                    .BorderThickness = a_BorderThickness,
+                    .Radius          = a_Radius,
+                    .Texture         = texture.Texture
+                } );
+            }
+
+            if ( Holds<NineSliceBrush>( a_Brush ) )
+            {
+                const NineSliceBrush& nineSlice = Get<NineSliceBrush>( a_Brush );
+                return AddSlicedRect( a_Rect,
+                {
+                    .Texture = nineSlice.Texture,
+                    .Slice   = nineSlice.Slice,
+                    .Tint    = nineSlice.Tint
+                } );
+            }
+
+            return *this;
+        }
+
         /**
 		 * @brief Adds a circle to the draw list with the specified style.
 		 * @note This is the same as calling AddRect with a square rect and uniform corner rounding equal to the radius, 
@@ -321,6 +377,26 @@ namespace RatUI
             };
         }
 
+        /** @brief The axis-aligned bounds of @p a_Rect after @p a_Transform. */
+        static Rect<Unit> TransformBounds( const Mat3<Unit>& a_Transform, const Rect<Unit>& a_Rect )
+        {
+            f32 minX = std::numeric_limits<f32>::max(), minY = minX;
+            f32 maxX = std::numeric_limits<f32>::lowest(), maxY = maxX;
+
+            for ( const f32 x : { a_Rect.Left().ToFloat(), a_Rect.Right().ToFloat() } )
+            {
+                for ( const f32 y : { a_Rect.Top().ToFloat(), a_Rect.Bottom().ToFloat() } )
+                {
+                    const f32 tx = a_Transform[0][0].ToFloat() * x + a_Transform[1][0].ToFloat() * y + a_Transform[2][0].ToFloat();
+                    const f32 ty = a_Transform[0][1].ToFloat() * x + a_Transform[1][1].ToFloat() * y + a_Transform[2][1].ToFloat();
+                    minX = std::min( minX, tx ); maxX = std::max( maxX, tx );
+                    minY = std::min( minY, ty ); maxY = std::max( maxY, ty );
+                }
+            }
+
+            return { { Unit( minX ), Unit( minY ) }, { Unit( maxX - minX ), Unit( maxY - minY ) } };
+        }
+
         // TODO: We call these alot, should cache them
 
         Mat3f GetPixelTransform() const 
@@ -331,8 +407,8 @@ namespace RatUI
             const Mat3<Unit>& currentTransform = m_TransformStack[m_TransformStackSize - 1];
             Mat3f pixelTransform;
             // Only the translation column is a length; the linear part is unitless and must not be DPI scaled.
-            for ( size i = 0; i < 3; ++i )
-                for ( size j = 0; j < 3; ++j )
+            for ( u32 i = 0; i < 3; ++i )
+                for ( u32 j = 0; j < 3; ++j )
                     pixelTransform[i][j] = ( i == 2 && j < 2 )
                         ? ToPixel( currentTransform[i][j], m_DPIScale ).ToFloat()
                         : currentTransform[i][j].ToFloat();

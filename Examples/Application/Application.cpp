@@ -46,6 +46,10 @@ namespace
             case SDLK_DOWN:      return EButtonID::KeyDown;
             case SDLK_LEFT:      return EButtonID::KeyLeft;
             case SDLK_RIGHT:     return EButtonID::KeyRight;
+            case SDLK_DELETE:    return EButtonID::KeyDelete;
+            case SDLK_INSERT:    return EButtonID::KeyInsert;
+            case SDLK_HOME:      return EButtonID::KeyHome;
+            case SDLK_END:       return EButtonID::KeyEnd;
             default:             return EButtonID::Unknown;
         }
     }
@@ -75,21 +79,6 @@ namespace
         if ( a_Mods & KMOD_LGUI )   result |= EModifier::LSuper;
         if ( a_Mods & KMOD_RGUI )   result |= EModifier::RSuper;
         return result;
-    }
-
-    /** @brief Arrow keys, Enter and Escape drive keyboard navigation between widgets. */
-    void Navigate( Scene& a_Scene, EButtonID a_Button, bool a_Pressed )
-    {
-        switch ( a_Button )
-        {
-            case EButtonID::KeyUp:     if ( a_Pressed ) a_Scene.Navigate( ENavAction::MoveUp );    break;
-            case EButtonID::KeyDown:   if ( a_Pressed ) a_Scene.Navigate( ENavAction::MoveDown );  break;
-            case EButtonID::KeyLeft:   if ( a_Pressed ) a_Scene.Navigate( ENavAction::MoveLeft );  break;
-            case EButtonID::KeyRight:  if ( a_Pressed ) a_Scene.Navigate( ENavAction::MoveRight ); break;
-            case EButtonID::KeyEscape: if ( a_Pressed ) a_Scene.Navigate( ENavAction::Cancel );    break;
-            case EButtonID::KeyEnter:  a_Scene.Navigate( a_Pressed ? ENavAction::ActivatePressed : ENavAction::ActivateReleased ); break;
-            default: break;
-        }
     }
 
     // -------------------------------------------------------------------------
@@ -146,6 +135,9 @@ bool Application::Run( ExampleFactory a_MakeExample )
     }
 
     m_Example   = a_MakeExample( *m_TextMetrics );
+    // Arrows, Enter/Space and Escape drive keyboard navigation. The Scene offers keys to a focused
+    // text field first and only navigates with the ones it leaves unhandled.
+    m_Example->GetScene().Input.NavMap.BindDefaultDesktop();
     m_LastTicks = SDL_GetTicks64();
 
 #ifdef __EMSCRIPTEN__
@@ -191,6 +183,7 @@ bool Application::Initialize()
         return false;
 
     SDL_GL_SetSwapInterval( 1 ); // VSync
+    SDL_StartTextInput();        // Deliver SDL_TEXTINPUT for text fields.
 
 #ifndef __EMSCRIPTEN__
     if ( glewInit() != GLEW_OK )
@@ -255,6 +248,17 @@ void Application::Frame()
     scene.UpdateLayout( { Unit{ width / pixelsPerUnit }, Unit{ height / pixelsPerUnit } } );
     scene.Tick( deltaSeconds );
 
+    // Tell the platform where text is being typed, so it can place the IME's candidate window (in window coordinates).
+    if ( const Optional<Rect<Unit>> caret = scene.GetTextInputRect() )
+    {
+        int windowWidth, windowHeight;
+        SDL_GetWindowSize( m_Window, &windowWidth, &windowHeight );
+        const f32      scale = pixelsPerUnit * static_cast<f32>( windowWidth ) / static_cast<f32>( std::max( width, 1 ) );
+        const SDL_Rect rect{ static_cast<int>( caret->Origin[0].ToFloat() * scale ), static_cast<int>( caret->Origin[1].ToFloat() * scale ),
+                             static_cast<int>( caret->Size[0].ToFloat() * scale ),   static_cast<int>( caret->Size[1].ToFloat() * scale ) };
+        SDL_SetTextInputRect( &rect );
+    }
+
     // ...then draw in pixels.
     glViewport( 0, 0, width, height );
     m_Renderer->SetViewport( width, height );
@@ -302,13 +306,33 @@ void Application::ProcessEvents()
                     break;
                 }
 
-                const EButtonID button  = ToButton( event.key.keysym.sym );
-                const bool      pressed = event.type == SDL_KEYDOWN;
-                Navigate( scene, button, pressed );
-                scene.DispatchInputEvent( { .Device = EDeviceID::Keyboard,
-                                            .Payload = ButtonEvent{ .Button = button, .Modifiers = modifiers, .Pressed = pressed, .Released = !pressed } } );
+                const bool pressed = event.type == SDL_KEYDOWN;
+                // Use the modifiers at the time of the key event, not at poll time.
+                scene.DispatchInputEvent( { .Device  = EDeviceID::Keyboard,
+                                            .Payload = ButtonEvent{ .Button    = ToButton( event.key.keysym.sym ),
+                                                                    .Modifiers = ToModifiers( static_cast<SDL_Keymod>( event.key.keysym.mod ) ),
+                                                                    .Pressed   = pressed,
+                                                                    .Released  = !pressed,
+                                                                    .Repeat    = event.key.repeat != 0 } } );
                 break;
             }
+
+            case SDL_WINDOWEVENT:
+                // Keys and buttons held when the window loses focus are released in another window.
+                if ( event.window.event == SDL_WINDOWEVENT_FOCUS_LOST )
+                {
+                    scene.ReleaseAllKeys();
+                    scene.ReleaseAllPointers();
+                }
+                else if ( event.window.event == SDL_WINDOWEVENT_LEAVE )
+                {
+                    scene.ClearHover();
+                }
+                break;
+
+            case SDL_TEXTINPUT:
+                scene.DispatchInputEvent( { .Device = EDeviceID::Keyboard, .Payload = TextInputEvent{ event.text.text } } );
+                break;
 
             case SDL_MOUSEBUTTONDOWN:
             case SDL_MOUSEBUTTONUP:
@@ -333,11 +357,17 @@ void Application::ProcessEvents()
                 break;
 
             case SDL_MOUSEWHEEL:
+            {
+                // The wheel scrolls what is under the mouse, so the event carries where it is.
+                int mouseX = 0, mouseY = 0;
+                SDL_GetMouseState( &mouseX, &mouseY );
                 scene.DispatchInputEvent( { .Device = EDeviceID::Mouse,
-                                            .Payload = PointerEvent{ .Type        = EPointerType::Mouse,
+                                            .Payload = PointerEvent{ .Position    = toUnits( mouseX, mouseY ),
+                                                                     .Type        = EPointerType::Mouse,
                                                                      .Modifiers   = modifiers,
                                                                      .ScrollDelta = Vec2<Unit>{ Unit{ (f32)event.wheel.x }, Unit{ (f32)event.wheel.y } } } } );
                 break;
+            }
 
             default:
                 break;

@@ -214,161 +214,89 @@ namespace RatUI::Unicode
     }
 
     /**
-     * @brief Normalises text using CSS 'white-space: normal' rules.
+     * @brief Normalises whitespace for layout, as CSS 'white-space' does.
      *
-     * All whitespace runs (U+0020 SPACE, U+0009 TAB, U+000A LINE FEED,
-     * U+000D CARRIAGE RETURN, U+000C FORM FEED, U+0085 NEXT LINE,
-     * U+2028 LINE SEPARATOR, U+2029 PARAGRAPH SEPARATOR) are collapsed to a
-     * single ASCII space.  Leading and trailing whitespace is removed.
+     * Line breaks are '\n', '\r\n', a lone '\r', '\f', U+0085 NEXT LINE, U+2028 LINE SEPARATOR and U+2029 PARAGRAPH
+     * SEPARATOR, decoded from their UTF-8 bytes inline so this works on raw UTF-8 without a full decode pass.
      *
-     * U+0085, U+2028, and U+2029 are decoded from their UTF-8 representations
-     * inline so that this function operates on raw UTF-8 without a full decode
-     * pass.
-     *
-     * @param a_Text  Raw input text (UTF-8).
+     * @param a_Text           Raw input text (UTF-8).
+     * @param a_CollapseSpaces Runs of spaces and tabs become one space, and spaces at the start and end of the text and
+     *                         around kept line breaks are removed ('normal', 'pre-line'). Otherwise they are kept as they
+     *                         are ('pre', 'pre-wrap').
+     * @param a_KeepLineBreaks Line breaks become '\n' ('pre', 'pre-wrap', 'pre-line'). Otherwise they count as spaces.
      * @return Normalised string.
      */
-    inline String NormalizeWhitespace( StringView a_Text )
-    {
-        String result;
-        // Reserve a heuristic half-capacity since whitespace runs collapse.
-        // ShrinkToFit is called at the end to release excess.
-        Reserve( result, Size( a_Text ) / 2 + 1 );
-
-        // Treat the beginning as "after space" to strip leading whitespace.
-        bool lastWasSpace = true;
-
-        for ( size i = 0; i < Size( a_Text ); )
-        {
-            const u8 c = static_cast<u8>( RawAt( a_Text, i ) );
-
-            // Detect multi-byte Unicode whitespace before the ASCII fast-path.
-            // U+0085 NEXT LINE            -> 0xC2 0x85      (2 bytes)
-            // U+2028 LINE SEPARATOR       -> 0xE2 0x80 0xA8 (3 bytes)
-            // U+2029 PARAGRAPH SEPARATOR  -> 0xE2 0x80 0xA9 (3 bytes)
-            if ( c == 0xC2 && i + 1 < Size( a_Text ) &&
-                 static_cast<u8>( RawAt( a_Text, i + 1 ) ) == 0x85 )
-            {
-                // U+0085: treat as whitespace, consume 2 bytes.
-                if ( !lastWasSpace )
-                {
-                    PushBack( result, ' ' );
-                    lastWasSpace = true;
-                }
-                i += 2;
-                continue;
-            }
-
-            if ( c == 0xE2 && i + 2 < Size( a_Text ) &&
-                 static_cast<u8>( RawAt( a_Text, i + 1 ) ) == 0x80 )
-            {
-                const u8 b2 = static_cast<u8>( RawAt( a_Text, i + 2 ) );
-                if ( b2 == 0xA8 || b2 == 0xA9 ) // U+2028 or U+2029
-                {
-                    if ( !lastWasSpace )
-                    {
-                        PushBack( result, ' ' );
-                        lastWasSpace = true;
-                    }
-                    i += 3;
-                    continue;
-                }
-            }
-
-            // ASCII whitespace fast-path.
-            const bool ws = ( c == 0x20 || c == 0x09 || c == 0x0A ||
-                              c == 0x0D || c == 0x0C );
-            if ( ws )
-            {
-                if ( !lastWasSpace )
-                {
-                    PushBack( result, ' ' );
-                    lastWasSpace = true;
-                }
-            }
-            else
-            {
-                PushBack( result, static_cast<char>( c ) );
-                lastWasSpace = false;
-            }
-            ++i;
-        }
-
-        // Strip any trailing space that was written for a trailing whitespace run.
-        if ( !Empty( result ) && RawAt( result, Size( result ) - 1 ) == ' ' )
-            Resize( result, Size( result ) - 1 );
-
-        // TODO ShrinkToFit( result );
-        return result;
-    }
-
-    /**
-     * @brief Normalises text using CSS 'white-space: pre-wrap' rules.
-     *
-     * Ordinary spaces are preserved.  Line-ending sequences are normalised:
-     *   '\r\n'             -> '\n'
-     *   lone '\r'          -> '\n'
-     *   '\f'               -> '\n'
-     *   U+0085 NEXT LINE   -> '\n'
-     *   U+2028 LINE SEP    -> '\n'
-     *   U+2029 PARA SEP    -> '\n'
-     *
-     * @param a_Text  Raw input text (UTF-8).
-     * @return Normalised string.
-     */
-    inline String NormalizeWhitespacePreWrap( StringView a_Text )
+    inline String NormalizeWhitespace( StringView a_Text, bool a_CollapseSpaces, bool a_KeepLineBreaks )
     {
         String result;
         Reserve( result, Size( a_Text ) );
 
-        for ( size i = 0; i < Size( a_Text ); )
+        const size count        = Size( a_Text );
+        bool       pendingSpace = false; // Collapsing: a run of spaces, written only if something visible follows.
+        bool       atLineStart  = true;  // Collapsing: spaces at the start of a line are dropped.
+
+        for ( size i = 0; i < count; )
         {
             const u8 c = static_cast<u8>( RawAt( a_Text, i ) );
 
+            size breakLength = 0;
             if ( c == '\r' )
-            {
-                // Collapse \r\n -> \n; lone \r -> \n.
-                if ( i + 1 < Size( a_Text ) && RawAt( a_Text, i + 1 ) == '\n' )
-                    ++i;
-                PushBack( result, '\n' );
-                ++i;
-                continue;
-            }
-
-            if ( c == '\f' )
-            {
-                PushBack( result, '\n' );
-                ++i;
-                continue;
-            }
-
-            // U+0085 NEXT LINE (0xC2 0x85) -> '\n'
-            if ( c == 0xC2 && i + 1 < Size( a_Text ) &&
-                 static_cast<u8>( RawAt( a_Text, i + 1 ) ) == 0x85 )
-            {
-                PushBack( result, '\n' );
-                i += 2;
-                continue;
-            }
-
-            // U+2028 LINE SEPARATOR / U+2029 PARAGRAPH SEPARATOR (0xE2 0x80 0xA8/0xA9) -> '\n'
-            if ( c == 0xE2 && i + 2 < Size( a_Text ) &&
-                 static_cast<u8>( RawAt( a_Text, i + 1 ) ) == 0x80 )
+                breakLength = ( i + 1 < count && RawAt( a_Text, i + 1 ) == '\n' ) ? 2 : 1;
+            else if ( c == '\n' || c == '\f' )
+                breakLength = 1;
+            else if ( c == 0xC2 && i + 1 < count && static_cast<u8>( RawAt( a_Text, i + 1 ) ) == 0x85 )
+                breakLength = 2;
+            else if ( c == 0xE2 && i + 2 < count && static_cast<u8>( RawAt( a_Text, i + 1 ) ) == 0x80 )
             {
                 const u8 b2 = static_cast<u8>( RawAt( a_Text, i + 2 ) );
                 if ( b2 == 0xA8 || b2 == 0xA9 )
-                {
-                    PushBack( result, '\n' );
-                    i += 3;
-                    continue;
-                }
+                    breakLength = 3;
+            }
+
+            if ( breakLength > 0 && a_KeepLineBreaks )
+            {
+                PushBack( result, '\n' );
+                pendingSpace = false; // Spaces before a kept line break are dropped too.
+                atLineStart  = true;
+                i += breakLength;
+                continue;
+            }
+
+            if ( breakLength > 0 || c == ' ' || c == '\t' )
+            {
+                if ( a_CollapseSpaces )
+                    pendingSpace = pendingSpace || !atLineStart;
+                else
+                    PushBack( result, breakLength > 0 ? ' ' : static_cast<char>( c ) );
+
+                i += breakLength > 0 ? breakLength : 1;
+                continue;
+            }
+
+            if ( pendingSpace )
+            {
+                PushBack( result, ' ' );
+                pendingSpace = false;
             }
 
             PushBack( result, static_cast<char>( c ) );
+            atLineStart = false;
             ++i;
         }
 
         return result;
+    }
+
+    /** @brief CSS 'white-space: normal': every whitespace run, line breaks included, becomes one space; the ends are trimmed. */
+    inline String NormalizeWhitespace( StringView a_Text )
+    {
+        return NormalizeWhitespace( a_Text, true, false );
+    }
+
+    /** @brief CSS 'white-space: pre-wrap': spaces are kept, and line breaks become '\n'. */
+    inline String NormalizeWhitespacePreWrap( StringView a_Text )
+    {
+        return NormalizeWhitespace( a_Text, false, true );
     }
 
     /**
@@ -635,6 +563,61 @@ namespace RatUI::Unicode
         }
 
         return std::move( a_Text );
+    }
+
+    /**
+     * @brief Appends one codepoint to a UTF-8 string.
+     * Surrogates (U+D800-U+DFFF) and values above U+10FFFF are not valid scalar values
+     * and are written as U+FFFD REPLACEMENT CHARACTER.
+     */
+    inline void AppendUTF8( String& a_Out, codepoint a_CP )
+    {
+        u32 cp = static_cast<u32>( a_CP );
+        if ( cp > 0x10FFFF || ( cp >= 0xD800 && cp <= 0xDFFF ) )
+            cp = 0xFFFD;
+
+        if ( cp < 0x80 )
+        {
+            PushBack( a_Out, static_cast<char>( cp ) );
+        }
+        else if ( cp < 0x800 )
+        {
+            PushBack( a_Out, static_cast<char>( 0xC0 | ( cp >> 6 ) ) );
+            PushBack( a_Out, static_cast<char>( 0x80 | ( cp & 0x3F ) ) );
+        }
+        else if ( cp < 0x10000 )
+        {
+            PushBack( a_Out, static_cast<char>( 0xE0 | ( cp >> 12 ) ) );
+            PushBack( a_Out, static_cast<char>( 0x80 | ( ( cp >> 6 ) & 0x3F ) ) );
+            PushBack( a_Out, static_cast<char>( 0x80 | ( cp & 0x3F ) ) );
+        }
+        else
+        {
+            PushBack( a_Out, static_cast<char>( 0xF0 | ( cp >> 18 ) ) );
+            PushBack( a_Out, static_cast<char>( 0x80 | ( ( cp >> 12 ) & 0x3F ) ) );
+            PushBack( a_Out, static_cast<char>( 0x80 | ( ( cp >> 6 ) & 0x3F ) ) );
+            PushBack( a_Out, static_cast<char>( 0x80 | ( cp & 0x3F ) ) );
+        }
+    }
+
+    /** @brief Encodes a run of codepoints as UTF-8 (see AppendUTF8 for invalid values). */
+    inline String EncodeUTF8( const codepoint* a_Data, size a_Count )
+    {
+        String out;
+        Reserve( out, a_Count );
+        for ( size i = 0; i < a_Count; ++i )
+            AppendUTF8( out, a_Data[i] );
+        return out;
+    }
+
+    /**
+     * @brief True for codepoints that NormalizeWhitespacePreWrap() turns into a line break:
+     * '\n', '\r', '\f', U+0085, U+2028 and U+2029.
+     */
+    constexpr inline bool IsLineBreak( codepoint a_CP )
+    {
+        return a_CP == U'\n' || a_CP == U'\r' || a_CP == U'\f' ||
+               a_CP == 0x0085 || a_CP == 0x2028 || a_CP == 0x2029;
     }
 
 } // namespace RatUI::Unicode

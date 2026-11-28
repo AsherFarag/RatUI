@@ -46,9 +46,9 @@ namespace RatUI::TextLayout
         // But I need to research this more.
 
         PreparedText result;
-        result.NormalizedText = a_Wrap.Prewrap()
-            ? Unicode::NormalizeWhitespacePreWrap( a_Text )
-            : Unicode::NormalizeWhitespace( a_Text );
+        const bool keepLineBreaks = a_Wrap.Newline == ENewline::Preserve;
+        result.PreserveWhitespace = a_Wrap.Whitespace == EWhitespace::Preserve;
+        result.NormalizedText     = Unicode::NormalizeWhitespace( a_Text, !result.PreserveWhitespace, keepLineBreaks );
 
         const StringView norm = result.NormalizedText; 
 
@@ -59,20 +59,30 @@ namespace RatUI::TextLayout
         // TODO: currently don't emit soft hyphens, but we reserve the width here in case we add that later.
         result.HyphenWidth = a_Measure( StringView{ "-" } );
 
-        // For NoWrap mode, we can skip segmentation and just measure the whole text as a single line.
+        // Without wrapping, each line is one Text segment, with a HardBreak between lines kept by ENewline::Preserve.
         if ( a_Wrap.BreakMode == EBreakMode::None )
         {
-            const Unit lineWidth = a_Measure( norm );
-            PushBack( result.Segments,
-                TextSegment{
-                    .StartByte = 0,
-                    .ByteLength = static_cast<u32>( Size( norm ) ),
-                    .Width      = lineWidth,
-                    .PaintWidth = lineWidth,
-                    .Kind       = ESegmentKind::Text,
-                    .IsCJKChar  = false
+            size lineStart = 0;
+            for ( size i = 0; i <= Size( norm ); ++i )
+            {
+                const bool atBreak = i < Size( norm ) && RawAt( norm, i ) == '\n';
+                if ( i < Size( norm ) && !atBreak )
+                    continue;
+
+                if ( i > lineStart )
+                {
+                    const u32  start     = static_cast<u32>( lineStart );
+                    const u32  length    = static_cast<u32>( i - lineStart );
+                    const Unit lineWidth = a_Measure( StringView{ Data( norm ) + start, length } );
+                    PushBack( result.Segments, TextSegment{ .StartByte = start, .ByteLength = length, .Width = lineWidth,
+                                                            .PaintWidth = lineWidth, .Kind = ESegmentKind::Text } );
                 }
-            );
+
+                if ( atBreak )
+                    PushBack( result.Segments, TextSegment{ .StartByte = static_cast<u32>( i ), .ByteLength = 1,
+                                                            .Kind = ESegmentKind::HardBreak } );
+                lineStart = i + 1;
+            }
             return result;
         }
 
@@ -119,7 +129,7 @@ namespace RatUI::TextLayout
             const size len = it.SequenceByteLength();
 
             // Pre-wrap newline -> HardBreak segment
-            if ( a_Wrap.Prewrap() && cp == U'\n' )
+            if ( keepLineBreaks && cp == U'\n' )
             {
                 flushWord( idx );
                 PushBack( result.Segments,
@@ -144,7 +154,8 @@ namespace RatUI::TextLayout
                 const size spaceStart = idx;
 
                 // Consume the entire run of whitespace as part of this space segment
-                while ( it && Unicode::IsWhitespace( *it ) )
+                // A kept line break ends the run: it is a HardBreak of its own.
+                while ( it && Unicode::IsWhitespace( *it ) && !( keepLineBreaks && *it == U'\n' ) )
                     ++it;
 
                 const size spaceEnd = it.ByteIndex();
@@ -278,6 +289,7 @@ namespace RatUI::TextLayout
         Unit paintLineW         = 0_u;   // width of visible content (excludes trailing spaces)
         bool hasContent         = false; // whether we've seen any non-space content on the current line (used to skip leading spaces and for paint width)
         u32  lineStartSeg       = 0;
+        bool hardLineStart      = true;          // at the start of the text or right after a newline
         u32  pendingBreakSeg    = c_InvalidSeg; // first seg of the NEXT line at break
         Unit pendingBreakPaintW = 0_u;          // paintLineW at the recorded break
 
@@ -291,6 +303,7 @@ namespace RatUI::TextLayout
             hasContent = false;
             pendingBreakSeg = c_InvalidSeg;
             pendingBreakPaintW = 0_u;
+            hardLineStart = false;
 
             return a_MaxLines == 0u || lineCount < a_MaxLines;
         };
@@ -319,10 +332,12 @@ namespace RatUI::TextLayout
         while ( i < segCount )
         {
             // At the start of a new line, consume (discard) leading Space segments.
+            // Preserved whitespace keeps them after a newline (indentation), but not at a soft wrap.
             if ( !hasContent )
             {
-                while ( i < segCount && segs[i].Kind == ESegmentKind::Space )
-                    ++i;
+                if ( !( a_Prepared.PreserveWhitespace && hardLineStart ) )
+                    while ( i < segCount && segs[i].Kind == ESegmentKind::Space )
+                        ++i;
 
                 if ( i >= segCount )
                     break;
@@ -340,6 +355,7 @@ namespace RatUI::TextLayout
                 if ( !emitLine( i, hasContent ? paintLineW : 0_u ) )
                     return lineCount;
                 lineStartSeg = i + 1;
+                hardLineStart = true;
                 ++i;
                 continue;
             }
@@ -349,7 +365,7 @@ namespace RatUI::TextLayout
             {
                 hasContent = true;
                 lineW = w;
-                paintLineW = w; // first segment is always Text (spaces were skipped above)
+                paintLineW = k == ESegmentKind::Space ? 0_u : w; // A preserved leading space only counts once text follows.
                 ++i;
                 continue;
             }
@@ -430,10 +446,11 @@ namespace RatUI::TextLayout
             if ( pendingBreakSeg != static_cast<u32>( -1 ) )
             {
                 // Break at the last recorded opportunity (word-space or CJK boundary).
-                if ( !emitLine( pendingBreakSeg, pendingBreakPaintW ) )
+                const u32 breakSeg = pendingBreakSeg;
+                if ( !emitLine( breakSeg, pendingBreakPaintW ) )
                     return lineCount;
-                lineStartSeg = pendingBreakSeg;
-                // Do NOT advance i; re-process the current segment on the new line.
+                // The new line starts at the break: segments that fit after it (kept with what follows them) go with it.
+                i = breakSeg;
                 continue;
             }
 

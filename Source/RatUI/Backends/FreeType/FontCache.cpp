@@ -178,7 +178,11 @@ namespace RatUI::FreeType
     FontUnit ShapeLine( Font& a_Font, StringView a_TextUTF8, const TextLayoutStyle& a_Layout, Array<ShapedGlyph>& o_Glyphs )
     {
         if ( Empty( a_TextUTF8 ) )
+        {
+            // Callers reuse o_Glyphs across lines, so a blank line must not keep the previous line's glyphs.
+            Clear( o_Glyphs );
             return 0_fu;
+        }
 
         hb_buffer_t* buf = a_Font.GetHBBuffer();
         hb_buffer_reset( buf );
@@ -250,7 +254,8 @@ namespace RatUI::FreeType
 				.XAdvance = xAdvance,
 				.YAdvance = yAdvance,
 				.XOffset = xOffset,
-				.YOffset = yOffset
+				.YOffset = yOffset,
+				.Cluster = infos[i].cluster
 			} );
 
             lineWidth += xAdvance;

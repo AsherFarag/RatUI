@@ -31,14 +31,15 @@ struct LayoutFixture
 };
 
 /**
- * @brief Runs one Measure + Arrange pass, allocating a_Root the full a_AvailableSize rect at the origin.
- * @note Widget-less trees (as used throughout these tests) never report HasWidthDependentContent,
+ * @brief Runs one Measure + Arrange pass and composes it, allocating a_Root the full a_AvailableSize rect at the origin.
+ * @note Widget-less trees (as used throughout these tests) never have WidthDependentContent,
  *       so a single pass is always sufficient here - no reflow loop is needed.
  */
 inline void RunLayout( LayoutNode& a_Root, Vec2<Unit> a_AvailableSize, LayoutFixture& a_Fixture )
 {
     MeasureLayoutNode( a_Root, a_AvailableSize, a_Fixture.Ctx );
     ArrangeLayoutNode( a_Root, Rect<Unit>{ Vec2<Unit>{ 0_u, 0_u }, a_AvailableSize }, a_Fixture.Ctx );
+    ComposeLayout( a_Root );
 }
 
 // Unit is a float under the hood, so exact equality is fragile - compare with a small absolute margin instead.

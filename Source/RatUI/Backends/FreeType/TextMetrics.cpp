@@ -44,7 +44,8 @@ namespace RatUI::FreeType
         ShapedText result;
         result.Font = a_Style.Font;
         result.FontSize = a_Style.Size;
-        result.LineHeight = GetLineHeight( face, a_Style ) + a_Style.LineSpacing;
+        result.LineHeight = GetLineHeight( face, a_Style );
+        result.LineSpacing = a_Style.LineSpacing;
         result.Ascender = Unit{ ( static_cast<f32>( face->ascender ) / unitsPerEM ) * a_Style.Size.ToFloat() };
         result.Descender = Unit{ ( static_cast<f32>( face->descender ) / unitsPerEM ) * a_Style.Size.ToFloat() };
         result.UnderlinePosition = Unit{ -( static_cast<f32>( face->underline_position ) / unitsPerEM ) * a_Style.Size.ToFloat() };
@@ -79,19 +80,39 @@ namespace RatUI::FreeType
         TextLayout::WalkLines( a_Prepared, maxWidth, maxLines, [&]( u32 lineStartSeg, u32 lineEndSeg, Unit paintWidth )
                                {
             const auto& segs = a_Prepared.Segments;
-            u32 end = lineEndSeg;
-            while ( end > lineStartSeg && segs[end - 1].Kind != ESegmentKind::Text )
-                --end;
+            const auto endOf = [&]( u32 a_Seg ) { return segs[a_Seg].StartByte + segs[a_Seg].ByteLength; };
 
-            StringView lineText{};
-            if ( end > lineStartSeg )
+            // Trailing spaces are shaped too, so a caret after them can be placed, but hang past the line's width.
+            u32 visibleEnd = lineEndSeg;
+            while ( visibleEnd > lineStartSeg && segs[visibleEnd - 1].Kind != ESegmentKind::Text )
+                --visibleEnd;
+            u32 textEnd = lineEndSeg;
+            while ( textEnd > lineStartSeg && segs[textEnd - 1].Kind == ESegmentKind::HardBreak )
+                --textEnd;
+
+            const u32 textStart      = lineStartSeg < Size( segs ) ? segs[lineStartSeg].StartByte : static_cast<u32>( Size( norm ) );
+            const u32 textEndByte    = textEnd > lineStartSeg ? endOf( textEnd - 1 ) : textStart;
+            const u32 visibleEndByte = visibleEnd > lineStartSeg ? endOf( visibleEnd - 1 ) : textStart;
+
+            ShapeLine( *font, StringView{ Data( norm ) + textStart, textEndByte - textStart }, a_Style, lineGlyphs );
+
+            const FontUnit letterSpacing = ToFontUnit( a_Style.LetterSpacing, a_Style.Size );
+            paintWidth = 0_u;
+            for ( u32 i = 0; i < Size( lineGlyphs ); ++i )
             {
-                const u32 byteStart = segs[lineStartSeg].StartByte;
-                const u32 byteEnd = segs[end - 1].StartByte + segs[end - 1].ByteLength;
-                lineText = StringView{ Data( norm ) + byteStart, byteEnd - byteStart };
-            }
+                ShapedGlyph& glyph = lineGlyphs[i];
+                glyph.Cluster += textStart;
 
-            paintWidth = ToUnit( ShapeLine( *font, lineText, a_Style, lineGlyphs ), a_Style.Size );
+                // Shaping spaced the last visible glyph from the hanging spaces after it; without them it wouldn't be.
+                if ( i > 0 && glyph.Cluster >= visibleEndByte && lineGlyphs[i - 1].Cluster < visibleEndByte )
+                {
+                    lineGlyphs[i - 1].XAdvance -= letterSpacing;
+                    paintWidth -= ToUnit( letterSpacing, a_Style.Size );
+                }
+
+                if ( glyph.Cluster < visibleEndByte )
+                    paintWidth += ToUnit( glyph.XAdvance, a_Style.Size );
+            }
 
             const bool isLastLine = ( maxLines > 0 && result.LineCount() == maxLines - 1 );
             const bool forceEllipsis = ellipsis && exceededMaxLines && isLastLine;
@@ -100,6 +121,11 @@ namespace RatUI::FreeType
 
             if ( ( forceEllipsis || lineOverflows ) && !Empty( lineGlyphs ) )
             {
+                // The ellipsis follows the visible text, not the spaces hanging after it.
+                lineGlyphs.erase( std::remove_if( lineGlyphs.begin(), lineGlyphs.end(),
+                                                  [&]( const ShapedGlyph& a_Glyph ) { return a_Glyph.Cluster >= visibleEndByte; } ),
+                                  lineGlyphs.end() );
+
                 if ( ellipsisWidth <= maxWidth )
                 {
                     const Unit prefixBudget = maxWidth - ellipsisWidth;
@@ -120,6 +146,10 @@ namespace RatUI::FreeType
 
                     Resize( lineGlyphs, keepCount );
                     Insert( lineGlyphs, End( lineGlyphs ), Begin( ellipsisGlyphs ), End( ellipsisGlyphs ) );
+                    // The ellipsis stands for the rest of the line, but counts as visible.
+                    const u32 ellipsisCluster = keepCount > 0 ? lineGlyphs[keepCount - 1].Cluster : textStart;
+                    for ( u32 i = keepCount; i < Size( lineGlyphs ); ++i )
+                        lineGlyphs[i].Cluster = ellipsisCluster;
 
                     paintWidth = accumulated + ellipsisWidth;
                 }
@@ -138,6 +168,9 @@ namespace RatUI::FreeType
                                        .Start = glyphStart,
                                        .End = glyphEnd,
                                        .Width = paintWidth,
+                                       .TextStart = textStart,
+                                       .TextEnd = textEndByte,
+                                       .VisibleEnd = visibleEndByte,
                                    } );
 
             result.MaxWidth = Unit{ std::max( result.MaxWidth.ToFloat(), paintWidth.ToFloat() ) }; } );
@@ -145,13 +178,8 @@ namespace RatUI::FreeType
         if ( Empty( result.Lines ) )
             return NullOpt;
 
-        const f32 baseSize = static_cast<f32>( c_MsdfPxRange * 2 );
-        const f32 sdfPadEm = static_cast<f32>( c_MsdfPxRange ) / baseSize;
-        const f32 sdfPadDisplay = sdfPadEm * a_Style.Size.ToFloat();
-
-        result.Ascender += Unit{ sdfPadDisplay };
-        result.TotalHeight = result.LineHeight * result.LineCount() + Unit{ std::abs( result.Descender.ToFloat() ) + sdfPadDisplay };
-
+        // The block height comes from ShapedText::TotalHeight(). The SDF padding around each glyph quad is a
+        // rendering detail: the quads overhang the block with transparent edges and don't affect layout.
         return result;
     }
 
@@ -182,6 +210,7 @@ namespace RatUI::FreeType
         if ( shape.contours.empty() )
             return true;
 
+        shape.orientContours();
         msdfgen::edgeColoringSimple( shape, 3.0 );
 
         f64 l = 0.0, b = 0.0, r = 0.0, t = 0.0;
@@ -232,8 +261,8 @@ namespace RatUI::FreeType
         o_Height = static_cast<u32>( h );
 
         o_Bearing = Vec2<FontUnit>{
-            static_cast<FontUnit>( l - padEm ),
-            static_cast<FontUnit>( t + padEm ),
+            FontUnit{ static_cast<f32>( l - padEm ) },
+            FontUnit{ static_cast<f32>( t + padEm ) },
         };
 
         return true;

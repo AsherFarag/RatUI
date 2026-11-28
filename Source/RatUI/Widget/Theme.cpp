@@ -10,12 +10,7 @@ namespace RatUI::Themes
             auto theme = std::make_shared<Theme>();
 
             theme->SetColors( {
-                { ThemeKey::Color::FocusOutline, Colors::White },
-                
-                // Slider
-                { ThemeKey::Color::SliderThumb, Colors::AccentBlue },
-                { ThemeKey::Color::SliderTrack, Colors::Surface600 },
-                { ThemeKey::Color::SliderTrackFill, Colors::AccentBlue }
+                { ThemeKey::Color::FocusOutline, Colors::White }
             } );
 
             theme->SetRadii( {
@@ -38,6 +33,13 @@ namespace RatUI::Themes
                 { ThemeKey::Brush::ButtonNormal,       SolidBrush{ Colors::Surface600 } },
                 { ThemeKey::Brush::ButtonHover,        SolidBrush{ Colors::Surface500 } },
                 { ThemeKey::Brush::ButtonPressed,      SolidBrush{ Colors::White } },
+
+                // Slider
+                { ThemeKey::Brush::SliderTrack,        SolidBrush{ Colors::Surface600 } },
+                { ThemeKey::Brush::SliderTrackFill,    SolidBrush{ Colors::AccentBlue } },
+                { ThemeKey::Brush::SliderThumb,        SolidBrush{ Colors::AccentBlue } },
+                { ThemeKey::Brush::SliderThumbHover,   SolidBrush{ Colors::LightBlue } },
+                { ThemeKey::Brush::SliderThumbPressed, SolidBrush{ Colors::AccentBlue } },
             } );
 
             // TODO

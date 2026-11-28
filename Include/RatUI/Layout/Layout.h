@@ -1,5 +1,7 @@
 #pragma once
 #include "../Core.h"
+#include "NodeID.h"
+#include <bitset>
 #include <concepts>
 
 namespace RatUI
@@ -53,13 +55,44 @@ namespace RatUI
     };
     RATUI_ENUM_ENABLE_BITMASK_OPERATORS( EAlign, u8 )
 
+    /**
+     * @brief The screen edges whose safe area (Scene::SetSafeArea) a node keeps its content clear of.
+     * The safe area passes down the tree: a node opting into an edge adds what is left of it to its padding and
+     * clears it for its descendants, so nested nodes don't inset twice. The inset doesn't depend on where the node
+     * sits, so opt in on the containers that touch the screen's edges, such as a HUD root or a top or bottom bar.
+     */
+    enum class ESafeAreaEdges : u8
+    {
+        None   = 0,
+        Top    = 1 << 0,
+        Right  = 1 << 1,
+        Bottom = 1 << 2,
+        Left   = 1 << 3,
+
+        Horizontal = Left | Right,
+        Vertical   = Top | Bottom,
+        All        = Horizontal | Vertical,
+    };
+    RATUI_ENUM_ENABLE_BITMASK_OPERATORS( ESafeAreaEdges, u8 )
+
     /** 
      * @brief Positioning modes define how a UI element is positioned relative to its parent container. 
      */
     enum class EPositioning : u8
     {
-        Flow,     ///< Participates in parent's stack/flex layout.
-        Anchored, ///< Positioned based on its Anchor relative to the parent.
+        /**
+		 * @brief Positioned in the parent's stack/flex layout, 
+         * based on the parent's layout type and the element's alignment.
+         */
+        Flow,
+        /**
+         * Positioned based on its Anchor relative to the parent's padded inner rect, outside of flow layout.
+         * The element's Margin insets that rect before anchoring, Percent sizes are relative to it, and
+         * SizeConstraints apply (including on stretched axes, where the clamped element is placed by its Pivot).
+         * Flex sizing is treated as Content - use a stretch anchor (Min != Max) to fill instead.
+         * SelfAlign and the parent's ChildAlign are ignored; use the Pivot.
+         */
+        Anchored,
     };
 
     /** 
@@ -114,88 +147,28 @@ namespace RatUI
     };
 
     /**
-	 * @brief Represents the visibility state of a UI element, defining how it is rendered, 
-     * whether it participates in layout calculations, and whether it can be hit-tested for interactions.
+	 * @brief Whether a UI element is drawn and whether it takes space in layout.
+     * Whether the pointer can hit it is separate (LayoutStyle::HitTestable), so showing an element never changes how it takes input.
      */
 	enum class EVisibility : u8
     {
-        None            = 0,
-        Render          = 1 << 0, ///< The element is rendered and visible.
-        Layout          = 1 << 1, ///< The element participates in layout calculations and occupies space.
-        SelfHitTest     = 1 << 2, ///< The element can be hit-tested (e.g., for mouse interactions) based on its own geometry.
-        ChildrenHitTest = 1 << 3, ///< The element's children can be hit-tested, even if the element itself is not
-                                  ///< (e.g., for invisible containers that still allow interaction with their children).
-
-        /** @brief Visible and hit-testable. Participates in layout and rendering. */
-        Visible = Render | Layout | SelfHitTest | ChildrenHitTest,
-
-        /** @brief  Not visible or hit-testable, but still occupies space in the layout. */
-        Hidden = Layout,
-
-        /** @brief Not visible, not hit-testable, and does not occupy any space in the layout. */
-        Collapsed = None,
-
-        /** @brief Visible but not hit-testable (including children). */
-        HitTestInvisible = Render | Layout,
-
-        /** @brief Visible and hit-testable, but the element itself is not hit-testable (children can still be hit-tested). */
-        SelfHitTestInvisible = Render | Layout | ChildrenHitTest
+        Visible,   ///< Drawn, and takes its space in layout.
+        Hidden,    ///< Not drawn or hit-tested, but still takes its space.
+        Collapsed, ///< Not drawn or hit-tested, and takes no space.
     };
-    RATUI_ENUM_ENABLE_BITMASK_OPERATORS( EVisibility, u8 );
 
-    /**
-	 * @brief Utility functions for working with EVisibility flags.
-     */
-    namespace Visibility         
+    namespace Visibility
     {
-        /** @brief Returns true if the element should be considered in layout calculations (i.e., it is not Collapsed). */
-        inline constexpr bool AffectsLayout( EVisibility a_Visibility )
-        {
-            return ( a_Visibility & EVisibility::Layout ) != EVisibility::None;
-        }
+        /** @brief Whether the element takes space in layout (it isn't Collapsed). */
+        constexpr bool AffectsLayout( EVisibility a_Visibility ) { return a_Visibility != EVisibility::Collapsed; }
 
-        /** @brief Returns true if the element should be rendered (i.e., it is Visible). */
-        constexpr bool IsRendered( EVisibility a_Visibility )
-        {
-            return ( a_Visibility & EVisibility::Render ) != EVisibility::None;
-        }
+        /** @brief Whether the element is drawn. */
+        constexpr bool IsRendered( EVisibility a_Visibility ) { return a_Visibility == EVisibility::Visible; }
 
-        /** @brief Returns true if the element should be hit-testable (i.e., it is Visible). */
-        constexpr bool IsHitTestable(EVisibility a_Visibility)
+        /** @brief The visibility a child ends up with under its parent: the more hidden of the two. */
+        RATUI_NODISCARD constexpr EVisibility Apply( EVisibility a_Parent, EVisibility a_Child )
         {
-            return ( a_Visibility & EVisibility::SelfHitTest ) != EVisibility::None;
-        }
-
-        /** @brief Returns true if the element's children should be hit-testable, even if the element itself is not. */
-        constexpr bool AreChildrenHitTestable(EVisibility a_Visibility)
-        {
-            return ( a_Visibility & EVisibility::ChildrenHitTest ) != EVisibility::None;
-        }
-
-        /**
-         * @brief Combines the visibility of a parent and child element to determine the effective visibility of the child.
-         * @param a_Parent The visibility of the parent element.
-         * @param a_Child The visibility of the child element.
-         * @return The effective visibility of the child element after applying the parent's visibility rules.
-         */
-        RATUI_NODISCARD static constexpr EVisibility Apply( EVisibility a_Parent, EVisibility a_Child )
-        {
-            // Layout: If both parent and child have Layout, then child has Layout. Otherwise, child does not have Layout.
-            // Render: If both parent and child have Render, then child has Render. Otherwise, child does not have Render.
-            // SelfHitTest: If parent has ChildrenHitTest, then child can have SelfHitTest. Otherwise, child cannot have SelfHitTest.
-            // ChildrenHitTest: If parent has ChildrenHitTest, then child can have ChildrenHitTest. Otherwise, child cannot have ChildrenHitTest.
-
-            EVisibility result =
-                (a_Parent & a_Child) &
-                (EVisibility::Render | EVisibility::Layout);
-        
-            if ((a_Parent & EVisibility::ChildrenHitTest) != EVisibility::None)
-            {
-                result |= a_Child &
-                    (EVisibility::SelfHitTest | EVisibility::ChildrenHitTest);
-            }
-        
-            return result;
+            return a_Parent > a_Child ? a_Parent : a_Child;
         }
     }
 
@@ -216,11 +189,15 @@ namespace RatUI
         /** @brief Calculates the total inset as a vector. */
         RATUI_NODISCARD constexpr Vec2<Unit> Total() const { return { Horizontal(), Vertical() }; }
 
-        /** @brief Applies the edge insets to a given rectangle, returning a new rectangle that is reduced by the specified insets. */
+        /**
+         * @brief Applies the edge insets to a given rectangle, returning a new rectangle that is reduced by the specified insets.
+         * Insets larger than the rectangle leave it zero-sized at the inset min edge rather than inside out.
+         */
         RATUI_NODISCARD constexpr Rect<Unit> Apply( const Rect<Unit>& a_Rect ) const
         {
-			return Rect<Unit>::FromMinMax( a_Rect.Min() + Vec2<Unit>{ L, T },
-                                           a_Rect.Max() - Vec2<Unit>{ R, B } );
+            const Vec2<Unit> min = a_Rect.Min() + Vec2<Unit>{ L, T };
+            const Vec2<Unit> max = a_Rect.Max() - Vec2<Unit>{ R, B };
+			return Rect<Unit>::FromMinMax( min, Vec2<Unit>{ std::max( min[0], max[0] ), std::max( min[1], max[1] ) } );
         }
 
         /** @brief Initializes all edges to the same value. */
@@ -228,6 +205,8 @@ namespace RatUI
 
         /** @brief Initializes horizontal and vertical edges separately. */
 		RATUI_NODISCARD static constexpr Edges Axis( Unit a_Horizontal, Unit a_Vertical ) { return { a_Vertical, a_Horizontal, a_Vertical, a_Horizontal }; }
+
+		RATUI_NODISCARD constexpr bool operator==( const Edges& ) const = default;
 
 		RATUI_NODISCARD constexpr Edges operator+( const Edges& a_Other ) const { return { .T = T + a_Other.T, .R = R + a_Other.R, .B = B + a_Other.B, .L = L + a_Other.L }; }
 		RATUI_NODISCARD constexpr Edges operator-( const Edges& a_Other ) const { return { .T = T - a_Other.T, .R = R - a_Other.R, .B = B - a_Other.B, .L = L - a_Other.L }; }
@@ -313,8 +292,9 @@ namespace RatUI
         Unit        Spacing{ 0_u };                     ///< The spacing to apply between child elements in a container.
         ELayoutType LayoutType{ ELayoutType::Overlay }; ///< The layout type to use for arranging child elements (if this element is a container).
         EAlign      ChildAlign{ EAlign::TopLeft };      ///< Default alignment for child elements within this container.
-		EVisibility Visibility{ EVisibility::Visible }; ///< The visibility state of the element, which can affect both rendering and layout.
-		bool        IsFocusScope{ false };              ///< Whether this element should be considered a focus scope for navigation.
+		EVisibility Visibility{ EVisibility::Visible }; ///< Whether the element is drawn and whether it takes space.
+		bool        HitTestable{ true };                ///< False: this node and everything below it ignore the pointer. Independent of Visibility.
+		ESafeAreaEdges SafeAreaEdges{ ESafeAreaEdges::None }; ///< Edges whose remaining safe area is added to Padding for this node's content.
 
         /**
          * @note For grid layouts, at least one of GridColumns or GridRows must be set to a non-zero value. 
@@ -373,15 +353,20 @@ namespace RatUI
      */
     struct LayoutResult
     {
-        Rect<Unit> FinalRect{};          ///< The final position and size of the element after layout, in absolute coordinates. Filled by the Arrange step.
+        Rect<Unit> ParentRect{};         ///< Position and size in the parent's space, before any ContentOffset. Filled by the Arrange step.
+        Rect<Unit> SceneRect{};          ///< Where the element is drawn and hit, in the scene's space. Filled by ComposeLayout, after Arrange.
+        Vec2<Unit> ContentSize{};        ///< How far the element's content extends from its top-left: its children, what overflows them (unless they clip, LayoutNode::ClipsContent), and its end padding. Filled by the Arrange step.
         Vec2<Unit> DesiredSize{};        ///< The desired size of the element based on its content and constraints. Filled by the Measure step.
 		Vec2<Unit> LastAvailableSize{};  ///< The last available size passed to the Measure step. Used to determine if a re-measure is necessary.
+		Edges      LastSafeArea{};       ///< The safe area that reached this node in the last Measure step. Used to determine if a re-measure is necessary.
 
 		LinearAggregate CachedLinear{};  ///< Cached aggregate values for linear layouts, used to optimize layout calculations.
 
-        EVisibility Visibility{ EVisibility::Visible };       ///< The visibility state of the element, which can affect both rendering and layout.
+        EVisibility Visibility{ EVisibility::Visible };       ///< Style.Visibility combined with the ancestors'.
+        bool        HitTestable{ true };        ///< Whether the pointer can hit this node: it and its ancestors are hit-testable and it is drawn.
         bool        IsDirty{ true };            ///< Whether the layout needs to be recalculated. Set to true when properties affecting layout are changed.
 		bool        IsDescendantDirty{ true };  ///< Whether any descendant elements are dirty and require layout recalculation.
+		bool        IsHitTestDirty{ false };    ///< On a root: where its nodes are, or which can be hit, changed (LayoutNode::MarkHitTestDirty). Whoever tracks what is under the pointer clears it.
     };
 
     /**
@@ -394,26 +379,39 @@ namespace RatUI
      */
     struct LayoutNode
     {
-        NodeID ID{};                               ///< The pool ID of this node, this is set automatically by the scene.
-		LayoutStyle Style{};                       ///< @warning Any changes to this struct should be followed by a call to MarkDirty() to ensure the layout is recalculated. 
-                                                   ///< Or use the factory-style setters below which automatically mark the node as dirty.
-        LayoutResult Layout{};                     ///< The cached layout result for this widget computed during the layout process.
+        const NodeID ID;              ///< The pool ID of this node, this is set automatically by the scene.
+		LayoutStyle Style{};          ///< @warning Any changes to this struct should be followed by a call to MarkDirty() to ensure the layout is recalculated. 
+                                      ///< Or use the factory-style setters below which automatically mark the node as dirty.
+        LayoutResult Layout{};        ///< The cached layout result for this widget computed during the layout process.
         Unique<class IWidget> Widget;
 
-        // TODO: Im not a big fan of this, but it's the only solution I can think of for now. 
-        // The problem is that some widgets (like ScrollContainer) have children that are 
-        // visually offset from their layout rect (e.g. scrolled content). 
-        // If we don't account for this, the hit test will fail for those children. 
-        // So we need to apply the ChildHitTestOffset to the logical position before recursing into children.
-        Vec2<Unit> ChildHitTestOffset{ 0_u, 0_u }; ///< The offset to apply to child hit-testing, allowing for custom hit-test regions that differ from the layout bounds.
+        /**
+         * @brief Moves this node's children by this much from where layout put them, e.g. to scroll or slide them.
+         * It only changes where they are drawn and hit (their SceneRects), so layout isn't run. Set it with
+         * SetContentOffset, which updates them at once.
+         */
+        Vec2<Unit> ContentOffset{ 0_u, 0_u };
+
+        bool NotifyGeometry{ false };       ///< A change to this node's size or ContentSize is reported to the nearest widget (IWidget::OnGeometryChanged). Set by the widget that wants it.
+        bool ClipsContent{ false };        ///< What overflows this node is cut off (by the widget painting it), so it doesn't count towards its parent's ContentSize.
+
+        LayoutNode( NodeID a_ID = {}, LayoutStyle a_Style = {} ); // Defined in Layout.cpp, IWidget is incomplete here.
+        ~LayoutNode();
+        LayoutNode( const LayoutNode& ) = delete;
+        LayoutNode( LayoutNode&& ) = delete;
+        LayoutNode& operator=( const LayoutNode& ) = delete;
+        LayoutNode& operator=( LayoutNode&& ) = delete;
 
         /** @brief Factory-style setter methods for layout properties - automatically marks the node as dirty when a property is changed. */
 
         LayoutNode& Spacing( Unit a_Spacing )              { Style.Spacing = a_Spacing; MarkDirty(); return *this; }
         LayoutNode& LayoutType( ELayoutType a_LayoutType ) { Style.LayoutType = a_LayoutType; MarkDirty(); return *this; }
         LayoutNode& ChildAlign( EAlign a_ChildAlign )      { Style.ChildAlign = a_ChildAlign; MarkDirty(); return *this; }
-        LayoutNode& Visibility( EVisibility a_Visibility ) { Style.Visibility = a_Visibility; MarkDirty(); return *this; }
-        LayoutNode& FocusScope( bool a_IsFocusScope )      { Style.IsFocusScope = a_IsFocusScope; MarkDirty(); return *this; }
+        /** @brief Only entering or leaving Collapsed runs layout again; Visible and Hidden take the same space. */
+        LayoutNode& Visibility( EVisibility a_Visibility );
+        /** @brief Sets whether the pointer can hit this node and everything below it. Never runs layout. */
+        LayoutNode& HitTestable( bool a_HitTestable );
+        LayoutNode& SafeAreaEdges( ESafeAreaEdges a_Edges ) { Style.SafeAreaEdges = a_Edges; MarkDirty(); return *this; }
 
         LayoutNode& GridColumns( u16 a_GridColumns )  { Style.GridColumns = a_GridColumns; MarkDirty(); return *this; }
         LayoutNode& GridRows( u16 a_GridRows )        { Style.GridRows = a_GridRows; MarkDirty(); return *this; }
@@ -444,8 +442,14 @@ namespace RatUI
         LayoutNode* PrevSibling() const { return m_PrevSibling; }
         LayoutNode* NextSibling() const { return m_NextSibling; }
 
+        /** @brief Sets Layout.Visibility and Layout.HitTestable from this node's style and its parent's resolved values. */
+        void ResolveVisibility();
+
         /** @brief Marks this node as dirty, indicating that its layout needs to be recalculated. Also marks all ancestor nodes as having a dirty descendant. */
         void MarkDirty();
+
+        /** @brief Marks this node's root as hit-test dirty: nodes moved, or which of them the pointer can hit changed. */
+        void MarkHitTestDirty();
 
         /** @brief Marks this node and all its descendants as dirty, indicating that their layout needs to be recalculated. */
         void MarkDescendantDirty();
@@ -562,5 +566,195 @@ namespace RatUI
             child.ForEachDescendant( std::forward<Func>( a_Func ) );
         } );
     }
+
+    /**
+     * @brief A versioned, bucket-based pool allocator for LayoutNodes providing stable pointers and safe handle validation via NodeID.
+     * Grows by allocating new buckets on the heap - existing bucket pointers and item references are never invalidated.
+     */
+    class NodePool
+    {
+    public:
+        /** @brief Checks if the given NodeID is valid (i.e., refers to an allocated item in the pool). */
+        RATUI_NODISCARD bool IsValid( NodeID a_ID ) const
+        {
+            const Bucket* bucket = BucketAt( Traits::Index( a_ID ) / c_ItemsPerBucket );
+            return bucket && bucket->IsValid( a_ID );
+        }
+
+        /** @brief Retrieves a pointer to the item associated with the given NodeID, or nullptr if the ID is invalid. */
+        RATUI_NODISCARD LayoutNode* Get( NodeID a_ID )
+        {
+            Bucket* bucket = BucketAt( Traits::Index( a_ID ) / c_ItemsPerBucket );
+            if ( !bucket || !bucket->IsValid( a_ID ) ) return nullptr;
+            return bucket->Get( Traits::Index( a_ID ) );
+        }
+
+        /** @brief Retrieves a const pointer to the item associated with the given NodeID, or nullptr if the ID is invalid. */
+        RATUI_NODISCARD const LayoutNode* Get( NodeID a_ID ) const
+        {
+            const Bucket* bucket = BucketAt( Traits::Index( a_ID ) / c_ItemsPerBucket );
+            if ( !bucket || !bucket->IsValid( a_ID ) ) return nullptr;
+            return bucket->Get( Traits::Index( a_ID ) );
+        }
+
+        /** @brief Allocates a new item in the pool with the given arguments, returning a NodeID that can be used to access it. */
+        template<typename... Args>
+        RATUI_NODISCARD NodeID Allocate( Args&&... a_Args )
+        {
+            if ( Empty( FreeList ) )
+                Grow();
+
+            // Only pop once construction succeeded, so a throwing constructor doesn't leak the slot.
+            u32 index = Back( FreeList );
+            NodeID id = BucketForItem( index )->Allocate( index, std::forward<Args>( a_Args )... );
+            PopBack( FreeList );
+            return id;
+        }
+
+        /** @brief Deallocates the item associated with the given NodeID, making its slot available for future allocations. */
+        void Deallocate( NodeID a_ID )
+        {
+            Bucket* bucket = BucketAt( Traits::Index( a_ID ) / c_ItemsPerBucket );
+            if ( !bucket || !bucket->IsValid( a_ID ) ) return;
+            bucket->Deallocate( Traits::Index( a_ID ) );
+			PushBack( FreeList, static_cast<u32>( Traits::Index( a_ID ) ) );
+        }
+
+        /** @brief Destroys all items and frees every slot. Buckets and their versions are kept so previously issued NodeIDs stay stale. */
+        void Clear()
+        {
+            ::RatUI::Clear( FreeList );
+            for ( u32 b = static_cast<u32>( Size( Buckets ) ); b-- > 0; )
+            {
+                Bucket& bucket = *Buckets[ b ];
+                for ( u32 i = c_ItemsPerBucket; i-- > 0; )
+                {
+                    if ( bucket.Occupancy.test( i ) )
+                        bucket.Deallocate( b * c_ItemsPerBucket + i );
+
+                    PushBack( FreeList, b * c_ItemsPerBucket + i ); // Reverse so lowest index is popped first
+                }
+            }
+        }
+
+        template<std::invocable<LayoutNode&> Func>
+        void ForEach( Func&& a_Func ) { ForEachImpl( *this, a_Func ); }
+
+        template<std::invocable<const LayoutNode&> Func>
+        void ForEach( Func&& a_Func ) const { ForEachImpl( *this, a_Func ); }
+
+    private:
+        using Traits = NodeIDTraits<NodeID>;
+
+        static constexpr u32 c_ItemsPerBucket = 4096;
+
+        static constexpr u32 NextVersion( u32 a_Version )
+        {
+            return ( a_Version + 1 ) & Traits::VersionMask;
+        }
+
+        /**
+         * @brief A bucket containing a fixed number of items, along with versioning and occupancy tracking for safe allocation and deallocation.
+         */
+        struct Bucket
+        {
+            alignas(LayoutNode) FixedArray<byte, c_ItemsPerBucket * sizeof(LayoutNode)> RawData{};
+            FixedArray<u32, c_ItemsPerBucket> Versions{};
+            std::bitset<   c_ItemsPerBucket> Occupancy{};
+
+            RATUI_NODISCARD LayoutNode* GetItems() { return reinterpret_cast<LayoutNode*>( Data( RawData ) ); }
+            RATUI_NODISCARD const LayoutNode* GetItems() const { return reinterpret_cast<const LayoutNode*>( Data( RawData ) ); }
+
+            RATUI_NODISCARD bool IsOccupied( u32 a_LocalIndex ) const
+            {
+                return Occupancy.test( a_LocalIndex );
+            }
+
+            RATUI_NODISCARD bool IsValid( NodeID a_ID ) const
+            {
+                u32 local = Traits::Index( a_ID ) % c_ItemsPerBucket;
+                return IsOccupied( local ) && Versions[ local ] == Traits::Version( a_ID );
+            }
+
+            template<typename... Args>
+            RATUI_NODISCARD NodeID Allocate( u32 a_GlobalIndex, Args&&... a_Args )
+            {
+                u32 local = a_GlobalIndex % c_ItemsPerBucket;
+                const NodeID id = Traits::Construct( a_GlobalIndex, NextVersion( Versions[ local ] ) );
+                std::construct_at( GetItems() + local, id, std::forward<Args>( a_Args )... );
+                Versions[ local ] = Traits::Version( id );
+                Occupancy.set( local );
+                return id;
+            }
+
+            void Deallocate( u32 a_GlobalIndex )
+            {
+                u32 local = a_GlobalIndex % c_ItemsPerBucket;
+                std::destroy_at( GetItems() + local );
+                Versions[ local ] = NextVersion( Versions[ local ] ); // invalidate existing NodeIDs
+                Occupancy.reset( local );
+            }
+
+
+            RATUI_NODISCARD LayoutNode*       Get( u32 a_GlobalIndex )       { return GetItems() + ( a_GlobalIndex % c_ItemsPerBucket ); }
+            RATUI_NODISCARD const LayoutNode* Get( u32 a_GlobalIndex ) const { return GetItems() + ( a_GlobalIndex % c_ItemsPerBucket ); }
+
+            Bucket() = default;
+            ~Bucket()
+            {
+                // Destroy any occupied items in the bucket
+                for ( u32 i = 0; i < c_ItemsPerBucket; ++i )
+                {
+                    if ( Occupancy.test( i ) )
+                        std::destroy_at( GetItems() + i );
+                }
+            }
+        };
+
+        Array<Unique<Bucket>> Buckets{};
+        Array<u32>            FreeList{};
+
+        template<typename Self, typename Func>
+        static void ForEachImpl( Self& a_Self, Func& a_Func )
+        {
+            for ( const auto& bucket : a_Self.Buckets )
+            {
+                if ( bucket == nullptr )
+                    continue;
+
+                for ( u32 i = 0; i < c_ItemsPerBucket; ++i )
+                {
+                    if ( bucket->Occupancy.test( i ) )
+                        a_Func( bucket->GetItems()[ i ] );
+                }
+            }
+        }
+
+        Bucket* BucketAt( u32 a_BucketIndex )
+        {
+            if ( a_BucketIndex >= Size( Buckets ) ) return nullptr;
+            return Buckets[ a_BucketIndex ].get();
+        }
+
+        const Bucket* BucketAt( u32 a_BucketIndex ) const
+        {
+            if ( a_BucketIndex >= Size( Buckets ) ) return nullptr;
+            return Buckets[ a_BucketIndex ].get();
+        }
+
+        Bucket*       BucketForItem( u32 a_ItemIndex )       { return BucketAt( a_ItemIndex / c_ItemsPerBucket ); }
+        const Bucket* BucketForItem( u32 a_ItemIndex ) const { return BucketAt( a_ItemIndex / c_ItemsPerBucket ); }
+
+        void Grow()
+        {
+            u32 newBucketIndex = static_cast<u32>( Size( Buckets ) );
+            EmplaceBack( Buckets, MakeUnique<Bucket>() );
+
+            // Push in reverse so lowest index is popped first
+            Reserve( FreeList, Size( FreeList ) + c_ItemsPerBucket );
+            for ( u32 i = c_ItemsPerBucket; i-- > 0; )
+                PushBack( FreeList, newBucketIndex * c_ItemsPerBucket + i );
+        }
+    };
 
 } // namespace RatUI

@@ -1,6 +1,7 @@
 #include <RatUI/Renderer/DrawBatcher.h>
 
 #include <algorithm>
+#include <cmath>
 
 namespace RatUI
 {
@@ -281,16 +282,18 @@ namespace RatUI
         const f32 dstTop    = scaledTop    * fitScaleY;
         const f32 dstBottom = scaledBottom * fitScaleY;
 
-        // Destination X/Y split points
-        const f32 x0 = a_Rect.Origin[0].ToFloat();
-        const f32 x1 = x0 + dstLeft;
-        const f32 x3 = x0 + rectW;
-        const f32 x2 = x3 - dstRight;
+        // TODO: This pixel snapping should be a drawlist option??
+        // Destination X/Y split points; all edges snap to whole pixels so slices don't seam or vary in thickness.
+        // The far edge is the snapped origin plus the snapped size, so the size doesn't change as the rect moves.
+        const f32 x0 = std::round( a_Rect.Origin[0].ToFloat() );
+        const f32 x3 = x0 + std::round( rectW );
+        const f32 x1 = std::clamp( std::round( x0 + dstLeft ), x0, x3 );
+        const f32 x2 = std::clamp( std::round( x3 - dstRight ), x1, x3 );
 
-        const f32 y0 = a_Rect.Origin[1].ToFloat();
-        const f32 y1 = y0 + dstTop;
-        const f32 y3 = y0 + rectH;
-        const f32 y2 = y3 - dstBottom;
+        const f32 y0 = std::round( a_Rect.Origin[1].ToFloat() );
+        const f32 y3 = y0 + std::round( rectH );
+        const f32 y1 = std::clamp( std::round( y0 + dstTop ), y0, y3 );
+        const f32 y2 = std::clamp( std::round( y3 - dstBottom ), y1, y3 );
 
         // Source UV split points, in local [0, 1] slice space, then mapped into the
         // TextureView's UV sub-rect so slices sourced from a texture atlas sample correctly.
@@ -313,6 +316,9 @@ namespace RatUI
             const Vec2<Pixel> halfSize{ Pixel{ ( dx1 - dx0 ) * 0.5f }, 
                                         Pixel{ ( dy1 - dy0 ) * 0.5f } };
 
+            // The SDF edge sits outside the quad so slices aren't anti-aliased against each other; the texture's alpha shapes the edges
+            const Vec2<Pixel> shapeHalfSize{ halfSize[0] + 1_px, halfSize[1] + 1_px };
+
             const u32 vertexBase = ( static_cast<u32>( Size( m_Vertices ) )
                                    - Back( m_Batches ).VertexByteOffset ) / sizeof( SDFVertex );
 
@@ -323,19 +329,19 @@ namespace RatUI
 
             verts[0] = { .Position = { Pixel{ dx0 }, Pixel{ dy0 } }, .LocalPos = { -halfSize[0], -halfSize[1] },
                          .UV = { su0, sv0 }, .FillColor = a_Tint, .BorderColor = Colors::Transparent,
-						 .BorderThickness = 0_px, .HalfSize = halfSize, .CornerRadius = 0_px, .Softness = 0.f };
+                         .BorderThickness = 0_px, .HalfSize = shapeHalfSize, .CornerRadius = 0_px, .Softness = 0.f };
 
             verts[1] = { .Position = { Pixel{ dx1 }, Pixel{ dy0 } }, .LocalPos = {  halfSize[0], -halfSize[1] },
                          .UV = { su1, sv0 }, .FillColor = a_Tint, .BorderColor = Colors::Transparent,
-                         .BorderThickness = 0_px, .HalfSize = halfSize, .CornerRadius = 0_px, .Softness = 0.f };
+                         .BorderThickness = 0_px, .HalfSize = shapeHalfSize, .CornerRadius = 0_px, .Softness = 0.f };
 
             verts[2] = { .Position = { Pixel{ dx0 }, Pixel{ dy1 } }, .LocalPos = { -halfSize[0],  halfSize[1] },
                          .UV = { su0, sv1 }, .FillColor = a_Tint, .BorderColor = Colors::Transparent,
-                         .BorderThickness = 0_px, .HalfSize = halfSize, .CornerRadius = 0_px, .Softness = 0.f };
+                         .BorderThickness = 0_px, .HalfSize = shapeHalfSize, .CornerRadius = 0_px, .Softness = 0.f };
 
             verts[3] = { .Position = { Pixel{ dx1 }, Pixel{ dy1 } }, .LocalPos = {  halfSize[0],  halfSize[1] },
                          .UV = { su1, sv1 }, .FillColor = a_Tint, .BorderColor = Colors::Transparent,
-                         .BorderThickness = 0_px, .HalfSize = halfSize, .CornerRadius = 0_px, .Softness = 0.f };
+                         .BorderThickness = 0_px, .HalfSize = shapeHalfSize, .CornerRadius = 0_px, .Softness = 0.f };
 
             auto idx = ReserveIndices( 6 );
             idx[0] = vertexBase + 0; idx[1] = vertexBase + 1; idx[2] = vertexBase + 2;
@@ -375,9 +381,9 @@ namespace RatUI
         const f32 rcpAtlasW = atlasW > 0.f ? 1.f / atlasW : 0.f;
         const f32 rcpAtlasH = atlasH > 0.f ? 1.f / atlasH : 0.f;
     
-        const Unit  fontSize   = a_Text.FontSize;
-        const Pixel textHeight = ToPixel( a_Text.TotalHeight, a_DpiScale );
-        const Pixel ascender   = ToPixel( a_Text.Ascender, a_DpiScale );
+        const Unit  fontSize      = a_Text.FontSize;
+        const Pixel textHeight    = ToPixel( a_Text.TotalHeight(), a_DpiScale );
+        const Pixel firstBaseline =ToPixel( a_Text.FirstBaseline(), a_DpiScale ); // Top of the block to the first baseline.
     
         const f32 baseSize   = a_Atlas.GetConfig().BaseSize.ToFloat();
         const f32 rcpBase    = baseSize > 0.f ? 1.f / baseSize : 0.f;
@@ -428,13 +434,13 @@ namespace RatUI
         {
             case ETextBaseline::Top:
             case ETextBaseline::Hanging:
-                baselineY += ascender;
+                baselineY += firstBaseline;
                 break;
             case ETextBaseline::Middle:
-                baselineY += ( a_LayoutRect.Size[1] - textHeight ) * 0.5f + ascender;
+                baselineY += ( a_LayoutRect.Size[1] - textHeight ) * 0.5f + firstBaseline;
                 break;
             case ETextBaseline::Bottom:
-                baselineY += a_LayoutRect.Size[1] - textHeight + ascender;
+                baselineY += a_LayoutRect.Size[1] - textHeight + firstBaseline;
                 break;
             case ETextBaseline::Alphabetic:
             default:
@@ -461,7 +467,10 @@ namespace RatUI
                     break;
             }
     
+            // Hanging trailing spaces aren't in line.Width. In right-to-left text they are drawn first, so start before them.
             Pixel penX = lineX;
+            for ( u32 g = line.Start; g < line.End && line.VisibleEnd < line.TextEnd && a_Text.Glyphs[g].Cluster >= line.VisibleEnd; ++g )
+                penX -= ToPixel( a_Text.Glyphs[g].XAdvance, fontSize, a_DpiScale );
     
             u32 vertexBase = ( static_cast<u32>( Size( m_Vertices ) ) - Back( m_Batches ).VertexByteOffset ) / sizeof( TextVertex );
     
@@ -519,7 +528,7 @@ namespace RatUI
             if ( numGlyphs >= a_MaxGlyphs )
                 break; // Stop processing lines if we've reached the maximum glyph limit
     
-            penY += ToPixel( a_Text.LineHeight, a_DpiScale );
+            penY += ToPixel( a_Text.LineAdvance(), a_DpiScale );
         }
     
         TryFlatten();

@@ -87,7 +87,7 @@ namespace RatUI
         {
             if ( !Transform.IsIdentity() )
             {
-                a_Event.Drawer.PushTransform( Transform.ToMatrix( a_Node.Layout.FinalRect ) );
+                a_Event.Drawer.PushTransform( Transform.ToMatrix( a_Node.Layout.SceneRect ) );
                 m_Pushed++;
             }  
         }
@@ -140,7 +140,7 @@ namespace RatUI
 			if ( !a_Event.Drawer.IsDebugEnabled() )
 				return;
 
-			a_Event.Drawer.AddRect( a_Node.Layout.FinalRect,
+			a_Event.Drawer.AddRect( a_Node.Layout.SceneRect,
 			{
 				.FillColor = FromColorF32( 1.0f, 0.0f, 0.0f, 0.25f )
 			} );
@@ -159,16 +159,16 @@ namespace RatUI
             if ( a_Node.Style.PositionMode == EPositioning::Anchored )
             {
                 // Draw bounds
-                a_Event.Drawer.AddRect( a_Node.Layout.FinalRect,
+                a_Event.Drawer.AddRect( a_Node.Layout.SceneRect,
                 {
 					.BorderColor = Colors::Orange,
                     .BorderThickness = 1_u
                 } );
 
 				// Draw pivot point
-				Vec2<Unit> pivotPoint = a_Node.Layout.FinalRect.TopLeft();
-				pivotPoint[0] += a_Node.Layout.FinalRect.Width() * a_Node.Style.PositionAnchor.Pivot[0];
-				pivotPoint[1] += a_Node.Layout.FinalRect.Height() * a_Node.Style.PositionAnchor.Pivot[1];
+				Vec2<Unit> pivotPoint = a_Node.Layout.SceneRect.TopLeft();
+				pivotPoint[0] += a_Node.Layout.SceneRect.Width() * a_Node.Style.PositionAnchor.Pivot[0];
+				pivotPoint[1] += a_Node.Layout.SceneRect.Height() * a_Node.Style.PositionAnchor.Pivot[1];
                 a_Event.Drawer.AddCircle( pivotPoint, 4_u,
                 {
 					.FillColor = Colors::Orange
@@ -177,7 +177,7 @@ namespace RatUI
             else
             {
                 // Draw bounds
-                a_Event.Drawer.AddRect( a_Node.Layout.FinalRect,
+                a_Event.Drawer.AddRect( a_Node.Layout.SceneRect,
                 {
                     .BorderColor = Colors::Red,
                     .BorderThickness = 1_u
@@ -185,7 +185,7 @@ namespace RatUI
             }
 
             // Draw center point
-            a_Event.Drawer.AddCircle( a_Node.Layout.FinalRect.Center(), 4_u,
+            a_Event.Drawer.AddCircle( a_Node.Layout.SceneRect.Center(), 4_u,
             {
                 .FillColor = c_CenterColor
             } );

@@ -1,6 +1,7 @@
 #pragma once
 #include "Theme.h"
 #include "Scene.h"
+#include "FocusRing.h"
 
 namespace RatUI
 {
@@ -14,44 +15,57 @@ namespace RatUI
 		using OnClickCallback = Callback<ButtonBaseWidget&>;
         OnClickCallback OnClick; ///< Callback that is invoked when the button is clicked.
 
-        ButtonBaseWidget() = default;
-        ButtonBaseWidget( OnClickCallback a_OnClick )
-            : OnClick( std::move( a_OnClick ) )
+        ButtonBaseWidget( OnClickCallback a_OnClick = {} )
+            : IWidget( { .Focus = EFocusPolicy::All, .Interactable = true } ), OnClick( std::move( a_OnClick ) )
         {}
 
         virtual ~ButtonBaseWidget() = default;
 
-        bool IsInteractable() const override { return true; }
-        bool IsFocusable()    const override { return true; }
-
         Reply OnButtonPressed( const ButtonEvent& a_Event ) override
         {
-            if ( !a_Event.Pressed )
+            if ( !a_Event.Pressed || a_Event.Button != EButtonID::MouseLeft )
                 return Reply::Unhandled();
 
-            if ( IsActivationButton( a_Event.Button ) )
-            {
-                m_IsPressed = true;
-                return Reply::Handled();
-            }
-
-            return Reply::Unhandled();
+            m_IsPressed    = true;
+            m_PressPointer = a_Event.Pointer.value_or( c_MousePointerID );
+            return Reply::Handled();
         }
 
         Reply OnButtonReleased( const ButtonEvent& a_Event ) override
         {
-            if ( !a_Event.Released )
+            if ( !a_Event.Released || a_Event.Button != EButtonID::MouseLeft )
                 return Reply::Unhandled();
 
-            if ( !IsActivationButton( a_Event.Button ) )
-                return Reply::Unhandled();
+            // The pressing pointer keeps the button while held, so it may be released somewhere else.
+            if ( a_Event.PointerPosition && !IsOver( *a_Event.PointerPosition ) )
+                m_IsPressed = false;
 
-            const bool wasPressed = m_IsPressed;
-            m_IsPressed = false;
+            return Release();
+        }
 
-            if ( wasPressed )
-                Invoke( OnClick, *this );
+        Reply OnPointerMove( const PointerEvent& a_Event ) override
+        {
+            // Touches have no hover, so leaving is seen here.
+            if ( m_PressPointer && *m_PressPointer == a_Event.ID && !IsOver( a_Event.Position ) )
+                m_IsPressed = false;
+            return Reply::Unhandled();
+        }
 
+        void OnPressCancelled( const PressCancelEvent& a_Event ) override
+        {
+            if ( a_Event.Pointer != m_PressPointer )
+                return;
+            m_IsPressed    = false;
+            m_PressPointer = NullOpt;
+        }
+
+        Reply OnActivate( const ActivateEvent& a_Event ) override
+        {
+            if ( !a_Event.Pressed )
+                return Release();
+
+            m_IsPressed    = true;
+            m_PressPointer = NullOpt;
             return Reply::Handled();
         }
 
@@ -64,7 +78,9 @@ namespace RatUI
         Reply OnPointerExit( const PointerEvent& a_Event ) override
         {
             m_IsHovered = false;
-            m_IsPressed = false;
+            // Only the pointer that pressed the button cancels its press by leaving; another pointer passing by doesn't.
+            if ( m_PressPointer && *m_PressPointer == a_Event.ID )
+                m_IsPressed = false;
             return Reply::Unhandled();
         }
 
@@ -73,14 +89,24 @@ namespace RatUI
 
     protected:
 
-        // TODO: This shouldn't be handled here, what if users wanted to change the activation buttons or have multiple buttons with different activation buttons?
-        static constexpr bool IsActivationButton( EButtonID a_Button )
+        /** @brief Ends a press, clicking if it wasn't cancelled (e.g. by the pointer leaving). */
+        Reply Release()
         {
-            return a_Button == EButtonID::MouseLeft || a_Button == EButtonID::KeyEnter;
+            const bool wasPressed = m_IsPressed;
+            m_IsPressed    = false;
+            m_PressPointer = NullOpt;
+
+            if ( wasPressed )
+                Invoke( OnClick, *this );
+
+            return Reply::Handled();
         }
+
+        bool IsOver( Vec2<Unit> a_Position ) const { return GetScene().IsOver( GetLayoutID(), a_Position ); }
 
         bool m_IsHovered{ false };
         bool m_IsPressed{ false };
+        Optional<PointerID> m_PressPointer{}; ///< The pointer that pressed the button; empty for a key.
     };
 
     /**
@@ -105,6 +131,7 @@ namespace RatUI
         Color BorderColor{ Colors::Transparent };               ///< The color of the panel's border
         Unit  BorderThickness{ 0_u };                           ///< The thickness of the panel's border
         CornerRadius Radius{ CornerRadius::None() };            ///< The corner rounding
+        FocusRingStyle FocusRing{};                             ///< Drawn while the widget has focus (theme: FocusOutline keys)
 
         // --------------------------------------------------------------------
         // IWidget Overrides
@@ -114,7 +141,7 @@ namespace RatUI
         {
             Scene& scene = GetScene();
             const LayoutNode& node = GetLayout();
-            const Rect<Unit>& rect = node.Layout.FinalRect;
+            const Rect<Unit>& rect = node.Layout.SceneRect;
 
             if constexpr ( HasMixin<ThemeMixin> )
             {
@@ -126,58 +153,17 @@ namespace RatUI
                     BorderColor = Theme.GetColor( ThemeKey::Color::ButtonBorder, BorderColor );
                     BorderThickness = Theme.GetMetric( ThemeKey::Metric::ButtonBorderThickness, BorderThickness );
                     Radius = Theme.GetRadius( ThemeKey::Radii::Button, Radius );
+                    FocusRing.UpdateFromTheme( Theme );
                 }
             }
 
 			// Fill brush based on state: pressed > hovered > normal
             const Brush& fillBrush = m_IsPressed ? PressedBrush : ( m_IsHovered ? HoverBrush : NormalBrush );
 
-            if ( Holds<SolidBrush>( fillBrush ) )
-            {
-                const SolidBrush& solid = Get<SolidBrush>( fillBrush );
-                a_Event.Drawer.AddRect( rect, 
-                {
-                    .FillColor = solid.Fill,
-                    .BorderColor = BorderColor,
-                    .BorderThickness = BorderThickness,
-                    .Radius = Radius
-                } );
-            }
-            else if ( Holds<TextureBrush>( fillBrush ) )
-            {
-                const TextureBrush& texture = Get<TextureBrush>( fillBrush );
-                a_Event.Drawer.AddRect( rect, 
-                {
-                    .FillColor = texture.Tint,
-                    .BorderColor = BorderColor,
-                    .BorderThickness = BorderThickness,
-                    .Radius = Radius,
-                    .Texture = texture.Texture
-                } );
-            }
-            else if ( Holds<NineSliceBrush>( fillBrush ) )
-            {
-                const NineSliceBrush& nineSlice = Get<NineSliceBrush>( fillBrush );
-                a_Event.Drawer.AddSlicedRect( rect, 
-                {
-                    .Texture = nineSlice.Texture,
-                    .Slice = nineSlice.Slice,
-                    .Tint = nineSlice.Tint,
-                } );
-            }
+            a_Event.Drawer.AddBrushRect( rect, fillBrush, BorderColor, BorderThickness, Radius );
 
-            // Draw focus ring 
-            // TODO: Should this be a util or even handled here?
-            if ( scene.GetFocusedNode() == GetLayoutID() )
-            {
-                a_Event.Drawer.AddRect( rect,
-                {
-                    .FillColor = Colors::Transparent,
-                    .BorderColor = BorderColor,
-                    .BorderThickness = BorderThickness,
-                    .Radius = Radius
-                } );
-            }
+            if ( scene.IsFocusVisible( GetLayoutID() ) )
+                FocusRing.Draw( a_Event.Drawer, rect, Radius );
 
             PaintChildren( a_Event );
         }

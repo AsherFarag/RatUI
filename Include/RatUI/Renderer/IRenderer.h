@@ -13,7 +13,7 @@ namespace RatUI
         virtual ~IRenderer() = default;
 
 		/** @brief Executes the given draw batches, each DrawBatch should equate to a single draw call on the backend. */
-		virtual void Execute( const struct DrawBatcher& a_Batcher ) = 0;
+		virtual void Execute( const class DrawBatcher& a_Batcher ) = 0;
 
         /**
          * @brief Creates a texture resource on the GPU with the specified information and initial data.
