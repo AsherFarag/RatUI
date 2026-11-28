@@ -1140,3 +1140,29 @@ TEST_CASE( "A Collapsed anchored subtree is not arranged, so its content doesn't
     REQUIRE_FALSE( root.Layout.IsDescendantDirty );
     REQUIRE_VEC2( wrapping.Layout.ParentRect.Size, 0.f, 0.f );
 }
+
+TEST_CASE( "SizeConstraints hold for flex and percent children of an overlay and a grid", "[layout-engine][sizing]" )
+{
+    LayoutFixture fx;
+    LayoutNode parent, flex, percent;
+    parent.PushBackChild( flex );
+    parent.PushBackChild( percent );
+    parent.FixedWidth( 400_u ).FixedHeight( 300_u );
+    flex.FlexWidth().FlexHeight().SizeConstraints( Constraints::AtMost( Vec2<Unit>{ 100_u, 50_u } ) );
+    percent.PercentWidth( 0.5f ).FixedHeight( 20_u ).SizeConstraints( Constraints::AtMost( Vec2<Unit>{ 80_u, Limits<Unit>::max() } ) );
+
+    SECTION( "overlay" )
+    {
+        parent.LayoutType( ELayoutType::Overlay );
+        RunLayout( parent, Vec2<Unit>{ 400_u, 300_u }, fx );
+        REQUIRE_VEC2( flex.Layout.ParentRect.Size, 100.f, 50.f );
+    }
+    SECTION( "grid" )
+    {
+        // A flex child here only fills a cell its neighbours size, so the percent child is the one to check.
+        parent.LayoutType( ELayoutType::Grid );
+        RunLayout( parent, Vec2<Unit>{ 400_u, 300_u }, fx );
+    }
+
+    REQUIRE( percent.Layout.ParentRect.Size[0].ToFloat() == Catch::Approx( 80.f ) );
+}

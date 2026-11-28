@@ -11,6 +11,13 @@ namespace
         u32 Rows;
     };
 
+    /** @brief a_Size within the child's SizeConstraints. Arrange re-applies them to every size it works out itself. */
+    static Vec2<Unit> ClampToConstraints( const LayoutNode& a_Child, Vec2<Unit> a_Size )
+    {
+        const Constraints& c = a_Child.Style.SizeConstraints;
+        return { std::clamp( a_Size[0], c.Min[0], c.Max[0] ), std::clamp( a_Size[1], c.Min[1], c.Max[1] ) };
+    }
+
     /**
      * @brief Resolves the final arranged size of a child on both axes,
      * substituting Percent-based sizes from the known inner container size.
@@ -19,11 +26,11 @@ namespace
     {
         const LayoutStyle& s = a_Child.Style;
         Vec2<Unit> size = a_Child.Layout.DesiredSize;
-        
+
         if ( s.WidthMode  == ESizing::Percent ) size[0] = s.PercentWidth  * a_InnerSize[0];
         if ( s.HeightMode == ESizing::Percent ) size[1] = s.PercentHeight * a_InnerSize[1];
 
-        return size;
+        return ClampToConstraints( a_Child, size );
     }
 
     /**
@@ -479,8 +486,6 @@ namespace
             }
             else
             {
-                // Percent sizes are re-resolved here, so re-apply the constraints measure clamped them to.
-                size[axis]   = std::clamp( size[axis], s.SizeConstraints.Min[axis], s.SizeConstraints.Max[axis] );
                 origin[axis] = minEdge - ( size[axis] * anchor.Pivot[axis] ) + anchor.Offset[axis];
             }
         }
@@ -508,6 +513,7 @@ namespace
 
             if (child.Style.WidthMode == ESizing::Flex) childSize[0] = std::max( 0_u, a_Inner.Size[0] - child.Style.Margin.Horizontal() );
             if (child.Style.HeightMode == ESizing::Flex) childSize[1] = std::max( 0_u, a_Inner.Size[1] - child.Style.Margin.Vertical() );
+            childSize = ClampToConstraints( child, childSize );
 
             // Align within the margin-inset container space
             const Rect<Unit> marginInnerRect{
@@ -719,6 +725,7 @@ namespace
             const Edges& margin = child.Style.Margin;
             if ( HasFlag( align, EAlign::HStretch ) || child.Style.WidthMode  == ESizing::Flex ) childSize[0] = std::max( 0_u, cellRect.Size[0] - margin.Horizontal() );
             if ( HasFlag( align, EAlign::VStretch ) || child.Style.HeightMode == ESizing::Flex ) childSize[1] = std::max( 0_u, cellRect.Size[1] - margin.Vertical() );
+            childSize = ClampToConstraints( child, childSize );
 
             const Rect<Unit> childRect = margin.Apply( AlignRect( childSize + margin.Total(), cellRect, align ) );
 

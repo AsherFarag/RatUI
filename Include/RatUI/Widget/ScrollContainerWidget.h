@@ -213,7 +213,7 @@ namespace RatUI
             if ( LayoutNode* content = GetContentNode() )
             {
                 a_Event.Drawer.PushClipRect( content->Layout.SceneRect );
-                PaintChildren( a_Event, *content );
+                PaintChildren( a_Event, *content, &content->Layout.SceneRect );
                 a_Event.Drawer.PopClipRect();
             }
 

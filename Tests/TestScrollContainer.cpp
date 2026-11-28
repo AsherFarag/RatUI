@@ -940,8 +940,36 @@ TEST_CASE( "ScrollContainerWidget: a row under a bare layout node is painted", "
     ScrollSceneFixture fixture;
     LayoutNode&        group  = fixture.Scene.CreateLayoutNode( {}, fixture.Scroll->GetLayoutID() );
     int                paints = 0;
-    fixture.Scene.CreateWidget<PaintProbe>( group.ID, paints );
+    PaintProbe* probe = fixture.Scene.CreateWidget<PaintProbe>( group.ID, paints );
+    probe->GetLayout().FixedWidth( 100_u ).FixedHeight( 30_u );
 
+    // It comes after the ten rows, so it is scrolled to.
+    fixture.Frame();
+    fixture.Scroll->SetScrollOffset( { 0_u, 230_u } );
+    fixture.Frame();
+    REQUIRE( paints == 1 );
+}
+
+TEST_CASE( "ScrollContainerWidget: rows scrolled out of view aren't painted", "[Scene][Scroll]" )
+{
+    struct PaintProbe : IWidget
+    {
+        int& Paints;
+        explicit PaintProbe( int& a_Paints ) : Paints( a_Paints ) {}
+        void OnPaint( const PaintEvent& ) override { ++Paints; }
+    };
+
+    ScrollSceneFixture fixture;
+
+    // Below the ten rows, at 300..330 of the content.
+    int         paints = 0;
+    PaintProbe* last   = fixture.Scene.CreateWidget<PaintProbe>( fixture.Scroll->GetContentNodeID(), paints );
+    last->GetLayout().FixedWidth( 100_u ).FixedHeight( 30_u );
+
+    fixture.Frame();
+    REQUIRE( paints == 0 );
+
+    fixture.Scroll->SetScrollOffset( { 0_u, 230_u } );
     fixture.Frame();
     REQUIRE( paints == 1 );
 }

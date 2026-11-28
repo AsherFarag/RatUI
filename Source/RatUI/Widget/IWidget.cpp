@@ -15,14 +15,20 @@ namespace RatUI
         return *node;
     }
 
-    void IWidget::PaintChildren( const PaintEvent& a_Event, LayoutNode& a_Node )
+    void IWidget::PaintChildren( const PaintEvent& a_Event, LayoutNode& a_Node, const Rect<Unit>* a_Visible )
     {
         for ( LayoutNode* child = a_Node.FirstChild(); child; child = child->NextSibling() )
         {
+            // Touching counts as inside, so an empty node at the edge still paints what is below it.
+            const Rect<Unit>& rect = child->Layout.SceneRect;
+            if ( a_Visible && ( rect.Right() < a_Visible->Left() || rect.Left() > a_Visible->Right() ||
+                                rect.Bottom() < a_Visible->Top() || rect.Top() > a_Visible->Bottom() ) )
+                continue;
+
             if ( child->Widget )
                 child->Widget->Paint( a_Event );
             else if ( Visibility::IsRendered( child->Layout.Visibility ) )
-                PaintChildren( a_Event, *child );
+                PaintChildren( a_Event, *child, a_Visible );
         }
     }
 

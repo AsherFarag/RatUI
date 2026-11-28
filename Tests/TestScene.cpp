@@ -1097,17 +1097,17 @@ TEST_CASE( "Scene: a widget under a bare layout node is painted", "[Scene]" )
     REQUIRE( paints == 1 );
 }
 
-#if RATUI_DEBUG
-TEST_CASE( "Builder: WithDebugName names the widget", "[Scene]" )
+TEST_CASE( "Builder: WithDebugName names the widget, and compiles without DebugMixin", "[Scene]" )
 {
     RatUI::Scene scene;
     PanelWidget* root = scene.CreateRootWidget<PanelWidget>();
 
     Builder<PanelWidget> builder( scene, root->GetLayoutID() );
     builder.WithDebugName( "Inventory" );
+#if RATUI_DEBUG
     REQUIRE( builder.Widget.DebugName == "Inventory" );
-}
 #endif
+}
 
 /** @brief ButtonSceneFixture with mouse helpers that return what DispatchInputEvent does. */
 struct PointerOwnerFixture : ButtonSceneFixture
@@ -1379,4 +1379,31 @@ TEST_CASE( "Scene: a button event moves hover to where it happened", "[Scene]" )
 
     f.Button( { 50_u, 80_u }, true );
     REQUIRE( f.Scene.Input.HoveredWidget == f.Second->GetLayoutID() );
+}
+
+TEST_CASE( "SliderWidget: a thumb grabbed off its centre doesn't jump", "[Scene]" )
+{
+    RatUI::Scene scene;
+    PanelWidget* root = scene.CreateRootWidget<PanelWidget>();
+    root->GetLayout().LayoutType( ELayoutType::Vertical ).Padding( Edges::All( 10_u ) );
+    SliderWidget* slider = scene.CreateWidget<SliderWidget>( root->GetLayoutID(), 0.f, 1.f, 0.5f );
+    slider->GetLayout().FixedWidth( 200_u ).FixedHeight( 20_u );
+    scene.UpdateLayout( { 400_u, 300_u } );
+
+    const auto button = [&]( Vec2<Unit> a_Position, bool a_Pressed ) {
+        scene.DispatchInputEvent( { .Device  = EDeviceID::Mouse,
+                                    .Payload = ButtonEvent{ .Button = EButtonID::MouseLeft, .Pressed = a_Pressed, .Released = !a_Pressed, .PointerPosition = a_Position } } );
+    };
+
+    // The 16 wide thumb is centred at x 110, over 184 of travel.
+    button( { 114_u, 20_u }, true );
+    REQUIRE( slider->Value.Get() == Catch::Approx( 0.5f ) );
+
+    scene.DispatchInputEvent( { .Device = EDeviceID::Mouse, .Payload = PointerEvent{ .Position = { 160_u, 20_u }, .Type = EPointerType::Mouse } } );
+    REQUIRE( slider->Value.Get() == Catch::Approx( 0.75f ) );
+    button( { 160_u, 20_u }, false );
+
+    // A press on the track still brings the thumb's centre to the pointer.
+    button( { 18_u, 20_u }, true );
+    REQUIRE( slider->Value.Get() == Catch::Approx( 0.f ) );
 }

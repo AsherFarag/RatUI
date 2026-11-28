@@ -142,7 +142,7 @@ namespace RatUI
         PointerEvent still = *Input.Hover;
         still.Delta        = { 0_u, 0_u };
         still.ScrollDelta  = { 0_u, 0_u };
-        SetHovered( HoverTarget( gesture, still.Position ), still );
+        SetHovered( HoverTarget( gesture, PointerTarget( gesture, still.Position ), still.Position ), still );
     }
 
     void Scene::ClearHover()
@@ -461,11 +461,10 @@ namespace RatUI
         return HitTest( a_Position );
     }
 
-    NodeID Scene::HoverTarget( const PointerGestureState* a_Gesture, Vec2<Unit> a_Position ) const
+    NodeID Scene::HoverTarget( const PointerGestureState* a_Gesture, NodeID a_Target, Vec2<Unit> a_Position ) const
     {
-        const NodeID target   = PointerTarget( a_Gesture, a_Position );
-        const bool   captured = a_Gesture && a_Gesture->CapturedWidget != c_InvalidNodeID;
-        return captured && !IsOver( target, a_Position ) ? c_InvalidNodeID : target;
+        const bool captured = a_Gesture && a_Gesture->CapturedWidget != c_InvalidNodeID;
+        return captured && !IsOver( a_Target, a_Position ) ? c_InvalidNodeID : a_Target;
     }
 
     bool Scene::IsPointerOverUI() const
@@ -581,7 +580,7 @@ namespace RatUI
         if ( a_Event.Type != EPointerType::Touch )
         {
             Input.Hover = a_Event;
-            SetHovered( HoverTarget( &gesture, a_Event.Position ), a_Event );
+            SetHovered( HoverTarget( &gesture, target, a_Event.Position ), a_Event );
         }
 
         bool handled = false;

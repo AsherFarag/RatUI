@@ -322,8 +322,11 @@ namespace RatUI
         /** @brief Paints the widgets inside this one. */
         void PaintChildren( const PaintEvent& a_Event ) { PaintChildren( a_Event, GetLayout() ); }
 
-        /** @brief Paints the nearest widgets below a_Node, through any bare layout nodes in between. */
-        void PaintChildren( const PaintEvent& a_Event, LayoutNode& a_Node );
+        /**
+         * @brief Paints the nearest widgets below a_Node, through any bare layout nodes in between. With a_Visible
+         * (e.g. a scroll container's clip), children whose rect is wholly outside it are skipped.
+         */
+        void PaintChildren( const PaintEvent& a_Event, LayoutNode& a_Node, const Rect<Unit>* a_Visible = nullptr );
 
     protected:
         friend Scene;

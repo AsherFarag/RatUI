@@ -283,14 +283,15 @@ namespace RatUI
         const f32 dstBottom = scaledBottom * fitScaleY;
 
         // TODO: This pixel snapping should be a drawlist option??
-        // Destination X/Y split points; all edges snap to whole pixels so slices don't seam or vary in thickness
+        // Destination X/Y split points; all edges snap to whole pixels so slices don't seam or vary in thickness.
+        // The far edge is the snapped origin plus the snapped size, so the size doesn't change as the rect moves.
         const f32 x0 = std::round( a_Rect.Origin[0].ToFloat() );
-        const f32 x3 = std::round( a_Rect.Origin[0].ToFloat() + rectW );
+        const f32 x3 = x0 + std::round( rectW );
         const f32 x1 = std::clamp( std::round( x0 + dstLeft ), x0, x3 );
         const f32 x2 = std::clamp( std::round( x3 - dstRight ), x1, x3 );
 
         const f32 y0 = std::round( a_Rect.Origin[1].ToFloat() );
-        const f32 y3 = std::round( a_Rect.Origin[1].ToFloat() + rectH );
+        const f32 y3 = y0 + std::round( rectH );
         const f32 y1 = std::clamp( std::round( y0 + dstTop ), y0, y3 );
         const f32 y2 = std::clamp( std::round( y3 - dstBottom ), y1, y3 );
 

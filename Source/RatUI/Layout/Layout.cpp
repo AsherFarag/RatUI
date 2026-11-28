@@ -29,6 +29,9 @@ namespace RatUI
 
     LayoutNode& LayoutNode::Visibility( EVisibility a_Visibility )
     {
+        if ( Style.Visibility == a_Visibility )
+            return *this;
+
         const bool takesSpaceChanged = Visibility::AffectsLayout( Style.Visibility ) != Visibility::AffectsLayout( a_Visibility );
         Style.Visibility = a_Visibility;
 
@@ -42,6 +45,9 @@ namespace RatUI
 
     LayoutNode& LayoutNode::HitTestable( bool a_HitTestable )
     {
+        if ( Style.HitTestable == a_HitTestable )
+            return *this;
+
         Style.HitTestable = a_HitTestable;
         ResolveVisibilityBelow( *this );
         MarkHitTestDirty();

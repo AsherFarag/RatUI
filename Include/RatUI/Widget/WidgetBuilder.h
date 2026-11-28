@@ -43,9 +43,11 @@ namespace RatUI
 			return *this;
 		}
 
-        Builder& WithDebugName( String a_DebugName ) requires ( WidgetType::template HasMixin<DebugMixin> )
+        /** @brief Names the widget for debug drawing. Does nothing in a build without DebugMixin (release). */
+        Builder& WithDebugName( String a_DebugName )
         {
-            Widget.DebugName = std::move( a_DebugName );
+            if constexpr ( WidgetType::template HasMixin<DebugMixin> )
+                Widget.DebugName = std::move( a_DebugName );
             return *this;
         }
     };

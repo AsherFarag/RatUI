@@ -389,3 +389,16 @@ TEST_CASE( "Constraints::Fixed pins both the minimum and maximum to the same siz
     REQUIRE_UNIT( c.Min[0], 50.f );
     REQUIRE_UNIT( c.Min[1], 60.f );
 }
+
+TEST_CASE( "Setting the visibility or hit-testability a node already has changes nothing", "[layout-node]" )
+{
+    LayoutNode root, child;
+    root.PushBackChild( child );
+    root.Layout.IsHitTestDirty = false;
+
+    child.Visibility( EVisibility::Visible ).HitTestable( true );
+    REQUIRE_FALSE( root.Layout.IsHitTestDirty );
+
+    child.Visibility( EVisibility::Hidden );
+    REQUIRE( root.Layout.IsHitTestDirty );
+}

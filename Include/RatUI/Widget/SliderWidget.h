@@ -124,7 +124,14 @@ namespace RatUI
                 if ( a_Event.PointerPosition )
                     m_LastPointerPos = *a_Event.PointerPosition;
                 GetScene().CapturePointer( m_DragPointer, GetLayoutID() );
-                UpdateFromPointer( GetLayout().Layout.SceneRect, m_LastPointerPos );
+
+                // A grabbed thumb keeps the pointer where it took it; a press on the track brings the thumb's centre there.
+                SyncTheme();
+                const Rect<Unit>& rect  = GetLayout().Layout.SceneRect;
+                const Rect<Unit>  thumb = GetThumbRect( rect );
+                const u32         axis  = Orientation == EOrient::Horizontal ? 0 : 1;
+                m_GrabOffset = thumb.Contains( m_LastPointerPos ) ? m_LastPointerPos[axis] - ( thumb.Origin[axis] + thumb.Size[axis] * 0.5f ) : 0_u;
+                UpdateFromPointer( rect, m_LastPointerPos );
 
                 return Reply::Handled();
             }
@@ -220,6 +227,7 @@ namespace RatUI
         bool m_IsThumbPressed { false };
         Vec2<Unit> m_LastPointerPos{ 0_u, 0_u };
         PointerID  m_DragPointer{ c_MousePointerID }; ///< The pointer dragging the slider, while m_IsDragging
+        Unit       m_GrabOffset{ 0_u };               ///< From the thumb's centre to where the pointer grabbed it, along the track.
 
         /**
          * @brief Moves to the next multiple of Step (from Min) up or down, so an off-step value lands back on the
@@ -378,7 +386,7 @@ namespace RatUI
                 const Unit travel = a_Rect.Width() - thumbSize[0];
                 if ( travel <= 0_u ) return;
 
-                const f32 t = ( a_Pos[0] - ( a_Rect.Left() + thumbSize[0] * 0.5f ) ).ToFloat()
+                const f32 t = ( a_Pos[0] - m_GrabOffset - ( a_Rect.Left() + thumbSize[0] * 0.5f ) ).ToFloat()
                               / travel.ToFloat();
                 setFromPosition( t );
             }
@@ -387,7 +395,7 @@ namespace RatUI
                 const Unit travel = a_Rect.Height() - thumbSize[1];
                 if ( travel <= 0_u ) return;
 
-                const f32 t = ( a_Pos[1] - ( a_Rect.Top() + thumbSize[1] * 0.5f ) ).ToFloat()
+                const f32 t = ( a_Pos[1] - m_GrabOffset - ( a_Rect.Top() + thumbSize[1] * 0.5f ) ).ToFloat()
                               / travel.ToFloat();
 				setFromPosition( t );
             }

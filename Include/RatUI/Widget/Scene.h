@@ -348,8 +348,8 @@ namespace RatUI
          */
         NodeID PointerTarget( const PointerGestureState* a_Gesture, Vec2<Unit> a_Position ) const;
 
-        /** @brief What a pointer at a_Position hovers: its PointerTarget, but a capturing widget only while the pointer is over it. */
-        NodeID HoverTarget( const PointerGestureState* a_Gesture, Vec2<Unit> a_Position ) const;
+        /** @brief What a pointer at a_Position hovers: a_Target (its PointerTarget), but a capturing widget only while the pointer is over it. */
+        NodeID HoverTarget( const PointerGestureState* a_Gesture, NodeID a_Target, Vec2<Unit> a_Position ) const;
 
         /**
          * @brief The navigation stops inside a_Scope, in layout order. Arrow keys move between stops outside groups:
