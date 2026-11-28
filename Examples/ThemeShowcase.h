@@ -1,11 +1,6 @@
 #pragma once
 #include "Example.h"
-#include <RatUI/Widget/ButtonWidget.h>
-#include <RatUI/Widget/InputTextWidget.h>
-#include <RatUI/Widget/PanelWidget.h>
-#include <RatUI/Widget/ScrollContainerWidget.h>
-#include <RatUI/Widget/SliderWidget.h>
-#include <RatUI/Widget/TextWidget.h>
+#include <RatUI/Widget/WidgetBuilder.h>
 #include <cmath>
 #include <format>
 #include <functional>
@@ -17,6 +12,8 @@
 class UnsafeAreaBackdrop : public PanelWidget
 {
 public:
+    using Super = PanelWidget;
+
     void OnPaint( const PaintEvent& a_Event ) override
     {
         a_Event.Drawer.AddBrushRect( GetLayout().Layout.SceneRect, SolidBrush{ FromColorF32( 1.f, 0.294f, 0.404f, 0.35f ) },
@@ -29,6 +26,8 @@ public:
 class ClippedPanel : public PanelWidget
 {
 public:
+    using Super = PanelWidget;
+
     void OnPaint( const PaintEvent& a_Event ) override
     {
         a_Event.Drawer.PushClipRect( GetLayout().Layout.SceneRect.Expanded( 1_u ) ); // Room for its own border.
@@ -36,6 +35,53 @@ public:
         a_Event.Drawer.PopClipRect();
     }
 };
+
+/**
+ * @brief The showcase's own factories, composed with the standard ones (see ShowcaseSceneBuilder below).
+ * This is how you add your own ui.Something() calls: a mixin templated on the final builder type B.
+ */
+template<typename B>
+struct ShowcaseFactories
+{
+    /** @brief A panel with the theme's fill that fills its parent's width. With a_Clip, its children are clipped to it. */
+    WidgetBuilder<PanelWidget> Box( bool a_Clip = false ) const
+    {
+        WidgetBuilder<PanelWidget> panel = a_Clip ? WidgetBuilder<PanelWidget>( MakeWidget<ClippedPanel>( Ui() ) ) : Ui().Panel();
+        return panel.FlexWidth().ContentHeight();
+    }
+
+    NodeBuilder Row( Unit a_Spacing ) const    { return Ui().HBox().FlexWidth().ContentHeight().Spacing( a_Spacing ); }
+    NodeBuilder Column( Unit a_Spacing ) const { return Ui().VBox().FlexWidth().ContentHeight().Spacing( a_Spacing ); }
+
+    WidgetBuilder<TextWidget> SizedText( String a_String, Unit a_Size, TextWrap a_Wrap = TextWrap::NoWrap(),
+                                    ETextOverflow a_Overflow = ETextOverflow::Clip ) const
+    {
+        return Ui().Text( std::move( a_String ) ).Font( Fonts::Roboto ).Size( a_Size ).Wrap( a_Wrap ).Overflow( a_Overflow ).ContentHeight();
+    }
+
+    /** @brief Text as wide as its parent, so one too long for it wraps there instead of running past it. */
+    WidgetBuilder<TextWidget> FitText( String a_String, Unit a_Size, TextWrap a_Wrap = TextWrap::WrapWord(),
+                                       ETextOverflow a_Overflow = ETextOverflow::Clip ) const
+    {
+        return SizedText( std::move( a_String ), a_Size, a_Wrap, a_Overflow ).FlexWidth();
+    }
+
+    /** @brief One line of text as wide as its parent, ending in "..." when it is too long for it. */
+    WidgetBuilder<TextWidget> Label( String a_String, Unit a_Size ) const
+    {
+        return FitText( std::move( a_String ), a_Size, TextWrap::NoWrap(), ETextOverflow::Ellipsis );
+    }
+
+    WidgetBuilder<InputTextWidget> Field( WidgetBuilder<InputTextWidget> a_Input ) const
+    {
+        return a_Input.FlexWidth().ContentHeight().Padding( 8_u );
+    }
+
+private:
+    const B& Ui() const { return static_cast<const B&>( *this ); }
+};
+
+using ShowcaseSceneBuilder = BasicSceneBuilder<StandardFactories, ShowcaseFactories>;
 
 /**
  * @brief A tour of the widgets, restyled live by switching between four themes.
@@ -53,31 +99,16 @@ public:
         // copies of it with a few keys changed, rebuilt on every theme switch.
         m_Scene.DefaultTheme = m_Base;
 
-        UnsafeAreaBackdrop* screen = m_Scene.CreateRootWidget<UnsafeAreaBackdrop>();
-        screen->GetLayout()
-            .LayoutType( ELayoutType::Overlay )
-            .WidthMode( ESizing::Flex )
-            .HeightMode( ESizing::Flex )
-            .SafeAreaEdges( ESafeAreaEdges::All );
+        const ShowcaseSceneBuilder& ui = m_Ui;
 
-        PanelWidget* page = m_Scene.CreateWidget<PanelWidget>( screen->GetLayoutID() );
-        page->Theme = m_Screen;
-        page->GetLayout()
-            .LayoutType( ELayoutType::Vertical )
-            .WidthMode( ESizing::Flex )
-            .HeightMode( ESizing::Flex )
-            .Padding( Edges::All( 20_u ) )
-            .Spacing( 16_u );
-
-        BuildHeader( page );
-
-        PanelWidget* body = AddBox( page, ELayoutType::Horizontal, 16_u );
-        body->GetLayout().HeightMode( ESizing::Flex );
-        BuildControlsCard( body );
-        BuildTextCard( body );
-        BuildScrollCard( body );
-
-        BuildStatusBar( page );
+        // The backdrop keeps the whole window, so its tint fills the unsafe bands; the page is laid out clear of them.
+        ui.Root( ui.MakeWidget<UnsafeAreaBackdrop>().Flex().SafeAreaEdges( ESafeAreaEdges::All )(
+            ui.Panel().Theme( m_Screen ).Vertical().Flex().Padding( 20_u ).Spacing( 16_u )(
+                Header(),
+                ui.Row( 16_u ).FlexHeight()( ControlsCard(), TextCard(), ScrollCard() ),
+                StatusBar()
+            )
+        ) );
 
         ApplyTheme( 0 );
         SetSafeAreaEnabled( false );
@@ -124,6 +155,8 @@ private:
     Shared<Theme> m_Label      { MakeShared<Theme>() }; ///< m_Base with centred text, for a label that fills its button.
     Shared<Theme> m_AccentLabel{ MakeShared<Theme>() }; ///< m_Accent with centred text.
 
+    ShowcaseSceneBuilder m_Ui{ m_Scene };
+
     Array<ToggleButton> m_ThemeButtons;
     ToggleButton        m_SafeAreaButton;
     size                m_ThemeIndex{ 0 };
@@ -139,106 +172,88 @@ private:
     // Sections
     // -------------------------------------------------------------------------
 
-    void BuildHeader( IWidget* a_Parent )
+    NodeBuilder Header()
     {
-        PanelWidget* header = AddBox( a_Parent, ELayoutType::Vertical, 10_u );
-
-        PanelWidget* titles = AddBox( header, ELayoutType::Vertical, 2_u );
-        AddFitText( titles, "RatUI Showcase", 28_u );
-        AddFitText( titles, "Every widget below restyles live when you switch themes.", 14_u, true );
+        const ShowcaseSceneBuilder& ui = m_Ui;
 
         // In their own row, so the title keeps the full width and the buttons share theirs in a narrow window.
-        PanelWidget* buttons = AddBox( header, ELayoutType::Horizontal, 8_u );
+        NodeBuilder buttons = ui.Row( 8_u );
         for ( size i = 0; i < Size( m_Themes ); ++i )
-            PushBack( m_ThemeButtons, AddToggle( buttons, m_Themes[i].Name, 110_u, [this, i] { ApplyTheme( i ); } ) );
+        {
+            PushBack( m_ThemeButtons, ToggleButton{} );
+            buttons( Toggle( m_Themes[i].Name, 110_u, [this, i] { ApplyTheme( i ); }, Back( m_ThemeButtons ) ) );
+        }
+        buttons( Toggle( "Safe Area", 120_u, [this] { SetSafeAreaEnabled( !m_SafeAreaEnabled ); }, m_SafeAreaButton ) );
 
-        m_SafeAreaButton = AddToggle( buttons, "Safe Area", 120_u, [this] { SetSafeAreaEnabled( !m_SafeAreaEnabled ); } );
+        return ui.Column( 10_u )(
+            ui.Column( 2_u )(
+                ui.FitText( "RatUI Showcase", 28_u ),
+                Muted( ui.FitText( "Every widget below restyles live when you switch themes.", 14_u ) )
+            ),
+            buttons
+        );
     }
 
-    void BuildControlsCard( IWidget* a_Parent )
+    WidgetBuilder<PanelWidget> ControlsCard()
     {
-        PanelWidget* card = AddCard( a_Parent, "Controls", "Drag them, or press Enter on one to adjust it with the arrows." );
+        const ShowcaseSceneBuilder& ui = m_Ui;
 
-        AddSlider( card, "Master Volume",   0.65f );
-        AddSlider( card, "Accent Strength", 0.30f );
-
-        PanelWidget* mixer = AddBox( card, ELayoutType::Horizontal, 10_u );
-        AddSlider( mixer, "Bass",   0.45f, EOrient::Vertical );
-        AddSlider( mixer, "Mid",    0.70f, EOrient::Vertical );
-        AddSlider( mixer, "Treble", 0.25f, EOrient::Vertical );
-
-        PanelWidget* buttons = AddBox( card, ELayoutType::Horizontal, 10_u );
-        TextWidget*   counter = nullptr;
-        ButtonWidget* click   = AddButton( buttons, "Click me", {}, &counter );
-        click->OnClick = [this, counter]( ButtonBaseWidget& )
+        TextWidget* counter = nullptr;
+        WidgetBuilder<ButtonWidget> click = Button( "Click me", {}, &counter ).OnClick( [this, counter]( ButtonBaseWidget& )
         {
             ++m_Clicks;
             counter->SetText( Text{ std::format( "Clicked {}x", m_Clicks ) } );
             SetStatus( std::format( "Button clicked {} time{}", m_Clicks, m_Clicks == 1 ? "" : "s" ) );
-        };
-        AddButton( buttons, "Reset", [this, counter]( ButtonBaseWidget& )
+        } );
+        WidgetBuilder<ButtonWidget> reset = Button( "Reset", [this, counter]( ButtonBaseWidget& )
         {
             m_Clicks = 0;
             counter->SetText( Text{ "Click me" } );
             SetStatus( "Counter reset" );
         } );
+
+        return Card( "Controls", "Drag them, or press Enter on one to adjust it with the arrows." )(
+            LabeledSlider( "Master Volume",   0.65f ),
+            LabeledSlider( "Accent Strength", 0.30f ),
+            ui.Row( 10_u )(
+                LabeledSlider( "Bass",   0.45f, EOrient::Vertical ),
+                LabeledSlider( "Mid",    0.70f, EOrient::Vertical ),
+                LabeledSlider( "Treble", 0.25f, EOrient::Vertical )
+            ),
+            ui.Row( 10_u )( click, reset )
+        );
     }
 
-    void BuildTextCard( IWidget* a_Parent )
+    WidgetBuilder<PanelWidget> TextCard()
     {
-        PanelWidget* card = AddCard( a_Parent, "Text", "Wrapping, reveal, overflow and editing." );
+        const ShowcaseSceneBuilder& ui = m_Ui;
 
-        AddFitText( card, "Word wrap", 13_u, true );
-        AddFitText( card, "Text wraps at word boundaries to fit its box, and reflows as the window is resized.", 16_u );
+        return Card( "Text", "Wrapping, reveal, overflow and editing." )(
+            Muted( ui.FitText( "Word wrap", 13_u ) ),
+            ui.FitText( "Text wraps at word boundaries to fit its box, and reflows as the window is resized.", 16_u ),
 
-        AddFitText( card, "Typewriter reveal", 13_u, true );
-        m_Typewriter = AddFitText( card,
-            "Dialogue can be revealed a glyph at a time. Only the drawing changes; the layout and shaped text stay the "
-            "same, so nothing jumps around while it types.",
-            16_u );
+            Muted( ui.FitText( "Typewriter reveal", 13_u ) ),
+            ui.FitText( "Dialogue can be revealed a glyph at a time. Only the drawing changes; the layout and shaped text stay "
+                        "the same, so nothing jumps around while it types.", 16_u ).Bind( m_Typewriter ),
 
-        AddFitText( card, "Overflow fade", 13_u, true );
-        AddFitText( card, "This line is far too long for its box, so instead of being cut off mid-glyph it fades out softly "
-                          "at the edge, which reads much better than a hard clip.",
-                    16_u, false, TextWrap::NoWrap(), ETextOverflow::Fade );
+            Muted( ui.FitText( "Overflow fade", 13_u ) ),
+            ui.FitText( "This line is far too long for its box, so instead of being cut off mid-glyph it fades out softly "
+                        "at the edge, which reads much better than a hard clip.", 16_u, TextWrap::NoWrap(), ETextOverflow::Fade ),
 
-        AddFitText( card, "Text input", 13_u, true );
-        InputTextWidget* name = AddInput( card, MakeUnique<SingleLineTextEditPolicy>() );
-        name->SetPlaceholder( "Type here and press Enter" );
-        name->OnSubmit = [this]( const String& a_Text ) { SetStatus( "Submitted: " + a_Text ); };
-
-        AddInput( card, MakeUnique<MultiLineTextEditPolicy>() )->SetText( "Multi-line field.\nEnter adds a line." );
+            Muted( ui.FitText( "Text input", 13_u ) ),
+            ui.Field( ui.InputText() )
+                .Placeholder( "Type here and press Enter" )
+                .OnSubmit( [this]( const String& a_Text ) { SetStatus( "Submitted: " + a_Text ); } ),
+            ui.Field( ui.TextArea() ).Text( "Multi-line field.\nEnter adds a line." )
+        );
     }
 
-    void BuildScrollCard( IWidget* a_Parent )
+    WidgetBuilder<PanelWidget> ScrollCard()
     {
-        PanelWidget* card = AddCard( a_Parent, "Scroll List", "Wheel, drag the bars, or Tab through the rows." );
-
-        PanelWidget* well = AddPanel( card, ELayoutType::Vertical, 0_u, Edges::All( 6_u ) );
-        well->Theme = m_Page;
-        well->GetLayout().HeightMode( ESizing::Flex );
-
-        ScrollContainerWidget* scroll = m_Scene.CreateWidget<ScrollContainerWidget>( well->GetLayoutID() );
-        scroll->OnScroll = [this]( ScrollContainerWidget&, const ScrollEvent& a_Event )
-        {
-            // Also called when only the range changes (e.g. the list is resized); the status is about where it scrolled to.
-            if ( a_Event.OffsetDelta[0] == 0_u && a_Event.OffsetDelta[1] == 0_u )
-                return;
-
-            SetStatus( std::format( "Scrolled to {}, {}", static_cast<int>( a_Event.Offset[0].ToFloat() ), static_cast<int>( a_Event.Offset[1].ToFloat() ) ) );
-        };
-
-        scroll->ScrollPadding = Edges::All( 4_u ); // A focused row keeps clear of the list's edges, which clip its focus ring.
+        const ShowcaseSceneBuilder& ui = m_Ui;
 
         // Room around the rows for their focus rings, which the list clips; more on the right to clear the scrollbar.
-        PanelWidget* rows = m_Scene.CreateWidget<PanelWidget>( scroll->GetContentNodeID() );
-        MakeInvisible( *rows );
-        rows->GetLayout()
-            .LayoutType( ELayoutType::Vertical )
-            .WidthMode( ESizing::Flex )
-            .HeightMode( ESizing::Content )
-            .Padding( Edges{ .T = 4_u, .R = 10_u, .B = 4_u, .L = 4_u } )
-            .Spacing( 6_u );
+        NodeBuilder rows = ui.Column( 6_u ).Padding( Edges{ .T = 4_u, .R = 10_u, .B = 4_u, .L = 4_u } );
 
         static constexpr const char* c_Items[] = { "Rusty Sword", "Cheese Wheel", "Lantern", "Rope", "Map Fragment",
                                                    "Iron Key", "Healing Herb", "Old Boot", "Silver Ring", "Torch",
@@ -246,23 +261,121 @@ private:
                                                    "Copper Coin", "Spyglass", "Candle", "Whistle", "Crown" };
         for ( size i = 0; i < std::size( c_Items ); ++i )
         {
-            AddListRow( rows, c_Items[i], std::format( "x{}", ( i * 7 ) % 12 + 1 ) );
+            rows( ListRow( c_Items[i], std::format( "x{}", ( i * 7 ) % 12 + 1 ) ) );
             if ( i == 4 )
-                AddSlider( rows, "Click me, then scroll", 0.5f );
+                rows( LabeledSlider( "Click me, then scroll", 0.5f ) );
         }
+        rows( ListRow( "A wide row that scrolls the list sideways", "->" ).FixedWidth( 640_u ) );
 
-        ButtonWidget* wide = AddListRow( rows, "A wide row that scrolls the list sideways", "->" );
-        wide->GetLayout().FixedWidth( 640_u );
+        return Card( "Scroll List", "Wheel, drag the bars, or Tab through the rows." )(
+            ui.Box().Theme( m_Page ).Vertical().FlexHeight().Padding( 6_u )(
+                ui.ScrollBox().With( [this]( ScrollContainerWidget& a_Scroll )
+                {
+                    a_Scroll.OnScroll = [this]( ScrollContainerWidget&, const ScrollEvent& a_Event )
+                    {
+                        // Also called when only the range changes (e.g. the list is resized); the status is about where it scrolled to.
+                        if ( a_Event.OffsetDelta[0] == 0_u && a_Event.OffsetDelta[1] == 0_u )
+                            return;
+
+                        SetStatus( std::format( "Scrolled to {}, {}", static_cast<int>( a_Event.Offset[0].ToFloat() ),
+                                                static_cast<int>( a_Event.Offset[1].ToFloat() ) ) );
+                    };
+                    a_Scroll.ScrollPadding = Edges::All( 4_u ); // A focused row keeps clear of the list's edges, which clip its focus ring.
+                } )( rows )
+            )
+        );
     }
 
-    void BuildStatusBar( IWidget* a_Parent )
+    WidgetBuilder<PanelWidget> StatusBar()
     {
-        PanelWidget* bar = AddPanel( a_Parent, ELayoutType::Horizontal, 12_u, Edges::Axis( 14_u, 10_u ) );
-        bar->GetLayout().ChildAlign( EAlign::CenterLeft );
+        const ShowcaseSceneBuilder& ui = m_Ui;
 
-        m_Status  = AddLabel( bar, "", 14_u );
-        m_KeyHint = AddLabel( bar, "Tab / arrows: move focus  |  Enter: press  |  F1: layout bounds", 13_u, true );
-        m_KeyHint->Theme = m_Hint;
+        return ui.Box().Horizontal().Padding( Edges::Axis( 14_u, 10_u ) ).Spacing( 12_u ).ChildAlign( EAlign::CenterLeft )(
+            ui.Label( "", 14_u ).Bind( m_Status ),
+            ui.Label( "Tab / arrows: move focus  |  Enter: press  |  F1: layout bounds", 13_u ).Theme( m_Hint ).Bind( m_KeyHint )
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Themed pieces
+    // -------------------------------------------------------------------------
+
+    template<typename W>
+    WidgetBuilder<W> Muted( WidgetBuilder<W> a_Builder ) const { return a_Builder.Theme( m_Muted ); }
+
+    /** @brief A titled card that fills its share of the row. */
+    WidgetBuilder<PanelWidget> Card( String a_Title, String a_Caption )
+    {
+        const ShowcaseSceneBuilder& ui = m_Ui;
+        return ui.Box( true ).Vertical().FlexHeight().Grow( 1.f ).Padding( 16_u ).Spacing( 10_u )(
+            ui.FitText( std::move( a_Title ), 20_u ),
+            Muted( ui.FitText( std::move( a_Caption ), 13_u ) )
+        );
+    }
+
+    WidgetBuilder<ButtonWidget> Button( String a_Label, ButtonWidget::OnClickCallback a_OnClick, TextWidget** a_OutLabel = nullptr )
+    {
+        const ShowcaseSceneBuilder& ui = m_Ui;
+        TextWidget* label = nullptr;
+        WidgetBuilder<ButtonWidget> button = ui.Button( std::move( a_OnClick ) ).FlexWidth().FixedHeight( 36_u ).Padding( Edges::Axis( 6_u, 0_u ) )(
+            ui.Label( std::move( a_Label ), 15_u ).Theme( m_Label ).Bind( label )
+        );
+        if ( a_OutLabel )
+            *a_OutLabel = label;
+        return button;
+    }
+
+    /** @brief A header button, at most a_Width wide and never narrower than its label, that shows the accent color while selected. */
+    WidgetBuilder<ButtonWidget> Toggle( String a_Label, Unit a_Width, std::function<void()> a_OnClick, ToggleButton& a_Out )
+    {
+        return Button( std::move( a_Label ), [a_OnClick]( ButtonBaseWidget& ) { a_OnClick(); }, &a_Out.Label )
+            .MinWidth( 84_u ).MaxWidth( a_Width ).Bind( a_Out.Button );
+    }
+
+    /** @brief A list row: a name on the left and a muted detail on the right. */
+    WidgetBuilder<ButtonWidget> ListRow( String a_Name, String a_Detail )
+    {
+        const ShowcaseSceneBuilder& ui = m_Ui;
+        return ui.Button( [this, a_Name]( ButtonBaseWidget& ) { SetStatus( "Picked " + a_Name ); } )
+            .Horizontal().FlexWidth().FixedHeight( 34_u ).Padding( Edges::Axis( 12_u, 0_u ) ).ChildAlign( EAlign::CenterLeft )(
+                ui.Label( std::move( a_Name ), 15_u ),
+                Muted( ui.SizedText( std::move( a_Detail ), 13_u ) )
+            );
+    }
+
+    /** @brief An inset card with a slider, its name and its value. */
+    WidgetBuilder<PanelWidget> LabeledSlider( String a_Label, f32 a_Value, EOrient a_Orientation = EOrient::Horizontal )
+    {
+        const ShowcaseSceneBuilder& ui = m_Ui;
+        const bool vertical = a_Orientation == EOrient::Vertical;
+
+        // A vertical slider is narrow, so its name and value are stacked and centred, in a card with less padding.
+        WidgetBuilder<TextWidget> name = ui.Label( a_Label, 14_u );
+        if ( vertical )
+            name.Theme( m_Label );
+
+        TextWidget* value = nullptr;
+        NodeBuilder header = vertical ? ui.Column( 2_u ).ChildAlign( EAlign::TopCenter ) : ui.Row( 6_u );
+        header( name, Muted( ui.SizedText( "", 14_u ) ).Bind( value ) );
+
+        WidgetBuilder<SliderWidget> slider = ui.Slider( 0.f, 1.f, a_Value, a_Orientation ).Step( 0.05f ); // Snaps to 5%; the arrow keys move one step.
+        if ( vertical )
+            slider.FixedSize( 32_u, 110_u );
+        else
+            slider.FlexWidth().FixedHeight( 26_u );
+
+        slider.OnValueChanged( [this, value, a_Label]( const f32& a_Current )
+        {
+            const int percent = static_cast<int>( std::round( a_Current * 100.f ) );
+            value->SetText( Text{ std::format( "{}%", percent ) } );
+            if ( m_Status )
+                SetStatus( std::format( "{}: {}%", a_Label, percent ) );
+        } );
+
+        WidgetBuilder<PanelWidget> card = ui.Box( true ).Theme( m_Page ).Vertical().Padding( vertical ? 6_u : 10_u ).Spacing( 8_u );
+        if ( vertical )
+            card.ChildAlign( EAlign::TopCenter );
+        return card( header, slider );
     }
 
     // -------------------------------------------------------------------------
@@ -336,176 +449,6 @@ private:
     {
         const auto mix = [&]( int i ) { return ( static_cast<f32>( a_From[i] ) * ( 1.f - a_T ) + static_cast<f32>( a_To[i] ) * a_T ) / 255.f; };
         return FromColorF32( mix( 0 ), mix( 1 ), mix( 2 ), mix( 3 ) );
-    }
-
-    // -------------------------------------------------------------------------
-    // Widget helpers
-    // -------------------------------------------------------------------------
-
-    /** @brief A panel with the theme's fill. With a_Clip, what its children draw outside it is cut off. */
-    PanelWidget* AddPanel( IWidget* a_Parent, ELayoutType a_Type, Unit a_Spacing, Edges a_Padding, bool a_Clip = false )
-    {
-        PanelWidget* panel = a_Clip ? m_Scene.CreateWidget<ClippedPanel>( a_Parent->GetLayoutID() )
-                                    : m_Scene.CreateWidget<PanelWidget>( a_Parent->GetLayoutID() );
-        panel->GetLayout()
-            .LayoutType( a_Type )
-            .WidthMode( ESizing::Flex )
-            .HeightMode( ESizing::Content )
-            .Padding( a_Padding )
-            .Spacing( a_Spacing );
-        return panel;
-    }
-
-    /** @brief An invisible panel, only for layout. */
-    PanelWidget* AddBox( IWidget* a_Parent, ELayoutType a_Type, Unit a_Spacing )
-    {
-        PanelWidget* box = AddPanel( a_Parent, a_Type, a_Spacing, Edges{} );
-        MakeInvisible( *box );
-        return box;
-    }
-
-    static void MakeInvisible( PanelWidget& a_Panel )
-    {
-        a_Panel.Theme.Reset();
-        a_Panel.FillBrush       = SolidBrush{ Colors::Transparent };
-        a_Panel.BorderThickness = 0_u;
-    }
-
-    /** @brief A titled card that fills its share of the row. */
-    PanelWidget* AddCard( IWidget* a_Parent, String a_Title, String a_Caption )
-    {
-        PanelWidget* card = AddPanel( a_Parent, ELayoutType::Vertical, 10_u, Edges::All( 16_u ), true );
-        card->GetLayout().HeightMode( ESizing::Flex ).FlexGrow( 1.f );
-
-        AddFitText( card, std::move( a_Title ), 20_u );
-        AddFitText( card, std::move( a_Caption ), 13_u, true );
-        return card;
-    }
-
-    TextWidget* AddText( IWidget* a_Parent, String a_String, Unit a_Size, bool a_Muted = false,
-                         TextWrap a_Wrap = TextWrap::NoWrap(), ETextOverflow a_Overflow = ETextOverflow::Clip )
-    {
-        TextLayoutStyle style{};
-        style.Font     = Fonts::Roboto;
-        style.Size     = a_Size;
-        style.Wrap     = a_Wrap;
-        style.Overflow = a_Overflow;
-
-        TextWidget* text = m_Scene.CreateWidget<TextWidget>( a_Parent->GetLayoutID(), Text{ std::move( a_String ) }, style );
-        if ( a_Muted )
-            text->Theme = m_Muted;
-        text->GetLayout().HeightMode( ESizing::Content );
-        return text;
-    }
-
-    /** @brief Text as wide as its parent, so one too long for it wraps there instead of running past it. */
-    TextWidget* AddFitText( IWidget* a_Parent, String a_String, Unit a_Size, bool a_Muted = false,
-                            TextWrap a_Wrap = TextWrap::WrapWord(), ETextOverflow a_Overflow = ETextOverflow::Clip )
-    {
-        TextWidget* text = AddText( a_Parent, std::move( a_String ), a_Size, a_Muted, a_Wrap, a_Overflow );
-        text->GetLayout().WidthMode( ESizing::Flex );
-        return text;
-    }
-
-    /** @brief One line of text as wide as its parent, ending in "..." when it is too long for it. */
-    TextWidget* AddLabel( IWidget* a_Parent, String a_String, Unit a_Size, bool a_Muted = false )
-    {
-        return AddFitText( a_Parent, std::move( a_String ), a_Size, a_Muted, TextWrap::NoWrap(), ETextOverflow::Ellipsis );
-    }
-
-    InputTextWidget* AddInput( IWidget* a_Parent, Unique<ITextEditPolicy> a_Policy )
-    {
-        InputTextWidget* input = m_Scene.CreateWidget<InputTextWidget>( a_Parent->GetLayoutID(), std::move( a_Policy ) );
-        input->GetLayout()
-            .WidthMode( ESizing::Flex )
-            .HeightMode( ESizing::Content )
-            .Padding( Edges::All( 8_u ) );
-        return input;
-    }
-
-    ButtonWidget* AddButton( IWidget* a_Parent, String a_Label, ButtonWidget::OnClickCallback a_OnClick,
-                             TextWidget** a_OutLabel = nullptr )
-    {
-        ButtonWidget* button = m_Scene.CreateWidget<ButtonWidget>( a_Parent->GetLayoutID(), std::move( a_OnClick ) );
-        button->GetLayout()
-            .WidthMode( ESizing::Flex )
-            .FixedHeight( 36_u )
-            .Padding( Edges::Axis( 6_u, 0_u ) )
-            .ChildAlign( EAlign::Center );
-
-        TextWidget* label = AddLabel( button, std::move( a_Label ), 15_u );
-        label->Theme      = m_Label;
-        if ( a_OutLabel )
-            *a_OutLabel = label;
-        return button;
-    }
-
-    /** @brief A header button, at most a_Width wide and never narrower than its label, that shows the accent color while selected. */
-    ToggleButton AddToggle( IWidget* a_Parent, String a_Label, Unit a_Width, std::function<void()> a_OnClick )
-    {
-        ToggleButton toggle;
-        toggle.Button = AddButton( a_Parent, std::move( a_Label ), [a_OnClick]( ButtonBaseWidget& ) { a_OnClick(); }, &toggle.Label );
-        toggle.Button->GetLayout().SizeConstraints( Constraints{ .Min = { 84_u, 0_u }, .Max = { a_Width, Limits<Unit>::max() } } );
-        return toggle;
-    }
-
-    /** @brief A list row: a name on the left and a muted detail on the right. */
-    ButtonWidget* AddListRow( IWidget* a_Parent, String a_Name, String a_Detail )
-    {
-        ButtonWidget* row = m_Scene.CreateWidget<ButtonWidget>( a_Parent->GetLayoutID(), [this, a_Name]( ButtonBaseWidget& )
-        {
-            SetStatus( "Picked " + a_Name );
-        } );
-        row->GetLayout()
-            .LayoutType( ELayoutType::Horizontal )
-            .WidthMode( ESizing::Flex )
-            .FixedHeight( 34_u )
-            .Padding( Edges::Axis( 12_u, 0_u ) )
-            .ChildAlign( EAlign::CenterLeft );
-
-        AddLabel( row, std::move( a_Name ), 15_u );
-        AddText( row, std::move( a_Detail ), 13_u, true );
-        return row;
-    }
-
-    /** @brief An inset card with a slider, its name and its value. */
-    void AddSlider( IWidget* a_Parent, String a_Label, f32 a_Value, EOrient a_Orientation = EOrient::Horizontal )
-    {
-        const bool vertical = a_Orientation == EOrient::Vertical;
-
-        // A vertical slider is narrow, so its name and value are stacked and centred, in a card with less padding.
-        PanelWidget* card = AddPanel( a_Parent, ELayoutType::Vertical, 8_u, Edges::All( vertical ? 6_u : 10_u ), true );
-        card->Theme = m_Page;
-        if ( vertical )
-            card->GetLayout().ChildAlign( EAlign::TopCenter );
-
-        PanelWidget* header = AddBox( card, vertical ? ELayoutType::Vertical : ELayoutType::Horizontal, vertical ? 2_u : 6_u );
-        if ( vertical )
-        {
-            header->GetLayout().ChildAlign( EAlign::TopCenter );
-            AddLabel( header, a_Label, 14_u )->Theme = m_Label;
-        }
-        else
-        {
-            AddLabel( header, a_Label, 14_u );
-        }
-        TextWidget* value = AddText( header, "", 14_u, true );
-
-        SliderWidget* slider = m_Scene.CreateWidget<SliderWidget>( card->GetLayoutID(), 0.f, 1.f, a_Value );
-        slider->Orientation = a_Orientation;
-        slider->Step        = 0.05f; // Snaps to 5%; the arrow keys move one step.
-        if ( vertical )
-            slider->GetLayout().FixedWidth( 32_u ).FixedHeight( 110_u );
-        else
-            slider->GetLayout().WidthMode( ESizing::Flex ).FixedHeight( 26_u );
-
-        slider->Value.Subscribe( [this, value, a_Label]( const f32& a_Current )
-        {
-            const int percent = static_cast<int>( std::round( a_Current * 100.f ) );
-            value->SetText( Text{ std::format( "{}%", percent ) } );
-            if ( m_Status )
-                SetStatus( std::format( "{}: {}%", a_Label, percent ) );
-        } );
     }
 
     // -------------------------------------------------------------------------
