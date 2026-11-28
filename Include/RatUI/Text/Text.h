@@ -146,8 +146,8 @@ namespace RatUI
      */
     namespace EWhitespace
     {
-        constexpr u8 Preserve = 0; ///< Whitespace is preserved as-is. Text will only wrap on line breaks.
-        constexpr u8 Collapse = 1; ///< Sequences of whitespace will collapse into a single whitespace. Text will wrap when necessary.
+        constexpr u8 Preserve = 0; ///< Spaces and tabs are kept as they are.
+        constexpr u8 Collapse = 1; ///< Runs of spaces and tabs collapse to one space, and spaces at the start and end of lines are removed.
 
         constexpr u8 _NumBits = 1;
     };
@@ -157,8 +157,8 @@ namespace RatUI
      */
     namespace ENewline
     {
-        constexpr u8 Preserve = 0; ///< Sequences of newlines will collapse into a single newline. Text will wrap when necessary, and on line breaks.
-        constexpr u8 Collapse = 1; ///< Newlines are treated as whitespace and will collapse into a single whitespace. Text will wrap when necessary.
+        constexpr u8 Preserve = 0; ///< Line breaks start a new line, in every EBreakMode.
+        constexpr u8 Collapse = 1; ///< Line breaks count as whitespace (see EWhitespace).
 
         constexpr u8 _NumBits = 1;
     };
@@ -172,13 +172,10 @@ namespace RatUI
         u8 Whitespace : EWhitespace::_NumBits { EWhitespace::Collapse };
         u8 Newline    : ENewline::_NumBits    { ENewline::Preserve };
 
-        /** @brief Determines if the text should be pre-wrapped - i.e., whether Prepare() should do an initial layout pass treating newlines as hard breaks. */
-        constexpr bool Prewrap() const { return ( BreakMode != EBreakMode::None ) && ( Newline == ENewline::Preserve ); }
-
         constexpr bool operator==( const TextWrap& ) const = default;
 
-        /** @brief Sequences of whitespace will collapse into a single whitespace. Text will never wrap to the next line. */
-        static constexpr TextWrap NoWrap()   { return { EBreakMode::None, EWhitespace::Collapse, ENewline::Preserve }; }
+        /** @brief One line: whitespace, line breaks included, collapses into a single space. */
+        static constexpr TextWrap NoWrap()   { return { EBreakMode::None, EWhitespace::Collapse, ENewline::Collapse }; }
 
         /** @brief Ordinary wrapping at word boundaries. Sequences of whitespace will collapse into a single whitespace. 
          *  Text will wrap when necessary, and on line breaks. */
@@ -188,14 +185,13 @@ namespace RatUI
          *  Text will wrap when necessary, and on line breaks. */
         static constexpr TextWrap WrapChar() { return { EBreakMode::Char, EWhitespace::Collapse, ENewline::Preserve }; }
 
-        /** @brief Sequences of whitespace will be preserved as-is. Text will only wrap on line breaks. */
+        /** @brief Spaces are kept as they are. Text only breaks onto a new line at line breaks. */
         static constexpr TextWrap Pre()      { return { EBreakMode::None, EWhitespace::Preserve, ENewline::Preserve }; }
 
-        /** @brief Sequences of whitespace will collapse into a single whitespace. Text will only wrap on line breaks. */
+        /** @brief Sequences of whitespace collapse into a single space. Text wraps at word boundaries, and on line breaks. */
         static constexpr TextWrap PreLine()  { return { EBreakMode::Word, EWhitespace::Collapse, ENewline::Preserve }; }
 
-        /** @brief Sequences of whitespace will be preserved as-is. Text will wrap at word boundaries, and on line breaks. 
-         *  Newlines will be treated as whitespace and will collapse into a single whitespace. */
+        /** @brief Spaces are kept as they are. Text wraps at word boundaries, and on line breaks. */
         static constexpr TextWrap PreWrap()  { return { EBreakMode::Word, EWhitespace::Preserve, ENewline::Preserve }; }
 
         /** @brief A default text wrap configuration that provides ordinary wrapping at word boundaries. */
@@ -330,6 +326,7 @@ namespace RatUI
         String             NormalizedText;     ///< Text after whitespace normalisation.
         Array<TextSegment> Segments;           ///< Pre-measured segments in logical order.
         Unit               HyphenWidth{ 0_u }; ///< Width of "-" (reserved for soft-hyphen support).
+        bool               PreserveWhitespace{ false }; ///< Keep spaces at the start of the text and after a newline (EWhitespace::Preserve).
     };
 
     /**
@@ -340,6 +337,7 @@ namespace RatUI
         GlyphID   GlyphIndex{};
         FontUnit  XAdvance  { 0.f }, YAdvance{ 0.f }; ///< The advance of the glyph, to move the pen position after rendering this glyph.
         FontUnit  XOffset   { 0.f },  YOffset{ 0.f }; ///< The offset of the glyph, relative to the pen position when rendering.
+        u32       Cluster   { 0 };    ///< Byte offset in PreparedText::NormalizedText of the text this glyph draws (its shaping cluster).
     };
 
     /**
@@ -349,7 +347,10 @@ namespace RatUI
     {
         u32  Start { 0 };
         u32  End   { 0 };
-        Unit Width { 0_u };
+        Unit Width { 0_u };     ///< Width of the visible text: trailing spaces are shaped but hang past it.
+        u32  TextStart{ 0 };    ///< Byte offset in PreparedText::NormalizedText where the line's text starts.
+        u32  TextEnd  { 0 };    ///< Byte offset where it ends, trailing spaces included and the line break not.
+        u32  VisibleEnd{ 0 };   ///< Byte offset where its visible text ends: glyphs from here on are trailing spaces that hang.
     };
 
     /**
@@ -375,6 +376,42 @@ namespace RatUI
 
 		/** @brief Returns the number of lines in the shaped text, which can be used for layout and spacing calculations. */
 		u32 LineCount() const { return static_cast<u32>( Size( Lines ) ); }
+
+        /**
+         * @brief Distance from the start of line @p a_Line to a caret before byte @p a_Byte of the prepared text, from the
+         * glyphs' clusters. A caret inside a cluster of several characters (e.g. a ligature) is placed in proportion.
+         * Left-to-right text only.
+         */
+        Unit CaretOffset( u32 a_Line, u32 a_Byte ) const
+        {
+            if ( a_Line >= LineCount() )
+                return 0_u;
+
+            const ShapedLine& line = Lines[a_Line];
+            Unit              x    = 0_u;
+            for ( u32 i = line.Start; i < line.End && Glyphs[i].Cluster < a_Byte; ++i )
+            {
+                const ShapedGlyph& glyph = Glyphs[i];
+
+                // A cluster's text runs to the next glyph's cluster, or to the line's end.
+                u32 clusterEnd = line.TextEnd;
+                for ( u32 j = i + 1; j < line.End; ++j )
+                {
+                    if ( Glyphs[j].Cluster != glyph.Cluster )
+                    {
+                        clusterEnd = Glyphs[j].Cluster;
+                        break;
+                    }
+                }
+
+                const Unit advance = ToUnit( glyph.XAdvance, FontSize );
+                if ( a_Byte >= clusterEnd || clusterEnd <= glyph.Cluster )
+                    x += advance;
+                else
+                    x += advance * ( static_cast<f32>( a_Byte - glyph.Cluster ) / static_cast<f32>( clusterEnd - glyph.Cluster ) );
+            }
+            return x;
+        }
 
         /** @brief Distance from one line's top (or baseline) to the next's: LineHeight + LineSpacing. */
         Unit LineAdvance() const { return LineHeight + LineSpacing; }

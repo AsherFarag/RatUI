@@ -2,6 +2,8 @@
 #include "../Core/Types.h"
 #include "../Input/InputEvent.h"
 
+#include <utility>
+
 namespace RatUI
 {
 
@@ -208,7 +210,7 @@ namespace RatUI
          * @param a_Text  The typed text, UTF-8 encoded (e.g. TextInputEvent::Text).
          * @return Change() if any text was inserted, otherwise Unhandle().
          */
-        [[nodiscard]] TextEditOutcome HandleText( TextEditModel& a_Model, StringView a_Text ) const;
+        [[nodiscard]] virtual TextEditOutcome HandleText( TextEditModel& a_Model, StringView a_Text ) const;
     };
 
     /**
@@ -280,11 +282,10 @@ namespace RatUI
 
     /**
      * @brief A text edit policy that allows for numeric input only,
-     * where only digits, a minus sign, and (for floating-point types) a decimal point are accepted.
+     * where only digits, a leading minus sign (signed and floating-point types) and one decimal point (floating-point
+     * types) are accepted. A sign or point that would land anywhere else is dropped, even from text input carrying several characters.
      * Pressing Enter commits the edit, and pressing Escape cancels it.
-     * This policy does not allow for multi-line input, and ignores Up/Down arrow keys to prevent navigation in multi-line text.
-     * It is templated on the numeric type (integral or floating-point) to determine which characters are accepted.
-     * For example, NumericTextEdit
+     * Up/Down are left unhandled, for the owning widget to step the value.
      */
     template<typename ValueType>
         requires ( std::floating_point<ValueType> || std::integral<ValueType> )
@@ -297,19 +298,40 @@ namespace RatUI
         {
             if ( a_Char >= U'0' && a_Char <= U'9' ) 
                 return true;
-
-            // Allow minus sign for negative numbers
-            if constexpr ( std::signed_integral<ValueType> )
-            {
-                return a_Char == U'-';
-            }
-            // Allow decimal point for floating-point numbers
-            else if constexpr ( std::floating_point<ValueType> )
-            {
-                return a_Char == U'.';
-            }
-
+            if ( a_Char == U'-' )
+                return c_Signed;
+            if ( a_Char == U'.' )
+                return c_Fractional;
             return false;
+        }
+
+        [[nodiscard]] TextEditOutcome HandleText( TextEditModel& a_Model, StringView a_Text ) const override
+        {
+            const TextEditModel::TextView text   = a_Model.GetTextBuffer();
+            const TextEditModel::TextView before = text.substr( 0, a_Model.SelectionStart() );
+            const TextEditModel::TextView after  = text.substr( a_Model.SelectionEnd() );
+
+            // Nothing goes in front of a sign, a sign only goes first, and there is one point.
+            // Only what is inserted is checked, so text set some other way can still be typed into.
+            if ( before.empty() && !after.empty() && after[0] == U'-' )
+                return TextEditOutcome::Unhandle();
+
+            bool                      hasPoint = before.find( U'.' ) != before.npos || after.find( U'.' ) != after.npos;
+            TextEditModel::TextBuffer accepted;
+            for ( const codepoint cp : DecodeEditText( a_Text ) )
+            {
+                if ( !AcceptChar( cp ) )
+                    continue;
+                if ( cp == U'-' && ( !before.empty() || !accepted.empty() ) )
+                    continue;
+                if ( cp == U'.' && std::exchange( hasPoint, true ) )
+                    continue;
+                accepted.push_back( cp );
+            }
+
+            if ( accepted.empty() )
+                return TextEditOutcome::Unhandle();
+            return TextEditOutcome::Change( a_Model.ReplaceSelection( accepted ) );
         }
 
         [[nodiscard]] TextEditOutcome HandleKey( TextEditModel& a_Model, const ButtonEvent& a_Event ) const override
@@ -326,6 +348,10 @@ namespace RatUI
                     return ITextEditPolicy::HandleKey( a_Model, a_Event );
             }
         }
+
+    private:
+        static constexpr bool c_Signed     = std::signed_integral<ValueType> || std::floating_point<ValueType>;
+        static constexpr bool c_Fractional = std::floating_point<ValueType>;
     };
 
 } // namespace RatUI

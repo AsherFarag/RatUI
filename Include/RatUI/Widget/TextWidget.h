@@ -13,7 +13,7 @@ namespace RatUI
      * overflows it clips at @p a_NodeRect's edge; on an axis it fits it leaves a line's height of room on each side, so
      * glyphs that overhang a tight line box (ascenders, descenders, italics) stay visible.
      *
-     * @param a_NodeRect   The text widget's FinalRect.
+     * @param a_NodeRect   The text widget's SceneRect.
      * @param a_TextRect   The rect the text is laid out in (the node rect less its content padding).
      * @param a_TextSize   The shaped text's width (its widest line) and height (its line boxes).
      * @param a_LineHeight The height of one line box.
@@ -45,7 +45,8 @@ namespace RatUI
         u32 VisibleGlyphs = Limits<u32>::max(); ///< Maximum number of glyphs to draw.
 
         TextWidget( Text a_Text = {}, const TextLayoutStyle& a_Style = {} )
-            : m_Text       ( std::move( a_Text ) )
+            : IWidget( { .WidthDependentContent = true } )
+            , m_Text       ( std::move( a_Text ) )
             , m_LayoutStyle( a_Style )
         {}
 
@@ -85,27 +86,16 @@ namespace RatUI
         {
             HandleThemeUpdate();
 
-            ITextMetrics* metrics = GetScene().TextMetrics;
-            if ( !metrics ) return { 0_u, 0_u };
-
             const Optional<ResolvedText> resolved = ResolveText( m_Text );
-            if ( !resolved || Empty( resolved->Data ) ) return { 0_u, 0_u };
-
-            if ( !m_ResolvedText || resolved->Version != m_ResolvedText->Version )
+            if ( IsSourceChanged( resolved ) )
             {
                 m_ResolvedText = resolved;
                 InvalidatePrepared();
             }
+            if ( !m_ResolvedText || Empty( m_ResolvedText->Data ) ) return { 0_u, 0_u };
 
-            if ( !m_PreparedText || m_LayoutStyle != m_LastLayoutStyle )
-            {
-                m_PreparedText = metrics->Prepare( m_ResolvedText->Data, m_LayoutStyle );
-                if ( !m_PreparedText ) 
-                    return { 0_u, 0_u };
-
-                m_LastLayoutStyle = m_LayoutStyle;
-                InvalidateShaped();
-            }
+            ITextMetrics* metrics = GetScene().TextMetrics;
+            if ( !metrics || !EnsurePrepared( *metrics ) ) return { 0_u, 0_u };
 
             const bool widthChanged = !IsApproxEqual( a_AvailableSize[0].ToFloat(), m_ShapedWidth.ToFloat() );
             if ( !m_ShapedText || widthChanged )
@@ -124,18 +114,23 @@ namespace RatUI
             return Vec2<Unit>{ m_ShapedText->MaxWidth, m_ShapedText->TotalHeight() };
         }
 
-        bool HasWidthDependentContent() const override { return true; }
-
         void OnPaint( const PaintEvent& a_Event ) override
         {
             HandleThemeUpdate();
+
+            // Layout only runs when something is dirty, so it is asked for here when the text changed at its source
+            // (localisation, a binding), or can be prepared now when it couldn't be while measuring (its font has loaded).
+            ITextMetrics* metrics     = GetScene().TextMetrics;
+            const bool    nowPrepared = !m_PreparedText && metrics && m_ResolvedText && !Empty( m_ResolvedText->Data ) && EnsurePrepared( *metrics );
+            if ( nowPrepared || IsSourceChanged( ResolveText( m_Text ) ) )
+                GetLayout().MarkDirty();
 
             if ( !m_ShapedText )
                 return;
 
             Scene& scene = GetScene();
             const LayoutNode& node = GetLayout();
-            const Rect<Unit> textRect = ContentPadding( node ).Apply( node.Layout.FinalRect );
+            const Rect<Unit> textRect = ContentPadding( node ).Apply( node.Layout.SceneRect );
 
             // Suppress the fade percentage when not in Fade overflow mode so the
             // MSDF shader doesn't accidentally fade glyphs in Clip/Ellipsis mode.
@@ -150,7 +145,7 @@ namespace RatUI
                 case ETextOverflow::Clip:
                 {
                     // Text that doesn't fit is cut at the node's edge so it can't draw over its neighbours.
-                    const Optional<Rect<Unit>> clip = TextClipRect( node.Layout.FinalRect, textRect,
+                    const Optional<Rect<Unit>> clip = TextClipRect( node.Layout.SceneRect, textRect,
                         { m_ShapedText->MaxWidth, m_ShapedText->TotalHeight() }, m_ShapedText->LineHeight );
 
                     if ( clip )
@@ -193,6 +188,28 @@ namespace RatUI
                     }
                 }
             }
+        }
+
+        /** @brief Whether a_Resolved, the text as it resolves now, differs from what was last measured. */
+        bool IsSourceChanged( const Optional<ResolvedText>& a_Resolved ) const
+        {
+            return HasValue( a_Resolved ) != HasValue( m_ResolvedText ) ||
+                   ( a_Resolved && a_Resolved->Version != m_ResolvedText->Version );
+        }
+
+        /** @brief Prepares the resolved text if it isn't yet. False while it can't be, e.g. because its font isn't loaded. */
+        bool EnsurePrepared( ITextMetrics& a_Metrics )
+        {
+            if ( m_PreparedText && !( m_LayoutStyle != m_LastLayoutStyle ) )
+                return true;
+
+            m_PreparedText = a_Metrics.Prepare( m_ResolvedText->Data, m_LayoutStyle );
+            if ( !m_PreparedText )
+                return false;
+
+            m_LastLayoutStyle = m_LayoutStyle;
+            InvalidateShaped();
+            return true;
         }
 
         // ---- Cache invalidation helpers ----

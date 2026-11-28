@@ -11,6 +11,13 @@ namespace
         u32 Rows;
     };
 
+    /** @brief a_Size within the child's SizeConstraints. Arrange re-applies them to every size it works out itself. */
+    static Vec2<Unit> ClampToConstraints( const LayoutNode& a_Child, Vec2<Unit> a_Size )
+    {
+        const Constraints& c = a_Child.Style.SizeConstraints;
+        return { std::clamp( a_Size[0], c.Min[0], c.Max[0] ), std::clamp( a_Size[1], c.Min[1], c.Max[1] ) };
+    }
+
     /**
      * @brief Resolves the final arranged size of a child on both axes,
      * substituting Percent-based sizes from the known inner container size.
@@ -19,11 +26,11 @@ namespace
     {
         const LayoutStyle& s = a_Child.Style;
         Vec2<Unit> size = a_Child.Layout.DesiredSize;
-        
+
         if ( s.WidthMode  == ESizing::Percent ) size[0] = s.PercentWidth  * a_InnerSize[0];
         if ( s.HeightMode == ESizing::Percent ) size[1] = s.PercentHeight * a_InnerSize[1];
 
-        return size;
+        return ClampToConstraints( a_Child, size );
     }
 
     /**
@@ -98,11 +105,7 @@ namespace
 
     static EVisibility ResolveNodeVisibility( LayoutNode& a_Node )
     {
-        if ( const LayoutNode* parent = a_Node.Parent() )
-            a_Node.Layout.Visibility = Visibility::Apply( parent->Layout.Visibility, a_Node.Style.Visibility );
-        else
-            a_Node.Layout.Visibility = a_Node.Style.Visibility;
-
+        a_Node.ResolveVisibility();
         return a_Node.Layout.Visibility;
     }
 
@@ -129,7 +132,13 @@ namespace
 
         if ( !Visibility::AffectsLayout( a_Node.Layout.Visibility ) )
         {
-            a_Node.Layout.DesiredSize = { 0_u, 0_u };
+            // Settled until it is shown again (which marks it dirty). Its subtree keeps its own dirty flags for then,
+            // but takes its visibility now, so nothing below reads as drawn or hit-testable.
+            a_Node.ForEachDescendant( []( LayoutNode& a_Child ) { a_Child.ResolveVisibility(); } );
+            a_Node.Layout.DesiredSize       = { 0_u, 0_u };
+            a_Node.Layout.LastAvailableSize = a_AvailableSize;
+            a_Node.Layout.IsDirty           = false;
+            a_Node.Layout.IsDescendantDirty = false;
             return { 0_u, 0_u };
         }
 
@@ -477,8 +486,6 @@ namespace
             }
             else
             {
-                // Percent sizes are re-resolved here, so re-apply the constraints measure clamped them to.
-                size[axis]   = std::clamp( size[axis], s.SizeConstraints.Min[axis], s.SizeConstraints.Max[axis] );
                 origin[axis] = minEdge - ( size[axis] * anchor.Pivot[axis] ) + anchor.Offset[axis];
             }
         }
@@ -506,6 +513,7 @@ namespace
 
             if (child.Style.WidthMode == ESizing::Flex) childSize[0] = std::max( 0_u, a_Inner.Size[0] - child.Style.Margin.Horizontal() );
             if (child.Style.HeightMode == ESizing::Flex) childSize[1] = std::max( 0_u, a_Inner.Size[1] - child.Style.Margin.Vertical() );
+            childSize = ClampToConstraints( child, childSize );
 
             // Align within the margin-inset container space
             const Rect<Unit> marginInnerRect{
@@ -539,14 +547,14 @@ namespace
         {
             ResolveNodeVisibility( child );
 
+            if ( !Visibility::AffectsLayout( child.Layout.Visibility ) )
+                return;
+
             if ( child.Style.PositionMode == EPositioning::Anchored )
             {
                 reflowed |= ArrangeAnchored( child, a_Inner, a_Ctx );
                 return;
             }
-
-            if ( !Visibility::AffectsLayout( child.Layout.Visibility ) )
-                return;
 
             Vec2<Unit> childSize = ResolveChildArrangeSize( child, a_Inner.Size );
 
@@ -575,20 +583,20 @@ namespace
             if (!isHz && (HasFlag( align, EAlign::HStretch ) || child.Style.WidthMode == ESizing::Flex))
                 childSize[0] = std::clamp( std::max( 0_u, a_Inner.Size[0] - child.Style.Margin.Horizontal() ), crossConstraints.Min[0], crossConstraints.Max[0] );
 
-            Rect<Unit> childRect;
+            // The child's slot is its size plus its margin; the margin then insets the slot, leaving the child its size.
+            const Vec2<Unit> slotSize = childSize + child.Style.Margin.Total();
+            Rect<Unit>       childRect{ .Size = slotSize };
 
             if ( isHz )
             {
                 childRect.Origin[0] = cursor;
-                childRect.Origin[1] = AlignCrossAxis( childSize[1], a_Inner.Origin[1], a_Inner.Size[1], align, isHz );
+                childRect.Origin[1] = AlignCrossAxis( slotSize[1], a_Inner.Origin[1], a_Inner.Size[1], align, isHz );
             }
             else
             {
-                childRect.Origin[0] = AlignCrossAxis( childSize[0], a_Inner.Origin[0], a_Inner.Size[0], align, isHz );
+                childRect.Origin[0] = AlignCrossAxis( slotSize[0], a_Inner.Origin[0], a_Inner.Size[0], align, isHz );
                 childRect.Origin[1] = cursor;
             }
-
-            childRect.Size = childSize;
 
             childRect = child.Style.Margin.Apply( childRect );
 
@@ -619,14 +627,14 @@ namespace
         {
             ResolveNodeVisibility( child );
 
+            if ( !Visibility::AffectsLayout( child.Layout.Visibility ) )
+                return;
+
             if ( child.Style.PositionMode == EPositioning::Anchored )
             {
                 reflowed |= ArrangeAnchored( child, a_Inner, a_Ctx );
                 return;
             }
-
-            if ( !Visibility::AffectsLayout( child.Layout.Visibility ) )
-                return;
 
             flowChildren[flowCount++] = &child;
         });
@@ -713,13 +721,13 @@ namespace
             Vec2<Unit>   childSize = childSizes[i];
             const EAlign align     = ResolveAlign( child, a_Node );
 
-            if ( HasFlag( align, EAlign::HStretch ) || child.Style.WidthMode  == ESizing::Flex ) childSize[0] = cellRect.Size[0];
-            if ( HasFlag( align, EAlign::VStretch ) || child.Style.HeightMode == ESizing::Flex ) childSize[1] = cellRect.Size[1];
+            // As in linear layouts, the margin sits around the child: stretching fills the cell less the margin.
+            const Edges& margin = child.Style.Margin;
+            if ( HasFlag( align, EAlign::HStretch ) || child.Style.WidthMode  == ESizing::Flex ) childSize[0] = std::max( 0_u, cellRect.Size[0] - margin.Horizontal() );
+            if ( HasFlag( align, EAlign::VStretch ) || child.Style.HeightMode == ESizing::Flex ) childSize[1] = std::max( 0_u, cellRect.Size[1] - margin.Vertical() );
+            childSize = ClampToConstraints( child, childSize );
 
-            Rect<Unit> childRect = AlignRect( childSize, cellRect, align );
-			childRect            = child.Style.Margin.Apply( childRect );
-            childRect.Size[0]    = std::max( 0_u, childRect.Size[0] );
-            childRect.Size[1]    = std::max( 0_u, childRect.Size[1] );
+            const Rect<Unit> childRect = margin.Apply( AlignRect( childSize + margin.Total(), cellRect, align ) );
 
             reflowed |= ArrangeLayoutNode( child, childRect, a_Ctx );
         }
@@ -732,52 +740,120 @@ namespace
     bool ArrangeLayoutNode( LayoutNode& a_Node, Rect<Unit> a_AllocatedRect, LayoutContext& a_Ctx )
     {
         ResolveNodeVisibility( a_Node );
-        a_Node.Layout.FinalRect = a_AllocatedRect;
-    
-        bool reflowed = false;
 
-        if ( a_Node.Widget && a_Node.Widget->HasWidthDependentContent() )
+        // Measure skipped it, so its sizes are stale.
+        if ( !Visibility::AffectsLayout( a_Node.Layout.Visibility ) )
+            return false;
+
+        const Vec2<Unit> previousSize        = a_Node.Layout.ParentRect.Size;
+        const Vec2<Unit> previousContentSize = a_Node.Layout.ContentSize;
+        a_Node.Layout.ParentRect = a_AllocatedRect;
+
+        bool        reflowed       = false;
+        const Edges contentPadding = ContentPadding( a_Node );
+
+        if ( a_Node.Widget && a_Node.Widget->GetTraits().WidthDependentContent )
         {
-            const LayoutStyle& s = a_Node.Style;
-            const Edges        contentPadding = ContentPadding( a_Node );
-            const Vec2<Unit>   contentSize = contentPadding.Apply( a_AllocatedRect ).Size;
+            const LayoutStyle& s            = a_Node.Style;
+            const Vec2<Unit>   contentSize  = contentPadding.Apply( a_AllocatedRect ).Size;
             const Vec2<Unit>   newIntrinsic = a_Node.Widget->OnMeasureContent( a_Node, contentSize, a_Ctx );
-    
+
             if ( s.HeightMode == ESizing::Content || s.HeightMode == ESizing::Flex )
             {
                 const Unit newHeight = std::clamp( newIntrinsic[1] + contentPadding.Vertical(),
                                                    s.SizeConstraints.Min[1], s.SizeConstraints.Max[1] );
-    
+
                 if ( !IsApproxEqual( newHeight.ToFloat(), a_Node.Layout.DesiredSize[1].ToFloat() ) )
                 {
                     a_Node.Layout.DesiredSize[1] = newHeight;
                     reflowed = true;
+
+                    // The ancestors measured the old height: the next pass measures them again. The node itself
+                    // isn't dirtied, so it keeps the height its final width gave it.
+                    if ( LayoutNode* parent = a_Node.Parent() )
+                        parent->MarkDescendantDirty();
                 }
             }
         }
-    
+
+        // Children are laid out in this node's own space: its top-left is the origin. Content starts after the start padding.
+        Vec2<Unit> contentEnd{ contentPadding.L, contentPadding.T };
         if ( a_Node.FirstChild() )
         {
-            const Rect<Unit> inner = ContentPadding( a_Node ).Apply( a_AllocatedRect );
-    
+            const Rect<Unit> inner = contentPadding.Apply( Rect<Unit>{ Vec2<Unit>{ 0_u, 0_u }, a_AllocatedRect.Size } );
+
             switch ( a_Node.Style.LayoutType )
             {
                 case ELayoutType::Horizontal:
                 case ELayoutType::Vertical:
                     reflowed |= ArrangeLinear( a_Node, inner, a_Ctx );
                     break;
-    
+
                 case ELayoutType::Overlay:
                     reflowed |= ArrangeOverlay( a_Node, inner, a_Ctx );
                     break;
-    
+
                 case ELayoutType::Grid:
                     reflowed |= ArrangeGrid( a_Node, inner, a_Ctx );
                     break;
             }
+
+            for ( const LayoutNode* child = a_Node.FirstChild(); child; child = child->NextSibling() )
+            {
+                if ( !Visibility::AffectsLayout( child->Layout.Visibility ) )
+                    continue;
+
+                // What overflows a child counts too, unless the child clips it.
+                // A child's trailing margin counts, so the space after the last child scrolls into view too.
+                const Rect<Unit>& rect = child->Layout.ParentRect;
+                Vec2<Unit>        end{ rect.Right() + child->Style.Margin.R, rect.Bottom() + child->Style.Margin.B };
+                if ( !child->ClipsContent )
+                {
+                    end = { std::max( end[0], rect.Origin[0] + child->Layout.ContentSize[0] ),
+                            std::max( end[1], rect.Origin[1] + child->Layout.ContentSize[1] ) };
+                }
+                contentEnd = { std::max( contentEnd[0], end[0] ), std::max( contentEnd[1], end[1] ) };
+            }
         }
-    
+        a_Node.Layout.ContentSize = { contentEnd[0] + contentPadding.R, contentEnd[1] + contentPadding.B };
+
+        if ( a_Node.NotifyGeometry && a_Ctx.GeometryChanges &&
+             !( previousSize == a_AllocatedRect.Size && previousContentSize == a_Node.Layout.ContentSize ) )
+        {
+            PushBack( *a_Ctx.GeometryChanges, GeometryChange{ &a_Node, previousSize, previousContentSize } );
+        }
+
         return reflowed;
+    }
+
+    static void ComposeChildren( LayoutNode& a_Node )
+    {
+        const Vec2<Unit> origin = a_Node.Layout.SceneRect.Origin + a_Node.ContentOffset;
+        for ( LayoutNode* child = a_Node.FirstChild(); child; child = child->NextSibling() )
+        {
+            child->Layout.SceneRect = { origin + child->Layout.ParentRect.Origin, child->Layout.ParentRect.Size };
+            ComposeChildren( *child );
+        }
+    }
+
+    void ComposeLayout( LayoutNode& a_Node )
+    {
+        if ( !a_Node.Parent() )
+            a_Node.Layout.SceneRect = a_Node.Layout.ParentRect;
+
+        ComposeChildren( a_Node );
+        a_Node.MarkHitTestDirty();
+    }
+
+    bool SetContentOffset( LayoutNode& a_Node, Vec2<Unit> a_Offset )
+    {
+        if ( a_Node.ContentOffset == a_Offset )
+            return false;
+
+        a_Node.ContentOffset = a_Offset;
+        ComposeChildren( a_Node );
+        a_Node.MarkHitTestDirty();
+        return true;
     }
 
 } // namespace RatUI

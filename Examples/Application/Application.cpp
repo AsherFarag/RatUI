@@ -18,6 +18,8 @@ namespace
     constexpr const char* c_WindowTitle  = "RatUI Examples";
     constexpr int         c_WindowWidth  = 1280;
     constexpr int         c_WindowHeight = 720;
+    constexpr int         c_MinWindowWidth  = 640; // Smaller than this, the examples have no room to lay out.
+    constexpr int         c_MinWindowHeight = 480;
 
     // Smallest space (in Units) the examples are laid out in. Smaller screens, such as phones,
     // scale the whole UI down to fit instead of cutting it off.
@@ -177,6 +179,7 @@ bool Application::Initialize()
     m_Window = SDL_CreateWindow( c_WindowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, c_WindowWidth, c_WindowHeight, windowFlags );
     if ( !m_Window )
         return false;
+    SDL_SetWindowMinimumSize( m_Window, c_MinWindowWidth, c_MinWindowHeight );
 
     m_GLContext = SDL_GL_CreateContext( m_Window );
     if ( !m_GLContext )
@@ -248,6 +251,17 @@ void Application::Frame()
     scene.UpdateLayout( { Unit{ width / pixelsPerUnit }, Unit{ height / pixelsPerUnit } } );
     scene.Tick( deltaSeconds );
 
+    // Tell the platform where text is being typed, so it can place the IME's candidate window (in window coordinates).
+    if ( const Optional<Rect<Unit>> caret = scene.GetTextInputRect() )
+    {
+        int windowWidth, windowHeight;
+        SDL_GetWindowSize( m_Window, &windowWidth, &windowHeight );
+        const f32      scale = pixelsPerUnit * static_cast<f32>( windowWidth ) / static_cast<f32>( std::max( width, 1 ) );
+        const SDL_Rect rect{ static_cast<int>( caret->Origin[0].ToFloat() * scale ), static_cast<int>( caret->Origin[1].ToFloat() * scale ),
+                             static_cast<int>( caret->Size[0].ToFloat() * scale ),   static_cast<int>( caret->Size[1].ToFloat() * scale ) };
+        SDL_SetTextInputRect( &rect );
+    }
+
     // ...then draw in pixels.
     glViewport( 0, 0, width, height );
     m_Renderer->SetViewport( width, height );
@@ -307,9 +321,16 @@ void Application::ProcessEvents()
             }
 
             case SDL_WINDOWEVENT:
-                // Keys held when the window loses focus are released in another window.
+                // Keys and buttons held when the window loses focus are released in another window.
                 if ( event.window.event == SDL_WINDOWEVENT_FOCUS_LOST )
+                {
                     scene.ReleaseAllKeys();
+                    scene.ReleaseAllPointers();
+                }
+                else if ( event.window.event == SDL_WINDOWEVENT_LEAVE )
+                {
+                    scene.ClearHover();
+                }
                 break;
 
             case SDL_TEXTINPUT:
@@ -339,11 +360,17 @@ void Application::ProcessEvents()
                 break;
 
             case SDL_MOUSEWHEEL:
+            {
+                // The wheel scrolls what is under the mouse, so the event carries where it is.
+                int mouseX = 0, mouseY = 0;
+                SDL_GetMouseState( &mouseX, &mouseY );
                 scene.DispatchInputEvent( { .Device = EDeviceID::Mouse,
-                                            .Payload = PointerEvent{ .Type        = EPointerType::Mouse,
+                                            .Payload = PointerEvent{ .Position    = toUnits( mouseX, mouseY ),
+                                                                     .Type        = EPointerType::Mouse,
                                                                      .Modifiers   = modifiers,
                                                                      .ScrollDelta = Vec2<Unit>{ Unit{ (f32)event.wheel.x }, Unit{ (f32)event.wheel.y } } } } );
                 break;
+            }
 
             default:
                 break;

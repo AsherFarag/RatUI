@@ -18,45 +18,57 @@ namespace RatUI
 		using OnClickCallback = Callback<ButtonBaseWidget&>;
         OnClickCallback OnClick; ///< Callback that is invoked when the button is clicked.
 
-        ButtonBaseWidget() = default;
-        ButtonBaseWidget( OnClickCallback a_OnClick )
-            : OnClick( std::move( a_OnClick ) )
+        ButtonBaseWidget( OnClickCallback a_OnClick = {} )
+            : IWidget( { .Focus = EFocusPolicy::All, .Interactable = true } ), OnClick( std::move( a_OnClick ) )
         {}
 
         virtual ~ButtonBaseWidget() = default;
 
-        bool IsInteractable() const override { return true; }
-        bool IsFocusable()    const override { return true; }
-
         Reply OnButtonPressed( const ButtonEvent& a_Event ) override
         {
-            if ( !a_Event.Pressed )
+            if ( !a_Event.Pressed || a_Event.Button != EButtonID::MouseLeft )
                 return Reply::Unhandled();
 
-            if ( IsActivationButton( a_Event.Button ) )
-            {
-                m_IsPressed = true;
-                m_PressPointer = a_Event.Pointer;
-                return Reply::Handled();
-            }
-
-            return Reply::Unhandled();
+            m_IsPressed    = true;
+            m_PressPointer = a_Event.Pointer.value_or( c_MousePointerID );
+            return Reply::Handled();
         }
 
         Reply OnButtonReleased( const ButtonEvent& a_Event ) override
         {
-            if ( !a_Event.Released )
+            if ( !a_Event.Released || a_Event.Button != EButtonID::MouseLeft )
                 return Reply::Unhandled();
 
-            if ( !IsActivationButton( a_Event.Button ) )
-                return Reply::Unhandled();
+            // The pressing pointer keeps the button while held, so it may be released somewhere else.
+            if ( a_Event.PointerPosition && !IsOver( *a_Event.PointerPosition ) )
+                m_IsPressed = false;
 
-            const bool wasPressed = m_IsPressed;
-            m_IsPressed = false;
+            return Release();
+        }
 
-            if ( wasPressed )
-                Invoke( OnClick, *this );
+        Reply OnPointerMove( const PointerEvent& a_Event ) override
+        {
+            // Touches have no hover, so leaving is seen here.
+            if ( m_PressPointer && *m_PressPointer == a_Event.ID && !IsOver( a_Event.Position ) )
+                m_IsPressed = false;
+            return Reply::Unhandled();
+        }
 
+        void OnPressCancelled( const PressCancelEvent& a_Event ) override
+        {
+            if ( a_Event.Pointer != m_PressPointer )
+                return;
+            m_IsPressed    = false;
+            m_PressPointer = NullOpt;
+        }
+
+        Reply OnActivate( const ActivateEvent& a_Event ) override
+        {
+            if ( !a_Event.Pressed )
+                return Release();
+
+            m_IsPressed    = true;
+            m_PressPointer = NullOpt;
             return Reply::Handled();
         }
 
@@ -80,11 +92,20 @@ namespace RatUI
 
     protected:
 
-        // TODO: This shouldn't be handled here, what if users wanted to change the activation buttons or have multiple buttons with different activation buttons?
-        static constexpr bool IsActivationButton( EButtonID a_Button )
+        /** @brief Ends a press, clicking if it wasn't cancelled (e.g. by the pointer leaving). */
+        Reply Release()
         {
-            return a_Button == EButtonID::MouseLeft || a_Button == EButtonID::KeyEnter;
+            const bool wasPressed = m_IsPressed;
+            m_IsPressed    = false;
+            m_PressPointer = NullOpt;
+
+            if ( wasPressed )
+                Invoke( OnClick, *this );
+
+            return Reply::Handled();
         }
+
+        bool IsOver( Vec2<Unit> a_Position ) const { return GetScene().IsOver( GetLayoutID(), a_Position ); }
 
         bool m_IsHovered{ false };
         bool m_IsPressed{ false };
@@ -125,7 +146,7 @@ namespace RatUI
         {
             Scene& scene = GetScene();
             const LayoutNode& node = GetLayout();
-            const Rect<Unit>& rect = node.Layout.FinalRect;
+            const Rect<Unit>& rect = node.Layout.SceneRect;
 
             if constexpr ( HasMixin<ThemeMixin> )
             {

@@ -10,6 +10,8 @@ jobs:
   # The core library on its own: no backends, no third party dependencies besides Catch2.
   core:
     name: Core (${{ matrix.name }})
+    # A pull request from main or dev here is already tested by the push.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository || ( github.head_ref != 'main' && github.head_ref != 'dev' )
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -38,6 +40,8 @@ jobs:
   # Every backend plus the examples app, with dependencies fetched where they are not installed.
   backends:
     name: Backends + Examples (${{ matrix.name }})
+    # A pull request from main or dev here is already tested by the push.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository || ( github.head_ref != 'main' && github.head_ref != 'dev' )
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -65,6 +69,8 @@ jobs:
   # Installs the core library and builds a separate project against it with find_package().
   package:
     name: Install + find_package
+    # A pull request from main or dev here is already tested by the push.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository || ( github.head_ref != 'main' && github.head_ref != 'dev' )
     runs-on: ubuntu-latest
 
     steps:

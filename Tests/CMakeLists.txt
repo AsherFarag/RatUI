@@ -24,6 +24,9 @@ target_link_libraries(RatUI_Tests
         Catch2::Catch2WithMain
 )
 
+# Lets tests find files in the source tree (e.g. the example fonts) whatever directory they run from.
+target_compile_definitions(RatUI_Tests PRIVATE RATUI_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+
 # The fetched Catch2 does not add its helper scripts to the module path itself.
 if(DEFINED Catch2_SOURCE_DIR AND EXISTS "${Catch2_SOURCE_DIR}/extras/Catch.cmake")
     list(APPEND CMAKE_MODULE_PATH "${Catch2_SOURCE_DIR}/extras")

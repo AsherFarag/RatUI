@@ -15,10 +15,11 @@ It's designed for games and aims to integrate into your codebase rather than the
 ## Features
 
 * **Retained-mode widgets:** panels, buttons, text, text input, sliders and scroll containers, with a `Scene` that owns them and handles input, layout and drawing.
-* **Layout engine:** horizontal, vertical, overlay and grid layouts, with content, fixed, percent and flex sizing, padding, margins, spacing, size constraints and anchored positioning.
+* **Layout engine:** horizontal, vertical, overlay and grid layouts, with content, fixed, percent and flex sizing, padding, margins, spacing, size constraints, anchored positioning and safe areas (notches, TV overscan).
 * **Text:** MTSDF glyphs that stay sharp at any size, HarfBuzz shaping, word wrapping (including CJK line breaking rules), clip/ellipsis/fade overflow, outlines, drop shadows and per-glyph reveal for dialogue.
 * **Theming:** colors, brushes, corner radii, fonts and text styles are looked up by key, so swapping a theme restyles the whole scene live.
-* **Input and navigation:** mouse, keyboard and gamepad input; focus scopes and directional navigation for controller-driven menus.
+* **Input and navigation:** mouse, touch, pen, keyboard and gamepad input; directional and Tab navigation, navigation groups and modal scopes for controller-driven menus.
+* **Game friendly:** `Scene::DispatchInputEvent` and `Scene::IsPointerOverUI` tell your game which input is the UI's and which is its own.
 * **Animation:** easing curves and interpolation for animating widget properties.
 * **Backend-agnostic core:** the core has no third party dependencies. FreeType/HarfBuzz text and an OpenGL 3.3 / WebGL2 renderer are opt-in backends, and you can plug in your own through `IRenderer` and `ITextMetrics`.
 * **Bring your own types:** math and container types (`String`, `Array`, ...) are user overridable and default to the STL.
@@ -85,11 +86,14 @@ button->GetLayout().FixedWidth( 160_u ).FixedHeight( 40_u ).ChildAlign( EAlign::
 TextLayoutStyle labelStyle{};
 labelStyle.Font = FontHandle{ 1 };
 labelStyle.Size = 16_u;
-TextWidget* label = scene.CreateWidget<TextWidget>( button->GetLayoutID(), Text{ "Click me" }, labelStyle );
-label->GetLayout().Visibility( EVisibility::HitTestInvisible ); // Let clicks through to the button.
+scene.CreateWidget<TextWidget>( button->GetLayoutID(), Text{ "Click me" }, labelStyle ); // Text lets clicks through to the button.
 
 // --- Every frame ---
-scene.DispatchInputEvent( event ); // Your platform's input, translated to RatUI InputEvents.
+// Your platform's input, translated to RatUI InputEvents.
+if ( !scene.DispatchInputEvent( event ) )
+{
+    // The UI didn't use it: it is your game's.
+}
 scene.UpdateLayout( { Unit{ (f32)width }, Unit{ (f32)height } } );
 scene.Tick( deltaSeconds );
 
@@ -182,7 +186,7 @@ With `FetchContent`:
 include(FetchContent)
 FetchContent_Declare(RatUI
     GIT_REPOSITORY https://github.com/AsherFarag/RatUI.git
-    GIT_TAG        v0.1.0)
+    GIT_TAG        v0.2.0)
 set(RATUI_BACKEND_OPENGL ON)
 set(RATUI_FETCH_DEPENDENCIES ON)
 FetchContent_MakeAvailable(RatUI)

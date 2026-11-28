@@ -102,7 +102,7 @@ namespace RatUI
 
         Self SelfAlign( EAlign a_Align ) const            { Layout().SelfAlign( a_Align ); return This(); }
         Self Visibility( EVisibility a_Visibility ) const { Layout().Visibility( a_Visibility ); return This(); }
-        Self FocusScope( bool a_IsFocusScope = true ) const { Layout().FocusScope( a_IsFocusScope ); return This(); }
+        Self HitTestable( bool a_HitTestable ) const      { Layout().HitTestable( a_HitTestable ); return This(); }
 
         Self Padding( Edges a_Padding ) const { Layout().Padding( a_Padding ); return This(); }
         Self Padding( Unit a_Padding ) const  { Layout().Padding( Edges::All( a_Padding ) ); return This(); }
@@ -321,7 +321,7 @@ namespace RatUI
 
         RATUI_NODISCARD LayoutNode& GetChildSlot() const
         {
-            LayoutNode* slot = m_Widget->GetScene().GetLayoutNode( m_Widget->GetChildSlotID() );
+            LayoutNode* slot = m_Widget->GetScene().GetLayoutNode( m_Widget->GetContentNodeID() );
             RATUI_USER_ASSERT( slot, "Cannot add children: the widget has no valid child slot." );
             return *slot;
         }
@@ -338,9 +338,15 @@ namespace RatUI
             return *this;
         }
 
-        WidgetBuilder DebugName( String a_Name ) const requires ( W::template HasMixin<DebugMixin> )
+        WidgetBuilder FocusPolicy( EFocusPolicy a_Policy ) const { m_Widget->SetFocusPolicy( a_Policy ); return *this; }
+        WidgetBuilder NavGroup( bool a_NavGroup = true ) const   { m_Widget->SetNavGroup( a_NavGroup ); return *this; }
+        WidgetBuilder Interactable( bool a_Interactable ) const  { m_Widget->SetInteractable( a_Interactable ); return *this; }
+
+        /** @brief Does nothing in a build without DebugMixin (release). */
+        WidgetBuilder DebugName( String a_Name ) const
         {
-            m_Widget->DebugName = std::move( a_Name );
+            if constexpr ( W::template HasMixin<DebugMixin> )
+                m_Widget->DebugName = std::move( a_Name );
             return *this;
         }
 
@@ -431,7 +437,7 @@ namespace RatUI
         WidgetBuilder<ButtonWidget> Button( String a_Label, ButtonWidget::OnClickCallback a_OnClick = {} ) const
         {
             return Button( std::move( a_OnClick ) )(
-                Text( std::move( a_Label ) ).NoWrap().Visibility( EVisibility::HitTestInvisible )
+                Text( std::move( a_Label ) ).NoWrap().HitTestable( false )
             );
         }
 

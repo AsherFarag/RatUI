@@ -33,7 +33,7 @@ namespace RatUI
      */
     struct NodeID
     {
-        u32 Value{ ~0u }; ///< The packed index and version. Default-constructed ids are invalid.
+        u64 Value{ ~0ull }; ///< The index (low 32 bits) and version (high 32 bits). Default-constructed ids are invalid.
 
         constexpr bool operator==( const NodeID& a_Other ) const = default;
     };
@@ -41,14 +41,13 @@ namespace RatUI
     template<>
     struct NodeIDTraits<NodeID>
     {
-        static constexpr u32         c_IndexBits   = 24;
-        static constexpr u32         c_IndexMask   = ( 1u << c_IndexBits ) - 1u;
-        static constexpr u32         VersionMask   = 0xFF;
+        // 32 bits of version: an id of a destroyed node stays stale however often its slot is reused.
+        static constexpr u32         VersionMask   = 0xFFFFFFFFu;
         static constexpr NodeID      Invalid       = NodeID{};
 
-        static constexpr u32         Index( NodeID a_ID )   { return a_ID.Value & c_IndexMask; }
-        static constexpr u32         Version( NodeID a_ID ) { return a_ID.Value >> c_IndexBits; }
-        static constexpr NodeID      Construct( u32 a_Index, u32 a_Version ) { return NodeID{ ( a_Index & c_IndexMask ) | ( ( a_Version & VersionMask ) << c_IndexBits ) }; }
+        static constexpr u32         Index( NodeID a_ID )   { return static_cast<u32>( a_ID.Value ); }
+        static constexpr u32         Version( NodeID a_ID ) { return static_cast<u32>( a_ID.Value >> 32 ); }
+        static constexpr NodeID      Construct( u32 a_Index, u32 a_Version ) { return NodeID{ static_cast<u64>( a_Index ) | ( static_cast<u64>( a_Version ) << 32 ) }; }
     };
 }
 #endif

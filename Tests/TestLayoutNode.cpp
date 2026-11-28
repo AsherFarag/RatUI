@@ -251,59 +251,68 @@ TEST_CASE( "Dirtying two siblings still reaches their shared ancestor correctly"
 // EVisibility::Apply
 // =============================================================================
 
-TEST_CASE( "Visibility::Apply keeps a Visible child fully visible under a Visible parent", "[layout-node][visibility]" )
+TEST_CASE( "Visibility::Apply gives a child the more hidden of its own and its parent's visibility", "[layout-node][visibility]" )
 {
-    EVisibility result = Visibility::Apply( EVisibility::Visible, EVisibility::Visible );
-    REQUIRE( result == EVisibility::Visible );
+    REQUIRE( Visibility::Apply( EVisibility::Visible, EVisibility::Visible ) == EVisibility::Visible );
+    REQUIRE( Visibility::Apply( EVisibility::Hidden, EVisibility::Visible ) == EVisibility::Hidden );
+    REQUIRE( Visibility::Apply( EVisibility::Visible, EVisibility::Hidden ) == EVisibility::Hidden );
+    REQUIRE( Visibility::Apply( EVisibility::Collapsed, EVisibility::Visible ) == EVisibility::Collapsed );
+    REQUIRE( Visibility::Apply( EVisibility::Hidden, EVisibility::Collapsed ) == EVisibility::Collapsed );
 }
 
-TEST_CASE( "Visibility::Apply propagates a Hidden parent onto a Visible child", "[layout-node][visibility]" )
+TEST_CASE( "Hidden takes space but isn't drawn; Collapsed does neither", "[layout-node][visibility]" )
 {
-    EVisibility result = Visibility::Apply( EVisibility::Hidden, EVisibility::Visible );
-
-    // Hidden still occupies layout space, it just isn't rendered or hit-testable.
-    REQUIRE( Visibility::AffectsLayout( result ) );
-    REQUIRE_FALSE( Visibility::IsRendered( result ) );
-    REQUIRE_FALSE( Visibility::IsHitTestable( result ) );
-    REQUIRE_FALSE( Visibility::AreChildrenHitTestable( result ) );
+    REQUIRE( Visibility::AffectsLayout( EVisibility::Hidden ) );
+    REQUIRE_FALSE( Visibility::IsRendered( EVisibility::Hidden ) );
+    REQUIRE_FALSE( Visibility::AffectsLayout( EVisibility::Collapsed ) );
+    REQUIRE_FALSE( Visibility::IsRendered( EVisibility::Collapsed ) );
 }
 
-TEST_CASE( "Visibility::Apply propagates Collapsed onto a child regardless of the child's own visibility", "[layout-node][visibility]" )
+TEST_CASE( "Hit testing is switched off for a node and everything below it, apart from visibility", "[layout-node][visibility]" )
 {
-    EVisibility result = Visibility::Apply( EVisibility::Collapsed, EVisibility::Visible );
+    LayoutNode root, child;
+    root.PushBackChild( child );
 
-    REQUIRE_FALSE( Visibility::AffectsLayout( result ) );
-    REQUIRE_FALSE( Visibility::IsRendered( result ) );
-    REQUIRE_FALSE( Visibility::IsHitTestable( result ) );
+    root.HitTestable( false );
+    REQUIRE( root.Layout.Visibility == EVisibility::Visible );
+    REQUIRE_FALSE( root.Layout.HitTestable );
+    REQUIRE_FALSE( child.Layout.HitTestable );
+
+    // Showing a node doesn't change how it takes input.
+    root.Visibility( EVisibility::Hidden );
+    root.Visibility( EVisibility::Visible );
+    REQUIRE_FALSE( child.Layout.HitTestable );
+
+    root.HitTestable( true );
+    REQUIRE( child.Layout.HitTestable );
 }
 
-TEST_CASE( "Visibility::Apply propagates HitTestInvisible even when the child wants hit testing", "[layout-node][visibility]" )
+TEST_CASE( "A node that isn't drawn can't be hit", "[layout-node][visibility]" )
 {
-    EVisibility result = Visibility::Apply( EVisibility::HitTestInvisible, EVisibility::Visible );
+    LayoutNode root, child;
+    root.PushBackChild( child );
 
-    REQUIRE( Visibility::IsRendered( result ) );
-    REQUIRE( Visibility::AffectsLayout( result ) );
-    REQUIRE_FALSE( Visibility::IsHitTestable( result ) );
-    REQUIRE_FALSE( Visibility::AreChildrenHitTestable( result ) );
+    root.Visibility( EVisibility::Hidden );
+    REQUIRE_FALSE( root.Layout.HitTestable );
+    REQUIRE_FALSE( child.Layout.HitTestable );
+    REQUIRE( child.Layout.Visibility == EVisibility::Hidden );
 }
 
-TEST_CASE( "Visibility::Apply lets a SelfHitTestInvisible parent still expose child hit testing", "[layout-node][visibility]" )
+TEST_CASE( "Only entering or leaving Collapsed marks layout dirty", "[layout-node][visibility]" )
 {
-    EVisibility result = Visibility::Apply( EVisibility::SelfHitTestInvisible, EVisibility::Visible );
+    LayoutNode root, child;
+    root.PushBackChild( child );
+    root.Layout.IsDirty = root.Layout.IsDescendantDirty = false;
+    child.Layout.IsDirty = child.Layout.IsDescendantDirty = false;
 
-    // The parent opts itself out of being hit, but still allows its children to be hit-tested.
-    REQUIRE( Visibility::IsHitTestable( result ) );
-    REQUIRE( Visibility::IsRendered( result ) );
-}
+    child.Visibility( EVisibility::Hidden );
+    child.HitTestable( false );
+    REQUIRE_FALSE( child.Layout.IsDirty );
+    REQUIRE_FALSE( root.Layout.IsDescendantDirty );
 
-TEST_CASE( "Visibility::Apply respects a child that has opted its own children out of hit testing", "[layout-node][visibility]" )
-{
-    // Visible parent, but the child itself never sets ChildrenHitTest on its own style.
-    EVisibility restrictedChild = EVisibility::Render | EVisibility::Layout | EVisibility::SelfHitTest;
-    EVisibility result = Visibility::Apply( EVisibility::Visible, restrictedChild );
-
-    REQUIRE( Visibility::IsHitTestable( result ) );          // the child itself is still hit-testable
-    REQUIRE_FALSE( Visibility::AreChildrenHitTestable( result ) ); // but its descendants won't be
+    child.Visibility( EVisibility::Collapsed );
+    REQUIRE( child.Layout.IsDirty );
+    REQUIRE( root.Layout.IsDescendantDirty );
 }
 
 // =============================================================================
@@ -379,4 +388,17 @@ TEST_CASE( "Constraints::Fixed pins both the minimum and maximum to the same siz
     REQUIRE( c.Min == c.Max );
     REQUIRE_UNIT( c.Min[0], 50.f );
     REQUIRE_UNIT( c.Min[1], 60.f );
+}
+
+TEST_CASE( "Setting the visibility or hit-testability a node already has changes nothing", "[layout-node]" )
+{
+    LayoutNode root, child;
+    root.PushBackChild( child );
+    root.Layout.IsHitTestDirty = false;
+
+    child.Visibility( EVisibility::Visible ).HitTestable( true );
+    REQUIRE_FALSE( root.Layout.IsHitTestDirty );
+
+    child.Visibility( EVisibility::Hidden );
+    REQUIRE( root.Layout.IsHitTestDirty );
 }

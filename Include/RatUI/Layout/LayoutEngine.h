@@ -21,8 +21,8 @@ namespace RatUI
 			RATUI_ASSERT( a_Alignment > 0 && ( a_Alignment & ( a_Alignment - 1 ) ) == 0, 
                           "Alignment must be a power of two." );
 
-			RATUI_ASSERT( Offset + a_Size <= Capacity, 
-                          "BumpAllocator out of memory." );
+			RATUI_USER_ASSERT( Offset + a_Size <= Capacity,
+                               "Layout ran out of scratch memory: raise it with Scene::SetLayoutScratchSize." );
 
 			u32 alignedOffset = ( Offset + ( a_Alignment - 1 ) ) & ~( a_Alignment - 1 );
 			Offset = alignedOffset + a_Size;
@@ -65,10 +65,21 @@ namespace RatUI
         ScopedMark& operator=( const ScopedMark& ) = delete;
     };
 
+    /** @brief A node whose size or content size layout changed, with what they were before. */
+    struct GeometryChange
+    {
+        LayoutNode* Node{ nullptr };
+        Vec2<Unit>  PreviousSize{};
+        Vec2<Unit>  PreviousContentSize{};
+    };
+
     struct LayoutContext
     {
 		BumpAllocator& Allocator;
 		Edges          RemainingSafeArea{}; ///< The safe area (Scene::SetSafeArea) not yet cleared by an ancestor of the node being measured.
+
+        /** @brief Receives the nodes with LayoutNode::NotifyGeometry that arrange changed. A node arranged twice is listed twice. */
+        Array<GeometryChange>* GeometryChanges{ nullptr };
     };
 
     /**
@@ -109,11 +120,20 @@ namespace RatUI
      *        the results of the Measure phase. This is the second pass of the layout process, 
      *        where each node is given a specific area to occupy and must position itself and its children within that area.
      * @param a_Node The layout node to arrange.
-     * @param a_AllocatedRect The rectangle allocated for this node by its parent during the Arrange phase. 
-     *                        The node should position itself and its children within this rectangle according to its layout style.
+     * @param a_AllocatedRect The rectangle allocated for this node by its parent, in the parent's space. It becomes the
+     *                        node's ParentRect; SceneRects are set afterwards by ComposeLayout.
      * @return true if any widget in this subtree required a content reflow after being
      *         given its final size (e.g. wrapped text whose height changed with final width).
      *         Callers should re-run Measure + Arrange once when this returns true.
      */
     bool       ArrangeLayoutNode( LayoutNode& a_Node, Rect<Unit> a_AllocatedRect, LayoutContext& a_Ctx );
+
+    /**
+     * @brief Sets the SceneRect of everything below a_Node from each node's ParentRect and its parent's ContentOffset.
+     * Run it on the root after arranging; a root's SceneRect is its ParentRect.
+     */
+    void       ComposeLayout( LayoutNode& a_Node );
+
+    /** @brief Sets a_Node's ContentOffset and moves everything below it there at once. Layout isn't touched. Returns whether it changed. */
+    bool       SetContentOffset( LayoutNode& a_Node, Vec2<Unit> a_Offset );
 } // namespace RatUI

@@ -4,38 +4,46 @@
 
 namespace RatUI
 {
-    // TODO: Make this a reusable utility?
-    namespace 
+    namespace
     {
-        /** @brief Focusable widgets under a_Node, looking through bare layout nodes. */
-        void CollectNavTargets( LayoutNode& a_Node, Array<const LayoutNode*>& a_Out )
+        NodeID HitTestNode( const LayoutNode& a_Node, Vec2<Unit> a_Position, bool a_InteractableOnly )
         {
-            a_Node.ForEachChild( [&]( LayoutNode& child )
+            if ( !a_Node.Layout.HitTestable )
+                return c_InvalidNodeID;
+
+            if ( !a_Node.Layout.SceneRect.Contains( a_Position ) )
+                return c_InvalidNodeID;
+
+            // Later children are drawn on top, so they are tried first.
+            for ( const LayoutNode* child = a_Node.LastChild(); child; child = child->PrevSibling() )
             {
-                if ( child.Widget )
-                {
-                    if ( child.Widget->IsFocusable() )
-                        PushBack( a_Out, &child );
-                }
-                else
-                {
-                    CollectNavTargets( child, a_Out );
-                }
-            } );
+                if ( const NodeID hit = HitTestNode( *child, a_Position, a_InteractableOnly ); hit != c_InvalidNodeID )
+                    return hit;
+            }
+
+            if ( !a_InteractableOnly || ( a_Node.Widget && a_Node.Widget->IsInteractable() ) )
+                return a_Node.ID;
+
+            return c_InvalidNodeID;
         }
 
-        /** @brief The ButtonEvent a widget receives for ENavAction::ActivatePressed/ActivateReleased. */
-        ButtonEvent MakeActivateEvent( bool a_Pressed )
+        constexpr bool IsMove( ENavAction a_Action )
         {
-            return ButtonEvent{
-                .Button   = EButtonID::KeyEnter,
-                .Pressed  = a_Pressed,
-                .Released = !a_Pressed,
-                .Held     = a_Pressed,
-            };
+            return a_Action == ENavAction::MoveLeft || a_Action == ENavAction::MoveRight ||
+                   a_Action == ENavAction::MoveUp   || a_Action == ENavAction::MoveDown;
+        }
+
+        /** @brief Whether a pointer is down in a press that landed on no widget: the game's until it is released. */
+        bool IsGamePress( const PointerGestureState& a_Gesture )
+        {
+            return a_Gesture.IsDown && a_Gesture.PressedWidget == c_InvalidNodeID;
         }
 
     } // namespace
+
+    // ========================================================================
+    // Layout
+    // ========================================================================
 
     void Scene::UpdateLayout( Vec2<Unit> a_AvailableSize )
     {
@@ -45,39 +53,159 @@ namespace RatUI
         if ( !rootNode )
             return;
 
-        alignas( 16 ) static thread_local byte scratchBuffer[1024 * 1024]; // TODO: Make this configurable
-		BumpAllocator allocator{ scratchBuffer, sizeof( scratchBuffer ) };
-		const Rect<Unit> rootRect{ Vec2<Unit>{ 0_u, 0_u }, a_AvailableSize };
-		LayoutContext layoutCtx{ allocator, m_SafeArea };
-
-        MeasureLayoutNode( *rootNode, a_AvailableSize, layoutCtx );
-        const bool needsSecondPass = ArrangeLayoutNode( *rootNode, rootRect, layoutCtx );
-        if ( needsSecondPass )
+        const auto NeedsLayout = [&]
         {
-            MeasureLayoutNode( *rootNode, a_AvailableSize, layoutCtx );
-            ArrangeLayoutNode( *rootNode, rootRect, layoutCtx );
+            return IsLayoutPending() || !( a_AvailableSize == m_LaidOutSize ) || !( m_SafeArea == m_LaidOutSafeArea ) || !( RootWidget == m_LaidOutRoot );
+        };
+
+        // Arrange can ask for another pass (wrapped text changing height), and a geometry handler can change layout,
+        // which is then laid out again here. Bounded, as content that never settles would loop forever.
+        constexpr u32 c_MaxLayoutPasses = 4;
+        u32           passes            = 0;
+        while ( passes < c_MaxLayoutPasses && NeedsLayout() )
+        {
+            ++m_LayoutCount;
+            if ( Size( m_LayoutScratch ) != m_LayoutScratchSize )
+                Resize( m_LayoutScratch, m_LayoutScratchSize );
+
+            BumpAllocator         allocator{ Data( m_LayoutScratch ), m_LayoutScratchSize };
+            const Rect<Unit>      rootRect{ Vec2<Unit>{ 0_u, 0_u }, a_AvailableSize };
+            Array<GeometryChange> changes;
+            LayoutContext         layoutCtx{ allocator, m_SafeArea, &changes };
+
+            bool settled = false;
+            for ( ; passes < c_MaxLayoutPasses && !settled; ++passes )
+            {
+                MeasureLayoutNode( *rootNode, a_AvailableSize, layoutCtx );
+                settled = !ArrangeLayoutNode( *rootNode, rootRect, layoutCtx );
+            }
+
+            ComposeLayout( *rootNode );
+
+            // Layout that ran out of passes carries on at the next call.
+            m_LaidOutSize     = settled ? a_AvailableSize : Vec2<Unit>{ Unit{ -1.f }, Unit{ -1.f } };
+            m_LaidOutSafeArea = m_SafeArea;
+            m_LaidOutRoot     = RootWidget;
+
+            // Layout is done, so the handlers may change the scene.
+            for ( size i = 0; i < Size( changes ); ++i )
+            {
+                // A node arranged in several passes is reported once, against what it was before the first.
+                LayoutNode& node = *changes[i].Node;
+                if ( std::any_of( changes.begin(), changes.begin() + i, [&]( const GeometryChange& a_Change ) { return a_Change.Node == &node; } ) )
+                    continue;
+
+                const GeometryEvent event{ .Size                = node.Layout.ParentRect.Size,
+                                           .PreviousSize        = changes[i].PreviousSize,
+                                           .ContentSize         = node.Layout.ContentSize,
+                                           .PreviousContentSize = changes[i].PreviousContentSize };
+                if ( event.Size == event.PreviousSize && event.ContentSize == event.PreviousContentSize )
+                    continue;
+
+                for ( LayoutNode* owner = &node; owner; owner = owner->Parent() )
+                {
+                    if ( owner->Widget )
+                    {
+                        owner->Widget->OnGeometryChanged( node, event );
+                        break;
+                    }
+                }
+            }
         }
 
-        // Note: This is hacky but currently it's necessary to do this to avoid invalid input state after a layout change.
-		// For example, if a widget is removed while the pointer is over it, we need to clear the hovered state.
-		// Or if we click and hold a button, move the pointer off it, this re-process helps clear the pressed state.
-		// Otherwise, we would have to wait until the next pointer event to fix the state.
-        // Only the mouse is replayed unconditionally. A lifted finger points at nothing (touches have no hover), and a
-        // touch or pen that Tick has forgotten must not be brought back, so those replay only while still tracked.
-        const PointerEvent& last = Input.LastPointerEvent;
-        if ( last.Type != EPointerType::Unknown )
+        if ( m_PendingBringIntoView != c_InvalidNodeID )
         {
-            const PointerGestureState* gesture = FindValue( Input.PointerStates, last.ID );
-            const bool replay = last.IsMouse() || ( gesture && ( !last.IsTouch() || gesture->IsDown ) );
-            if ( replay )
-                ProcessPointerEvent( last );
+            const NodeID target    = m_PendingBringIntoView;
+            m_PendingBringIntoView = c_InvalidNodeID;
+            BringIntoView( target );
+        }
+
+        // Layout or a content offset moved widgets under a pointer that didn't move, or one was shown or hidden.
+        if ( rootNode->Layout.IsHitTestDirty )
+        {
+            rootNode->Layout.IsHitTestDirty = false;
+            RefreshHover();
         }
     }
 
-    void Scene::SetSafeArea( const Edges& a_SafeArea )
+    void Scene::RefreshHover()
     {
-        // Measure keys its cache on the safe area reaching each node, so nothing needs marking dirty here.
-        m_SafeArea = a_SafeArea;
+        if ( !Input.Hover )
+            return;
+
+        // A pen that Tick has forgotten no longer points anywhere.
+        const PointerGestureState* gesture = FindValue( Input.PointerStates, Input.Hover->ID );
+        if ( !Input.Hover->IsMouse() && !gesture )
+            return;
+
+        // The pointer is where it was: only what is under it changed.
+        PointerEvent still = *Input.Hover;
+        still.Delta        = { 0_u, 0_u };
+        still.ScrollDelta  = { 0_u, 0_u };
+        SetHovered( HoverTarget( gesture, PointerTarget( gesture, still.Position ), still.Position ), still );
+    }
+
+    void Scene::ClearHover()
+    {
+        if ( !Input.Hover )
+            return;
+
+        const PointerEvent last = *Input.Hover;
+        Input.Hover.reset();
+        SetHovered( c_InvalidNodeID, last );
+    }
+
+    bool Scene::DispatchWheel( const PointerEvent& a_Event, NodeID a_Captured )
+    {
+        WheelLatch&          latch = Input.Wheel;
+        const GestureConfig& cfg   = Input.Config;
+
+        // Moving the pointer or pausing ends the gesture, and a widget holding the pointer takes its wheel.
+        const bool latched = a_Captured == c_InvalidNodeID && latch.Widget != c_InvalidNodeID && latch.Pointer == a_Event.ID &&
+                             m_ClockSeconds - latch.LastTime <= cfg.WheelLatchSeconds &&
+                             Math::DistanceSq( a_Event.Position, latch.Position ) <= Math::Sq( cfg.WheelLatchDistance );
+        if ( latched )
+        {
+            if ( IWidget* widget = GetWidget( latch.Widget ) )
+            {
+                latch.LastTime = m_ClockSeconds;
+                ApplyReply( widget->OnPointerScroll( a_Event ), a_Event.ID );
+                return true; // Still the latched widget's at its end: the rest of the gesture doesn't pass to the widgets around it.
+            }
+        }
+        latch = {};
+
+        // Bubbles up, so a scroll container scrolls with the pointer over any of its content.
+        // From the topmost node, not just interactable ones, so the wheel works over a scroll container's empty space too.
+        const NodeID from = a_Captured != c_InvalidNodeID ? a_Captured : HitTest( a_Event.Position, false );
+        for ( LayoutNode* node = m_Layouts.Get( from ); node; node = node->Parent() )
+        {
+            if ( !node->Widget )
+                continue;
+
+            const Reply reply = node->Widget->OnPointerScroll( a_Event );
+            ApplyReply( reply, a_Event.ID );
+            if ( reply.IsHandled() )
+            {
+                latch = WheelLatch{ .Widget = node->ID, .Pointer = a_Event.ID, .Position = a_Event.Position, .LastTime = m_ClockSeconds };
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void Scene::SetHovered( NodeID a_Target, const PointerEvent& a_Event )
+    {
+        if ( a_Target == Input.HoveredWidget )
+            return;
+
+        if ( IWidget* prev = GetWidget( Input.HoveredWidget ) )
+            ApplyReply( prev->OnPointerExit( a_Event ), a_Event.ID );
+
+        Input.HoveredWidget = a_Target;
+
+        if ( IWidget* next = GetWidget( a_Target ) )
+            ApplyReply( next->OnPointerEnter( a_Event ), a_Event.ID );
     }
 
     void Scene::Tick( f64 a_DeltaSeconds )
@@ -122,8 +250,15 @@ namespace RatUI
     {
         CleanupDestroyedWidgets();
 
-        if ( LayoutNode* rootNode = m_Layouts.Get( RootWidget ) )
-            IWidget::PaintNode( *rootNode, PaintEvent{ a_DrawList, a_DeltaSeconds } );
+        LayoutNode* rootNode = m_Layouts.Get( RootWidget );
+        if ( !rootNode )
+            return;
+
+        const PaintEvent event{ a_DrawList, a_DeltaSeconds };
+        if ( rootNode->Widget )
+            rootNode->Widget->Paint( event );
+        else if ( Visibility::IsRendered( rootNode->Layout.Visibility ) )
+            IWidget::PaintChildren( event, *rootNode );
     }
 
     // ========================================================================
@@ -154,11 +289,17 @@ namespace RatUI
         if ( a_Reply.ShouldReleasePointer() )
             ReleasePointerCapture( a_Pointer );
 
+        if ( a_Reply.ShouldDisengage() )
+            Disengage();
+
         if ( a_Reply.ShouldSetFocus() )
             SetFocus( a_Reply.GetFocusTarget() );
 
         if ( a_Reply.ShouldClearFocus() )
             SetFocus( c_InvalidNodeID );
+
+        if ( a_Reply.ShouldEngage() )
+            Engage( a_Reply.GetEngageTarget() );
     }
 
     // ========================================================================
@@ -178,14 +319,62 @@ namespace RatUI
                 return;
         }
 
+        // An engaged widget stays engaged only while it has focus.
+        Disengage();
+
         if ( IWidget* prev = GetWidget( Input.FocusedWidget ) )
             prev->OnFocusLost( FocusEvent{} );
 
         Input.FocusedWidget = a_Node;
         SyncNavScopes( a_Node );
 
+        // A pointer focuses what it can already see; keyboard or gamepad focus may land out of view.
+        if ( Input.InputMode == EInputMode::Navigation )
+            BringIntoView( a_Node );
+
         if ( IWidget* next = GetWidget( a_Node ) )
             next->OnFocusReceived( FocusEvent{} );
+    }
+
+    void Scene::Engage( NodeID a_Node )
+    {
+        IWidget* widget = GetWidget( a_Node );
+        if ( !widget || !widget->CanEngage() )
+            return;
+
+        SetFocus( a_Node );
+        if ( Input.FocusedWidget != a_Node || Input.EngagedWidget == a_Node )
+            return;
+
+        Input.EngagedWidget = a_Node;
+        widget->OnEngage();
+    }
+
+    void Scene::Disengage()
+    {
+        const NodeID engaged = Input.EngagedWidget;
+        if ( engaged == c_InvalidNodeID )
+            return;
+
+        Input.EngagedWidget = c_InvalidNodeID;
+        if ( IWidget* widget = GetWidget( engaged ) )
+            widget->OnDisengage();
+    }
+
+    void Scene::OnFocusTraitsChanged( IWidget& a_Widget )
+    {
+        const NodeID id = a_Widget.GetLayoutID();
+
+        // Navigation was inside it as a group, so it leaves. A scope pushed by hand stays.
+        if ( !a_Widget.IsNavGroup() )
+        {
+            Array<NavScope>& stack = Input.NavStack;
+            stack.erase( std::remove_if( stack.begin(), stack.end(), [id]( const NavScope& a_Scope ) { return a_Scope.Scope == id && !a_Scope.Modal; } ),
+                         stack.end() );
+        }
+
+        if ( !a_Widget.IsFocusable() && Input.FocusedWidget == id )
+            ClearFocus();
     }
 
     void Scene::SyncNavScopes( NodeID a_Focused )
@@ -205,21 +394,23 @@ namespace RatUI
             return std::any_of( path.begin(), path.end(), [&]( const LayoutNode* a_Node ) { return a_Node->ID == a_ID; } );
         };
 
-        // Keep the scopes that still contain the widget (this also keeps scopes pushed by hand,
-        // e.g. a dialog with a custom restore target); drop the rest.
-        size keep = 0;
+        // A scope pushed by hand (e.g. a dialog) stays until it is popped, wherever focus goes, and so does what is
+        // under it. Above the innermost one, keep the scopes that still contain the widget; drop the rest.
+        size keep = Size( Input.NavStack );
+        while ( keep > 0 && !Input.NavStack[keep - 1].Modal )
+            --keep;
         while ( keep < Size( Input.NavStack ) && IsOnPath( Input.NavStack[keep].Scope ) )
             ++keep;
         while ( Size( Input.NavStack ) > keep )
             PopBack( Input.NavStack );
 
-        // Push the focus scopes between the innermost kept scope (or the root) and the widget.
+        // Push the groups between the innermost kept scope (or the root) and the widget.
         // Each one restores to itself on pop, as if it had been entered with Activate.
         const NodeID innermost = keep > 0 ? Input.NavStack[keep - 1].Scope : RootWidget;
         bool         below     = false;
         for ( LayoutNode* scope : path )
         {
-            if ( below && scope->Style.IsFocusScope )
+            if ( below && scope->Widget && scope->Widget->IsNavGroup() )
                 Input.PushNavScope( scope->ID, scope->ID );
             if ( scope->ID == innermost )
                 below = true;
@@ -234,56 +425,64 @@ namespace RatUI
         // Start in the current nav scope (e.g. the group of a text field that Escape just left),
         // and only fall back to the whole scene if that scope has nothing focusable.
         Array<const LayoutNode*> candidates;
-        if ( LayoutNode* scope = m_Layouts.Get( GetCurrentNavScope() ) )
-            CollectFocusableCandidates( *scope, candidates );
+        if ( const LayoutNode* scope = m_Layouts.Get( GetCurrentNavScope() ) )
+            CollectNavTargets( *scope, candidates );
 
         if ( Empty( candidates ) )
         {
-            if ( LayoutNode* root = m_Layouts.Get( RootWidget ) )
-                CollectFocusableCandidates( *root, candidates );
+            if ( const LayoutNode* root = m_Layouts.Get( RootWidget ) )
+                CollectNavTargets( *root, candidates );
         }
 
         if ( !Empty( candidates ) )
-            SetFocus( candidates[0]->Widget->GetLayoutID() );
+            SetFocus( candidates[0]->ID );
     }
 
     // ========================================================================
     // Hit Testing
     // ========================================================================
 
-    NodeID Scene::HitTest( NodeID a_ID, Vec2<Unit> a_LogicalPos )
+    NodeID Scene::HitTest( Vec2<Unit> a_Position, bool a_InteractableOnly ) const
     {
-        LayoutNode* node = m_Layouts.Get( a_ID );
-        if ( !node )
-            return c_InvalidNodeID;
+        const LayoutNode* root = m_Layouts.Get( RootWidget );
+        return root ? HitTestNode( *root, a_Position, a_InteractableOnly ) : c_InvalidNodeID;
+    }
 
-        if ( !Visibility::IsHitTestable( node->Layout.Visibility ) &&
-             !Visibility::AreChildrenHitTestable( node->Layout.Visibility ) )
-            return c_InvalidNodeID;
-
-        if ( !node->Layout.FinalRect.Contains( a_LogicalPos ) )
-            return c_InvalidNodeID;
-
-        // Children may be visually offset from their FinalRect translate 
-        // the test position into their local space before recursing.
-        const Vec2<Unit> childPos = a_LogicalPos + node->ChildHitTestOffset;
-
-        NodeID childHit = c_InvalidNodeID;
-        node->ForEachChildReverse( [&]( LayoutNode& child )
+    bool Scene::IsOver( NodeID a_Node, Vec2<Unit> a_Position ) const
+    {
+        for ( const LayoutNode* node = m_Layouts.Get( HitTest( a_Position ) ); node; node = node->Parent() )
         {
-            if ( childHit != c_InvalidNodeID )
-                return; // TODO: Need a way to break out of ForEachChildReverse early, or use a different iteration method.
+            if ( node->ID == a_Node )
+                return true;
+        }
+        return false;
+    }
 
-            childHit = HitTest( child.ID, childPos );
-        } );
+    NodeID Scene::PointerTarget( const PointerGestureState* a_Gesture, Vec2<Unit> a_Position ) const
+    {
+        if ( a_Gesture && a_Gesture->CapturedWidget != c_InvalidNodeID )
+            return a_Gesture->CapturedWidget;
+        if ( a_Gesture && IsGamePress( *a_Gesture ) )
+            return c_InvalidNodeID;
+        return HitTest( a_Position );
+    }
 
-        if ( childHit != c_InvalidNodeID )
-            return childHit;
+    NodeID Scene::HoverTarget( const PointerGestureState* a_Gesture, NodeID a_Target, Vec2<Unit> a_Position ) const
+    {
+        const bool captured = a_Gesture && a_Gesture->CapturedWidget != c_InvalidNodeID;
+        return captured && !IsOver( a_Target, a_Position ) ? c_InvalidNodeID : a_Target;
+    }
 
-        if ( node->Widget && node->Widget->IsInteractable() )
-            return a_ID;
+    bool Scene::IsPointerOverUI() const
+    {
+        for ( const auto& [pointerID, gesture] : Input.PointerStates )
+        {
+            if ( gesture.CapturedWidget != c_InvalidNodeID )
+                return true;
+        }
 
-        return c_InvalidNodeID;
+        // Nothing is hovered while the pointer that hovers is down in the game.
+        return Input.HoveredWidget != c_InvalidNodeID;
     }
 
     // ========================================================================
@@ -304,17 +503,54 @@ namespace RatUI
 		return false;
     }
 
-    bool Scene::WantsTextInput() const
+    Optional<Rect<Unit>> Scene::GetTextInputRect() const
     {
         const IWidget* focused = GetWidget( Input.FocusedWidget );
-        return focused && focused->WantsTextInput();
+        return focused ? focused->GetTextInputRect() : NullOpt;
     }
 
     void Scene::ReleaseAllKeys()
     {
+        // Taken first: a handler may change what is held.
+        const HashMap<EButtonID, KeyPressTarget> presses = std::move( Input.KeyPresses );
         Input.KeyPresses.clear();
         Input.ModifierState     = EModifier::None;
         Input.DropNextTextInput = false;
+
+        for ( const auto& [button, press] : presses )
+        {
+            if ( IWidget* target = GetWidget( press.Widget ) )
+                target->OnPressCancelled( {} );
+        }
+    }
+
+    void Scene::CancelPointer( PointerID a_Pointer )
+    {
+        PointerGestureState* gesture = FindValue( Input.PointerStates, a_Pointer );
+        if ( !gesture || ( !gesture->IsDown && gesture->CapturedWidget == c_InvalidNodeID ) )
+            return;
+
+        const NodeID held = gesture->CapturedWidget != c_InvalidNodeID ? gesture->CapturedWidget : gesture->PressedWidget;
+        gesture->IsDown         = false;
+        gesture->IsDragging     = false;
+        gesture->PressCount     = 0;
+        gesture->CapturedWidget = c_InvalidNodeID;
+        gesture->PressedWidget  = c_InvalidNodeID;
+
+        if ( IWidget* widget = GetWidget( held ) )
+            widget->OnPressCancelled( { .Pointer = a_Pointer } );
+
+        // The capture is gone, so hover goes back to what is under the pointer.
+        RefreshHover();
+    }
+
+    void Scene::ReleaseAllPointers()
+    {
+        Array<PointerID> pointers;
+        for ( const auto& [pointerID, gesture] : Input.PointerStates )
+            PushBack( pointers, pointerID );
+        for ( const PointerID pointerID : pointers )
+            CancelPointer( pointerID );
     }
 
     bool Scene::ProcessTextInputEvent( const TextInputEvent& a_Event )
@@ -338,26 +574,19 @@ namespace RatUI
 
     bool Scene::ProcessPointerEvent( const PointerEvent& a_Event )
     {
-        Input.LastPointerEvent = a_Event;
-
         if ( a_Event.IsMouse() || Math::LengthSq( a_Event.Delta ) > 0_u )
             Input.InputMode = EInputMode::Pointer;
 
         PointerGestureState& gesture = Input.PointerStates[a_Event.ID];
         const NodeID captured = gesture.CapturedWidget;
-        const NodeID target = captured != c_InvalidNodeID ? captured : HitTest( RootWidget, a_Event.Position );
+        const NodeID target   = PointerTarget( &gesture, a_Event.Position );
 
         // --- Hover transitions ---
         // Touches have no hover: a finger only points while it presses, and hover is shared by every pointer.
-        if ( a_Event.Type != EPointerType::Touch && captured == c_InvalidNodeID && target != Input.HoveredWidget )
+        if ( a_Event.Type != EPointerType::Touch )
         {
-            if ( IWidget* prev = GetWidget( Input.HoveredWidget ) )
-                ApplyReply( prev->OnPointerExit( a_Event ), a_Event.ID );
-
-            Input.HoveredWidget = target;
-
-            if ( IWidget* next = GetWidget( target ) )
-                ApplyReply( next->OnPointerEnter( a_Event ), a_Event.ID );
+            Input.Hover = a_Event;
+            SetHovered( HoverTarget( &gesture, target, a_Event.Position ), a_Event );
         }
 
         bool handled = false;
@@ -400,17 +629,19 @@ namespace RatUI
         }
 
         // --- Raw pointer dispatch (move / scroll) ---
+        const bool scrolls = a_Event.ScrollDelta[0] != 0_u || a_Event.ScrollDelta[1] != 0_u;
+        if ( scrolls && ( captured != c_InvalidNodeID || !IsGamePress( gesture ) ) )
+            handled = DispatchWheel( a_Event, captured );
+
         if ( IWidget* widget = GetWidget( target ) )
         {
-            if ( a_Event.ScrollDelta[0] != 0_u || a_Event.ScrollDelta[1] != 0_u )
-                ApplyReply( widget->OnPointerScroll( a_Event ), a_Event.ID );
-
             Reply moveReply = widget->OnPointerMove( a_Event );
             ApplyReply( moveReply, a_Event.ID );
             handled = handled || moveReply.IsHandled();
         }
 
-        return handled;
+        // A pointer is the UI's by who it went to, whether or not the widget does anything with it.
+        return handled || target != c_InvalidNodeID;
     }
 
     bool Scene::ProcessButtonEvent( const ButtonEvent& a_Event )
@@ -425,7 +656,7 @@ namespace RatUI
         if ( isKey )
             Input.DropNextTextInput = false;
 
-        // --- Key release: goes to the widget that took the press, even if focus moved since ---
+        // --- Key release: goes to whatever took the press, even if focus moved since ---
         if ( isKey && a_Event.Released )
         {
             if ( auto it = Input.KeyPresses.find( a_Event.Button ); it != Input.KeyPresses.end() )
@@ -434,120 +665,190 @@ namespace RatUI
                 Input.KeyPresses.erase( it );
 
                 if ( IWidget* target = GetWidget( press.Widget ) )
-                    ApplyReply( target->OnButtonReleased( press.Activate ? MakeActivateEvent( false ) : a_Event ) );
+                    ApplyReply( press.Activate ? target->OnActivate( { .Pressed = false } ) : target->OnButtonReleased( a_Event ) );
                 return true;
             }
         }
 
-        // The focused widget, if it was already offered this key below; it isn't offered it twice.
-        NodeID alreadyOffered = c_InvalidNodeID;
-
-        // --- Text input gets key presses before navigation ---
-        if ( isKey && a_Event.Pressed && WantsTextInput() )
+        if ( isKey && a_Event.Pressed )
         {
-            const NodeID focusedID = Input.FocusedWidget;
-            if ( IWidget* focused = GetWidget( focusedID ) )
+            // --- The focused widget, then its ancestors ---
+            for ( LayoutNode* node = m_Layouts.Get( Input.FocusedWidget ); node; node = node->Parent() )
             {
-                const Reply reply = focused->OnButtonPressed( a_Event );
+                if ( !node->Widget )
+                    continue;
+
+                const NodeID handler = node->ID;
+                const Reply  reply   = node->Widget->OnButtonPressed( a_Event );
                 ApplyReply( reply );
                 if ( reply.IsHandled() )
                 {
-                    Input.KeyPresses[a_Event.Button] = { .Widget = focusedID };
+                    Input.KeyPresses[a_Event.Button] = { .Widget = handler };
                     return true;
                 }
-                alreadyOffered = focusedID;
             }
-        }
 
-		// --- Navigation mapping ---
-        const ENavAction navAction = Input.NavMap.Resolve( a_Event.Button );
-        if ( navAction != ENavAction::None )
-        {
+            // --- Then navigation ---
+            ENavAction navAction = Input.NavMap.Resolve( a_Event.Button );
+            if ( navAction == ENavAction::Next && HasAnyFlag( a_Event.Modifiers, EModifier::Shift ) )
+                navAction = ENavAction::Previous;
+
+            if ( navAction == ENavAction::None )
+                return false;
+
             Input.InputMode = EInputMode::Navigation;
-            if ( a_Event.Pressed )
-            {
-                Input.DropNextTextInput = isKey;
-                EnsureInitialFocus(); // Not on release, or releasing Escape would re-focus what it just unfocused.
-            }
+            if ( !ProcessNavPress( navAction, a_Event ) )
+                return false;
 
-            if ( navAction == ENavAction::ActivatePressed || navAction == ENavAction::ActivateReleased )
-            {
-                // Releases of presses a widget took were routed above. An unmatched release had no
-                // press target, so it is dropped rather than activating whatever is focused now.
-                // Holding the key down activates once, not once per key repeat.
-                if ( a_Event.Pressed && !a_Event.Repeat )
-                {
-                    const NodeID      target     = Input.FocusedWidget;
-                    const LayoutNode* targetNode = m_Layouts.Get( target );
-                    const bool        getsPress  = targetNode && targetNode->Widget && !targetNode->Style.IsFocusScope;
-
-                    Navigate( ENavAction::ActivatePressed );
-                    if ( getsPress )
-                        Input.KeyPresses[a_Event.Button] = { .Widget = target, .Activate = true };
-                }
-            }
-            else if ( a_Event.Pressed )
-            {
-                Navigate( navAction );
-            }
-
-            return true; // Nav mappings always consume the button; it doesn't reach the focused widget raw.
+            // Navigation used the press, so it takes the text and the release that follow.
+            Input.DropNextTextInput = true;
+            if ( Input.KeyPresses.find( a_Event.Button ) == Input.KeyPresses.end() )
+                Input.KeyPresses[a_Event.Button] = {};
+            return true;
         }
 
-        // --- Gesture from button press/release ---
+        // --- Pointer buttons go to the captured widget or the one under the pointer; other releases to the focused widget ---
         NodeID targetWidget = Input.FocusedWidget;
 
-        const PointerID pointer = a_Event.Pointer.value_or( c_MousePointerID );
-        if ( a_Event.PointerPosition && IsPointerButton( a_Event.Button ) )
+        const PointerID pointer   = a_Event.Pointer.value_or( c_MousePointerID );
+        const bool      isPointer = a_Event.PointerPosition && IsPointerButton( a_Event.Button );
+        if ( isPointer )
         {
-            const NodeID capturedBefore = GetCapturedWidget( pointer );
+            Input.InputMode = EInputMode::Pointer;
 
-            UpdateGestureState( a_Event );
+            // A press of the button that is already down means its release was lost: the old press is cancelled.
+            const PointerGestureState* stale = FindValue( Input.PointerStates, pointer );
+            if ( a_Event.Pressed && !a_Event.Repeat && stale && stale->IsDown && stale->Button == a_Event.Button )
+                CancelPointer( pointer );
 
-            // Pointer buttons should dispatch to the captured widget (if any) so release stays with the press target.
-            targetWidget = capturedBefore != c_InvalidNodeID
-                ? capturedBefore
-                : HitTest( RootWidget, *a_Event.PointerPosition );
+            // Found before the gesture changes, so the release that ends a press still goes with it.
+            targetWidget = PointerTarget( FindValue( Input.PointerStates, pointer ), *a_Event.PointerPosition );
+            UpdateGestureState( a_Event, targetWidget );
         }
 
-		// --- Dispatch to focused widget ---
-        if ( isKey && targetWidget == alreadyOffered && alreadyOffered != c_InvalidNodeID )
-            return false;
-
-        if ( IWidget* focused = GetWidget( targetWidget ) )
+        Reply reply = Reply::Unhandled();
+        if ( IWidget* widget = GetWidget( targetWidget ) )
         {
-            Reply reply = Reply::Unhandled();
             if ( a_Event.Pressed )
-                reply = focused->OnButtonPressed( a_Event );
-			else if ( a_Event.Released )
-				reply = focused->OnButtonReleased( a_Event );
+                reply = widget->OnButtonPressed( a_Event );
+            else if ( a_Event.Released )
+                reply = widget->OnButtonReleased( a_Event );
 
             ApplyReply( reply, pointer );
-            if ( isKey && a_Event.Pressed && reply.IsHandled() )
-                Input.KeyPresses[a_Event.Button] = { .Widget = targetWidget };
-            return reply.IsHandled();
         }
 
-        return false;
+        if ( !isPointer )
+            return reply.IsHandled();
+
+        // The press or release may have changed who holds the pointer, and so what it hovers. Touches don't hover.
+        if ( Input.Hover && Input.Hover->ID == pointer )
+        {
+            Input.Hover->Position = *a_Event.PointerPosition;
+            RefreshHover();
+        }
+
+        // A pointer button is the UI's by who it went to, whether or not the widget does anything with it.
+        return targetWidget != c_InvalidNodeID;
     }
 
-    void Scene::UpdateGestureState( const ButtonEvent& a_Event )
+    bool Scene::ProcessNavPress( ENavAction a_Action, const ButtonEvent& a_Event )
     {
-        if ( !a_Event.Pointer )
+        // An engaged widget left this key unhandled: it is offered the action, then arrows stay with it and the rest disengage it.
+        if ( IsEngaged( Input.FocusedWidget ) )
+        {
+            if ( IWidget* engaged = GetWidget( Input.FocusedWidget ) )
+            {
+                const Reply reply = engaged->OnNavigate( NavEvent{ .Action = a_Action } );
+                ApplyReply( reply );
+                if ( reply.IsHandled() )
+                    return true;
+            }
+
+            if ( a_Action == ENavAction::Next || a_Action == ENavAction::Previous )
+            {
+                Disengage();
+                Navigate( a_Action );
+            }
+            else if ( !IsMove( a_Action ) && !a_Event.Repeat ) // Holding Activate down engages once; its repeats must not disengage again.
+            {
+                Disengage();
+            }
+            return true;
+        }
+
+        switch ( a_Action )
+        {
+            case ENavAction::Cancel:
+                return Navigate( a_Action );
+
+            case ENavAction::ActivatePressed:
+            {
+                // Holding the key down activates once, not once per key repeat.
+                if ( a_Event.Repeat )
+                    return Input.FocusedWidget != c_InvalidNodeID;
+
+                // With nothing focused, the first press only picks the starting widget, as a move does.
+                if ( Input.FocusedWidget == c_InvalidNodeID )
+                {
+                    EnsureInitialFocus();
+                    return Input.FocusedWidget != c_InvalidNodeID;
+                }
+
+                const NodeID   target       = Input.FocusedWidget;
+                const IWidget* widget       = GetWidget( target );
+                const bool     sendsRelease = widget && !widget->IsNavGroup() && !widget->CanEngage();
+
+                if ( !Navigate( a_Action ) )
+                    return false;
+
+                if ( sendsRelease )
+                    Input.KeyPresses[a_Event.Button] = { .Widget = target, .Activate = true };
+                return true;
+            }
+
+            case ENavAction::MoveLeft:
+            case ENavAction::MoveRight:
+            case ENavAction::MoveUp:
+            case ENavAction::MoveDown:
+            case ENavAction::Next:
+            case ENavAction::Previous:
+            {
+                // With nothing focused, the first move or Tab only picks the starting widget. Shift+Tab still
+                // moves on from it, wrapping to the last widget.
+                const bool hadFocus = Input.FocusedWidget != c_InvalidNodeID;
+                EnsureInitialFocus();
+                const bool pickedStart = !hadFocus && Input.FocusedWidget != c_InvalidNodeID;
+                if ( pickedStart && a_Action != ENavAction::Previous )
+                    return true;
+
+                return Navigate( a_Action ) || pickedStart;
+            }
+
+            default:
+                return false;
+        }
+    }
+
+    void Scene::UpdateGestureState( const ButtonEvent& a_Event, NodeID a_Hit )
+    {
+        if ( !a_Event.PointerPosition )
             return;
 
-        PointerGestureState& gesture = Input.PointerStates[*a_Event.Pointer];
+        // An event without a pointer ID is the mouse's, as in ProcessButtonEvent.
+        const PointerID pointer = a_Event.Pointer.value_or( c_MousePointerID );
+        PointerGestureState& gesture = Input.PointerStates[pointer];
         const GestureConfig& cfg = Input.Config;
         const f64 now = m_ClockSeconds;
 
         if ( a_Event.Pressed )
         {
-            const NodeID target = HitTest( RootWidget, *a_Event.PointerPosition );
+            // Another button of a pointer that is already down doesn't start a new gesture or take its capture.
+            if ( gesture.IsDown && a_Event.Button != gesture.Button )
+                return;
 
+            gesture.Button = a_Event.Button;
             const bool withinWindow = ( now - gesture.LastPressTime ) <= cfg.MultiPressWindowSeconds;
-            const bool withinRange = a_Event.PointerPosition
-                ? Math::DistanceSq( *a_Event.PointerPosition, gesture.DownPosition ) <= Math::Sq( cfg.MultiPressDistance )
-                : false;
+            const bool withinRange  = Math::DistanceSq( *a_Event.PointerPosition, gesture.DownPosition ) <= Math::Sq( cfg.MultiPressDistance );
 
             if ( !withinWindow || !withinRange )
                 gesture.PressCount = 0;
@@ -555,21 +856,29 @@ namespace RatUI
             gesture.PressCount += 1;
             gesture.DownPosition = *a_Event.PointerPosition;
             gesture.LastDownTime = now;
-            gesture.PressedWidget = target;
+            gesture.PressedWidget = a_Hit;
             gesture.IsDragging = false;
             gesture.LongPressFired = false;
             gesture.IsDown = true;
 
-            // Capture pointer on press so drag/release stay on this widget
-            if ( IWidget* widget = GetWidget( target ) )
+            if ( IWidget* widget = GetWidget( a_Hit ) )
             {
-                // Widget can override capture in OnButtonPressed, but we default-capture
-                // for interactable widgets to ensure drag/click completion
-                if ( widget->IsInteractable() )
-                    gesture.CapturedWidget = target;
+                // Captured on press, so the drag and the release stay with this widget.
+                // The widget can change that in OnButtonPressed.
+                gesture.CapturedWidget = a_Hit;
+
+                // Focus moves on press, before the widget sees it, so a drag or a long press focuses too.
+                // Pressing something that can't take focus leaves focus where it is.
+                if ( widget->IsFocusable() )
+                    SetFocus( a_Hit );
+            }
+            else
+            {
+                // Pressing empty space (or a non-interactable panel) unfocuses, e.g. leaves a text field.
+                SetFocus( c_InvalidNodeID );
             }
         }
-        else if ( a_Event.Released && gesture.IsDown )
+        else if ( a_Event.Released && gesture.IsDown && a_Event.Button == gesture.Button )
         {
             // --- Drag end ---
             if ( gesture.IsDragging )
@@ -582,7 +891,7 @@ namespace RatUI
                         .Delta = *a_Event.PointerPosition - gesture.DownPosition,  // Total delta
                         .Modifiers = a_Event.Modifiers
                     };
-                    ApplyReply( widget->OnDragEnd( drag ), *a_Event.Pointer );
+                    ApplyReply( widget->OnDragEnd( drag ), pointer );
                 }
             }
             // --- Click (single, double, triple, etc.) ---
@@ -596,10 +905,7 @@ namespace RatUI
                         .Modifiers = a_Event.Modifiers
                     };
                     Reply reply = widget->OnPress( press );
-                    ApplyReply( reply, *a_Event.Pointer );
-
-                    if ( widget->IsFocusable() )
-                        SetFocus( gesture.PressedWidget );
+                    ApplyReply( reply, pointer );
                 }
             }
 
@@ -618,143 +924,274 @@ namespace RatUI
 
     void Scene::PushNavScope( NodeID a_ScopeID )
     {
-        Input.PushNavScope( a_ScopeID, Input.FocusedWidget );
+        Input.PushNavScope( a_ScopeID, Input.FocusedWidget, true );
     }
 
-    void Scene::PopNavScope()
+    bool Scene::PopNavScope()
     {
-        if ( Optional<NavScope> popped = Input.PopNavScope() )
-        {
-            if ( popped->Restored != c_InvalidNodeID )
-                SetFocus( popped->Restored );
-        }
+        const Optional<NavScope> popped = Input.PopNavScope();
+        if ( !popped )
+            return false;
+
+        if ( popped->Restored != c_InvalidNodeID )
+            SetFocus( popped->Restored );
+        return true;
     }
 
-    NavReply Scene::QueryBoundaryReply( ENavAction a_Action, NodeID a_Focused )
+    NavReply Scene::QueryBoundaryReply( ENavAction a_Action )
     {
-        LayoutNode* node = m_Layouts.Get( a_Focused );
-        while ( node )
-        {
-            if ( node->Widget && node->Widget->IsNavigationBoundary() )
-                return node->Widget->OnNavigationBoundary( NavEvent{ .Action = a_Action } );
-
-            node = node->Parent();
-        }
+        // The scope navigation is in decides: an entered group, or a widget pushed with PushNavScope (e.g. a modal).
+        if ( IWidget* scope = GetWidget( GetCurrentNavScope() ) )
+            return scope->OnNavigationBoundary( NavEvent{ .Action = a_Action } );
         return NavReply::Escape();
     }
 
-    void Scene::CollectFocusableCandidates( LayoutNode& a_Scope, Array<const LayoutNode*>& a_Out )
+    void Scene::CollectNavTargets( const LayoutNode& a_Scope, Array<const LayoutNode*>& a_Out, bool a_IntoGroups, NodeID a_Keep ) const
     {
-        a_Scope.ForEachChild( [&]( LayoutNode& child )
+        a_Scope.ForEachChild( [&]( const LayoutNode& child )
         {
-            if ( child.Widget && child.Widget->IsFocusable() )
+            if ( !Visibility::IsRendered( child.Layout.Visibility ) )
+                return;
+
+            const bool stop  = child.Widget && child.Widget->IsNavStop();
+            const bool group = child.Widget && child.Widget->IsNavGroup();
+
+            if ( stop && ( !group || !a_IntoGroups || child.ID == a_Keep ) )
                 PushBack( a_Out, &child );
 
-            // Don't descend into a nested boundary's subtree -- that's a separate scope,
-            // only entered by explicitly pushing it.
-            if ( !child.Widget || !child.Widget->IsNavigationBoundary() )
-                CollectFocusableCandidates( child, a_Out );
+            if ( !group || a_IntoGroups )
+                CollectNavTargets( child, a_Out, a_IntoGroups, a_Keep );
         } );
     }
 
-    void Scene::Navigate( ENavAction a_Action )
+    void Scene::BringIntoView( NodeID a_Node )
     {
-        const auto FocusFirstIn = [&]( NodeID a_ScopeID )
+        // Until the pending layout has run, the node may not be where (or as large as) it is going to be.
+        if ( IsLayoutPending() )
         {
-            LayoutNode* scopeNode = m_Layouts.Get( a_ScopeID );
-            if ( !scopeNode ) return;
+            m_PendingBringIntoView = a_Node;
+            return;
+        }
 
+        const LayoutNode* node = m_Layouts.Get( a_Node );
+        if ( !node )
+            return;
+
+        // Innermost first: each widget may move the node, so the next one out sees where it ended up.
+        for ( LayoutNode* ancestor = node->Parent(); ancestor; ancestor = ancestor->Parent() )
+        {
+            if ( ancestor->Widget )
+                ancestor->Widget->OnBringIntoView( *node );
+        }
+    }
+
+    void Scene::SetContentOffset( NodeID a_Node, Vec2<Unit> a_Offset )
+    {
+        if ( LayoutNode* node = m_Layouts.Get( a_Node ) )
+            RatUI::SetContentOffset( *node, a_Offset );
+    }
+
+    bool Scene::Navigate( ENavAction a_Action )
+    {
+        const auto FocusEnd = [&]( NodeID a_ScopeID, bool a_Last )
+        {
             Array<const LayoutNode*> targets;
-            CollectNavTargets( *scopeNode, targets );
-            if ( !Empty( targets ) )
-                SetFocus( targets[0]->ID );
+            if ( const LayoutNode* scopeNode = m_Layouts.Get( a_ScopeID ) )
+                CollectNavTargets( *scopeNode, targets );
+            if ( Empty( targets ) )
+                return false;
+
+            SetFocus( ( a_Last ? Back( targets ) : targets[0] )->ID );
+            return true;
         };
+
+        if ( a_Action == ENavAction::None )
+            return false;
 
         if ( a_Action == ENavAction::Cancel )
         {
-            PopNavScope();
-            return;
+            // A scope pushed by hand belongs to its widget (e.g. a dialog), which may close itself or stay open instead.
+            IWidget* owner = !Empty( Input.NavStack ) && Back( Input.NavStack ).Modal ? GetWidget( Back( Input.NavStack ).Scope ) : nullptr;
+            if ( owner )
+            {
+                const Reply reply = owner->OnNavigate( NavEvent{ .Action = a_Action } );
+                ApplyReply( reply );
+                if ( reply.IsHandled() )
+                    return true;
+            }
+            return PopNavScope();
         }
 
         if ( a_Action == ENavAction::ActivatePressed || a_Action == ENavAction::ActivateReleased )
         {
-            LayoutNode* focusedNode = m_Layouts.Get( Input.FocusedWidget );
-            if ( !focusedNode || !focusedNode->Widget )
-                return;
+            const NodeID focusedID = Input.FocusedWidget;
+            IWidget*     focused   = GetWidget( focusedID );
+            if ( !focused )
+                return false;
 
-            if ( a_Action == ENavAction::ActivatePressed && focusedNode->Style.IsFocusScope )
+            const bool pressed = a_Action == ENavAction::ActivatePressed;
+            if ( pressed && focused->IsNavGroup() )
             {
-                PushNavScope( Input.FocusedWidget );
-                FocusFirstIn( Input.FocusedWidget );
-                return;
+                Input.PushNavScope( focusedID, focusedID );
+                FocusEnd( focusedID, false );
+                return true;
             }
 
-            const ButtonEvent ev = MakeActivateEvent( a_Action == ENavAction::ActivatePressed );
+            if ( pressed && focused->CanEngage() )
+            {
+                Engage( focusedID );
+                return IsEngaged( focusedID );
+            }
 
-            // TODO: Shouldnt be making fake events like this, should add something like IWidget::OnPressed/OnHovered etc??
-            Reply reply = a_Action == ENavAction::ActivatePressed
-                ? focusedNode->Widget->OnButtonPressed( ev )
-                : focusedNode->Widget->OnButtonReleased( ev );
-
+            const Reply reply = focused->OnActivate( { .Pressed = pressed } );
             ApplyReply( reply );
-            return;
+            return reply.IsHandled();
         }
 
-        NodeID      scopeID = GetCurrentNavScope();
-        LayoutNode* scopeNode = m_Layouts.Get( scopeID );
-        LayoutNode* focusedNode = m_Layouts.Get( Input.FocusedWidget );
+        const LayoutNode* focusedNode = m_Layouts.Get( Input.FocusedWidget );
 
+        // Tab order is layout order through every group, wrapping at either end. Only a scope pushed by hand confines it.
+        if ( a_Action == ENavAction::Next || a_Action == ENavAction::Previous )
+        {
+            NodeID rootID = RootWidget;
+            for ( size i = Size( Input.NavStack ); i-- > 0; )
+            {
+                if ( Input.NavStack[i].Modal )
+                {
+                    rootID = Input.NavStack[i].Scope;
+                    break;
+                }
+            }
+
+            Array<const LayoutNode*> targets;
+            if ( const LayoutNode* rootNode = m_Layouts.Get( rootID ) )
+                CollectNavTargets( *rootNode, targets, true, Input.FocusedWidget );
+            if ( Empty( targets ) )
+                return false;
+
+            const size  count   = Size( targets );
+            const size  current = static_cast<size>( std::find( targets.begin(), targets.end(), focusedNode ) - targets.begin() );
+            const bool  forward = a_Action == ENavAction::Next;
+            size        next;
+            if ( current == count )
+                next = forward ? 0 : count - 1;
+            else
+                next = forward ? ( current + 1 ) % count : ( current + count - 1 ) % count;
+
+            SetFocus( targets[next]->ID );
+            return true;
+        }
+
+        const NodeID      scopeID   = GetCurrentNavScope();
+        const LayoutNode* scopeNode = m_Layouts.Get( scopeID );
         if ( !scopeNode )
-            return;
+            return false;
 
         if ( !focusedNode )
-        {
-            FocusFirstIn( scopeID );
-            return;
-        }
+            return FocusEnd( scopeID, false );
 
         Array<const LayoutNode*> targets;
         CollectNavTargets( *scopeNode, targets );
 
-        const LayoutNode* nextNode = FindNavigatableNode( a_Action, focusedNode, targets );
-
-        if ( nextNode )
+        if ( const LayoutNode* nextNode = FindNavigatableNode( a_Action, focusedNode, targets ) )
         {
             SetFocus( nextNode->ID );
-            return;
+            return true;
         }
 
-        // No target found within the current scope - consult boundary policy.
-        const NavReply navReply = QueryBoundaryReply( a_Action, Input.FocusedWidget );
+        // Nothing further that way in the current scope: its widget decides.
+        const NavReply navReply = QueryBoundaryReply( a_Action );
 
         switch ( navReply.GetRule() )
         {
             case NavReply::EBoundaryRule::Escape:
-                PopNavScope();
-                break;
+                // Arrows leave a group, back to the group itself. A scope pushed by hand is only left by Cancel or PopNavScope.
+                if ( Empty( Input.NavStack ) || Back( Input.NavStack ).Modal )
+                    return false;
+                return PopNavScope();
 
-            case NavReply::EBoundaryRule::Stop:
-                // Wrap: focus the first/last focusable child depending on direction.
-                FocusFirstIn( scopeID );
-                break;
+            case NavReply::EBoundaryRule::Wrap:
+                return FocusEnd( scopeID, a_Action == ENavAction::MoveLeft || a_Action == ENavAction::MoveUp );
 
             case NavReply::EBoundaryRule::Explicit:
                 SetFocus( navReply.GetExplicitTarget() );
-                break;
-
-            case NavReply::EBoundaryRule::Custom:
-            {
-                NodeID target = navReply.ResolveCustom( a_Action, Input.FocusedWidget );
-                if ( target != c_InvalidNodeID )
-                    SetFocus( target );
-                break;
-            }
+                return Input.FocusedWidget == navReply.GetExplicitTarget();
         }
+
+        return false;
     }
 
     // ========================================================================
-    // Reset
+    // Widget Lifetime
     // ========================================================================
+
+    void Scene::DestroyWidgetImmediately( LayoutNode& a_Node )
+    {
+        a_Node.DetachFromParent();
+
+        // Each child detaches itself, so take the first until none are left.
+        while ( LayoutNode* child = a_Node.FirstChild() )
+            DestroyWidgetImmediately( *child );
+
+        const NodeID id = a_Node.ID;
+
+        // Nothing may still refer to it afterwards: a later widget can reuse the NodeID.
+        if ( IWidget* widget = a_Node.Widget.get() )
+        {
+            if ( Input.EngagedWidget == id )
+            {
+                Input.EngagedWidget = c_InvalidNodeID;
+                widget->OnDisengage();
+            }
+            if ( Input.FocusedWidget == id )
+            {
+                Input.FocusedWidget = c_InvalidNodeID;
+                widget->OnFocusLost( FocusEvent{} );
+            }
+            widget->OnDestroy();
+        }
+
+        Array<NavScope>& stack = Input.NavStack;
+        stack.erase( std::remove_if( stack.begin(), stack.end(), [id]( const NavScope& a_Scope ) { return a_Scope.Scope == id; } ), stack.end() );
+        for ( NavScope& scope : stack )
+        {
+            if ( scope.Restored == id )
+                scope.Restored = c_InvalidNodeID;
+        }
+
+        for ( auto it = Input.KeyPresses.begin(); it != Input.KeyPresses.end(); )
+            it = it->second.Widget == id ? Input.KeyPresses.erase( it ) : std::next( it );
+
+        for ( auto& [pointerID, gesture] : Input.PointerStates )
+        {
+            // A widget destroyed mid-press keeps the pointer until the release, so the rest of the press doesn't go to the game.
+            if ( gesture.IsDown )
+                continue;
+
+            if ( gesture.CapturedWidget == id )
+                gesture.CapturedWidget = c_InvalidNodeID;
+            if ( gesture.PressedWidget == id )
+                gesture.PressedWidget = c_InvalidNodeID;
+        }
+        if ( Input.HoveredWidget == id )
+            Input.HoveredWidget = c_InvalidNodeID;
+        if ( Input.Wheel.Widget == id )
+            Input.Wheel = {};
+
+        m_Layouts.Deallocate( id );
+    }
+
+    void Scene::CleanupDestroyedWidgets()
+    {
+        // Destroying can queue more (e.g. from OnDestroy), so by index, until none are left.
+        for ( size i = 0; i < Size( m_ToDestroy ); ++i )
+        {
+            if ( LayoutNode* node = m_Layouts.Get( m_ToDestroy[i] ) )
+                DestroyWidgetImmediately( *node );
+        }
+
+        Clear( m_ToDestroy );
+    }
 
     void Scene::Reset()
     {
@@ -762,19 +1199,25 @@ namespace RatUI
         RootWidget = c_InvalidNodeID;
         Input.Reset();
         Clear( m_ToDestroy );
+        m_LaidOutSize = { Unit{ -1.f }, Unit{ -1.f } };
+        m_PendingBringIntoView = c_InvalidNodeID;
     }
 
     LayoutNode& Scene::CreateLayoutNode( LayoutStyle a_Style, NodeID a_ParentID )
     {
+        if ( const IWidget* parent = GetWidget( a_ParentID ) )
+            a_ParentID = parent->GetContentNodeID();
+
+        // A node made under a parent that is gone would never be drawn or destroyed.
+        LayoutNode* parentNode = m_Layouts.Get( a_ParentID );
+        RATUI_USER_ASSERT( parentNode || a_ParentID == c_InvalidNodeID, "Creating a widget or layout node under a parent that no longer exists." );
+
         NodeID nodeID = m_Layouts.Allocate( a_Style );
         LayoutNode* node = m_Layouts.Get( nodeID );
         RATUI_ASSERT( node, "Failed to allocate layout node." );
 
-        if ( a_ParentID != c_InvalidNodeID )
-        {
-            if ( LayoutNode* parentNode = m_Layouts.Get( a_ParentID ) )
-                parentNode->PushBackChild( *node );
-        }
+        if ( parentNode )
+            parentNode->PushBackChild( *node );
 
         return *node;
     }

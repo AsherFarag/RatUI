@@ -7,7 +7,7 @@
 namespace RatUI
 {
     /**
-     * @brief
+     * @brief A filled, optionally bordered and rounded box that lays out its children.
      */
     class PanelWidget : public IWidget
     {
@@ -31,15 +31,14 @@ namespace RatUI
         // IWidget Overrides
         // --------------------------------------------------------------------
 
-        bool IsInteractable()       const override { return false; }
-		bool IsFocusable()          const override { return true; }
-        bool IsNavigationBoundary() const override { return true; }
+        // A panel is only background and layout, so pointer events and navigation pass through it to the widgets inside.
+        // With SetNavGroup( true ) it is a group: navigation stops on it, Activate enters it and Cancel leaves it.
 
         void OnPaint( const PaintEvent& a_Event ) override
         {
 			Scene& scene = GetScene();
             const LayoutNode& node = GetLayout();
-            const Rect<Unit>& rect = node.Layout.FinalRect;
+            const Rect<Unit>& rect = node.Layout.SceneRect;
 
             if constexpr ( HasMixin<ThemeMixin> )
             {
